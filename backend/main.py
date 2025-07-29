@@ -4,6 +4,7 @@
 import logging
 import os
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from supabase import create_client, Client
@@ -31,7 +32,7 @@ from services.oracle_service import OracleService
 from services.compliance_service import ComplianceService
 
 # --- Configuration & Logging ---
-settings: Settings = get_settings()
+Settings = get_settings()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -71,17 +72,21 @@ app = FastAPI(
     redoc_url="/api/redoc" if os.getenv("ENVIRONMENT") == "development" else None
 )
 
-# --- CORS Middleware (Critical for Vercel) ---
+# --- Global Exception Handler ---
+@app.exception_handler(Exception)
+async def http_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception for request {request.method} {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An internal server error occurred."},
+    )
+
+# --- CORS Middleware ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://seamount.io",
-        "https://*.vercel.app",
-        "http://localhost:3000",
-        "http://localhost:5173"
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
