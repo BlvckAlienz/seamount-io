@@ -1,30 +1,36 @@
-// File Location: frontend/src/components/ProtectedRoute.tsx
+// File Location: frontend/src/components/auth/ProtectedRoute.tsx
 // Description: The definitive, multi-layered security gatekeeper for all frontend routes.
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Shield, AlertTriangle, Info } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+
+// --- CORRECTED IMPORT PATH ---
+// We now use the '@' alias for a robust, absolute path from the '/src' directory.
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactElement;
-  minKycLevel?: number; // e.g., 1 for basic access, 2 for trading, etc.
-  adminRequired?: boolean; // Set to true for admin-only routes
+  minKycLevel?: number;
+  adminRequired?: boolean;
 }
 
-const LoadingScreen = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+const LoadingScreen: React.FC = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gray-950">
+    <div className="relative w-16 h-16">
+      <div className="absolute inset-0 rounded-full border-4 border-gray-800"></div>
+      <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 animate-spin"></div>
+    </div>
   </div>
 );
 
-const AccessDeniedCard = ({ title, message, actionText, actionUrl }: { title: string, message: string, actionText: string, actionUrl: string }) => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
-    <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+const AccessDeniedCard: React.FC<{ title: string; message: string; actionText: string; actionUrl: string }> = ({ title, message, actionText, actionUrl }) => (
+  <div className="flex items-center justify-center min-h-screen bg-gray-950 p-4 text-white">
+    <div className="max-w-md w-full bg-gray-900/80 backdrop-blur-lg rounded-xl p-8 text-center shadow-2xl border border-red-800/80">
       <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-      <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
-      <p className="text-gray-600 mb-6">{message}</p>
-      <a href={actionUrl} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+      <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
+      <p className="text-gray-400 mb-6">{message}</p>
+      <a href={actionUrl} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
         {actionText}
       </a>
     </div>
@@ -40,32 +46,33 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, minKycLevel =
   }
 
   // --- Check 1: Authentication ---
-  // If the user is not authenticated and not in demo mode, redirect to login.
   if (!user && !isDemoMode) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // User is not logged in. Redirect them to the landing page to use the AuthModal.
+    // We pass the intended destination in the state so they can be redirected after login.
+    return <Navigate to="/" state={{ from: location, openAuth: true }} replace />;
   }
   
-  // If in demo mode, allow access to non-admin routes, otherwise show a message.
+  // --- Handle Demo Mode ---
   if (isDemoMode) {
     if (adminRequired) {
       return <AccessDeniedCard 
         title="Admin Access Required"
         message="This feature is not available in demo mode and requires administrator privileges."
         actionText="Exit Demo & Login"
-        actionUrl="/login"
+        actionUrl="/"
       />;
     }
     return children; // Allow access for demo users on non-admin routes
   }
 
-  // At this point, we know we have a real, authenticated user.
+  // --- Handle Real User ---
   if (!user) {
-    // This case should theoretically not be hit, but it's a safety net.
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // This is a safety net. If the user object is somehow null after the loading state,
+    // send them back to the landing page.
+    return <Navigate to="/" replace />;
   }
 
   // --- Check 2: Admin Role ---
-  // If the route requires an admin and the user is not one, deny access.
   if (adminRequired && !user.is_admin) {
     return <AccessDeniedCard 
       title="Access Denied"
@@ -76,7 +83,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, minKycLevel =
   }
 
   // --- Check 3: KYC Trust Level ---
-  // If the route requires a minimum KYC level and the user doesn't meet it, deny access.
   if (user.kyc_level < minKycLevel) {
     return <AccessDeniedCard 
       title="Verification Required"
@@ -87,7 +93,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, minKycLevel =
   }
 
   // --- All checks passed ---
-  // The user is authenticated and has the required permissions. Render the component.
   return children;
 };
 
