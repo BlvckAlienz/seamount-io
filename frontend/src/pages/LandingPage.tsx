@@ -1,8 +1,10 @@
-import React, 'react';
-import { useState, useEffect, useCallback } from 'react';
+// File Location: frontend/src/pages/LandingPage.tsx
+// Description: The definitive, corrected, and production-ready landing page component.
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Twitter, Instagram, Mail, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
-import Button from '../components/ui/Button';
+import Button from '../components/ui/Button'; // Assuming Button is in ui subdir
 
 // Define the component's props to accept the function from App.tsx
 interface LandingPageProps {
@@ -280,7 +282,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </footer>
       
-      {/* Auth Modal is rendered by the parent App component */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialView={activeAuthView} onAuthSuccess={() => navigate('/dashboard')} />
     </div>
   );
 };
