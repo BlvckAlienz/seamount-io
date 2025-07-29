@@ -1,0 +1,56 @@
+SEAMOUNT.IO - PRODUCTION-READY FINANCIAL TRADING PLATFORM
+
+DESIGN PHILOSOPHY:
+- Beautiful, professional interfaces that rival Robinhood, Coinbase, and Interactive Brokers
+- Dark theme with sophisticated gradients and glassmorphism effects
+- Every component must be production-ready with proper error handling
+- Mobile-first responsive design with smooth animations
+- No cookie-cutter templates - create unique, memorable interfaces
+
+TECHNICAL REQUIREMENTS:
+- React 18 + TypeScript (strict mode)
+- Tailwind CSS with custom design system
+- Lucide React icons only
+- Recharts for financial data visualization
+- Built-in state management (React Context + useReducer)
+- Error boundaries and loading states for all components
+- Accessibility compliant (ARIA labels, keyboard navigation)
+
+FINANCIAL PLATFORM FEATURES:
+- Real-time portfolio tracking with advanced charts
+- Multi-asset trading interface (crypto, stocks, forex)
+- P2P payments with USDS stablecoin integration
+- Risk management and analytics dashboard
+- Mobile wallet functionality with QR codes
+- Professional order management system
+
+CODE QUALITY STANDARDS:
+- TypeScript interfaces for all data structures
+- Proper error handling with user-friendly messages
+- Loading skeletons for all async operations
+- Optimistic UI updates for better UX
+- Clean component architecture with proper separation
+- Performance optimized with React.memo and useMemo
+
+API INTEGRATION READY:
+- Axios instance with interceptors configured
+- Environment variable support for different endpoints
+- WebSocket simulation for real-time data
+- Mock data that resembles real financial APIs
+- Authentication flow preparation
+
+VISUAL REQUIREMENTS:
+- Use gradients, shadows, and subtle animations
+- Cards with proper elevation and hover effects
+- Professional color scheme (deep blues, greens, subtle purples)
+- Typography hierarchy that's easy to read
+- Interactive elements with clear feedback
+- Charts that look like Bloomberg Terminal quality
+
+CREATE COMPONENTS THAT ARE:
+1. Immediately deployable to production
+2. Visually impressive enough to win a hackathon
+3. Functionally sophisticated like enterprise software
+4. Mobile-optimized for real-world usage
+
+Always include proper TypeScript types, error handling, and make every component self-contained and reusable.

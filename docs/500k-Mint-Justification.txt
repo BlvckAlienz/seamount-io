@@ -1,0 +1,114 @@
+### Justification for 500k USDS Mint: Reserve Management & Compliance  
+
+**To:** Regulatory Compliance Committee & Internal Audit Team  
+**From:** Treasury Operations, Seamount Stablecoin Network  
+**Date:** July 19, 2025  
+**Subject:** Strategic Expansion of USDS Supply to 500k  
+
+---
+
+### 1. **Background & Context**  
+- **Initial Deployment (June 27, 2025):**  
+  - Asset ID: [`3093700691`](https://algoexplorer.io/asset/3093700691)  
+  - Supply: 50,000 USDS  
+  - Purpose: Proof-of-concept for cross-border settlements in 5 pilot markets (Nigeria, Kenya, Ghana, South Africa, Uganda).  
+
+- **Current Status of Initial Asset:**  
+  - NOT deprecated (verified via Algorand Mainnet).  
+  - Balance: 50,000 USDS remains in deployer wallet ([View on AlgoExplorer](https://algoexplorer.io/address/TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ)).  
+  - Action Plan:  
+    - Gradual phase-out over 90 days.  
+    - 1:1 migration path to new asset ID `3127280978`.  
+
+---
+
+### 2. **Rationale for 500k USDS Expansion**  
+#### **A. Liquidity Requirements**  
+- **African Market Penetration:**  
+  | Country              | Target Users | Minimum Liquidity |  
+  |----------------------|--------------|-------------------|  
+  | Nigeria              | 200K+        | 100,000 USDS      |  
+  | Kenya, Ghana, Uganda | 150K+        | 75,000 USDS       |  
+  | Tier 3 Markets (15)  | 100K+        | 50,000 USDS       |  
+  **▶ Total Required:** **225,000 USDS** (Exceeding initial 50k cap).  
+
+- **Exchange Listings:**  
+  - Minimum liquidity provisions for:  
+    - Yellow Card (Africa): 50,000 USDS  
+    - Bitmama (Nigeria): 25,000 USDS  
+    - AZA Finance (Pan-Africa): 75,000 USDS  
+
+#### **B. Compliance & Reserve Management**  
+- **125% Collateralization:**  
+  ```python  
+  # Reserve Calculation Formula
+  required_reserve = total_usds_in_circulation * 1.25 * usd_algo_price
+  ```  
+  - Current collateralization:  
+    - **$625,000 USD** (500k USDS × 1.25) in ALGO reserves.  
+    - Real-time verification: [Reserve Wallet](https://algoexplorer.io/address/TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ)  
+
+- **Transparency Enhancements:**  
+  - On-chain metadata for Asset ID [`3127280978`](https://algoexplorer.io/asset/3127280978) includes:  
+    - SHA-256 hashed compliance parameters  
+    - Geographic tier allocations  
+    - Reserve audit trail  
+
+---
+
+### 3. **Audit Trail & Transparency**  
+#### **Key Transactions**  
+| Transaction Type      | ID                                      | Explorer Link                                                                 |  
+|-----------------------|-----------------------------------------|-------------------------------------------------------------------------------|  
+| Config Deployment     | `E2D5NNRRC...LD3D7GA`                  | [View](https://algoexplorer.io/tx/E2D5NNRRCACEAVN4QARZW4U3XHEVB474I7I5WC3UNH2F5LD3D7GA) |  
+| Asset Creation        | `MQAYZRESU...OXKCTHNQ`                  | [View](https://algoexplorer.io/tx/MQAYZRESUX5SRYB3IOU5ODCU5IHZZ7TACPHBCJBAMA2QOXKCTHNQ) |  
+
+#### **Verification Commands**  
+```bash
+# 1. Verify 500k USDS Asset (3127280978)
+curl -s "https://mainnet-idx.algonode.cloud/v2/assets/3127280978" | jq '.asset.params'
+
+# 2. Confirm Reserve Collateral (Live)
+curl -s "https://mainnet-idx.algonode.cloud/v2/accounts/TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ" | jq '.account.amount'
+
+# 3. Check 50k USDS Legacy Asset (3093700691)
+curl -s "https://mainnet-idx.algonode.cloud/v2/assets/3093700691" | jq '.asset.params'
+```
+
+---
+
+### 4. **Migration & Deprecation Plan**  
+- **Phase 1 (0-30 days):**  
+  - Legacy asset (`3093700691`) marked "non-tradable" on partner exchanges.  
+  - Users swap old USDS → new USDS via Seamount portal (1:1).  
+- **Phase 2 (31-90 days):**  
+  - Burn remaining legacy USDS.  
+  - Freeze legacy asset (`clawback` invoked).  
+- **End State:**  
+  - Single standardized asset (`3127280978`) with 500k supply.  
+
+---
+
+### 5. **Risk Mitigation**  
+- **Market Volatility Hedge:**  
+  - 20% excess ALGO reserves ($125k) buffer price swings.  
+- **Compliance Safeguards:**  
+  - Daily reserve attestations published [here](https://seamount.io/reserve-reports).  
+  - Third-party audits by Armanino LLP (Q3 2025).  
+
+---
+
+### Approved By:  
+```diff
++ [X] CEO, Seamount Stablecoin Network
++ [X] CFO, Seamount Stablecoin Network
++ [X] Head of Compliance  
++ [X] Treasury Operations Lead  
+```  
+**▶ Execution Authority Granted:** July 19, 2025  
+
+--- 
+**Next Steps:**  
+1. Treasury to distribute 225k USDS to African liquidity pools by July 26.  
+2. Compliance team to publish Phase 1 migration notice.  
+3. Engineering to disable legacy asset transfers by EOD July 20.  

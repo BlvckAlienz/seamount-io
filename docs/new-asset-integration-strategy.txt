@@ -1,0 +1,63 @@
+Integration Strategy: Replace your existing main.py
+The main_migration.py is designed to replace your current main deployment script, not run as a separate service.
+What to do:
+
+Backup your current main.py
+Replace it with the main_migration.py content
+Rename main_migration.py → main.py
+
+Why this approach:
+The migration script handles your one-time transition from 50k → 500k asset. Once executed:
+
+Old 50k asset becomes deprecated
+New 500k asset becomes your primary USDS
+All future operations use the new asset
+
+File structure after migration:
+/algorand_usds_supply_manager.py  # New supply management core
+/main.py                          # Updated deployment (was main_migration.py)
+/your_other_existing_files.py     # Unchanged
+Post-migration workflow:
+
+Run updated main.py once to execute migration
+Use mint_more_tokens() function for future token minting
+All existing payment/transfer code needs updating to use new_asset_id
+
+Critical: This is a breaking change - your existing asset ID references need updating throughout your codebase to use the new asset ID after migration.
+
+
+Implementation Guide:
+
+Replace your current main.py with the artifact above
+File location requirements:
+
+main.py (root directory)
+algorand_usds_supply_manager.py (from your documents - same directory)
+
+
+Environment variables needed:
+bashexport ALGORAND_CREATOR_MNEMONIC="your 25-word mnemonic"
+# Your existing Algorand config vars (API endpoint, etc.)
+
+Run migration once:
+bashpython main.py
+
+Important outputs to save:
+
+new_asset_id - Use this in all future operations
+old_asset_id - Deprecate/ignore after migration
+
+
+Update your existing codebase:
+
+Replace all references to old asset ID with new asset ID
+Use mint_additional_tokens() for future token creation
+
+
+Post-migration minting example:
+python# Mint 100k USDS to specific address
+await mint_additional_tokens(100000, "RECIPIENT_ADDRESS_HERE")
+
+
+Critical: Run this migration in testnet first, then mainnet. The old 50k asset becomes obsolete after successful migration.
+Ready to execute?

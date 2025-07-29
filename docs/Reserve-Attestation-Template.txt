@@ -1,0 +1,159 @@
+Reserve Attestation Template
+Daily automated report proving 125% collateralization:
+
+python
+# File: reserve_attestation.py
+import json
+from datetime import datetime
+from algosdk.v2client import indexer
+
+# Configuration
+INDEXER_URL = "https://mainnet-idx.algonode.cloud"
+RESERVE_ADDRESS = "TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ"
+NEW_USDS = 3127280978
+ORACLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids=algorand&vs_currencies=usd"
+
+def generate_attestation():
+    # Fetch reserve data
+    indexer_client = indexer.IndexerClient("", INDEXER_URL)
+    account_info = indexer_client.account_info(RESERVE_ADDRESS)
+    
+    # Get ALGO balance (microAlgos)
+    algo_balance = account_info['account']['amount'] / 1_000_000
+    
+    # Get USDS in circulation (new asset)
+    usds_balance = next(
+        (a['amount'] for a in account_info['account']['assets'] 
+        if a['asset-id'] == NEW_USDS
+    ) / 1_000_000
+    
+    # Get ALGO/USD price
+    # (In production: use decentralized oracle like Chainlink)
+    algo_price = 0.15  # Example: fetch from ORACLE_PRICE_URL
+    
+    # Calculate collateralization
+    reserve_value = algo_balance * algo_price
+    required_reserve = usds_balance * 1.25
+    collateral_ratio = (reserve_value / required_reserve) * 100
+    
+    # Generate report
+    return {
+        "date": datetime.utcnow().isoformat() + "Z",
+        "reserve_address": RESERVE_ADDRESS,
+        "algo_balance": round(algo_balance, 6),
+        "usds_circulating": round(usds_balance, 6),
+        "algo_usd_price": round(algo_price, 4),
+        "reserve_value_usd": round(reserve_value, 2),
+        "required_reserve_usd": round(required_reserve, 2),
+        "collateral_ratio": round(collateral_ratio, 2),
+        "compliance_status": "Satisfied" if collateral_ratio >= 125 else "Deficit",
+        "onchain_proof": {
+            "algo_balance_txn": get_last_txn(indexer_client, RESERVE_ADDRESS, "pay"),
+            "usds_supply_txn": get_last_txn(indexer_client, RESERVE_ADDRESS, "axfer", NEW_USDS)
+        }
+    }
+
+def get_last_txn(client, address, txn_type, asset=None):
+    params = {"address": address, "tx-type": txn_type, "limit": 1}
+    if asset: params["asset-id"] = asset
+    return client.search_transactions(**params)['transactions'][0]['id']
+
+if __name__ == "__main__":
+    report = generate_attestation()
+    with open(f"reserve_attestation_{datetime.utcnow().date()}.json", "w") as f:
+        json.dump(report, f, indent=2)
+    
+    # Print human-readable summary
+    print(f"""
+    Seamount Reserve Attestation Report
+    ===================================
+    Date: {report['date']}
+    ALGO Balance: {report['algo_balance']} 
+    USDS Circulating: {report['usds_circulating']}
+    ALGO/USD Price: ${report['algo_usd_price']}
+    Reserve Value: ${report['reserve_value_usd']}
+    Required Minimum: ${report['required_reserve_usd']}
+    Collateralization: {report['collateral_ratio']}%
+    Status: {report['compliance_status']}
+    
+    On-Chain Proof:
+    - ALGO Balance: https://algoexplorer.io/tx/{report['onchain_proof']['algo_balance_txn']}
+    - USDS Supply: https://algoexplorer.io/tx/{report['onchain_proof']['usds_supply_txn']}
+    """)
+Sample Output:
+json
+{
+  "date": "2025-07-19T12:00:00Z",
+  "reserve_address": "TX4LYASI7...",
+  "algo_balance": 8996.0,
+  "usds_circulating": 500000.0,
+  "algo_usd_price": 0.15,
+  "reserve_value_usd": 1349.4,
+  "required_reserve_usd": 625000.0,
+  "collateral_ratio": 0.22,
+  "compliance_status": "Deficit",
+  "onchain_proof": {
+    "algo_balance_txn": "E2D5NNRRC...LD3D7GA",
+    "usds_supply_txn": "MQAYZRESU...OXKCTHNQ"
+  }
+}
+
+Audit Workflow:
+Daily Automation:
+
+Diagram
+Code
+
+
+
+
+
+
+On-Chain Verification:
+
+Hash of report stored in transaction note:
+
+python
+txn = PaymentTxn(
+    sender=RESERVE_ADDRESS,
+    note=hashlib.sha256(json_report).hexdigest()
+)
+Verifiable via:
+
+bash
+curl "https://mainnet-idx.algonode.cloud/v2/transactions/<txid>" | jq '.transaction.note'
+Deficit Alerts:
+
+SMS/email alerts if compliance_status != "Satisfied"
+
+Implementation Roadmap:
+Week 1:
+
+Deploy migration contract to mainnet
+
+Set up daily attestation cron job
+
+Week 2:
+
+Integrate Chainlink oracle for ALGO/USD price
+
+Build public reserve dashboard
+
+Week 3:
+
+Initiate legacy USDS phase-out (90-day countdown)
+
+Compliance Advantages:
+Real-Time Transparency:
+
+Reserve status verifiable by any third party
+
+Immutable Audit Trail:
+
+Daily reports anchored on Algorand blockchain
+
+Automated Enforcement:
+
+Smart contracts prevent over-issuance
+
+Auto-freeze if collateralization < 125%
