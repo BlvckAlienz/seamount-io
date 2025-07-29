@@ -16,6 +16,10 @@ import {
 import { TrendingUp, TrendingDown, Activity, BarChart3 } from 'lucide-react';
 import { ChartDataPoint } from '../types';
 
+// --- CORRECTED IMPORT PATH ---
+// Using robust, absolute path with the '@' alias from vite.config.ts
+import { ChartDataPoint } from '@/types';
+
 interface AdvancedChartProps {
   data: ChartDataPoint[];
   height?: number;
