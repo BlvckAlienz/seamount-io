@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Twitter, Instagram, Mail, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
-import Button from '../components/ui/Button'; // Assuming Button is in ui subdir
-import AuthModal from '../components/auth/AuthModal'; // Assuming AuthModal is in auth subdir
+import Button from '../components/ui/Button';
 
-const LandingPage: React.FC = () => {
+// Define the component's props to accept the function from App.tsx
+interface LandingPageProps {
+  onOpenAuth: (view: 'login' | 'register') => void;
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const navigate = useNavigate();
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeAuthView, setActiveAuthView] = useState<'login' | 'register'>('register');
   const [expandedFaqs, setExpandedFaqs] = useState<number[]>([]);
-
-  // State for Yield Calculator
   const [stakeAmount, setStakeAmount] = useState('10000');
   const [stakePeriod, setStakePeriod] = useState('365');
   const [rewards, setRewards] = useState('$450.00');
-  
-  // State for Contact Form
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
@@ -25,19 +24,12 @@ const LandingPage: React.FC = () => {
     );
   };
 
-  const handleOpenAuthModal = (view: 'login' | 'register') => {
-    setActiveAuthView(view);
-    setIsAuthModalOpen(true);
-  };
-
-  // --- Yield Calculator Logic (Migrated from static JS) ---
   const calculateYield = useCallback(() => {
     const amount = parseFloat(stakeAmount) || 0;
     let apy = 0.045; // Default for 1 year
     if (stakePeriod === '30') apy = 0.035;
     else if (stakePeriod === '90') apy = 0.040;
     else if (stakePeriod === '180') apy = 0.042;
-    
     const annualYield = amount * apy;
     setRewards(`$${annualYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   }, [stakeAmount, stakePeriod]);
@@ -46,7 +38,6 @@ const LandingPage: React.FC = () => {
     calculateYield();
   }, [calculateYield]);
 
-  // --- Contact Form Submission Logic (Migrated from static JS) ---
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormStatus('sending');
@@ -68,7 +59,6 @@ const LandingPage: React.FC = () => {
     }
   };
 
-  // --- Scroll Animations (Migrated from static JS) ---
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -108,8 +98,8 @@ const LandingPage: React.FC = () => {
               <a href="#contact" className="text-gray-300 hover:text-white transition-colors">Contact</a>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={() => handleOpenAuthModal('login')}>Sign In</Button>
-              <Button onClick={() => handleOpenAuthModal('register')} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" elevated>Sign Up</Button>
+              <Button variant="ghost" onClick={() => onOpenAuth('login')}>Sign In</Button>
+              <Button onClick={() => onOpenAuth('register')} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" elevated>Sign Up</Button>
             </div>
           </div>
         </div>
@@ -127,7 +117,7 @@ const LandingPage: React.FC = () => {
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 via-white to-purple-300 bg-clip-text text-transparent tracking-tighter">The Future of Cross-Border Payments is Here</h1>
               <p className="text-lg sm:text-xl text-gray-300 mb-10 leading-relaxed">Experience instant, low-cost P2P and B2B transfers powered by Web3 technology. Built for the financial realities of emerging markets.</p>
               <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
-                <Button onClick={() => handleOpenAuthModal('register')} size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" icon={ArrowRight} elevated animated>Get Started for Free</Button>
+                <Button onClick={() => onOpenAuth('register')} size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" icon={ArrowRight} elevated animated>Get Started for Free</Button>
                 <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView()} elevated>Learn More</Button>
               </div>
               <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-gray-400">
@@ -266,6 +256,19 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </section>
+        
+        {/* Newsletter & CTA */}
+        <section className="py-20 bg-gradient-to-r from-blue-900/20 to-purple-900/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Transform Your Cross-Border Payments?</h2>
+              <Button size="lg" onClick={() => onOpenAuth('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg" elevated animated>Sign Up for Free</Button>
+              <p className="mt-4 text-sm text-gray-400">
+                Already have an account? <button onClick={() => onOpenAuth('login')} className="text-blue-400 hover:underline font-semibold">Sign In</button>
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
@@ -277,8 +280,7 @@ const LandingPage: React.FC = () => {
         </div>
       </footer>
       
-      {/* Auth Modal */}
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialView={activeAuthView} onAuthSuccess={() => navigate('/dashboard')} />
+      {/* Auth Modal is rendered by the parent App component */}
     </div>
   );
 };
