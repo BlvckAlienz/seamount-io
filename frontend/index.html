@@ -5,24 +5,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seamount.io - Financial Inclusion for Emerging Markets</title>
-    <meta name="description" content="Next-gen P2P payments & autonomous portfolio management. USDS stablecoin with 4.5% yield. 2.6% fees. Global compliance.">
-    
+    <title>Seamount.io - The Future of P2P Stablecoin Payments</title>
+
+    <!-- SEO and Social Sharing Meta Tags -->
+    <meta name="description" content="Seamount.io offers a next-generation P2P payment network powered by the USDS stablecoin, featuring high-yield returns and low-cost, compliant cross-border transactions for emerging markets.">
+    <meta name="keywords" content="stablecoin, p2p payments, cross-border, defi, financial inclusion, USDS, yield farming, cryptocurrency, nigeria, africa">
+    <meta property="og:title" content="Seamount.io - The Future of P2P Stablecoin Payments">
+    <meta property="og:description" content="High-yield USDS stablecoin, low-cost global transfers, and full regulatory compliance.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.seamount.io/">
+    <!-- <meta property="og:image" content="https://www.seamount.io/assets/images/og-image.png"> You will need to create this image -->
+    <meta name="twitter:card" content="summary_large_image">
+	
+	<!-- =================================================================================== -->
+	<!-- START: Definitive Favicon Set -->
+	<!-- This block ensures the Seamount logo appears correctly in all browser tabs, -->
+	<!-- on Apple and Android home screens, and more. -->
+	<!-- =================================================================================== -->
+	<link rel="icon" type="image/png" href="/frontend/public/favicon-96x96.png" sizes="96x96" />
+	<link rel="icon" type="image/svg+xml" href="/frontend/public/favicon.svg" />
+	<link rel="shortcut icon" href="/frontend/public/favicon.ico" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/frontend/public/apple-touch-icon.png" />
+	<meta name="apple-mobile-web-app-title" content="Seamount" />
+	<link rel="manifest" href="/frontend/public/site.webmanifest" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <style>
+        /* --- CSS Variables for Easy Theming --- */
+        :root {
+            --primary-color: #14b8a6;
+            --primary-color-dark: #0d9488;
+            --secondary-color: #10b981;
+            --secondary-color-dark: #059669;
+            --dark-bg: #1a202c;
+            --light-bg: #f8fafc;
+            --text-dark: #1a202c;
+            --text-light: #f8fafc;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+        }
+
+        /* --- Base & Reset Styles --- */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            scroll-behavior: smooth;
         }
         
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             line-height: 1.6;
-            color: #1a1a1a;
+            color: var(--text-dark);
+            background-color: white;
             overflow-x: hidden;
         }
         
@@ -33,6 +75,7 @@
             width: 100%;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             z-index: 1000;
             padding: 1rem 0;
             transition: all 0.3s ease;
@@ -50,7 +93,7 @@
         .logo {
             font-size: 1.8rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -70,7 +113,7 @@
         }
         
         .nav-links a:hover {
-            color: #14b8a6;
+            color: var(--primary-color);
         }
         
         .nav-cta {
@@ -92,7 +135,7 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             color: white;
             box-shadow: 0 4px 15px rgba(20, 184, 166, 0.4);
         }
@@ -104,12 +147,12 @@
         
         .btn-secondary {
             background: transparent;
-            color: #14b8a6;
-            border: 2px solid #14b8a6;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
         }
         
         .btn-secondary:hover {
-            background: #14b8a6;
+            background: var(--primary-color);
             color: white;
         }
         
@@ -118,7 +161,7 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             position: relative;
             overflow: hidden;
         }
@@ -174,7 +217,7 @@
         
         .btn-hero-primary {
             background: white;
-            color: #14b8a6;
+            color: var(--primary-color);
             padding: 1rem 2rem;
             font-size: 1.1rem;
             font-weight: 700;
@@ -197,6 +240,7 @@
         .hero-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 2.5rem;
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -219,13 +263,12 @@
             font-weight: 700;
             margin-bottom: 1.5rem;
             text-align: center;
-            color: #ffffff; /* Changed to solid white for better visibility */
+            color: #ffffff;
             text-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
         
         .features-list {
             list-style: none;
-            space-y: 0.75rem;
         }
         
         .features-list li {
@@ -242,14 +285,14 @@
         }
         
         .features-list i {
-            color: #ffffff; /* Changed to white for better contrast */
+            color: #ffffff;
             margin-right: 0.75rem;
             width: 16px;
             font-size: 0.9rem;
         }
         
         .feature-highlight {
-            background: rgba(16, 185, 129, 0.3); /* Increased opacity for better visibility */
+            background: rgba(16, 185, 129, 0.3);
             border-radius: 8px;
             padding: 0.75rem;
             margin: 0.25rem 0;
@@ -259,7 +302,7 @@
         /* Features Section */
         .features {
             padding: 6rem 0;
-            background: #f8fafc;
+            background: var(--light-bg);
         }
         
         .container {
@@ -276,13 +319,13 @@
         .section-title {
             font-size: 2.5rem;
             font-weight: 800;
-            color: #1a202c;
+            color: var(--text-dark);
             margin-bottom: 1rem;
         }
         
         .section-subtitle {
             font-size: 1.2rem;
-            color: #718096;
+            color: var(--text-muted);
             max-width: 600px;
             margin: 0 auto;
         }
@@ -299,7 +342,7 @@
             border-radius: 20px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border-color);
         }
         
         .feature-card:hover {
@@ -310,7 +353,7 @@
         .feature-icon {
             width: 60px;
             height: 60px;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             border-radius: 16px;
             display: flex;
             align-items: center;
@@ -323,19 +366,19 @@
         .feature-title {
             font-size: 1.3rem;
             font-weight: 700;
-            color: #1a202c;
+            color: var(--text-dark);
             margin-bottom: 1rem;
         }
         
         .feature-description {
-            color: #718096;
+            color: var(--text-muted);
             line-height: 1.6;
         }
         
         /* USDS Section */
         .usds-section {
             padding: 6rem 0;
-            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+            background: linear-gradient(135deg, var(--dark-bg) 0%, #2d3748 100%);
             color: white;
         }
         
@@ -355,6 +398,7 @@
         .usds-features {
             list-style: none;
             margin: 2rem 0;
+            padding-left: 0;
         }
         
         .usds-features li {
@@ -365,7 +409,7 @@
         }
         
         .usds-features i {
-            color: #10b981;
+            color: var(--secondary-color);
             margin-right: 1rem;
             width: 20px;
         }
@@ -373,6 +417,7 @@
         .staking-calculator {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             border-radius: 20px;
             padding: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -410,7 +455,7 @@
         }
         
         .rewards-display {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--secondary-color-dark) 100%);
             padding: 1.5rem;
             border-radius: 12px;
             text-align: center;
@@ -427,53 +472,10 @@
             opacity: 0.9;
         }
         
-        /* About Section */
-        .about {
-            padding: 6rem 0;
-            background: white;
-        }
-        
-        .about-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 3rem;
-            margin-top: 3rem;
-        }
-        
-        .about-card {
-            text-align: center;
-            padding: 2rem;
-        }
-        
-        .about-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1.5rem;
-            color: white;
-            font-size: 2rem;
-        }
-        
-        .about-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #1a202c;
-            margin-bottom: 1rem;
-        }
-        
-        .about-description {
-            color: #718096;
-            line-height: 1.6;
-        }
-        
         /* Contact Section */
         .contact {
             padding: 6rem 0;
-            background: #f8fafc;
+            background: var(--light-bg);
         }
         
         .contact-grid {
@@ -500,7 +502,7 @@
         .contact-icon {
             width: 50px;
             height: 50px;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -511,12 +513,12 @@
         
         .contact-details h4 {
             font-weight: 700;
-            color: #1a202c;
+            color: var(--text-dark);
             margin-bottom: 0.5rem;
         }
         
         .contact-details p {
-            color: #718096;
+            color: var(--text-muted);
         }
         
         .contact-form {
@@ -534,23 +536,25 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #1a202c;
+            color: var(--text-dark);
         }
         
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             width: 100%;
             padding: 0.75rem;
-            border: 2px solid #e2e8f0;
+            border: 2px solid var(--border-color);
             border-radius: 12px;
             font-size: 1rem;
             transition: border-color 0.3s ease;
         }
         
         .form-group input:focus,
-        .form-group textarea:focus {
+        .form-group textarea:focus,
+        .form-group select:focus {
             outline: none;
-            border-color: #14b8a6;
+            border-color: var(--primary-color);
         }
         
         .form-group textarea {
@@ -560,7 +564,7 @@
         
         /* Footer */
         .footer {
-            background: #1a202c;
+            background: var(--dark-bg);
             color: white;
             padding: 3rem 0 1rem;
         }
@@ -576,20 +580,25 @@
             font-size: 1.5rem;
             font-weight: 800;
             margin-bottom: 1rem;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         
+        .footer-brand p {
+            color: var(--text-muted);
+        }
+
         .footer-section h4 {
             font-weight: 700;
             margin-bottom: 1rem;
-            color: #14b8a6;
+            color: var(--primary-color);
         }
         
         .footer-section ul {
             list-style: none;
+            padding: 0;
         }
         
         .footer-section li {
@@ -597,13 +606,13 @@
         }
         
         .footer-section a {
-            color: #718096;
+            color: var(--text-muted);
             text-decoration: none;
             transition: color 0.3s ease;
         }
         
         .footer-section a:hover {
-            color: #14b8a6;
+            color: var(--primary-color);
         }
         
         .social-links {
@@ -615,7 +624,7 @@
         .social-links a {
             width: 40px;
             height: 40px;
-            background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-color-dark) 100%);
             border-radius: 10px;
             display: flex;
             align-items: center;
@@ -633,35 +642,32 @@
             border-top: 1px solid #2d3748;
             padding-top: 2rem;
             text-align: center;
-            color: #718096;
+            color: var(--text-muted);
         }
         
         /* Responsive Design */
+        @media (max-width: 992px) {
+            .hero-container, .usds-grid, .contact-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .hero-cta {
+                justify-content: center;
+            }
+            .hero-visual {
+                margin-top: 3rem;
+            }
+        }
+
         @media (max-width: 768px) {
             .nav-links {
                 display: none;
             }
-            
-            .hero-container {
-                grid-template-columns: 1fr;
-                text-align: center;
-            }
-            
             .hero-content h1 {
                 font-size: 2.5rem;
             }
-            
-            .usds-grid,
-            .contact-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .hero-cta {
-                justify-content: center;
-            }
-            
-            .features-grid {
-                grid-template-columns: 1fr;
+            .section-title {
+                font-size: 2rem;
             }
         }
         
@@ -669,7 +675,7 @@
         .fade-in {
             opacity: 0;
             transform: translateY(30px);
-            transition: all 0.6s ease;
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
         }
         
         .fade-in.visible {
@@ -691,6 +697,42 @@
             0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
             40% { transform: translateX(-50%) translateY(-10px); }
             60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        /* Cookie Consent Banner */
+        .cookie-consent-banner {
+            position: fixed;
+            bottom: -200px; /* Initially hidden */
+            left: 0;
+            right: 0;
+            background: rgba(26, 32, 44, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: var(--text-light);
+            padding: 1.5rem;
+            z-index: 2000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: bottom 0.5s ease-in-out;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .cookie-consent-banner.visible {
+            bottom: 0;
+        }
+
+        .cookie-consent-banner p {
+            margin: 0;
+            flex-grow: 1;
+            min-width: 250px;
+        }
+
+        .cookie-actions {
+            display: flex;
+            gap: 1rem;
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -759,44 +801,32 @@
             </div>
             <div class="features-grid">
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-bolt"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-bolt"></i></div>
                     <h3 class="feature-title">Fast Settlement</h3>
                     <p class="feature-description">Sub-second global transfers with 99.9% uptime. Built for speed and reliability.</p>
                 </div>
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
                     <h3 class="feature-title">AI Portfolio</h3>
                     <p class="feature-description">Smart algorithms analyze markets 24/7, delivering better returns than traditional portfolios.</p>
                 </div>
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
                     <h3 class="feature-title">USDS Stablecoin</h3>
                     <p class="feature-description">USD-backed with 1:1 reserves. Monthly audits and institutional custody for maximum stability.</p>
                 </div>
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-coins"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-coins"></i></div>
                     <h3 class="feature-title">Low Fees</h3>
                     <p class="feature-description">2.6% base fees with USDS holder discounts. Save 90% vs traditional banking.</p>
                 </div>
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-exchange-alt"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-exchange-alt"></i></div>
                     <h3 class="feature-title">Multi-Asset Trading</h3>
                     <p class="feature-description">Easy fiat-to-crypto conversion. Support for 60+ currencies and 200+ digital assets.</p>
                 </div>
                 <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i class="fas fa-balance-scale"></i>
-                    </div>
+                    <div class="feature-icon"><i class="fas fa-balance-scale"></i></div>
                     <h3 class="feature-title">Fully Compliant</h3>
                     <p class="feature-description">Global AML/KYC compliance with institutional-grade security.</p>
                 </div>
@@ -811,7 +841,6 @@
                 <div class="usds-content fade-in">
                     <h2>USDS Stablecoin</h2>
                     <p>USD-pegged stablecoin with transparent reserves and optimized yield generation for smart investors.</p>
-                    
                     <ul class="usds-features">
                         <li><i class="fas fa-check-circle"></i> 1:1 USD backing with monthly audits</li>
                         <li><i class="fas fa-check-circle"></i> 4.5% APY yield optimization</li>
@@ -819,19 +848,15 @@
                         <li><i class="fas fa-check-circle"></i> Focused on regulatory compliance in 3+ African corridors</li>
                         <li><i class="fas fa-check-circle"></i> DEX liquidity and yield farming</li>
                     </ul>
-                    
                     <div style="margin-top: 2rem;">
                         <a href="#" class="btn btn-primary" data-action="platform" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); margin-right: 1rem;">
-                            <i class="fas fa-coins"></i>
-                            Get USDS
+                            <i class="fas fa-coins"></i> Get USDS
                         </a>
                         <a href="#" class="btn btn-secondary" style="border-color: #10b981; color: #10b981;">
-                            <i class="fas fa-file-alt"></i>
-                            Docs
+                            <i class="fas fa-file-alt"></i> Docs
                         </a>
                     </div>
                 </div>
-                
                 <div class="staking-calculator fade-in">
                     <h3 class="calculator-title">Yield Calculator</h3>
                     <div class="input-group">
@@ -863,17 +888,16 @@
                 <h2 class="section-title">Partner With Us</h2>
                 <p class="section-subtitle">Join us and back the DeFi infrastructure for Emerging Markets</p>
             </div>
+            <div class="contact-grid">
+                <div class="contact-info">
                     <div class="contact-item fade-in">
-                        <div class="contact-icon">
-                            <i class="fas fa-envelope"></i>
-                        </div>
+                        <div class="contact-icon"><i class="fas fa-envelope"></i></div>
                         <div class="contact-details">
                             <h4>Contact</h4>
                             <p>support@seamount.io | +254 (751) 875-374</p>
                         </div>
                     </div>
                 </div>
-                
                 <div class="contact-form fade-in">
                     <h3 style="margin-bottom: 1.5rem; color: #1a202c; font-weight: 700;">Request Pitch Deck</h3>
                     <form id="pitch-form">
@@ -904,8 +928,7 @@
                             <textarea id="message" name="message" placeholder="Tell us about your investment thesis..."></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1.1rem;">
-                            <i class="fas fa-paper-plane"></i>
-                            Get Pitch Deck
+                            <i class="fas fa-paper-plane"></i> Get Pitch Deck
                         </button>
                     </form>
                 </div>
@@ -960,85 +983,156 @@
             </div>
         </div>
     </footer>
+    
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-consent-banner" class="cookie-consent-banner">
+        <p>We use cookies to enhance your experience and for analytics. By continuing to visit this site you agree to our use of cookies.</p>
+        <div class="cookie-actions">
+            <button id="cookie-deny-btn" class="btn btn-secondary">Deny</button>
+            <button id="cookie-accept-btn" class="btn btn-primary">Accept</button>
+        </div>
+    </div>
 
     <script>
-    // This script is now architecturally aware. It knows the difference between
-    // backend API calls and frontend application routes.
-
-    // This variable should be dynamically injected or configured during deployment.
-    // For now, it assumes the frontend is served from the same domain.
-    const FRONTEND_BASE_URL = window.location.origin;
-
-    // --- Authentication & Onboarding Workflow Handlers ---
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // The "Demo" button should navigate to the /dashboard route in demo mode.
-        // The AuthContext in your React app will handle the logic.
-        const demoBtns = document.querySelectorAll('[data-action="demo"]');
-        demoBtns.forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                // We'll use a query parameter to signal the React app to enter demo mode.
-                window.location.href = `${FRONTEND_BASE_URL}/dashboard?mode=demo`;
-            };
-        });
-        
-        // The "Login" or "Register" button should take the user to the signup page of the React app.
-        const registerBtns = document.querySelectorAll('[data-action="register"]');
-        registerBtns.forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                window.location.href = `${FRONTEND_BASE_URL}/signup`;
-            };
-        });
-        
-        // The main "Get Started" button also directs to the signup page.
-        const platformBtns = document.querySelectorAll('[data-action="platform"]');
-        platformBtns.forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                window.location.href = `${FRONTEND_BASE_URL}/signup`;
-            };
-        });
-        
-        // The "Investors" button should trigger the contact form.
-        const investorBtns = document.querySelectorAll('[data-action="invest"]');
-        investorBtns.forEach(btn => {
-            btn.onclick = (e) => {
-                e.preventDefault();
-                // Smooth scroll to the contact form section
-                document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
-            };
-        });
-    });
-
-    // The rest of your script (smooth scrolling, animations, yield calculator, pitch form) remains the same,
-    // but ensure the API_BASE_URL in your pitch form submission is correct.
-    const API_BASE_URL = window.location.origin; // Since Vercel rewrites /api to the backend.
-
-    document.getElementById('pitch-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const submitBtn = this.querySelector('button[type="submit"]');
-        
-        try {
-            // ... (form submission logic) ...
-            
-            // CRITICAL: This fetch URL must point to a real API endpoint.
-            // Let's assume you create one in main.py at /api/v1/investor-contact
-            const response = await fetch(`${API_BASE_URL}/api/v1/investor-contact`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-            
-            // ... (rest of the form logic) ...
-            
-        } catch (error) {
-            // ...
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- 1. Device Detection ---
+        const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile()) {
+            document.body.classList.add('is-mobile');
         }
-    });
 
-    // ... [The rest of your existing JavaScript] ...
-</script>
+        // --- 2. Cookie Consent Logic ---
+        const COOKIE_NAME = 'seamount_cookie_consent';
+        const banner = document.getElementById('cookie-consent-banner');
+        const acceptBtn = document.getElementById('cookie-accept-btn');
+        const denyBtn = document.getElementById('cookie-deny-btn');
+
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        };
+
+        const setCookie = (name, value, days) => {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Lax; Secure`;
+        };
+
+        if (!getCookie(COOKIE_NAME)) {
+            setTimeout(() => {
+                banner.classList.add('visible');
+            }, 1500);
+        }
+
+        acceptBtn.addEventListener('click', () => {
+            setCookie(COOKIE_NAME, 'accepted', 365);
+            banner.classList.remove('visible');
+        });
+
+        denyBtn.addEventListener('click', () => {
+            setCookie(COOKIE_NAME, 'denied', 365);
+            banner.classList.remove('visible');
+        });
+
+        // --- 3. Authentication & Onboarding Workflow Handlers ---
+        const FRONTEND_BASE_URL = window.location.origin;
+
+        const setupActionRedirects = (action, url) => {
+            document.querySelectorAll(`[data-action="${action}"]`).forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = url;
+                });
+            });
+        };
+
+        setupActionRedirects('demo', `${FRONTEND_BASE_URL}/dashboard?mode=demo`);
+        setupActionRedirects('register', `${FRONTEND_BASE_URL}/signup`);
+        setupActionRedirects('platform', `${FRONTEND_BASE_URL}/signup`);
+
+        // --- 4. Investor Pitch Form Submission ---
+        const pitchForm = document.getElementById('pitch-form');
+        if (pitchForm) {
+            pitchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = pitchForm.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+                const formData = {
+                    name: pitchForm.name.value,
+                    email: pitchForm.email.value,
+                    company: pitchForm.company.value,
+                    checkSize: pitchForm['check-size'].value,
+                    message: pitchForm.message.value,
+                };
+                
+                try {
+                    // NOTE: You need to create a '/api/v1/investor-contact' endpoint in your backend/main.py
+                    const response = await fetch('/api/v1/investor-contact', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok.');
+                    }
+                    
+                    submitBtn.innerHTML = '<i class="fas fa-check"></i> Submitted!';
+                    pitchForm.reset();
+
+                } catch (error) {
+                    console.error('Pitch form submission error:', error);
+                    submitBtn.innerHTML = '<i class="fas fa-times"></i> Submission Failed';
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    }, 3000);
+                }
+            });
+        }
+
+        // --- 5. Yield Calculator ---
+        const stakeAmountInput = document.getElementById('stake-amount');
+        const stakePeriodSelect = document.getElementById('stake-period');
+        const rewardsAmountDisplay = document.getElementById('rewards-amount');
+
+        const calculateYield = () => {
+            const amount = parseFloat(stakeAmountInput.value) || 0;
+            const selectedOption = stakePeriodSelect.options[stakePeriodSelect.selectedIndex];
+            const apyText = selectedOption.text;
+            const apyMatch = apyText.match(/(\d+\.?\d*)%/);
+            const apy = apyMatch ? parseFloat(apyMatch[1]) / 100 : 0.045;
+            
+            const annualYield = amount * apy;
+            rewardsAmountDisplay.textContent = `$${annualYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+        
+        stakeAmountInput.addEventListener('input', calculateYield);
+        stakePeriodSelect.addEventListener('change', calculateYield);
+        calculateYield(); // Initial calculation
+
+        // --- 6. Scroll Animations ---
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+    });
+    </script>
 </body>
 </html>
