@@ -1,14 +1,8 @@
-// File Location: frontend/src/pages/LandingPage.tsx
-// Description: The definitive, complete, and production-ready landing page component.
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Twitter, Instagram, Mail, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
-
-// --- DEFINITIVE, CORRECTED IMPORTS ---
 import Button from '@/components/ui/Button';
 
-// Define the component's props to accept the function from App.tsx
 interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
 }
@@ -16,13 +10,9 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const navigate = useNavigate();
   const [expandedFaqs, setExpandedFaqs] = useState<number[]>([]);
-
-  // State for Yield Calculator
   const [stakeAmount, setStakeAmount] = useState('10000');
   const [stakePeriod, setStakePeriod] = useState('365');
   const [rewards, setRewards] = useState('$450.00');
-  
-  // State for Contact Form
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
@@ -34,7 +24,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const calculateYield = useCallback(() => {
     const amount = parseFloat(stakeAmount) || 0;
-    let apy = 0.045; // Default for 1 year
+    let apy = 0.045;
     if (stakePeriod === '30') apy = 0.035;
     else if (stakePeriod === '90') apy = 0.040;
     else if (stakePeriod === '180') apy = 0.042;
@@ -50,7 +40,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     e.preventDefault();
     setFormStatus('sending');
     try {
-      // NOTE: Ensure '/api/v1/investor-contact' endpoint exists in your backend/main.py
       const response = await fetch('/api/v1/investor-contact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -83,15 +72,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, []);
 
   const faqs = [
-    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle within seconds, not days. Our blockchain technology enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
-    { question: "What are the fees for using Seamount?", answer: "Our fees are typically just 0.1-0.5% per transaction, compared to 3-7% with traditional remittance providers. There are no hidden fees or exchange rate markups." },
+    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle within minutes, not days. Our blockchain technology, powered by Algorand, enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
+    { question: "What are the fees for using Seamount?", answer: "Our fees are typically just 2.6-3.8% per transaction, compared to 12-15% with traditional banks. There are no hidden fees or exchange rate markups." },
     { question: "Is USDS stablecoin regulated and secure?", answer: "Yes, USDS is fully compliant with local regulations and maintains a 1:1 USD peg. All USDS tokens are fully backed by USD reserves, ensuring stability and security." },
-    { question: "Which African countries are supported?", answer: "We currently support Kenya, Nigeria, South Africa, Ghana, and Uganda, with more countries being added regularly. Our platform integrates with local payment methods including M-Pesa and bank transfers." }
+    { question: "Which African countries are supported?", answer: "We currently support 60+ countries including US, Nigeria, South Africa, Kenya, Ghana, Uganda, with more countries being added regularly. Our platform integrates with local payment methods including Flutterwave, Paystack, and bank transfers." }
   ];
 
   return (
     <div className="min-h-screen bg-gray-950 text-white selection:bg-blue-500/30">
-      {/* Navigation */}
       <nav className="bg-black/60 backdrop-blur-lg sticky top-0 z-50 border-b border-gray-800/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
@@ -114,16 +102,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </nav>
 
       <main>
-        {/* Hero Section */}
         <section className="relative py-20 md:py-32 overflow-hidden">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNTkuNSA2MEgwVjBoNjBWNjBoLS41ek0xIDF2NThoNTguMDAxVjFIMXoiIGZpbGw9IiMyMDIwMjAiIG9wYWNpdHk9IjAuMiIgZmlsbC1ydWxlPSJldmVub2RkIi8+PC9zdmc+')] bg-[length:30px_30px] opacity-20"></div>
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute top-1/4 left-1/3 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-
           <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
             <div className="text-center max-w-4xl mx-auto">
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 bg-gradient-to-r from-blue-400 via-white to-purple-300 bg-clip-text text-transparent tracking-tighter">The Future of Cross-Border Payments is Here</h1>
-              <p className="text-lg sm:text-xl text-gray-300 mb-10 leading-relaxed">Experience instant, low-cost P2P and B2B transfers powered by Web3 technology. Built for the financial realities of emerging markets.</p>
+              <p className="text-lg sm:text-xl text-gray-300 mb-10 leading-relaxed">Experience instant, low-cost P2P and B2B transfers powered by Stablecoin tech. Built for the financial realities of emerging African markets.</p>
               <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
                 <Button onClick={() => onOpenAuth('register')} size="lg" className="px-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" icon={ArrowRight} elevated animated>Get Started for Free</Button>
                 <Button size="lg" variant="outline" onClick={() => document.getElementById('features')?.scrollIntoView()} elevated>Learn More</Button>
@@ -137,7 +123,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        {/* Features Showcase */}
         <section id="features" className="py-20 bg-gray-950/40 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in">
@@ -146,12 +131,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[
-                { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in seconds, not days. Our blockchain technology enables immediate settlement across borders." },
+                { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in minutes, not days. Our blockchain technology, powered by Algorand, enables immediate settlement across borders." },
                 { icon: <DollarSign className="h-8 w-8 text-green-500" />, title: "Ultra-Low Fees", description: "Pay pennies, not percentages. Save up to 87% compared to traditional banks and remittance services." },
                 { icon: <Shield className="h-8 w-8 text-purple-500" />, title: "USDS Stablecoin", description: "Our fully-reserved, USD-pegged stablecoin ensures stable value and offers staking rewards." },
                 { icon: <TrendingUp className="h-8 w-8 text-yellow-500" />, title: "AI-Powered Trading", description: "Let AI optimize your investment portfolio with advanced algorithmic trading and risk management." },
                 { icon: <Zap className="h-8 w-8 text-red-500" />, title: "Staking Rewards", description: "Earn competitive yields by holding USDS tokens. The longer you stake, the higher your returns." },
-                { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for M-Pesa, bank transfers, and mobile money." }
+                { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for Flutterwave, Paystack, bank transfers, and mobile money." }
               ].map((feature, index) => (
                 <div key={index} className="p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 hover:border-blue-700/50 transition-all duration-300 shadow-xl backdrop-blur-sm hover:-translate-y-2 fade-in">
                   <div className="rounded-full w-14 h-14 flex items-center justify-center bg-gray-800/80 mb-5 border border-gray-700/50 shadow-inner">{feature.icon}</div>
@@ -163,9 +148,32 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
         
-        {/* USDS Section */}
-        <section id="stablecoin" className="py-20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-b from-gray-950 to-gray-900"></div>
+        <section id="about" className="py-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16 fade-in">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">About Seamount</h2>
+              <p className="text-gray-400 max-w-2xl mx-auto">Building bridges between traditional finance and Web3 to democratize financial access for emerging markets.</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div className="fade-in">
+                <div className="mb-8">
+                  <h3 className="text-2xl font-bold mb-4 text-white">Our Mission</h3>
+                  <p className="text-gray-300 leading-relaxed">Seamount is on a mission to revolutionize cross-border payments in emerging markets. We're building technology that enables instant, low-cost transfers between countries, making financial services accessible to everyone regardless of location.</p>
+                </div>
+              </div>
+              <div className="fade-in">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-blue-400">5+</div><div className="text-gray-400">Countries Reached</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-purple-400">$50M+</div><div className="text-gray-400">Transaction Volume</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-green-400">87%</div><div className="text-gray-400">Cost Savings</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-yellow-400">25K+</div><div className="text-gray-400">Happy Users</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="stablecoin" className="py-20 relative overflow-hidden bg-gray-950/40 backdrop-blur-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 <div className="text-center mb-16 fade-in">
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet USDS - Your Gateway to Web3 Finance</h2>
@@ -185,12 +193,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         <h3 className="text-xl font-bold mb-4 text-center">Yield Calculator</h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-sm text-gray-400">Investment Amount</label>
-                                <input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white" />
+                                <label htmlFor="stake-amount" className="text-sm text-gray-400">Investment Amount</label>
+                                <input id="stake-amount" name="stake-amount" type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white" />
                             </div>
                             <div>
-                                <label className="text-sm text-gray-400">Period</label>
-                                <select value={stakePeriod} onChange={(e) => setStakePeriod(e.target.value)} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white">
+                                <label htmlFor="stake-period" className="text-sm text-gray-400">Period</label>
+                                <select id="stake-period" name="stake-period" value={stakePeriod} onChange={(e) => setStakePeriod(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white">
                                     <option value="30">1 Month (3.5% APY)</option>
                                     <option value="90">3 Months (4.0% APY)</option>
                                     <option value="180">6 Months (4.2% APY)</option>
@@ -207,40 +215,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
         </section>
 
-        {/* FAQs */}
-        <section className="py-20">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-16 fade-in">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-            </div>
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div key={index} className="bg-gradient-to-r from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 overflow-hidden transition-all duration-300 fade-in">
-                  <button onClick={() => toggleFaq(index)} className="w-full p-5 flex items-center justify-between text-left">
-                    <h3 className="text-lg font-medium text-white">{faq.question}</h3>
-                    <div className="transform transition-transform duration-300" style={{ transform: expandedFaqs.includes(index) ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                      <ChevronDown className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </button>
-                  <div className="transition-all duration-300 ease-in-out" style={{ maxHeight: expandedFaqs.includes(index) ? '200px' : '0', overflow: 'hidden' }}>
-                    <div className="px-5 pb-5 pt-2"><p className="text-gray-300">{faq.answer}</p></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Contact Information */}
-        <section id="contact" className="py-20 bg-gray-950/40 backdrop-blur-sm">
+        <section id="contact" className="py-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Get in Touch</h2>
-              <p className="text-gray-400 max-w-2xl mx-auto">Have questions about Seamount or USDS? Our team is here to help.</p>
+              <p className="text-gray-400 max-w-2xl mx-auto">Have questions or interested in investing? Our team is here to help.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6 fade-in">
-                {[
+                 {[
                   { icon: <MapPin className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />, title: "Our Address", detail: "Wood Avenue, Kilimani, Nairobi, Kenya" },
                   { icon: <Mail className="h-6 w-6 text-green-500 flex-shrink-0 mt-1" />, title: "Email Us", detail: "support@seamount.io" },
                   { icon: <Phone className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />, title: "Call Us", detail: "+254 751 875 374" }
@@ -252,9 +235,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <form onSubmit={handleContactSubmit} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 p-6 backdrop-blur-sm">
                   <h3 className="text-xl font-bold mb-4">Send Us a Message</h3>
                   <div className="space-y-4">
-                    <input type="text" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Full Name" required />
-                    <input type="email" value={formState.email} onChange={(e) => setFormState({...formState, email: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Email" required />
-                    <textarea value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg resize-none" rows={4} placeholder="Your message" required></textarea>
+                    <div>
+                      <label htmlFor="contact-name" className="block text-sm font-medium text-gray-300 mb-1">Your Name</label>
+                      <input id="contact-name" name="name" type="text" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Full Name" required />
+                    </div>
+                    <div>
+                      <label htmlFor="contact-email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                      <input id="contact-email" name="email" type="email" value={formState.email} onChange={(e) => setFormState({...formState, email: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Email" required />
+                    </div>
+                    <div>
+                      <label htmlFor="contact-message" className="block text-sm font-medium text-gray-300 mb-1">Message</label>
+                      <textarea id="contact-message" name="message" value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg resize-none" rows={4} placeholder="Your message" required></textarea>
+                    </div>
                     <Button type="submit" loading={formStatus === 'sending'} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
                       {formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}
                     </Button>
@@ -264,8 +256,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
           </div>
         </section>
-        
-        {/* Newsletter & CTA */}
+
         <section className="py-20 bg-gradient-to-r from-blue-900/20 to-purple-900/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <div className="max-w-3xl mx-auto">
@@ -279,7 +270,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="bg-gray-950 border-t border-gray-800/60 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center text-sm text-gray-500">
@@ -287,8 +277,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </div>
       </footer>
-      
-      {/* The AuthModal is now correctly rendered by the parent App component, so it is removed from here. */}
     </div>
   );
 };

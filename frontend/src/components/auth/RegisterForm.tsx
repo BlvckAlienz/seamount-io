@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+// File Location: frontend/src/components/auth/RegisterForm.tsx
+import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
@@ -11,35 +12,39 @@ const PASSWORD_REQUIREMENTS = [
   { id: 'number', text: 'At least one number', regex: /[0-9]/ },
 ];
 
-interface RegisterFormProps {
-  onSuccess?: () => void;
-  onLoginClick?: () => void;
-}
+interface RegisterFormProps { onSuccess?: () => void; onLoginClick?: () => void; }
 
 const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onLoginClick }) => {
   const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '', countryCode: 'US' });
   const [validRequirements, setValidRequirements] = useState<Record<string, boolean>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
-  
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const { signUp, loading, error: authError } = useAuth();
+
+  const validatePassword = (password: string) => {
+    const newValidRequirements: Record<string, boolean> = {};
+    PASSWORD_REQUIREMENTS.forEach(req => { newValidRequirements[req.id] = req.regex.test(password); });
+    setValidRequirements(newValidRequirements);
+    return Object.values(newValidRequirements).every(Boolean);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (name === 'password') evaluatePasswordStrength(value);
-  };
-
-  const evaluatePasswordStrength = (password: string) => {
-    const newValidRequirements: Record<string, boolean> = {};
-    PASSWORD_REQUIREMENTS.forEach(req => {
-      newValidRequirements[req.id] = req.regex.test(password);
-    });
-    setValidRequirements(newValidRequirements);
+    if (name === 'password') validatePassword(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormErrors({});
+    if (!validatePassword(formData.password)) {
+      setFormErrors({ password: "Password does not meet all requirements." });
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setFormErrors({ confirmPassword: "Passwords do not match." });
+      return;
+    }
     const { success, error } = await signUp(formData.email, formData.password, formData.countryCode);
     if (success) {
       if (onSuccess) onSuccess();
@@ -61,5 +66,4 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onLoginClick }) 
     </Card>
   );
 };
-
 export default RegisterForm;
