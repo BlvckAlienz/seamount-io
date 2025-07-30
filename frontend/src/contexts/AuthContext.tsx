@@ -1,12 +1,8 @@
-// File Location: frontend/src/contexts/AuthContext.tsx
-// Description: The definitive, corrected, and production-ready authentication context.
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../config/api';
-import { UserProfile } from '../types'; // Assuming UserProfile is defined in src/types/index.ts
+import { UserProfile } from '../types';
 
 interface AuthState {
   session: Session | null;
@@ -20,8 +16,8 @@ interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, country_code: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  enterDemoMode: () => void;
-  onboardingStep?: number; // Added for compatibility with OnboardingPage
+  enterDemoMode: (navigate: (path: string) => void) => void;
+  onboardingStep?: number;
   updateOnboardingStep: (step: number, data: any) => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
@@ -34,7 +30,9 @@ export function useAuth() {
   return context;
 }
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// AuthProvider content is now a separate component.
+// This allows it to be a child of the Router and use navigation hooks.
+const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
@@ -42,8 +40,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     error: null,
     isDemoMode: false,
   });
-  const navigate = useNavigate();
-
+  
   const fetchUserProfile = useCallback(async () => {
     try {
       const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
@@ -51,7 +48,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error("AuthContext: Failed to fetch user profile:", error);
       setState(prev => ({ ...prev, user: null, loading: false }));
-      // If fetching fails, the token is likely invalid. Forcing a sign-out is a safe pattern.
       await supabase.auth.signOut();
     }
   }, []);
@@ -60,35 +56,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setState(prev => ({ ...prev, session, error: null }));
-        
         if (event === 'SIGNED_IN') {
           await fetchUserProfile();
-          // The navigation logic can be handled by the component that calls signIn/signUp
         }
-        
         if (event === 'SIGNED_OUT') {
           setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
-          navigate('/');
         }
       }
     );
 
     const checkInitialSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            setState(prev => ({ ...prev, session }));
-            await fetchUserProfile();
-        } else {
-            setState(prev => ({ ...prev, loading: false }));
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setState(prev => ({ ...prev, session }));
+        await fetchUserProfile();
+      } else {
+        setState(prev => ({ ...prev, loading: false }));
+      }
     }
     checkInitialSession();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate, fetchUserProfile]);
-  
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile]);
+
   const signUp = async (email: string, password: string, country_code: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     const { error } = await supabase.auth.signUp({ 
@@ -96,14 +86,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
         options: { data: { country_code } }
     });
-    
     if (error) {
       setState(prev => ({ ...prev, error: error.message, loading: false }));
       return { success: false, error: error.message };
     }
-    
-    // On success, onAuthStateChange listener will fire.
-    // The UI should show a "Check your email" message.
     setState(prev => ({ ...prev, loading: false }));
     return { success: true };
   };
@@ -111,12 +97,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signIn = async (email: string, password: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    
     if (error) {
       setState(prev => ({ ...prev, error: error.message, loading: false }));
       return { success: false, error: error.message };
     }
-    // onAuthStateChange will handle successful login and profile fetch.
     return { success: true };
   };
 
@@ -124,42 +108,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
   };
   
-  const enterDemoMode = () => {
+  const enterDemoMode = (navigate: (path: string) => void) => {
     setState({
       session: null,
       user: {
-        id: 'demo-user-123',
-        email: 'demo@seamount.io',
-        kyc_level: 3,
-        kyc_status: 'approved',
-        is_admin: false, // Explicitly set admin status
+        id: 'demo-user-123', email: 'demo@seamount.io', kyc_level: 3,
+        kyc_status: 'approved', is_admin: false,
       } as UserProfile,
-      loading: false,
-      error: null,
-      isDemoMode: true,
+      loading: false, error: null, isDemoMode: true,
     });
     navigate('/dashboard');
   };
 
-  // --- Placeholder functions for Onboarding compatibility ---
   const updateOnboardingStep = async (step: number, data: any) => {
-      // In a real app, this would make an API call.
-      console.log("Updating onboarding step:", step, data);
+    console.log("Updating onboarding step:", step, data);
   };
   const completeOnboarding = async () => {
-      console.log("Completing onboarding...");
+    console.log("Completing onboarding...");
   };
 
   const value = { 
-    ...state, 
-    signUp, 
-    signIn, 
-    signOut, 
-    enterDemoMode,
-    onboardingStep: state.user?.kyc_level === 0 ? 1 : undefined, // Example logic
-    updateOnboardingStep,
-    completeOnboarding
+    ...state, signUp, signIn, signOut, enterDemoMode,
+    onboardingStep: state.user?.kyc_level === 0 ? 1 : undefined,
+    updateOnboardingStep, completeOnboarding
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// The exported AuthProvider now only wraps the content component.
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return <AuthProviderContent>{children}</AuthProviderContent>;
 };
