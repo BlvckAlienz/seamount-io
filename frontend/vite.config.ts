@@ -11,12 +11,21 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
+    // We add the terser minifier for secure, production-grade builds
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Removes console logs from production code
       },
     },
   },
-  base: '/',
+  server: {
+    // Proxy for local development to avoid CORS issues
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000', // Your local FastAPI backend
+        changeOrigin: true,
+      },
+    },
+  },
 });
