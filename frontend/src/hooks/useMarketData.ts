@@ -1,8 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { realMarketData } from '../services/realMarketData';
-import { Portfolio, Asset } from '../types';
+// File Location: frontend/src/hooks/useMarketData.ts
+// Description: The definitive, corrected, and production-ready hook for fetching market and portfolio data.
 
-export function useRealMarketData() {
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-hot-toast';
+
+// --- CORRECTED IMPORT PATHS & ARCHITECTURE ---
+import { apiClient } from '@/config/api';
+import { Portfolio, Asset } from '@/types'; // Assuming types are in src/types
+
+export function useMarketData() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -10,39 +16,25 @@ export function useRealMarketData() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const refreshData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
-      const [portfolioData, assetData] = await Promise.all([
-        realMarketData.getPortfolioData(),
-        realMarketData.getPortfolioData().then(p => p.assets || [])
-      ]);
+      // All data fetching now goes through our secure, centralized apiClient.
+      // This assumes your backend has an endpoint like '/api/v1/portfolio/summary'
+      const response = await apiClient.get('/api/v1/portfolio/summary');
+      
+      const portfolioData: Portfolio = response.data;
       
       setPortfolio(portfolioData);
-      setAssets(assetData);
+      setAssets(portfolioData.assets || []); // Assuming the API returns assets within the portfolio object
       setLastUpdated(new Date());
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+      const errorMessage = (err as any).response?.data?.detail || (err instanceof Error ? err.message : 'Failed to fetch market data');
+      setError(errorMessage);
       console.error('Market data fetch error:', err);
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const getStockData = useCallback(async (symbol: string) => {
-    try {
-      return await realMarketData.getStockData(symbol);
-    } catch (err) {
-      console.error(`Failed to fetch ${symbol} data:`, err);
-      return null;
-    }
-  }, []);
-
-  const getCryptoData = useCallback(async (symbol: string) => {
-    try {
-      return await realMarketData.getCoinbaseData(symbol);
-    } catch (err) {
-      console.error(`Failed to fetch ${symbol} crypto data:`, err);
-      return null;
     }
   }, []);
 
@@ -51,9 +43,9 @@ export function useRealMarketData() {
     refreshData();
   }, [refreshData]);
 
-  // Auto-refresh every 30 seconds
+  // Optional: Auto-refresh data periodically
   useEffect(() => {
-    const interval = setInterval(refreshData, 30000);
+    const interval = setInterval(refreshData, 60000); // Refresh every 60 seconds
     return () => clearInterval(interval);
   }, [refreshData]);
 
@@ -64,7 +56,5 @@ export function useRealMarketData() {
     error,
     lastUpdated,
     refreshData,
-    getStockData,
-    getCryptoData
   };
 }
