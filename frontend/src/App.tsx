@@ -23,6 +23,7 @@ import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 // --- Context ---
 import { AuthProvider } from './contexts/AuthContext';
 
+// AppContent handles the routing and modal state, keeping the main App component clean.
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
@@ -35,7 +36,10 @@ const AppContent: React.FC = () => {
   return (
     <>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+        
+        {/* Protected Routes with Progressive KYC Levels */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute minKycLevel={1}><DashboardPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute minKycLevel={1}><UserProfilePage /></ProtectedRoute>} />
@@ -43,10 +47,18 @@ const AppContent: React.FC = () => {
         <Route path="/trading" element={<ProtectedRoute minKycLevel={2}><TradingPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute minKycLevel={2}><PaymentsPage /></ProtectedRoute>} />
         <Route path="/portfolio" element={<ProtectedRoute minKycLevel={3}><PortfolioPage /></ProtectedRoute>} />
+        
+        {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
+
+        {/* Fallback Route - redirect unknown paths to the landing page */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialView={authView} />
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        initialView={authView}
+      />
     </>
   );
 }
@@ -54,7 +66,8 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      {/* The Router MUST be the parent of the AuthProvider */}
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Toaster position="top-right" />
           <AppContent />

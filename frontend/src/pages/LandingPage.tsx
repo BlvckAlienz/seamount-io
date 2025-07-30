@@ -127,7 +127,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Revolutionizing Financial Access</h2>
-              <p className="text-gray-400 max-w-2xl mx-auto">Our platform is designed to solve the real-world challenges of cross-border payments for emerging markets.</p>
+              <p className="text-gray-400 max-w-2xl mx-auto">Our platform is designed to solve real-world challenges of cross-border payments for emerging African markets.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[
@@ -152,21 +152,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in">
               <h2 className="text-3xl md:text-4xl font-bold mb-4">About Seamount</h2>
-              <p className="text-gray-400 max-w-2xl mx-auto">Building bridges between traditional finance and Web3 to democratize financial access for emerging markets.</p>
+              <p className="text-gray-400 max-w-2xl mx-auto">A stablecoin network that bridges traditional finance and Web3 to democratize financial access for emerging African markets.</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div className="fade-in">
                 <div className="mb-8">
                   <h3 className="text-2xl font-bold mb-4 text-white">Our Mission</h3>
-                  <p className="text-gray-300 leading-relaxed">Seamount is on a mission to revolutionize cross-border payments in emerging markets. We're building technology that enables instant, low-cost transfers between countries, making financial services accessible to everyone regardless of location.</p>
+                  <p className="text-gray-300 leading-relaxed">Seamount is on a mission to transform cross-border payments in emerging African markets. We're building a stablecoin infrastructure that enables instant, low-cost transfers between countries, making financial services accessible to everyone regardless of location.</p>
                 </div>
               </div>
               <div className="fade-in">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-blue-400">5+</div><div className="text-gray-400">Countries Reached</div></div>
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-purple-400">$50M+</div><div className="text-gray-400">Transaction Volume</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-blue-400">60+</div><div className="text-gray-400">Countries Reached</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-purple-400">500K USDS</div><div className="text-gray-400">Total Token Supply</div></div>
                   <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-green-400">87%</div><div className="text-gray-400">Cost Savings</div></div>
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-yellow-400">25K+</div><div className="text-gray-400">Happy Users</div></div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-yellow-400">1.5K+</div><div className="text-gray-400">Projected Users (3-6 months)</div></div>
                 </div>
               </div>
             </div>
@@ -176,7 +176,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <section id="stablecoin" className="py-20 relative overflow-hidden bg-gray-950/40 backdrop-blur-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
                 <div className="text-center mb-16 fade-in">
-                    <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet USDS - Your Gateway to Web3 Finance</h2>
+                    <h2 className="text-3xl md:text-4xl font-bold mb-4">Meet USDS - Your Gateway to Stablecoins Network</h2>
                     <p className="text-gray-400 max-w-2xl mx-auto">A stable digital currency that powers cross-border transactions with the security of blockchain technology.</p>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
