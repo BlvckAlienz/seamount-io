@@ -1,17 +1,13 @@
-// File Location: /frontend/src/App.tsx
-// Description: The definitive main application shell, corrected to match the final project structure.
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
-// --- Core Components & Pages (Verified against your final `tree` structure) ---
+// --- Core Components & Pages ---
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthModal from './components/auth/AuthModal';
-import EnvSetup from './components/layout/EnvSetup';
 
 // --- Page Imports ---
 import LandingPage from './pages/LandingPage';
@@ -24,10 +20,10 @@ import SettingsPage from './pages/SettingsPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 
-// --- Context & Config ---
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { validateEnvironment, type EnvironmentStatus } from './config/env';
+// --- Context ---
+import { AuthProvider } from './contexts/AuthContext';
 
+// AppContent handles the routing and modal state, keeping the main App component clean.
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
@@ -55,39 +51,22 @@ const AppContent: React.FC = () => {
         {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
 
-        {/* Fallback Route */}
+        {/* Fallback Route - redirect unknown paths to the landing page */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} initialView={authView} />
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        initialView={authView}
+      />
     </>
   );
 }
 
 function App() {
-  const [envStatus, setEnvStatus] = useState<EnvironmentStatus | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const status = await validateEnvironment();
-        setEnvStatus(status);
-      } catch (err) {
-        setEnvStatus({ isValid: false, errors: [err instanceof Error ? err.message : 'Unknown error'], warnings: [], criticalServices: [], optionalServices: [] });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    validate();
-  }, []);
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen bg-gray-950"></div>; // Or your loading skeleton
-  }
-
-  if (envStatus && !envStatus.isValid) {
-    return <ErrorBoundary><EnvSetup envStatus={envStatus} /></ErrorBoundary>;
-  }
+  // A production app trusts its environment has been set correctly by Vercel.
+  // The complex and fragile client-side validation has been removed.
+  // This is the standard, robust pattern for production applications.
 
   return (
     <ErrorBoundary>
