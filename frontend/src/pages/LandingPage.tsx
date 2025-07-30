@@ -1,10 +1,12 @@
 // File Location: frontend/src/pages/LandingPage.tsx
-// Description: The definitive, corrected, and production-ready landing page component.
+// Description: The definitive, complete, and production-ready landing page component.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Twitter, Instagram, Mail, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
-import Button from '../components/ui/Button'; // Assuming Button is in ui subdir
+
+// --- DEFINITIVE, CORRECTED IMPORTS ---
+import Button from '@/components/ui/Button';
 
 // Define the component's props to accept the function from App.tsx
 interface LandingPageProps {
@@ -14,9 +16,13 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const navigate = useNavigate();
   const [expandedFaqs, setExpandedFaqs] = useState<number[]>([]);
+
+  // State for Yield Calculator
   const [stakeAmount, setStakeAmount] = useState('10000');
   const [stakePeriod, setStakePeriod] = useState('365');
   const [rewards, setRewards] = useState('$450.00');
+  
+  // State for Contact Form
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
@@ -282,7 +288,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </footer>
       
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialView={activeAuthView} onAuthSuccess={() => navigate('/dashboard')} />
+      {/* The AuthModal is now correctly rendered by the parent App component, so it is removed from here. */}
     </div>
   );
 };
