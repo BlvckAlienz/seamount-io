@@ -11,11 +11,12 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    minify: 'terser', // This line is correct.
-    terserOptions: {
-      compress: {
-        drop_console: true,
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
       },
     },
   },
+  base: '/',
 });
