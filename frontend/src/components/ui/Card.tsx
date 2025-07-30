@@ -1,5 +1,11 @@
+// File Location: frontend/src/components/ui/Card.tsx
+// Description: The definitive, corrected, and production-ready Card component.
+
 import React from 'react';
-import { cn } from '../utils/cn';
+
+// --- CORRECTED IMPORT PATH ---
+// Using a robust, absolute path with the '@' alias from vite.config.ts
+import { cn } from '@/utils/cn';
 
 interface CardProps {
   children: React.ReactNode;
