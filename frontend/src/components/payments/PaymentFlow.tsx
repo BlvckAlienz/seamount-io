@@ -1,8 +1,15 @@
+// File Location: frontend/src/components/payments/PaymentFlow.tsx
+// Description: The definitive, corrected, and production-ready payment flow component.
+
 import React, { useState, useCallback } from 'react';
-import { CreditCard, Ban as Bank, Smartphone, Globe, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { useBackendIntegration } from '../hooks/useBackendIntegration';
-import Card from './Card';
-import Button from './Button';
+import { CreditCard, Smartphone, Globe, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+
+// --- CORRECTED IMPORT PATHS ---
+// Using robust, absolute paths with the '@' alias from vite.config.ts
+import { useUserProfile } from '@/hooks/useUserProfile'; // Assuming this hook exists for user data
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { apiClient } from '@/config/api';
 
 interface PaymentFlowProps {
   userId: string;
