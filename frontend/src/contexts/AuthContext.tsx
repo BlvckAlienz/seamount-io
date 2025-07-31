@@ -1,5 +1,3 @@
-**File Path:** `frontend/src/contexts/AuthContext.tsx`
-```typescript
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
