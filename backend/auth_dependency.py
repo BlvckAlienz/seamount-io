@@ -1,29 +1,32 @@
 # File Location: backend/auth_dependency.py
 # Description: The definitive, modern authentication dependency using JWKS for Supabase.
 
-import os
 import logging
 import jwt
 from jwt import PyJWKClient
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
 from models import UserProfile
 
-# --- Configuration ---
-settings = get_settings() # Assuming you have this pattern in your config
+# --- DEFINITIVE, CORRECTED IMPORT ---
+# Import the singleton accessor function from our central config.
+from config import get_settings
+
+# --- Configuration & Initialization ---
+settings = get_settings()
 supabase: Client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 security = HTTPBearer()
 logger = logging.getLogger(__name__)
 
 # --- JWKS Client Setup ---
-# This client will fetch the public keys from Supabase and cache them.
+# This client will fetch the public keys from Supabase and cache them for performance.
 jwks_uri = settings.SUPABASE_JWKS_URI
 if not jwks_uri:
     raise EnvironmentError("SUPABASE_JWKS_URI is not configured in the environment.")
 jwks_client = PyJWKClient(jwks_uri, cache_jwk_set=True, lifespan=3600)
 
-async def get_current_user(token: str = Depends(security)) -> UserProfile:
+async def get_current_user(token: HTTPAuthorizationCredentials = Depends(security)) -> UserProfile:
     """
     Validates a Supabase JWT using the modern JWKS method and fetches the user's profile.
     This is the secure, up-to-date way to handle Supabase authentication.
@@ -46,8 +49,7 @@ async def get_current_user(token: str = Depends(security)) -> UserProfile:
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID (sub) not found in token.")
 
-        # 3. Fetch the user's profile from our public table.
-        # This part remains the same.
+        # 3. Fetch the user's profile from our public table via the Supabase client.
         response = supabase.table("user_profiles").select("*").eq("id", user_id).single().execute()
 
         if not response.data:
@@ -56,11 +58,11 @@ async def get_current_user(token: str = Depends(security)) -> UserProfile:
         return UserProfile(**response.data)
 
     except jwt.ExpiredSignatureError:
-        logger.warning("Authentication failed: Token has expired.")
+        logger.warning(f"Authentication failed for sub {payload.get('sub')}: Token has expired.")
         raise HTTPException(status_code=401, detail="Token has expired.")
     except jwt.exceptions.PyJWTError as e:
-        logger.error(f"Authentication failed: Invalid token. Error: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+        logger.error(f"Authentication failed due to invalid token: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid token.")
     except Exception as e:
         logger.error(f"An unexpected error occurred during authentication: {e}")
         raise HTTPException(status_code=500, detail="Could not validate credentials.")
