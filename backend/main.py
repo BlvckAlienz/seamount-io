@@ -94,6 +94,9 @@ class InvestorContactPayload(BaseModel):
     checkSize: str
     message: Optional[str] = ""
 
+class CookieConsentPayload(BaseModel):
+    preferences: Dict[str, bool]
+
 class AdminDependency:
     async def __call__(self, current_user: UserProfile = Depends(get_current_user)) -> UserProfile:
         if not getattr(current_user, 'is_admin', False):
@@ -108,14 +111,36 @@ get_current_admin_user = AdminDependency()
 
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    # A real health check would ping dependencies.
     return {"status": "healthy"}
 
+# --- Public Routes ---
 @app.post("/api/v1/investor-contact", tags=["Public"])
 async def investor_contact(payload: InvestorContactPayload):
     logger.info(f"Received investor contact from: {payload.name} ({payload.email})")
     # In a real implementation, you would use the email_service here.
     return {"status": "success", "message": "Your message has been received."}
+
+@app.post("/api/v1/consent/cookies", tags=["Public"])
+async def save_cookie_consent(payload: CookieConsentPayload, request: Request, current_user: Optional[UserProfile] = Depends(get_current_user)):
+    """
+    Saves user cookie consent preferences. Works for both authenticated and anonymous users.
+    """
+    user_id = str(current_user.id) if current_user else None
+    ip_address = request.client.host
+    user_agent = request.headers.get("user-agent")
+
+    consent_data = {
+        "user_id": user_id,
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "consent_type": "cookies",
+        "preferences": payload.preferences
+    }
+    
+    # Use our database service to log the event
+    await database_service.log_event("user_consent", consent_data)
+    
+    return {"status": "success", "message": "Consent preferences saved."}
 
 # --- User & Onboarding Routes ---
 @app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])

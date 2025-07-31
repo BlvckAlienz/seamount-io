@@ -20,6 +20,10 @@
       "dest": "/frontend/assets/$1"
     },
     {
+      "src": "/legal/(.*)",
+      "dest": "/frontend/legal/$1"
+    },
+    {
       "handle": "filesystem"
     },
     {
