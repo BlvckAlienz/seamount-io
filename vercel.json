@@ -16,8 +16,20 @@
       "destination": "/backend/api/main.py"
     },
     {
+      "source": "/assets/(.*)",
+      "destination": "/frontend/assets/$1"
+    },
+    {
+      "source": "/legal/(.*)",
+      "destination": "/frontend/legal/$1"
+    },
+    {
+      "source": "/(.*\\.(?:ico|png|svg|webmanifest))",
+      "destination": "/frontend/$1"
+    },
+    {
       "source": "/(.*)",
-      "destination": "frontend/index.html"
+      "destination": "/frontend/index.html"
     }
   ]
 }
