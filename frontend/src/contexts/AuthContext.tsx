@@ -1,4 +1,7 @@
+**File Path:** `frontend/src/contexts/AuthContext.tsx`
+```typescript
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
@@ -16,7 +19,7 @@ interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, country_code: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
-  enterDemoMode: (navigate: (path: string) => void) => void;
+  enterDemoMode: () => void;
   onboardingStep?: number;
   updateOnboardingStep: (step: number, data: any) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -30,8 +33,6 @@ export function useAuth() {
   return context;
 }
 
-// AuthProvider content is now a separate component.
-// This allows it to be a child of the Router and use navigation hooks.
 const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     session: null,
@@ -40,6 +41,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     error: null,
     isDemoMode: false,
   });
+  const navigate = useNavigate();
   
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -61,6 +63,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         if (event === 'SIGNED_OUT') {
           setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
+          navigate('/');
         }
       }
     );
@@ -77,7 +80,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     checkInitialSession();
 
     return () => subscription.unsubscribe();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, navigate]);
 
   const signUp = async (email: string, password: string, country_code: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
@@ -108,7 +111,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
   };
   
-  const enterDemoMode = (navigate: (path: string) => void) => {
+  const enterDemoMode = () => {
     setState({
       session: null,
       user: {
@@ -136,7 +139,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// The exported AuthProvider now only wraps the content component.
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return <AuthProviderContent>{children}</AuthProviderContent>;
 };

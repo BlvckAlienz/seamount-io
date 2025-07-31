@@ -20,7 +20,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [currentView, setCurrentView] = useState(initialView);
 
   useEffect(() => {
-    // Reset view when modal is reopened
+    // Reset the view to the initial one every time the modal is opened
     if (isOpen) {
       setCurrentView(initialView);
     }
@@ -58,7 +58,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           {currentView === 'register' && (
             <RegisterForm
               onSuccess={() => {
-                // After successful registration, switch to login view with a success message
+                // After successful registration, provide clear instructions and switch to login view
                 alert("Registration successful! Please check your email to verify your account, then sign in.");
                 setCurrentView('login');
               }}
