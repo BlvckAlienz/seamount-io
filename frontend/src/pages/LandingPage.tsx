@@ -52,9 +52,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   };
 
   const sendConsentToServer = async (preferences: CookiePreferences) => {
-    try {
+        try {
       // apiClient.post('/api/v1/consent/cookies', { preferences });
-      console.log("Cookie consent recorded, ChevronDown } from 'lucide-react';
+      console.log("Cookie consent recorded.", preferences);
+    } catch (error) {
+      console.error("Failed to save cookie consent to server:", error);
+    }
 import Button from '@/components/ui/Button';
 
 // ---.", preferences);
