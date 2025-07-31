@@ -16,14 +16,16 @@ VOLUME_DISCOUNTS = {
 
 class Settings(BaseSettings):
     """
-    Defines and validates all environment variables. This class is the single source of truth for configuration.
-    It reads from a `.env` file located in the SAME directory as the running script.
+    Defines and validates all environment variables. This class is a perfect mirror
+    of the required variables in the .env file for the backend to run.
     """
     # --- Core & Security ---
     DATABASE_URL: str
     JWT_SECRET: str
     COMPLYCUBE_API_KEY: str
     ENCRYPTION_KEY: str
+    TOKEN_EXPIRATION_MINUTES: int
+    MAX_LOGIN_ATTEMPTS: int
     
     # --- Supabase ---
     VITE_SUPABASE_URL: str
@@ -35,8 +37,10 @@ class Settings(BaseSettings):
     FLUTTERWAVE_SECRET_KEY: str
     FLUTTERWAVE_PUBLIC_KEY: str
     COINGECKO_API_KEY: str
-    
-    # --- Algorand Network ---
+    CHAINLINK_ETH_USD_FEED: str
+    CHAINLINK_BTC_USD_FEED: str
+
+    # --- Algorand Network Configuration ---
     ALGORAND_NODE_URL: str
     ALGORAND_INDEXER_URL: str
     ALGORAND_API_KEY: str
@@ -54,18 +58,25 @@ class Settings(BaseSettings):
 
     # --- Email Service ---
     MAIL_SERVER: str
-    MAIL_PORT: int = 587
+    MAIL_PORT: int
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
-    MAIL_STARTTLS: bool = True
-    MAIL_SSL_TLS: bool = False
+    MAIL_STARTTLS: bool
+    MAIL_SSL_TLS: bool
 
     # --- Operational ---
+    NODE_ENV: str
     API_URL: str
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str
+    MOCK_MODE: bool
+
+    # --- Static Business Logic (Not from .env) ---
+    FEE_STRUCTURE: Dict[str, Any] = FEE_STRUCTURE
+    GEOGRAPHIC_TIERS: Dict[str, List[str]] = GEOGRAPHIC_TIERS
+    VOLUME_DISCOUNTS: Dict[str, Any] = VOLUME_DISCOUNTS
     
-    # --- CORS Configuration ---
+    # --- CORS Configuration (Not from .env) ---
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:5173",
         "https://seamount.io",
@@ -75,8 +86,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
-        # IMPORTANT: This setting is removed to avoid the "extra inputs not permitted" error
-        # extra = 'forbid' 
 
 # --- Singleton Accessor ---
 _settings_instance = None

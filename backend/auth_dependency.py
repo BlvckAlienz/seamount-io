@@ -60,12 +60,15 @@ async def get_current_user(token: HTTPAuthorizationCredentials = Depends(securit
 
     except jwt.ExpiredSignatureError:
         # Log the specific user ID if available in the expired token (payload is still accessible)
-        expired_payload = jwt.decode(token.credentials, options={"verify_signature": False})
-        logger.warning(f"Authentication failed for sub {expired_payload.get('sub')}: Token has expired.")
+        try:
+            expired_payload = jwt.decode(token.credentials, options={"verify_signature": False})
+            logger.warning(f"Authentication failed for sub {expired_payload.get('sub')}: Token has expired.")
+        except Exception:
+            logger.warning("Authentication failed: An expired token was received that could not be decoded.")
         raise HTTPException(status_code=401, detail="Token has expired.")
     except jwt.exceptions.PyJWTError as e:
         logger.error(f"Authentication failed due to invalid token: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid token.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred during authentication: {e}")
+        logger.error(f"An unexpected error occurred during authentication: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Could not validate credentials.")

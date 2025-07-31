@@ -113,36 +113,18 @@ get_current_admin_user = AdminDependency()
 async def health_check():
     return {"status": "healthy"}
 
-# --- Public Routes ---
 @app.post("/api/v1/investor-contact", tags=["Public"])
 async def investor_contact(payload: InvestorContactPayload):
     logger.info(f"Received investor contact from: {payload.name} ({payload.email})")
-    # In a real implementation, you would use the email_service here.
     return {"status": "success", "message": "Your message has been received."}
 
 @app.post("/api/v1/consent/cookies", tags=["Public"])
 async def save_cookie_consent(payload: CookieConsentPayload, request: Request, current_user: Optional[UserProfile] = Depends(get_current_user)):
-    """
-    Saves user cookie consent preferences. Works for both authenticated and anonymous users.
-    """
     user_id = str(current_user.id) if current_user else None
-    ip_address = request.client.host
-    user_agent = request.headers.get("user-agent")
-
-    consent_data = {
-        "user_id": user_id,
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-        "consent_type": "cookies",
-        "preferences": payload.preferences
-    }
-    
-    # Use our database service to log the event
+    consent_data = { "user_id": user_id, "ip_address": request.client.host, "user_agent": request.headers.get("user-agent"), "consent_type": "cookies", "preferences": payload.preferences }
     await database_service.log_event("user_consent", consent_data)
-    
     return {"status": "success", "message": "Consent preferences saved."}
 
-# --- User & Onboarding Routes ---
 @app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])
 async def get_user_profile(current_user: UserProfile = Depends(get_current_user)):
     return current_user
@@ -159,9 +141,10 @@ async def advance_onboarding_step(payload: OnboardingStepPayload, current_user: 
 
 @app.post("/api/v1/kyc/start-session", tags=["Onboarding"])
 async def start_kyc_session(current_user: UserProfile = Depends(get_current_user)):
+    if not current_user.country_code:
+        raise HTTPException(status_code=400, detail="User country code is required to start KYC.")
     return await kyc_service.start_verification_session(str(current_user.id), current_user.email, current_user.country_code)
 
-# --- Wallet & Payment Routes ---
 @app.get("/api/v1/wallet/balance", tags=["Payments"])
 async def get_wallet_balance(current_user: UserProfile = Depends(get_current_user)):
     if not current_user.algorand_address:
@@ -187,7 +170,6 @@ async def send_p2p_payment(payload: PaymentPayload, current_user: UserProfile = 
 async def get_payment_history(limit: int = 20, current_user: UserProfile = Depends(get_current_user)):
     return await database_service.get_payment_history(str(current_user.id), limit)
 
-# --- Admin & Compliance Routes ---
 @app.get("/api/v1/compliance/dashboard", tags=["Admin"])
 async def get_compliance_dashboard(country_code: Optional[str] = None, admin: UserProfile = Depends(get_current_admin_user)):
     return await compliance_service.get_dashboard_metrics(country_code)

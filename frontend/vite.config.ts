@@ -29,19 +29,14 @@ export default defineConfig({
   // DEFINITIVE LOCAL DEVELOPMENT SERVER CONFIGURATION
   // =============================================================================
   server: {
+    // This proxy is ESSENTIAL for your "Two Terminals" local development workflow.
+    // It tells your Vite server (running on port 5173) to forward any request
+    // it sees for '/api' over to your Python backend server (running on port 8000).
     proxy: {
-      // This rule intercepts all requests made from the frontend to a path starting with '/api'
       '/api': {
-        // It forwards them to your local Python backend server
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-
-        // --- THE CRITICAL FIX IS HERE ---
-        // This 'rewrite' function is a powerful rule that intercepts the path before forwarding.
-        // It uses a regular expression (`/^\/api\/api/`) to find any path that accidentally
-        // starts with `/api/api` and intelligently corrects it to a single `/api`.
-        // This permanently solves the "double api" bug for your local development.
-        rewrite: (path) => path.replace(/^\/api\/api/, '/api'),
+        // The rewrite is removed as it's no longer necessary with the corrected apiClient
       },
     },
   },
