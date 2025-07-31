@@ -1,6 +1,5 @@
 import logging
 from typing import Dict, Any, List
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 # --- Static Business Logic Configuration ---
@@ -18,26 +17,36 @@ VOLUME_DISCOUNTS = {
 class Settings(BaseSettings):
     """
     Defines and validates all environment variables. This class is the single source of truth for configuration.
-    It reads from a `.env` file located in the `/backend` directory.
+    It reads from a `.env` file located in the SAME directory as the running script.
     """
     # --- Core & Security ---
     DATABASE_URL: str
+    JWT_SECRET: str
+    COMPLYCUBE_API_KEY: str
     ENCRYPTION_KEY: str
     
     # --- Supabase ---
-    VITE_SUPABASE_URL: str = Field(alias='VITE_SUPABASE_URL') # Public URL
-    SUPABASE_SERVICE_KEY: str # Private Admin Key
-    SUPABASE_JWKS_URI: str # For secure JWT verification
+    VITE_SUPABASE_URL: str
+    SUPABASE_SERVICE_KEY: str
+    SUPABASE_JWKS_URI: str
     
     # --- External APIs ---
-    COMPLYCUBE_API_KEY: str
+    ALPHA_VANTAGE_KEY: str
     FLUTTERWAVE_SECRET_KEY: str
-
+    FLUTTERWAVE_PUBLIC_KEY: str
+    COINGECKO_API_KEY: str
+    
     # --- Algorand Network ---
     ALGORAND_NODE_URL: str
+    ALGORAND_INDEXER_URL: str
     ALGORAND_API_KEY: str
     ALGORAND_CREATOR_MNEMONIC: str
+    ALGORAND_NETWORK: str
     USDS_ASSET_ID: int
+
+    # --- Treasury (Sensitive) ---
+    TREASURY_ADDRESS: str
+    TREASURY_PRIVATE_KEY: str
 
     # --- Redis (Upstash) ---
     UPSTASH_REDIS_REST_URL: str
@@ -49,10 +58,12 @@ class Settings(BaseSettings):
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
 
     # --- Operational ---
-    API_URL: str # The public URL of this backend API (e.g., https://seamount-api.vercel.app)
-    ENVIRONMENT: str = "production"
+    API_URL: str
+    ENVIRONMENT: str = "development"
     
     # --- CORS Configuration ---
     ALLOWED_ORIGINS: List[str] = [
@@ -61,17 +72,11 @@ class Settings(BaseSettings):
         "https://www.seamount.io",
     ]
 
-    # --- Static Business Logic (Not from .env) ---
-    FEE_STRUCTURE: Dict[str, Any] = FEE_STRUCTURE
-    GEOGRAPHIC_TIERS: Dict[str, List[str]] = GEOGRAPHIC_TIERS
-    VOLUME_DISCOUNTS: Dict[str, Any] = VOLUME_DISCOUNTS
-
     class Config:
-        # Pydantic will automatically look for a `.env` file and load variables.
-        # It is case-insensitive, so it will match `API_URL` to `api_url` in the .env file.
         env_file = ".env"
         env_file_encoding = 'utf-8'
-        extra = 'ignore' # Ignore extra fields from the .env file
+        # IMPORTANT: This setting is removed to avoid the "extra inputs not permitted" error
+        # extra = 'forbid' 
 
 # --- Singleton Accessor ---
 _settings_instance = None

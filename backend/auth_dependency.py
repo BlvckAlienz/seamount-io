@@ -14,6 +14,7 @@ from models import UserProfile
 from config import get_settings
 
 # --- Configuration & Initialization ---
+# This ensures we use the same, single, validated settings instance across the app.
 settings = get_settings()
 supabase: Client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 security = HTTPBearer()
@@ -58,7 +59,9 @@ async def get_current_user(token: HTTPAuthorizationCredentials = Depends(securit
         return UserProfile(**response.data)
 
     except jwt.ExpiredSignatureError:
-        logger.warning(f"Authentication failed for sub {payload.get('sub')}: Token has expired.")
+        # Log the specific user ID if available in the expired token (payload is still accessible)
+        expired_payload = jwt.decode(token.credentials, options={"verify_signature": False})
+        logger.warning(f"Authentication failed for sub {expired_payload.get('sub')}: Token has expired.")
         raise HTTPException(status_code=401, detail="Token has expired.")
     except jwt.exceptions.PyJWTError as e:
         logger.error(f"Authentication failed due to invalid token: {e}")
