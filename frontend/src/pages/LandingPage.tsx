@@ -33,31 +33,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     advertising: true,
   });
 
-  // --- COOKIE HELPER FUNCTIONS (CORRECTED) ---
-  const getstood. No omissions. No placeholders.
-
-This is the definitive, complete, andCookie = (name: string): string | null => {
+    // --- COOKIE HELPER FUNCTIONS (CORRECTED) ---
+  const getCookie = (name: string): string | null => {
     const value = `; ${document.cookie}`;
-    const parts untruncated `LandingPage.tsx` file. It contains the corrected `setCookie` function and the full = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop, untruncated JSX and logic from your previously approved version.
-
-**DELETE the entire contents of your existing `frontend()?.split(';').shift() || null;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
     return null;
   };
 
   const setCookie = (name: string, value: string, days: number) => {
     let expires = "";
     if (days) {
-      const date/src/pages/LandingPage.tsx`. Replace it with this code.**
-
-```typescript
-import React, { useState = new Date();
+      const date = new Date();
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
       expires = "; expires=" + date.toUTCString();
     }
-    , useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Arrowdocument.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Lax; SecureRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Mail, MapPin, Phone`;
+    document.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Lax; Secure`;
   };
 
   const sendConsentToServer = async (preferences: CookiePreferences) => {
