@@ -35,7 +35,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
-    loading: true,
+    loading: true, // Start in a loading state
     error: null,
     isDemoMode: false,
   });
@@ -44,38 +44,38 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = useCallback(async () => {
     try {
       const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
-      setState(prev => ({ ...prev, user: data, loading: false }));
+      setState(prev => ({ ...prev, user: data })); // Keep loading true until the whole check is done
     } catch (error) {
-      console.error("AuthContext: Failed to fetch user profile:", error);
-      setState(prev => ({ ...prev, user: null, loading: false }));
+      console.error("AuthContext: Failed to fetch user profile, signing out.", error);
       await supabase.auth.signOut();
+      setState(prev => ({ ...prev, user: null, session: null }));
     }
   }, []);
 
   useEffect(() => {
+    const checkUserSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setState(prev => ({ ...prev, session, loading: !session }));
+
+      if (session) {
+        await fetchUserProfile();
+      }
+      setState(prev => ({ ...prev, loading: false }));
+    };
+    
+    checkUserSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setState(prev => ({ ...prev, session, error: null }));
-        if (event === 'SIGNED_IN') {
-          await fetchUserProfile();
-        }
-        if (event === 'SIGNED_OUT') {
+      (_event, session) => {
+        if (_event === 'SIGNED_OUT') {
           setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
           navigate('/');
+        } else if (session) {
+          setState(prev => ({ ...prev, session }));
+          fetchUserProfile();
         }
       }
     );
-
-    const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setState(prev => ({ ...prev, session }));
-        await fetchUserProfile();
-      } else {
-        setState(prev => ({ ...prev, loading: false }));
-      }
-    }
-    checkInitialSession();
 
     return () => subscription.unsubscribe();
   }, [fetchUserProfile, navigate]);
@@ -87,19 +87,18 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
         options: { data: { country_code } }
     });
+    setState(prev => ({ ...prev, loading: false }));
     if (error) {
-      setState(prev => ({ ...prev, error: error.message, loading: false }));
       return { success: false, error: error.message };
     }
-    setState(prev => ({ ...prev, loading: false }));
     return { success: true };
   };
 
   const signIn = async (email: string, password: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setState(prev => ({ ...prev, loading: false }));
     if (error) {
-      setState(prev => ({ ...prev, error: error.message, loading: false }));
       return { success: false, error: error.message };
     }
     return { success: true };
