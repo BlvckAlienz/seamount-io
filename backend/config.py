@@ -3,7 +3,6 @@ from typing import Dict, Any, List
 from pydantic_settings import BaseSettings
 
 # --- Static Business Logic Configuration ---
-# This data is part of the application's core logic, not environment-specific.
 FEE_STRUCTURE = {
     'conversion': {'base_fee': 0.020}, 'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 'network': {'base_fee': 0.00}, 'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 'staking': {'reward_rate': 4.5}
 }
@@ -16,16 +15,14 @@ VOLUME_DISCOUNTS = {
 
 class Settings(BaseSettings):
     """
-    Defines and validates all environment variables. This class is a perfect mirror
-    of the required variables in the .env file for the backend to run.
+    Defines and validates all environment variables. This class is the single source of truth for configuration.
+    It reads from a `.env` file for local development and relies on Vercel's environment variables in production.
     """
     # --- Core & Security ---
     DATABASE_URL: str
     JWT_SECRET: str
     COMPLYCUBE_API_KEY: str
     ENCRYPTION_KEY: str
-    TOKEN_EXPIRATION_MINUTES: int
-    MAX_LOGIN_ATTEMPTS: int
     
     # --- Supabase ---
     VITE_SUPABASE_URL: str
@@ -37,10 +34,8 @@ class Settings(BaseSettings):
     FLUTTERWAVE_SECRET_KEY: str
     FLUTTERWAVE_PUBLIC_KEY: str
     COINGECKO_API_KEY: str
-    CHAINLINK_ETH_USD_FEED: str
-    CHAINLINK_BTC_USD_FEED: str
 
-    # --- Algorand Network Configuration ---
+    # --- Algorand Network ---
     ALGORAND_NODE_URL: str
     ALGORAND_INDEXER_URL: str
     ALGORAND_API_KEY: str
@@ -58,30 +53,31 @@ class Settings(BaseSettings):
 
     # --- Email Service ---
     MAIL_SERVER: str
-    MAIL_PORT: int
+    MAIL_PORT: int = 587
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
-    MAIL_STARTTLS: bool
-    MAIL_SSL_TLS: bool
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
 
     # --- Operational ---
-    NODE_ENV: str
     API_URL: str
-    ENVIRONMENT: str
-    MOCK_MODE: bool
+    ENVIRONMENT: str = "development"
+    
+    # --- CORS Configuration (Hardcoded for Security) ---
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:5173", # Local Vite Frontend
+        "https://seamount.io",   # Production Frontend Domain
+        "https://www.seamount.io", # WWW version
+        "https-seamount-io.vercel.app" # Vercel's primary deployment URL for seamount-io
+        # NOTE: Wildcard for preview URLs can be added if needed, but is less secure.
+        # "https://*-blvckalienzs-projects.vercel.app" 
+    ]
 
     # --- Static Business Logic (Not from .env) ---
     FEE_STRUCTURE: Dict[str, Any] = FEE_STRUCTURE
     GEOGRAPHIC_TIERS: Dict[str, List[str]] = GEOGRAPHIC_TIERS
     VOLUME_DISCOUNTS: Dict[str, Any] = VOLUME_DISCOUNTS
-    
-    # --- CORS Configuration (Not from .env) ---
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "https://seamount.io",
-        "https://www.seamount.io",
-    ]
 
     class Config:
         env_file = ".env"
