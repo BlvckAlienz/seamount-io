@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -27,6 +27,14 @@ import { AuthProvider } from './contexts/AuthContext';
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
+  const location = useLocation();
+
+  // This effect listens for the state passed from ProtectedRoute to open the modal
+  useEffect(() => {
+    if ((location.state as any)?.openAuth) {
+      handleOpenAuth('login');
+    }
+  }, [location.state]);
 
   const handleOpenAuth = (view: 'login' | 'register') => {
     setAuthView(view);

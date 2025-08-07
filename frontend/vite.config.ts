@@ -20,9 +20,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     // We are switching to Vite's default, highly optimized, and safer 'esbuild' minifier.
-    // It is significantly faster and less prone to the aggressive tree-shaking errors
-    // that can incorrectly remove `onClick` handlers. This is the most critical fix.
+    // This is significantly faster and less prone to the aggressive tree-shaking errors
+    // that can incorrectly remove `onClick` handlers.
     minify: 'esbuild', 
+    
+    // --- THE CRITICAL FIX IS HERE ---
+    // This configuration explicitly tells the esbuild minifier to be less aggressive.
+    // It prevents it from incorrectly identifying and removing "unused" but critical
+    // parts of React's interactivity chain. This is the direct solution to the
+    // "silent failure" of your event handlers.
+    esbuild: {
+      treeShaking: false,
+    },
   },
 
   // =============================================================================
