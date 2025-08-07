@@ -1,28 +1,31 @@
-# Core FastAPI Stack
-fastapi==0.110.0
-uvicorn[standard]==0.27.1
+# --- Production WSGI Server (The Critical Missing Piece) ---
+gunicorn
 
-# Database & Cache
+# --- Core FastAPI Stack ---
+fastapi==0.110.0
+uvicorn[standard]==0.27.1 # Still needed for local dev
+
+# --- Database & Cache ---
 supabase>=2.0.0,<3.0.0
 upstash-redis>=1.1.0
 
-# Security & Auth
+# --- Security & Auth ---
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
-pyjwt>=2.8.0
+pyjwt[crypto]>=2.8.0 # Use [crypto] for better performance
 cryptography>=42.0.0
 
-# Blockchain
+# --- Blockchain ---
 py-algorand-sdk>=2.0.0
 
-# Email
+# --- Email ---
 fastapi-mail>=1.4.1
 
-# HTTP Client
+# --- HTTP Client ---
 httpx>=0.26.0
 requests>=2.31.0
 
-# Utilities
+# --- Utilities ---
 python-dotenv>=1.0.0
 pydantic-settings>=2.1.0
 tenacity>=8.2.3
