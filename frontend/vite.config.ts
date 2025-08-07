@@ -14,29 +14,26 @@ export default defineConfig({
     },
   },
 
-  // --- Production Build Configuration ---
+  // =============================================================================
+  // DEFINITIVE PRODUCTION BUILD CONFIGURATION
+  // =============================================================================
   build: {
     outDir: 'dist',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true, // Removes console.log from production builds
-      },
-    },
+    // We are switching to Vite's default, highly optimized, and safer 'esbuild' minifier.
+    // It is significantly faster and less prone to the aggressive tree-shaking errors
+    // that can incorrectly remove `onClick` handlers. This is the most critical fix.
+    minify: 'esbuild', 
   },
 
   // =============================================================================
   // DEFINITIVE LOCAL DEVELOPMENT SERVER CONFIGURATION
   // =============================================================================
   server: {
-    // This proxy is ESSENTIAL for your "Two Terminals" local development workflow.
-    // It tells your Vite server (running on port 5173) to forward any request
-    // it sees for '/api' over to your Python backend server (running on port 8000).
     proxy: {
+      // This proxy is ESSENTIAL for your "Two Terminals" local development workflow.
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
-        // The rewrite is removed as it's no longer necessary with the corrected apiClient
       },
     },
   },

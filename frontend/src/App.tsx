@@ -66,7 +66,7 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <ErrorBoundary>
-      {/* The Router MUST be the parent of the AuthProvider to fix the crash */}
+      {/* The Router MUST be the parent of the AuthProvider */}
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Toaster position="top-right" />
