@@ -4,11 +4,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [packages]
-fastapi = "*"
-uvicorn = "*"
-requests = "*"
+# Keep this minimal — you can rely on requirements.txt too.
+# Add any direct Pipfile-managed dependencies here (optional).
+# Example:
+# fastapi = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.10"
+python_version = "3.12"
