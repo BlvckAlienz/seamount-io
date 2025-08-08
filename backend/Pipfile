@@ -4,10 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [packages]
-# Keep this minimal — you can rely on requirements.txt too.
-# Add any direct Pipfile-managed dependencies here (optional).
-# Example:
-# fastapi = "*"
+# leave blank if you prefer using requirements.txt; optional pypi-managed deps go here
 
 [dev-packages]
 
