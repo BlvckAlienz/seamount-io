@@ -4,7 +4,6 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [packages]
-# leave blank if you prefer using requirements.txt; optional pypi-managed deps go here
 
 [dev-packages]
 
