@@ -17,7 +17,6 @@ VOLUME_DISCOUNTS = {
 class Settings(BaseSettings):
     """
     Defines and validates all environment variables. This class is the single source of truth for configuration.
-    It reads from a `.env` file for local development and relies on Vercel's environment variables in production.
     """
     # --- Core & Security ---
     DATABASE_URL: SecretStr
@@ -65,13 +64,11 @@ class Settings(BaseSettings):
     API_URL: str
     ENVIRONMENT: str = "development"
     
-    # --- CORS Configuration ---
-    # This is now a simple string in the .env file, e.g., "http://localhost:5173,https://seamount.io"
-    ALLOWED_ORIGINS_STR: str = Field(alias='ALLOWED_ORIGINS')
+    # --- CORS Configuration (from .env) ---
+    ALLOWED_ORIGINS_STR: str = Field("", alias='ALLOWED_ORIGINS')
     
-    # --- Whitelabel API Service ---
-    # A comma-separated string of API keys in your .env file, e.g., "key1,key2,key3"
-    WHITELISTED_API_KEYS_STR: str = Field(alias='WHITELISTED_API_KEYS')
+    # --- Whitelabel API Service (from .env) ---
+    WHITELISTED_API_KEYS_STR: str = Field("", alias='WHITELISTED_API_KEYS')
 
     # --- Static Business Logic (Not from .env) ---
     FEE_STRUCTURE: Dict[str, Any] = FEE_STRUCTURE
@@ -81,17 +78,20 @@ class Settings(BaseSettings):
     # --- Dynamically Parsed Properties ---
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
+        if not self.ALLOWED_ORIGINS_STR:
+            return []
         return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
     
     @property
     def WHITELISTED_API_KEYS(self) -> Set[str]:
+        if not self.WHITELISTED_API_KEYS_STR:
+            return set()
         return {key.strip() for key in self.WHITELISTED_API_KEYS_STR.split(',')}
 
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
 
-# --- Singleton Accessor ---
 _settings_instance = None
 def get_settings() -> Settings:
     global _settings_instance
@@ -104,6 +104,5 @@ def get_settings() -> Settings:
             raise
     return _settings_instance
 
-# --- Centralized Logger ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
