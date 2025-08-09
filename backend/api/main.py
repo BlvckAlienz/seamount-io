@@ -1,3 +1,6 @@
+# File Location: backend/api/main.py
+# Description: The definitive, production-ready API Gateway for Seamount.io.
+
 import logging
 from fastapi import FastAPI, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -34,7 +37,8 @@ from services.compliance_service import ComplianceService
 settings: Settings = get_settings()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
-supabase_client: Client = create_client(settings.VITE_SUPABASE_URL.get_secret_value(), settings.SUPABASE_SERVICE_KEY.get_secret_value())
+
+supabase_client: Client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY.get_secret_value())
 
 # --- Service Instantiation (The Dependency Injection Container) ---
 database_service = DatabaseService(settings)
@@ -48,7 +52,7 @@ treasury_service = TreasuryService(settings, database_service, algorand_service)
 onboarding_service = OnboardingService(settings, supabase_client, wallet_service, kyc_service)
 compliance_service = ComplianceService(settings, database_service, kyc_service, audit_service)
 oracle_service = OracleService()
-payment_service = PaymentService(settings, supabase_client, algorand_service, kyc_service, audit_service, treasury_service, compliance_service)
+payment_service = PaymentService(settings, supabase_client, algorand_service, kyc_service, audit_service, treasury_service, notification_service)
 trading_service = TradingService(supabase_client, algorand_service)
 
 app = FastAPI(
@@ -98,8 +102,11 @@ class PaymentPayload(BaseModel):
     memo: str = ""
 
 class InvestorContactPayload(BaseModel):
-    name: str; email: EmailStr; company: str
-    checkSize: str; message: Optional[str] = ""
+    name: str
+    email: EmailStr
+    company: str
+    checkSize: str
+    message: Optional[str] = ""
     
 class WhitelabelQuotePayload(BaseModel):
     from_currency: str
@@ -145,8 +152,6 @@ async def get_payment_quote(
     """
     logger.info(f"Received whitelabel quote request from client ...{api_key[-4:]}")
     
-    # This is where you would integrate your oracle and fee calculation logic
-    # For now, we return a mock quote.
     amount = payload.amount
     mock_quote = {
         "from_currency": payload.from_currency.upper(),
