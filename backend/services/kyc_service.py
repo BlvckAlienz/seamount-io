@@ -7,7 +7,7 @@ from supabase import Client
 from fastapi import HTTPException
 from datetime import datetime
 
-from ..config import Settings
+from config import Settings
 from .audit_service import AuditService, AuditEventType
 from .database_service import DatabaseService
 from .kyc_providers.complycube import ComplyCubeVerifier

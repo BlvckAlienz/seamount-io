@@ -10,7 +10,7 @@ from supabase import Client
 from fastapi import HTTPException
 
 # --- Core Dependencies ---
-from ..config import Settings
+from config import Settings
 from .audit_service import AuditService, AuditEventType
 from .kyc_service import KYCService
 from .database_service import DatabaseService

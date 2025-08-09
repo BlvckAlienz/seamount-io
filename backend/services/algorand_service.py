@@ -19,7 +19,7 @@ from algosdk.transaction import (
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Assumes config.py is in the root of the backend directory
-from ..config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 
