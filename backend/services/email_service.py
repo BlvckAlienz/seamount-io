@@ -3,15 +3,24 @@ from typing import List
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# This import will now work correctly because config.py has get_settings and logger.
-from config import get_settings, logger
+# --- Core Dependencies ---
+from config import Settings, logger # Import the base logger and Settings type
 
 class EmailService:
-    def __init__(self):
-        settings = get_settings()
+    """
+    A modern, dependency-injected service for sending transactional emails.
+    """
+    def __init__(self, settings: Settings):
+        """
+        Initializes the service with a pre-configured settings object,
+        following a clean dependency injection pattern.
+        """
+        if not all([settings.MAIL_USERNAME, settings.MAIL_PASSWORD, settings.MAIL_FROM]):
+            raise ValueError("Mail credentials are not fully configured.")
+            
         self.conf = ConnectionConfig(
             MAIL_USERNAME=settings.MAIL_USERNAME,
-            MAIL_PASSWORD=settings.MAIL_PASSWORD,
+            MAIL_PASSWORD=settings.MAIL_PASSWORD.get_secret_value(), # Use .get_secret_value() for SecretStr
             MAIL_FROM=settings.MAIL_FROM,
             MAIL_PORT=settings.MAIL_PORT,
             MAIL_SERVER=settings.MAIL_SERVER,
@@ -28,6 +37,9 @@ class EmailService:
         reraise=True
     )
     async def send_email(self, subject: str, recipients: List[str], body: str):
+        """
+        Sends an email with robust error handling and retries.
+        """
         message = MessageSchema(
             subject=subject,
             recipients=recipients,
@@ -43,16 +55,6 @@ class EmailService:
             logger.error(f"Failed to send email to {recipients}. Error: {e}")
             raise
 
-async def send_test_email():
-    email_service = EmailService()
-    try:
-        await email_service.send_email(
-            subject="Test Email from Seamount.io",
-            recipients=["upskillwithai9@gmail.com"], # Change to a recipient for testing
-            body="<p>This is a test from the robust Seamount.io email service. If you received this, it works.</p>"
-        )
-    except Exception as e:
-        logger.critical(f"Email sending failed after all retries. Final error: {e}")
-
-if __name__ == "__main__":
-    asyncio.run(send_test_email())
+# Note: The test functions `send_test_email` and the `if __name__ == "__main__"` block
+# are removed as they are not needed for the production service and can cause
+# circular dependencies or other issues when run as part of the main application.
