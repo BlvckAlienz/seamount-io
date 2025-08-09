@@ -383,3 +383,8 @@ async def log_audit_event(
         event_type, user_id, details, ip_address, 
         resource_id, severity, critical
     )
+    
+# Backwards compatibility: allow imports of AuditService used elsewhere
+AuditService = AuditLogger
+__all__ = ["AuditLogger", "AuditService", "audit_logger", "log_audit_event"]
+
