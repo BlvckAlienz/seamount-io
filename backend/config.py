@@ -1,5 +1,6 @@
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 # --- Static Business Logic Configuration ---
@@ -19,43 +20,43 @@ class Settings(BaseSettings):
     It reads from a `.env` file for local development and relies on Vercel's environment variables in production.
     """
     # --- Core & Security ---
-    DATABASE_URL: str
-    JWT_SECRET: str
-    COMPLYCUBE_API_KEY: str
-    ENCRYPTION_KEY: str
+    DATABASE_URL: SecretStr
+    JWT_SECRET: SecretStr
+    COMPLYCUBE_API_KEY: SecretStr
+    ENCRYPTION_KEY: SecretStr
     
     # --- Supabase ---
     VITE_SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: str
+    SUPABASE_SERVICE_KEY: SecretStr
     SUPABASE_JWKS_URI: str
     
     # --- External APIs ---
-    ALPHA_VANTAGE_KEY: str
-    FLUTTERWAVE_SECRET_KEY: str
+    ALPHA_VANTAGE_KEY: SecretStr
+    FLUTTERWAVE_SECRET_KEY: SecretStr
     FLUTTERWAVE_PUBLIC_KEY: str
-    COINGECKO_API_KEY: str
+    COINGECKO_API_KEY: SecretStr
 
     # --- Algorand Network ---
     ALGORAND_NODE_URL: str
     ALGORAND_INDEXER_URL: str
-    ALGORAND_API_KEY: str
-    ALGORAND_CREATOR_MNEMONIC: str
+    ALGORAND_API_KEY: SecretStr
+    ALGORAND_CREATOR_MNEMONIC: SecretStr
     ALGORAND_NETWORK: str
     USDS_ASSET_ID: int
 
     # --- Treasury (Sensitive) ---
     TREASURY_ADDRESS: str
-    TREASURY_PRIVATE_KEY: str
+    TREASURY_PRIVATE_KEY: SecretStr
 
     # --- Redis (Upstash) ---
     UPSTASH_REDIS_REST_URL: str
-    UPSTASH_REDIS_REST_TOKEN: str
+    UPSTASH_REDIS_REST_TOKEN: SecretStr
 
     # --- Email Service ---
     MAIL_SERVER: str
     MAIL_PORT: int = 587
     MAIL_USERNAME: str
-    MAIL_PASSWORD: str
+    MAIL_PASSWORD: SecretStr
     MAIL_FROM: str
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
@@ -64,20 +65,27 @@ class Settings(BaseSettings):
     API_URL: str
     ENVIRONMENT: str = "development"
     
-    # --- CORS Configuration (Hardcoded for Security) ---
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:5173", # Local Vite Frontend
-        "https://seamount.io",   # Production Frontend Domain
-        "https://www.seamount.io", # WWW version
-        "https-seamount-io.vercel.app" # Vercel's primary deployment URL for seamount-io
-        # NOTE: Wildcard for preview URLs can be added if needed, but is less secure.
-        # "https://*-blvckalienzs-projects.vercel.app" 
-    ]
+    # --- CORS Configuration ---
+    # This is now a simple string in the .env file, e.g., "http://localhost:5173,https://seamount.io"
+    ALLOWED_ORIGINS_STR: str = Field(alias='ALLOWED_ORIGINS')
+    
+    # --- Whitelabel API Service ---
+    # A comma-separated string of API keys in your .env file, e.g., "key1,key2,key3"
+    WHITELISTED_API_KEYS_STR: str = Field(alias='WHITELISTED_API_KEYS')
 
     # --- Static Business Logic (Not from .env) ---
     FEE_STRUCTURE: Dict[str, Any] = FEE_STRUCTURE
     GEOGRAPHIC_TIERS: Dict[str, List[str]] = GEOGRAPHIC_TIERS
     VOLUME_DISCOUNTS: Dict[str, Any] = VOLUME_DISCOUNTS
+
+    # --- Dynamically Parsed Properties ---
+    @property
+    def ALLOWED_ORIGINS(self) -> List[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
+    
+    @property
+    def WHITELISTED_API_KEYS(self) -> Set[str]:
+        return {key.strip() for key in self.WHITELISTED_API_KEYS_STR.split(',')}
 
     class Config:
         env_file = ".env"
