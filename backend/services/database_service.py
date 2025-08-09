@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from datetime import datetime
 
 # Assumes config.py is in the root of the backend directory
-from ..config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 
