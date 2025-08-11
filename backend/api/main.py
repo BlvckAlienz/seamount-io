@@ -29,6 +29,7 @@ from services.trading_service import TradingService
 from services.treasury_service import TreasuryService
 from services.oracle_service import OracleService
 from services.compliance_service import ComplianceService
+from services.swap_service import SwapService
 
 # --- Configuration & Initialization ---
 settings: Settings = get_settings()
@@ -49,7 +50,9 @@ onboarding_service = OnboardingService(settings, supabase_client, wallet_service
 compliance_service = ComplianceService(settings, database_service, kyc_service, audit_service)
 oracle_service = OracleService(settings, database_service)
 payment_service = PaymentService(settings, supabase_client, algorand_service, kyc_service, audit_service, treasury_service, notification_service)
-trading_service = TradingService(supabase_client, algorand_service)
+# --- THE CRITICAL FIX IS HERE ---
+swap_service = SwapService(settings, algorand_service, database_service, wallet_service)
+trading_service = TradingService(settings, supabase_client, database_service, algorand_service, swap_service)
 
 app = FastAPI(
     title="Seamount.io API Gateway",
@@ -63,7 +66,6 @@ app = FastAPI(
 # MIDDLEWARE & SECURITY
 # =============================================================================
 
-# --- Definitive CORS Middleware (Dynamically Configured) ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -72,18 +74,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- API Key Authentication for Whitelabel Clients ---
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 async def get_api_key(api_key: str = Security(api_key_header)):
-    """Dependency to validate a whitelisted client's API key."""
     if api_key in settings.WHITELISTED_API_KEYS:
         return api_key
     else:
         raise HTTPException(status_code=403, detail="Invalid or missing API Key")
 
-# --- Global Exception Handler ---
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception for request {request.method} {request.url}: {exc}", exc_info=True)
@@ -93,21 +92,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # --- Pydantic Models for API Payloads ---
 class PaymentPayload(BaseModel):
-    recipient_address: str
-    amount: Decimal = Field(..., gt=0)
-    memo: str = ""
+    recipient_address: str; amount: Decimal = Field(..., gt=0); memo: str = ""
 
 class InvestorContactPayload(BaseModel):
-    name: str
-    email: EmailStr
-    company: str
-    checkSize: str
-    message: Optional[str] = ""
+    name: str; email: EmailStr; company: str; checkSize: str; message: Optional[str] = ""
     
 class WhitelabelQuotePayload(BaseModel):
-    from_currency: str
-    to_currency: str
-    amount: float
+    from_currency: str; to_currency: str; amount: float
 
 # =============================================================================
 # API ROUTES
@@ -131,48 +122,28 @@ async def send_p2p_payment(payload: PaymentPayload, current_user: UserProfile = 
     if not current_user.algorand_address:
         raise HTTPException(status_code=400, detail="Wallet not provisioned")
     return await payment_service.process_p2p_payment(
-        sender_profile=current_user.dict(),
-        recipient_address=payload.recipient_address,
-        amount=payload.amount,
-        memo=payload.memo
+        sender_profile=current_user.dict(), recipient_address=payload.recipient_address,
+        amount=payload.amount, memo=payload.memo
     )
 
 @app.get("/api/v1/market/price/{base_currency}/{quote_currency}", tags=["Market Data"])
 async def get_market_price(base_currency: str, quote_currency: str, current_user: UserProfile = Depends(get_current_user)):
-    """
-    Retrieves the current consensus price for a given currency pair from the Oracle Service.
-    """
     try:
         price, metadata = await oracle_service.get_price(base_currency, quote_currency)
-        return {
-            "price": str(price),
-            "metadata": metadata
-        }
+        return {"price": str(price), "metadata": metadata}
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
-    except Exception as e:
-        logger.error(f"Failed to get price for {base_currency}/{quote_currency}: {e}", exc_info=True)
+    except Exception:
         raise HTTPException(status_code=500, detail="Could not retrieve market price.")
 
-# --- Whitelabel Service Endpoint ---
 @app.post("/api/v1/whitelabel/quote", tags=["Whitelabel Services"])
-async def get_payment_quote(
-    payload: WhitelabelQuotePayload,
-    api_key: str = Depends(get_api_key)
-):
-    """
-    A protected, whitelabel-ready endpoint for getting a real-time transfer quote.
-    """
+async def get_payment_quote(payload: WhitelabelQuotePayload, api_key: str = Depends(get_api_key)):
     logger.info(f"Received whitelabel quote request from client ...{api_key[-4:]}")
-    
     amount = payload.amount
     mock_quote = {
-        "from_currency": payload.from_currency.upper(),
-        "to_currency": payload.to_currency.upper(),
-        "amount_to_send": amount,
-        "estimated_fee": amount * 0.02, # Mock 2% fee
-        "estimated_amount_to_receive": amount * 0.98,
-        "quote_id": f"quote_{uuid4()}",
+        "from_currency": payload.from_currency.upper(), "to_currency": payload.to_currency.upper(),
+        "amount_to_send": amount, "estimated_fee": amount * 0.02,
+        "estimated_amount_to_receive": amount * 0.98, "quote_id": f"quote_{uuid4()}",
         "expires_at": (datetime.utcnow() + timedelta(minutes=5)).isoformat()
     }
     return mock_quote
