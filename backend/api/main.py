@@ -1,6 +1,3 @@
-# File Location: backend/api/main.py
-# Description: The definitive, production-ready API Gateway for Seamount.io.
-
 import logging
 from fastapi import FastAPI, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -37,7 +34,6 @@ from services.compliance_service import ComplianceService
 settings: Settings = get_settings()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 supabase_client: Client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY.get_secret_value())
 
 # --- Service Instantiation (The Dependency Injection Container) ---
@@ -51,7 +47,7 @@ algorand_service = AlgorandService(settings)
 treasury_service = TreasuryService(settings, database_service, algorand_service)
 onboarding_service = OnboardingService(settings, supabase_client, wallet_service, kyc_service)
 compliance_service = ComplianceService(settings, database_service, kyc_service, audit_service)
-oracle_service = OracleService()
+oracle_service = OracleService(settings, database_service)
 payment_service = PaymentService(settings, supabase_client, algorand_service, kyc_service, audit_service, treasury_service, notification_service)
 trading_service = TradingService(supabase_client, algorand_service)
 
@@ -140,6 +136,23 @@ async def send_p2p_payment(payload: PaymentPayload, current_user: UserProfile = 
         amount=payload.amount,
         memo=payload.memo
     )
+
+@app.get("/api/v1/market/price/{base_currency}/{quote_currency}", tags=["Market Data"])
+async def get_market_price(base_currency: str, quote_currency: str, current_user: UserProfile = Depends(get_current_user)):
+    """
+    Retrieves the current consensus price for a given currency pair from the Oracle Service.
+    """
+    try:
+        price, metadata = await oracle_service.get_price(base_currency, quote_currency)
+        return {
+            "price": str(price),
+            "metadata": metadata
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Failed to get price for {base_currency}/{quote_currency}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not retrieve market price.")
 
 # --- Whitelabel Service Endpoint ---
 @app.post("/api/v1/whitelabel/quote", tags=["Whitelabel Services"])
