@@ -1,11 +1,5 @@
-// File Location: frontend/src/components/payments/P2PPayment.tsx
-// Description: The definitive, corrected, and production-ready P2P payment component.
-
 import React, { useState } from 'react';
 import { Send, DollarSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-
-// --- CORRECTED IMPORT PATHS ---
-// Using robust, absolute paths with the '@' alias from vite.config.ts
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { apiClient } from '@/config/api';
@@ -26,7 +20,6 @@ const P2PPayment: React.FC<P2PPaymentProps> = ({
   const [memo, setMemo] = useState('');
   const [status, setStatus] = useState<'idle' | 'executing' | 'complete' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [transactionResult, setTransactionResult] = useState<any>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,15 +29,18 @@ const P2PPayment: React.FC<P2PPaymentProps> = ({
     }
     setStatus('executing');
     setError(null);
+
     try {
-      const response = await apiClient.post('/api/v1/payments/p2p', {
+      // The API call is now explicit and absolute.
+      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
         recipient_address: receiverAddress,
         amount: parseFloat(amount),
         memo: memo,
       });
-      setTransactionResult(response.data);
+
       setStatus('complete');
       if (onComplete) onComplete(response.data);
+
     } catch (err) {
       const errorMessage = (err as any).response?.data?.detail || (err instanceof Error ? err.message : 'Payment failed');
       setError(errorMessage);

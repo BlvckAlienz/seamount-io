@@ -1,10 +1,5 @@
-// File Location: frontend/src/components/payments/FlutterwavePayment.tsx
-// Description: The definitive, corrected, and production-ready Flutterwave payment component.
-
 import React, { useState } from 'react';
 import { Check, AlertCircle, Globe, DollarSign } from 'lucide-react';
-
-// --- CORRECTED IMPORT PATHS ---
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { apiClient } from '@/config/api';
@@ -57,7 +52,7 @@ const FlutterwavePayment: React.FC<FlutterwavePaymentProps> = ({
       if (isNaN(amount) || amount <= 0) throw new Error('Please enter a valid amount');
       if (!paymentData.email) throw new Error('Email is required');
       
-      const response = await apiClient.post('/api/v1/payments/initialize-deposit', {
+      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/initialize-deposit`, {
         amount,
         currency: paymentData.currency,
         email: paymentData.email,

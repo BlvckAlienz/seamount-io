@@ -37,7 +37,7 @@ export function useWallet() {
 
     setWalletState(prev => ({ ...prev, loading: true }));
     try {
-      const response = await apiClient.get('/api/v1/wallet/balance');
+      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/balance`);
       setWalletState(prev => ({
         ...prev,
         balance: response.data.balance_usds,
@@ -66,7 +66,7 @@ export function useWallet() {
     }
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/provision-wallets`);
       toast.success("Wallet provisioned successfully!");
       // The AuthContext will automatically refetch the user profile,
       // which will trigger the balance refresh.
@@ -88,7 +88,7 @@ export function useWallet() {
     }
     setWalletState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const response = await apiClient.post('/api/v1/payments/p2p', {
+      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
         recipient_address: recipientAddress,
         amount: amount,
         memo: memo,

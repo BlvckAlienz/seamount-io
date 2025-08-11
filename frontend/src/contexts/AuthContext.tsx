@@ -43,7 +43,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const fetchUserProfile = useCallback(async () => {
     try {
-      const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
+      const { data } = await apiClient.get<UserProfile>(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/profile`);
       setState(prev => ({ ...prev, user: data })); // Keep loading true until the whole check is done
     } catch (error) {
       console.error("AuthContext: Failed to fetch user profile, signing out.", error);

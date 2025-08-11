@@ -28,7 +28,7 @@ const ComplianceDashboard = () => {
     const fetchMetrics = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get('/api/v1/compliance/dashboard');
+        const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/compliance/dashboard`);
         setMetrics(response.data);
       } catch (error) {
         toast.error('Failed to load compliance dashboard data.');

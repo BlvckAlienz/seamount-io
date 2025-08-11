@@ -21,7 +21,7 @@ export function useMarketData() {
     try {
       // All data fetching now goes through our secure, centralized apiClient.
       // This assumes your backend has an endpoint like '/api/v1/portfolio/summary'
-      const response = await apiClient.get('/api/v1/portfolio/summary');
+      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/portfolio/summary`);
       
       const portfolioData: Portfolio = response.data;
       

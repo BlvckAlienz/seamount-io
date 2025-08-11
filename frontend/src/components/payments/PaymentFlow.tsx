@@ -73,7 +73,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
       const amount = parseFloat(paymentData.amount);
       if (isNaN(amount) || amount <= 0) throw new Error('Please enter a valid amount');
 
-      const response = await apiClient.post('/api/v1/payments/initialize-deposit', {
+      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/initialize-deposit`, {
         amount,
         currency: paymentData.currency,
         email: user.email,
