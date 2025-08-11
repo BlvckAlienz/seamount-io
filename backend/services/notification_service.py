@@ -1,159 +1,126 @@
-"""
-Notification Service for Seamount.io - User Communication Hub
-Handles: Transaction alerts, KYC updates, system notifications
-File Location: backend/services/notification_service.py
-"""
-
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 from decimal import Decimal
+
+# --- Core Dependencies ---
+from .email_service import EmailService
 
 logger = logging.getLogger(__name__)
 
 class NotificationService:
-    """Handles all user notifications and alerts"""
+    """
+    Handles all user notifications and alerts by orchestrating different delivery methods.
+    It is a modern, dependency-injected service.
+    """
     
-    def __init__(self):
-        self.notification_queue = []
-        self.email_enabled = True
-        self.sms_enabled = True
-        self.push_enabled = True
+    def __init__(self, email_service: EmailService):
+        """
+        Initializes the service with a pre-configured EmailService client,
+        following a clean dependency injection pattern.
+        """
+        if not email_service:
+            raise ValueError("EmailService dependency is required.")
+            
+        self.email_service = email_service
+        # In a real app, you would also inject SMS and Push notification services here.
+        logger.info("NotificationService initialized successfully.")
         
-    async def send_deposit_confirmation(self, user_id: str, amount: Decimal, usds_balance: Decimal) -> Dict[str, Any]:
-        """Send deposit confirmation notification"""
+    async def send_deposit_confirmation(self, user_email: str, amount: Decimal, usds_balance: Decimal) -> None:
+        """Sends a deposit confirmation email to the user."""
         try:
-            notification = {
-                'type': 'deposit_confirmation',
-                'user_id': user_id,
-                'amount': float(amount),
-                'usds_balance': float(usds_balance),
-                'timestamp': datetime.now(),
-                'message': f"Deposit confirmed: {amount} USD converted to {amount} USDS"
-            }
-            
-            self.notification_queue.append(notification)
-            
-            # Log for monitoring dashboard
-            logger.info(f"Deposit confirmation sent to user {user_id}: {amount} USD")
-            
-            return {'success': True, 'notification_id': f"notif_{user_id}_{int(datetime.now().timestamp())}"}
+            subject = f"Deposit Confirmed: Your Seamount.io Wallet has been Funded"
+            body = f"""
+            <html>
+                <body>
+                    <p>Dear Seamount User,</p>
+                    <p>We are pleased to inform you that your deposit of <strong>{amount:.2f} USD</strong> has been successfully processed.</p>
+                    <p>An equivalent amount of <strong>{amount:.2f} USDS</strong> has been minted to your wallet.</p>
+                    <p>Your new USDS balance is: <strong>{usds_balance:.6f} USDS</strong>.</p>
+                    <p>Thank you for using Seamount.io.</p>
+                </body>
+            </html>
+            """
+            await self.email_service.send_email(subject, [user_email], body)
+            logger.info(f"Deposit confirmation sent to user {user_email}")
             
         except Exception as e:
-            logger.error(f"Deposit notification failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    async def send_transfer_notifications(self, sender_id: str, recipient_id: str, amount: Decimal, fee: Decimal) -> Dict[str, Any]:
-        """Send transfer notifications to both parties"""
+            logger.error(f"Failed to send deposit notification to {user_email}: {e}")
+            # In a production system, this failure would be added to a retry queue.
+
+    async def send_transfer_notifications(self, sender_email: str, recipient_email: str, amount: Decimal, fee: Decimal) -> None:
+        """Sends transfer notification emails to both the sender and recipient."""
         try:
             # Sender notification
-            sender_notification = {
-                'type': 'transfer_sent',
-                'user_id': sender_id,
-                'amount': float(amount),
-                'fee': float(fee),
-                'recipient_id': recipient_id,
-                'timestamp': datetime.now(),
-                'message': f"Transfer sent: {amount} USDS (fee: {fee} USDS)"
-            }
-            
+            sender_subject = f"Transfer Sent: You sent {amount:.2f} USDS"
+            sender_body = f"""
+            <html>
+                <body>
+                    <p>Dear Seamount User,</p>
+                    <p>You have successfully sent <strong>{amount:.2f} USDS</strong>.</p>
+                    <p>A transaction fee of <strong>{fee:.2f} USDS</strong> was applied.</p>
+                    <p>Thank you for using Seamount.io.</p>
+                </body>
+            </html>
+            """
+            await self.email_service.send_email(sender_subject, [sender_email], sender_body)
+
             # Recipient notification
-            recipient_notification = {
-                'type': 'transfer_received',
-                'user_id': recipient_id,
-                'amount': float(amount),
-                'sender_id': sender_id,
-                'timestamp': datetime.now(),
-                'message': f"Transfer received: {amount} USDS"
-            }
+            recipient_subject = f"Transfer Received: You have received {amount:.2f} USDS"
+            recipient_body = f"""
+            <html>
+                <body>
+                    <p>Dear Seamount User,</p>
+                    <p>You have received a new payment of <strong>{amount:.2f} USDS</strong>.</p>
+                    <p>The funds are now available in your Seamount.io wallet.</p>
+                    <p>Thank you for using Seamount.io.</p>
+                </body>
+            </html>
+            """
+            await self.email_service.send_email(recipient_subject, [recipient_email], recipient_body)
             
-            self.notification_queue.extend([sender_notification, recipient_notification])
-            
-            logger.info(f"Transfer notifications sent: {sender_id} → {recipient_id}, {amount} USDS")
-            
-            return {'success': True, 'notifications_sent': 2}
+            logger.info(f"Transfer notifications sent: {sender_email} -> {recipient_email}, {amount} USDS")
             
         except Exception as e:
-            logger.error(f"Transfer notifications failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    async def send_withdrawal_confirmation(self, user_id: str, amount: Decimal, method: str, estimated_arrival: str) -> Dict[str, Any]:
-        """Send withdrawal confirmation notification"""
+            logger.error(f"Failed to send transfer notifications: {e}")
+
+    async def send_withdrawal_confirmation(self, user_email: str, amount: Decimal, method: str, estimated_arrival: str) -> None:
+        """Sends a withdrawal confirmation email to the user."""
         try:
-            notification = {
-                'type': 'withdrawal_confirmation',
-                'user_id': user_id,
-                'amount': float(amount),
-                'method': method,
-                'estimated_arrival': estimated_arrival,
-                'timestamp': datetime.now(),
-                'message': f"Withdrawal confirmed: {amount} USD via {method}"
-            }
-            
-            self.notification_queue.append(notification)
-            
-            logger.info(f"Withdrawal confirmation sent to user {user_id}: {amount} USD via {method}")
-            
-            return {'success': True, 'notification_id': f"notif_{user_id}_{int(datetime.now().timestamp())}"}
-            
+            subject = f"Withdrawal Processed: {amount:.2f} USD is on its way"
+            body = f"""
+            <html>
+                <body>
+                    <p>Dear Seamount User,</p>
+                    <p>Your withdrawal request for <strong>{amount:.2f} USD</strong> via {method} has been processed.</p>
+                    <p>The estimated arrival time for your funds is: <strong>{estimated_arrival}</strong>.</p>
+                    <p>Thank you for using Seamount.io.</p>
+                </body>
+            </html>
+            """
+            await self.email_service.send_email(subject, [user_email], body)
+            logger.info(f"Withdrawal confirmation sent to user {user_email}: {amount} USD via {method}")
+
         except Exception as e:
-            logger.error(f"Withdrawal notification failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    async def send_kyc_update(self, user_id: str, status: str, message: str) -> Dict[str, Any]:
-        """Send KYC status update notification"""
+            logger.error(f"Failed to send withdrawal notification to {user_email}: {e}")
+            
+    async def send_kyc_update(self, user_email: str, status: str, message: str) -> None:
+        """Sends a KYC status update email to the user."""
         try:
-            notification = {
-                'type': 'kyc_update',
-                'user_id': user_id,
-                'status': status,
-                'message': message,
-                'timestamp': datetime.now()
-            }
-            
-            self.notification_queue.append(notification)
-            
-            logger.info(f"KYC update sent to user {user_id}: {status}")
-            
-            return {'success': True, 'notification_id': f"kyc_{user_id}_{int(datetime.now().timestamp())}"}
-            
+            subject = f"Your Identity Verification Status has been Updated"
+            body = f"""
+            <html>
+                <body>
+                    <p>Dear Seamount User,</p>
+                    <p>Your KYC verification status has been updated to: <strong>{status.upper()}</strong>.</p>
+                    <p>{message}</p>
+                    <p>If you have any questions, please contact our support team.</p>
+                    <p>Thank you for using Seamount.io.</p>
+                </body>
+            </html>
+            """
+            await self.email_service.send_email(subject, [user_email], body)
+            logger.info(f"KYC update sent to user {user_email}: {status}")
+
         except Exception as e:
-            logger.error(f"KYC notification failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    async def get_user_notifications(self, user_id: str, limit: int = 50) -> Dict[str, Any]:
-        """Get user notifications for dashboard"""
-        try:
-            user_notifications = [
-                notif for notif in self.notification_queue
-                if notif['user_id'] == user_id
-            ]
-            
-            # Sort by timestamp (newest first)
-            user_notifications.sort(key=lambda x: x['timestamp'], reverse=True)
-            
-            return {
-                'success': True,
-                'notifications': user_notifications[:limit],
-                'total': len(user_notifications)
-            }
-            
-        except Exception as e:
-            logger.error(f"Get notifications failed: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Notification service health check"""
-        try:
-            return {
-                'healthy': True,
-                'queue_size': len(self.notification_queue),
-                'email_enabled': self.email_enabled,
-                'sms_enabled': self.sms_enabled,
-                'push_enabled': self.push_enabled,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Notification health check failed: {str(e)}")
-            return {'healthy': False, 'error': str(e)}
+            logger.error(f"Failed to send KYC notification to {user_email}: {e}")

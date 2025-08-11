@@ -1,50 +1,68 @@
-# File Location: backend/services/onboarding_service.py
-# Description: Orchestrates the multi-step user onboarding journey.
-
-import os
 import logging
 import json
 from supabase import Client
 from upstash_redis import Redis
 from fastapi import HTTPException
 
-from services.wallet_service import WalletService
-# from services.kyc_service import KYCService # To be integrated next
+# --- Core Dependencies ---
+from config import Settings
+from .wallet_service import WalletService
+from .kyc_service import KYCService
 
 logger = logging.getLogger(__name__)
 
 class OnboardingService:
-    def __init__(self, supabase_client: Client, wallet_service: WalletService):
+    """
+    Orchestrates the multi-step user onboarding journey, managing state via Redis
+    and coordinating other services like Wallet and KYC.
+    """
+    def __init__(self, settings: Settings, supabase_client: Client, wallet_service: WalletService, kyc_service: KYCService):
+        """
+        Initializes the service with pre-configured dependencies.
+        """
+        self.settings = settings
         self.supabase = supabase_client
         self.wallet_service = wallet_service
-        # self.kyc_service = kyc_service
+        self.kyc_service = kyc_service
         
-        redis_url = os.environ.get("UPSTASH_REDIS_REST_URL")
-        redis_token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-        if not redis_url or not redis_token:
-            raise ValueError("Upstash Redis environment variables are not set.")
-        self.redis = Redis(url=redis_url, token=redis_token)
+        if not settings.UPSTASH_REDIS_REST_URL or not settings.UPSTASH_REDIS_REST_TOKEN:
+            raise ValueError("Upstash Redis environment variables are not set for OnboardingService.")
+        
+        self.redis = Redis(
+            url=settings.UPSTASH_REDIS_REST_URL, 
+            token=settings.UPSTASH_REDIS_REST_TOKEN.get_secret_value()
+        )
+        logger.info("OnboardingService initialized successfully.")
 
     async def get_onboarding_status(self, user_id: str) -> dict:
-        """Retrieves the user's current onboarding step and data from Redis."""
+        """
+        Retrieves the user's current onboarding step from Redis. If not in Redis,
+        it infers the step from the user's profile in the database.
+        """
         try:
             progress_json = await self.redis.get(f"onboarding:{user_id}")
             if progress_json:
                 return json.loads(progress_json)
             
-            # If no progress in Redis, check their profile for completion status
-            profile_res = await self.supabase.table("user_profiles").select("kyc_level").eq("id", user_id).single().execute()
-            kyc_level = profile_res.data.get("kyc_level", 0)
+            profile_res = await self.supabase.table("user_profiles").select("kyc_level, algorand_address").eq("id", user_id).single().execute()
             
-            # Define logic for what step corresponds to what kyc_level
-            current_step = 1
-            if kyc_level == 1: current_step = 2 # Basic info done
-            if kyc_level == 2: current_step = 3 # KYC docs submitted
+            if not profile_res.data:
+                raise HTTPException(status_code=404, detail="User profile not found.")
+            
+            user = profile_res.data
+            kyc_level = user.get("kyc_level", 0)
+            has_wallet = user.get("algorand_address") is not None
+            
+            # Infer the current step based on the user's profile state
+            current_step = 1 # Welcome
+            if kyc_level >= 1: current_step = 2 # Identity
+            if kyc_level >= 2: current_step = 3 # Wallet
+            if has_wallet: current_step = 4 # Security/Complete
             
             return {"step": current_step, "data": {}}
             
         except Exception as e:
-            logger.error(f"Failed to get onboarding progress for user {user_id}: {e}")
+            logger.error(f"Failed to get onboarding status for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not retrieve onboarding status.")
 
     async def save_onboarding_progress(self, user_id: str, step: int, data: dict) -> dict:
@@ -55,7 +73,7 @@ class OnboardingService:
             await self.redis.set(f"onboarding:{user_id}", json.dumps(progress), ex=86400)
             return {"status": "success", "message": "Progress saved"}
         except Exception as e:
-            logger.error(f"Failed to save onboarding progress for user {user_id}: {e}")
+            logger.error(f"Failed to save onboarding progress for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not save progress.")
 
     async def advance_step(self, user_id: str, current_step: int, step_data: dict) -> dict:
@@ -63,42 +81,48 @@ class OnboardingService:
         Processes the data for the current step and advances the user to the next.
         This is the core logic of the "confidence-building machine".
         """
-        # --- Step 1: Basic Info ---
-        if current_step == 1:
-            # Update user_profiles table with name, country, etc. from step_data
-            await self.supabase.table("user_profiles").update({
-                "first_name": step_data.get("first_name"),
-                "last_name": step_data.get("last_name"),
-                "country_code": step_data.get("country_code"),
-                "kyc_level": 1, # Advance trust level
-                "kyc_status": "pending_documents"
-            }).eq("id", user_id).execute()
-            return {"next_step": 2, "message": "Profile updated. Please proceed to identity verification."}
+        try:
+            # --- Step 1: Basic Info ---
+            if current_step == 1:
+                await self.supabase.table("user_profiles").update({
+                    "first_name": step_data.get("first_name"),
+                    "last_name": step_data.get("last_name"),
+                    "country_code": step_data.get("country_code"),
+                    "kyc_level": 1,
+                    "kyc_status": "pending_documents"
+                }).eq("id", user_id).execute()
+                return {"next_step": 2, "message": "Profile updated. Please proceed to identity verification."}
 
-        # --- Step 2: KYC Document Submission ---
-        elif current_step == 2:
-            # This is where you would call your kyc_service to start the ComplyCube session
-            # kyc_session = await self.kyc_service.start_verification(user_id, step_data)
-            await self.supabase.table("user_profiles").update({
-                "kyc_status": "pending_verification"
-            }).eq("id", user_id).execute()
-            return {"next_step": 3, "message": "KYC documents submitted for verification."}
+            # --- Step 2: KYC Document Submission ---
+            elif current_step == 2:
+                user_profile_res = await self.supabase.table("user_profiles").select("email, country_code").eq("id", user_id).single().execute()
+                if not user_profile_res.data:
+                    raise HTTPException(status_code=404, detail="User not found for KYC.")
+                
+                kyc_session = await self.kyc_service.start_verification_session(
+                    user_id, 
+                    user_profile_res.data['email'], 
+                    user_profile_res.data['country_code']
+                )
+                return {"next_step": 3, "message": "KYC session initiated.", "kyc_flow_url": kyc_session.get('flow_url')}
 
-        # --- Step 3: Wallet Provisioning ---
-        elif current_step == 3:
-            wallets = await self.wallet_service.provision_user_wallet(user_id)
-            return {"next_step": 4, "message": "Wallet created successfully.", "wallets": wallets}
-            
-        # --- Step 4: Onboarding Complete ---
-        elif current_step == 4:
-            await self.supabase.table("user_profiles").update({
-                "kyc_status": "approved", # Assume KYC is approved for now
-                "kyc_level": 2
-            }).eq("id", user_id).execute()
-            
-            # Clean up the temporary onboarding data from Redis
-            await self.redis.delete(f"onboarding:{user_id}")
-            return {"onboarding_complete": True, "message": "Welcome to Seamount!"}
+            # --- Step 3: Wallet Provisioning ---
+            elif current_step == 3:
+                wallets = await self.wallet_service.provision_user_wallet(user_id)
+                return {"next_step": 4, "message": "Wallet created successfully.", "wallets": wallets}
+                
+            # --- Step 4: Onboarding Complete ---
+            elif current_step == 4:
+                # This step is now just for final confirmation. The kyc_status will be updated by a webhook.
+                await self.supabase.table("user_profiles").update({
+                    "kyc_level": 2 # Mark as fully onboarded pending verification
+                }).eq("id", user_id).execute()
+                
+                await self.redis.delete(f"onboarding:{user_id}")
+                return {"onboarding_complete": True, "message": "Welcome to Seamount!"}
 
-        else:
-            raise HTTPException(status_code=400, detail="Invalid onboarding step.")
+            else:
+                raise HTTPException(status_code=400, detail="Invalid onboarding step.")
+        except Exception as e:
+            logger.error(f"Failed to advance onboarding step for user {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="An error occurred while processing your request.")
