@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
 from datetime import datetime, timedelta
+import os
 
 # --- Core Components: The Foundation ---
 from config import get_settings, Settings
@@ -102,14 +103,33 @@ class InvestorContactPayload(BaseModel):
     
 class WhitelabelQuotePayload(BaseModel):
     from_currency: str; to_currency: str; amount: float
+    
+# =============================================================================
+# ROOT & HEALTH ROUTES
+# =============================================================================
+
+@app.get("/", tags=["System"])
+async def root():
+    """
+    Root health check for Render & external monitoring.
+    This ensures Render sees the service as alive.
+    """
+    return {
+        "status": "healthy",
+        "service": "Seamount.io API Gateway",
+        "message": "Cross-border payments API is running"
+    }
+
+@app.get("/health", tags=["System"])
+async def generic_health_check():
+    """
+    Minimal /health endpoint for uptime checks.
+    """
+    return {"status": "ok"}
 
 # =============================================================================
 # API ROUTES
 # =============================================================================
-
-@app.get("/api/v1/health", tags=["System"])
-async def health_check():
-    return {"status": "healthy"}
 
 @app.post("/api/v1/investor-contact", tags=["Public"])
 async def investor_contact(payload: InvestorContactPayload):
