@@ -1,4 +1,3 @@
-import os
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional
@@ -10,7 +9,6 @@ from algosdk.transaction import (
     AssetTransferTxn,
     PaymentTxn,
     AssetOptInTxn,
-    SuggestedParams,
 )
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
@@ -24,6 +22,10 @@ class AlgorandService:
     This service handles raw on-chain operations like transfers, minting, and balance checks.
     """
     def __init__(self, settings: Settings):
+        """
+        Initializes the service with a pre-configured settings object,
+        following a clean dependency injection pattern.
+        """
         self.settings = settings
         self.algod_client = algod.AlgodClient(
             settings.ALGORAND_API_KEY.get_secret_value(), 
@@ -36,8 +38,6 @@ class AlgorandService:
             raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
         
         try:
-            # --- THE CRITICAL FIX IS HERE ---
-            # We must call .get_secret_value() to access the raw string from the SecretStr object
             mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
             self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
             self.treasury_address = account.address_from_private_key(self.treasury_private_key)
@@ -57,7 +57,7 @@ class AlgorandService:
         """
         logger.info(f"Waiting for confirmation of transaction: {tx_id}")
         last_round = self.algod_client.status().get("last-round")
-        for i in range(10): # Check up to 10 rounds
+        for _ in range(10): # Check up to 10 rounds
             try:
                 txinfo = self.algod_client.pending_transaction_info(tx_id)
                 if txinfo.get("confirmed-round") and txinfo.get("confirmed-round") > 0:
@@ -68,9 +68,9 @@ class AlgorandService:
                 last_round += 1
             except AlgodHTTPError as e:
                 if 'not found' in str(e).lower():
-                    logger.warning(f"Pending transaction {tx_id} not found, checking confirmed transactions.")
+                    logger.warning(f"Pending transaction {tx_id} not found, it might already be confirmed.")
                     # In a production system with an indexer, you would query it here as a fallback.
-                    pass
+                    pass 
         raise TimeoutError(f"Transaction {tx_id} was not confirmed after multiple rounds.")
 
     async def get_usds_balance(self, address: str) -> Decimal:
@@ -105,12 +105,8 @@ class AlgorandService:
             amount_base_units = int(amount * (10**self.decimals))
 
             txn = AssetTransferTxn(
-                sender=sender_address,
-                sp=params,
-                receiver=receiver_address,
-                amt=amount_base_units,
-                index=self.usds_asset_id,
-                note=memo.encode()
+                sender=sender_address, sp=params, receiver=receiver_address,
+                amt=amount_base_units, index=self.usds_asset_id, note=memo.encode()
             )
             signed_txn = txn.sign(sender_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
@@ -118,25 +114,20 @@ class AlgorandService:
             logger.info(f"Successfully sent {amount} USDS from {sender_address} to {receiver_address}. TxID: {tx_id}")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to send USDS: {e}")
+            logger.error(f"Failed to send USDS: {e}", exc_info=True)
             raise
 
     async def mint_usds(self, recipient_address: str, amount: Decimal, fiat_reference: str) -> str:
         """
         Mints new USDS from the treasury account to a recipient.
-        This represents the creation of new stablecoins against new fiat reserves.
         """
         try:
             params = self.algod_client.suggested_params()
             amount_base_units = int(amount * (10**self.decimals))
 
             txn = AssetTransferTxn(
-                sender=self.treasury_address,
-                sp=params,
-                receiver=recipient_address,
-                amt=amount_base_units,
-                index=self.usds_asset_id,
-                note=f"USDS Mint. Ref: {fiat_reference}".encode()
+                sender=self.treasury_address, sp=params, receiver=recipient_address,
+                amt=amount_base_units, index=self.usds_asset_id, note=f"USDS Mint. Ref: {fiat_reference}".encode()
             )
             signed_txn = txn.sign(self.treasury_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
@@ -144,13 +135,12 @@ class AlgorandService:
             logger.info(f"Successfully minted {amount} USDS to {recipient_address}. TxID: {tx_id}")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to mint USDS: {e}")
+            logger.error(f"Failed to mint USDS: {e}", exc_info=True)
             raise
 
     async def burn_usds(self, user_private_key: str, amount: Decimal, fiat_reference: str) -> str:
         """
         Burns USDS by transferring it from a user's account back to the treasury.
-        This represents the redemption of stablecoins for fiat.
         """
         try:
             user_address = account.address_from_private_key(user_private_key)
@@ -158,12 +148,8 @@ class AlgorandService:
             amount_base_units = int(amount * (10**self.decimals))
 
             txn = AssetTransferTxn(
-                sender=user_address,
-                sp=params,
-                receiver=self.treasury_address,
-                amt=amount_base_units,
-                index=self.usds_asset_id,
-                note=f"USDS Burn. Ref: {fiat_reference}".encode()
+                sender=user_address, sp=params, receiver=self.treasury_address,
+                amt=amount_base_units, index=self.usds_asset_id, note=f"USDS Burn. Ref: {fiat_reference}".encode()
             )
             signed_txn = txn.sign(user_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
@@ -171,13 +157,12 @@ class AlgorandService:
             logger.info(f"Successfully burned {amount} USDS from {user_address}. TxID: {tx_id}")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to burn USDS: {e}")
+            logger.error(f"Failed to burn USDS: {e}", exc_info=True)
             raise
 
     async def prepare_opt_in_transaction(self, user_address: str) -> Dict[str, Any]:
         """
         Prepares a USDS opt-in transaction for the user to sign on the frontend.
-        Returns the unsigned transaction encoded as a base64 string.
         """
         try:
             if not account.is_valid_address(user_address):
@@ -194,13 +179,12 @@ class AlgorandService:
                 "tx_id": txn.get_txid()
             }
         except Exception as e:
-            logger.error(f"Failed to prepare opt-in transaction for {user_address}: {e}")
+            logger.error(f"Failed to prepare opt-in transaction for {user_address}: {e}", exc_info=True)
             raise
 
     async def fund_account_for_opt_in(self, user_address: str) -> Optional[str]:
         """
         Funds a new user account with the minimum balance required for an asset opt-in.
-        This is a critical step for user experience, abstracting away gas fees.
         """
         try:
             min_balance = 100000  # 0.1 ALGO for base account
@@ -209,11 +193,8 @@ class AlgorandService:
 
             params = self.algod_client.suggested_params()
             txn = PaymentTxn(
-                sender=self.treasury_address,
-                sp=params,
-                receiver=user_address,
-                amt=total_funding,
-                note=b"Seamount Account Funding for USDS Opt-in"
+                sender=self.treasury_address, sp=params, receiver=user_address,
+                amt=total_funding, note=b"Seamount Account Funding for USDS Opt-in"
             )
             signed_txn = txn.sign(self.treasury_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
@@ -221,5 +202,5 @@ class AlgorandService:
             logger.info(f"Successfully funded {user_address} with {total_funding} microAlgos. TxID: {tx_id}")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to fund account {user_address}: {e}")
+            logger.error(f"Failed to fund account {user_address}: {e}", exc_info=True)
             raise

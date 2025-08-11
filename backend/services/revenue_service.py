@@ -1,243 +1,128 @@
-// Location: /backend/services/revenue_service.py
-
-import asyncio
 import logging
-import functools
-from typing import List, Dict, Optional
-from decimal import Decimal
-from supabase import create_client, Client
-import os
-from datetime import datetime
+from typing import Dict, Any
+from decimal import Decimal, getcontext
+from datetime import datetime, timedelta
 
+# --- Core Dependencies ---
+from config import Settings
+from .database_service import DatabaseService
+
+# Set decimal precision for financial calculations
+getcontext().prec = 28
 logger = logging.getLogger(__name__)
 
-# Add retry decorator
-def retry(max_attempts=3, backoff_factor=2):
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            for attempt in range(max_attempts):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    if attempt == max_attempts - 1:
-                        # Last attempt failed, re-raise the exception
-                        logger.error(f"Failed after {max_attempts} attempts: {e}")
-                        raise
-                    # Calculate backoff time
-                    backoff_time = backoff_factor ** attempt
-                    logger.warning(f"Attempt {attempt + 1} failed, retrying in {backoff_time}s: {e}")
-                    await asyncio.sleep(backoff_time)
-        return wrapper
-    return decorator
+class RevenueService:
+    """
+    Handles all revenue collection and tracking logic, using the definitive
+    business rules from the application's central configuration.
+    """
+    def __init__(self, settings: Settings, db_service: DatabaseService):
+        """
+        Initializes the service with pre-configured dependencies.
+        """
+        self.settings = settings
+        self.db_service = db_service
+        logger.info("RevenueService initialized successfully.")
 
-class TradingSignal:
-    def __init__(self, symbol: str, action: str, entry_price: float, stop_loss: float, 
-                 take_profit: float, confidence: float, timeframe: str, setup_type: str, 
-                 risk_profile: str, quantity: float, timestamp: float, user_id: str):
-        self.symbol = symbol
-        self.action = action
-        self.entry_price = float(entry_price)
-        self.stop_loss = float(stop_loss)
-        self.take_profit = float(take_profit)
-        self.confidence = confidence
-        self.timeframe = timeframe
-        self.setup_type = setup_type
-        self.risk_profile = risk_profile
-        self.quantity = float(quantity)
-        self.timestamp = timestamp
-        self.user_id = user_id
-
-class SeamountTradingAgent:
-    def __init__(self):
-        self.supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-        self.logger = logger
-        self.max_retries = 3
-        # Initialize database connection early
-        self._init_database()
-        
-    def _init_database(self):
-        """Initialize database connection with error handling"""
+    async def _log_revenue(self, amount: Decimal, fee_type: str, transaction_id: str, status: str = 'collected') -> None:
+        """Logs a revenue event to the database via the DatabaseService."""
         try:
-            if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
-                self.logger.warning("Supabase credentials missing, using demo mode")
+            revenue_log = {
+                "amount": float(amount),
+                "fee_type": fee_type,
+                "transaction_id": transaction_id,
+                "status": status
+            }
+            # This call assumes a 'log_event' or similar method in your DatabaseService
+            # that can write to a 'revenue_log' table.
+            await self.db_service.log_event("revenue_log", revenue_log)
         except Exception as e:
-            self.logger.error(f"Database initialization error: {e}")
+            logger.error(f"Revenue logging failed for tx_id {transaction_id}: {e}", exc_info=True)
+            # In a production system, this would go to a dead-letter queue for retry.
 
-    @retry(max_attempts=3, backoff_factor=2)
-    async def generate_trading_signals(self) -> List[TradingSignal]:
-        market_data = await self.fetch_market_data()
-        signals = []
-        
-        user_response = await self.supabase.table("users").select("id").execute()
-        user_ids = [row["id"] for row in user_response.data]
-        
-        for user_id in user_ids:
-            for symbol, data in market_data.items():
-                signal = self._generate_signal(symbol, data, user_id)
-                if signal:
-                    signals.append(signal)
-        
-        self.logger.info(f"Generated {len(signals)} trading signals")
-        return signals
+    def _get_user_tier_info(self, country_code: str) -> str:
+        """Helper to determine a user's geographic tier from the central config."""
+        for tier, countries in self.settings.GEOGRAPHIC_TIERS.items():
+            if country_code.upper() in countries:
+                return tier
+        return 'tier_3' # Default to the most restrictive tier
 
-    def _generate_signal(self, symbol: str, data: Dict, user_id: str) -> Optional[TradingSignal]:
+    async def collect_and_log_fee(self, amount: Decimal, sender_country: str, recipient_country: str, transaction_id: str) -> Decimal:
+        """
+        Calculates and logs the definitive transaction fee based on the business logic
+        defined in the central FEE_STRUCTURE.
+        """
         try:
-            price = data["price"]
-            ma_24h = data["ma_24h"]
-            timestamp = datetime.utcnow().timestamp()
+            sender_tier = self._get_user_tier_info(sender_country)
+            fee_structure = self.settings.FEE_STRUCTURE
+            fee_type = "cross_border"
             
-            if price > ma_24h:
-                return TradingSignal(
-                    symbol=symbol,
-                    action="BUY",
-                    entry_price=price,
-                    stop_loss=price * 0.98,
-                    take_profit=price * 1.05,
-                    confidence=0.7,
-                    timeframe="1h",
-                    setup_type="momentum",
-                    risk_profile="medium",
-                    quantity=1000.0,
-                    timestamp=timestamp,
-                    user_id=user_id
-                )
-            elif price < ma_24h:
-                return TradingSignal(
-                    symbol=symbol,
-                    action="SELL",
-                    entry_price=price,
-                    stop_loss=price * 1.02,
-                    take_profit=price * 0.95,
-                    confidence=0.7,
-                    timeframe="1h",
-                    setup_type="momentum",
-                    risk_profile="medium",
-                    quantity=1000.0,
-                    timestamp=timestamp,
-                    user_id=user_id
-                )
-            return None
-        except Exception as e:
-            self.logger.error(f"Signal generation failed for {symbol}: {e}")
-            return None
-
-    async def fetch_market_data(self) -> Dict:
-        try:
-            response = await self.supabase.table("market_data").select("*").execute()
-            if response.data:
-                return {row["symbol"]: row for row in response.data}
+            if sender_country == recipient_country:
+                fee_type = "p2p_local"
+                fee_key = sender_tier if sender_tier in fee_structure['processing'] else 'tier_2_standard'
+                fee_rate = fee_structure['processing'][fee_key]
+                fee_amount = amount * Decimal(str(fee_rate))
             else:
-                return {
-                    "ALGO-USDS": {"price": 0.15, "ma_24h": 0.14, "volume": 100000},
-                    "USDT-USDS": {"price": 1.0, "ma_24h": 1.01, "volume": 50000}
-                }
-        except Exception as e:
-            self.logger.error(f"Market data fetch failed: {e}")
-            raise
+                fee_key = sender_tier if sender_tier in fee_structure['bridge'] else 'tier_2_standard'
+                fee_rate = fee_structure['bridge'][fee_key]
+                fee_amount = amount * Decimal(str(fee_rate))
+                min_fee = Decimal(str(fee_structure['bridge']['min_fee']))
+                max_fee = Decimal(str(fee_structure['bridge']['max_fee']))
+                fee_amount = max(min_fee, min(fee_amount, max_fee))
 
-class SeamountPaymentAgent:
-    def __init__(self):
-        self.supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-        self.logger = logger
-        self.max_retries = 3
-        self._init_database()
+            final_fee = fee_amount.quantize(Decimal('0.01'))
 
-    def _init_database(self):
-        """Initialize database connection with error handling"""
-        try:
-            if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
-                self.logger.warning("Supabase credentials missing, using demo mode")
-        except Exception as e:
-            self.logger.error(f"Database initialization error: {e}")
-
-    @retry(max_attempts=3, backoff_factor=2)
-    async def optimize_route(self, sender_address: str, receiver_address: str, amount: float) -> Dict:
-        if not await self.check_aml(sender_address) or not await self.check_aml(receiver_address):
-            raise ValueError("AML compliance check failed")
-        
-        route = {
-            "route": [sender_address, receiver_address],
-            "estimated_fee": amount * Decimal("0.001"),
-            "estimated_time": 10,
-            "compliance_status": "approved"
-        }
-        
-        self.logger.info(f"Optimized payment route for {amount} USDS")
-        return route
-
-    async def check_aml(self, address: str) -> bool:
-        try:
-            response = await self.supabase.table("sanctions_list").select("address").eq("address", address).execute()
-            is_clean = len(response.data) == 0
-            self.logger.info(f"AML check for {address}: {'PASSED' if is_clean else 'FAILED'}")
-            return is_clean
-        except Exception as e:
-            self.logger.error(f"AML check failed for {address}: {e}")
-            return False
-
-class RevenueTracker:
-    def __init__(self):
-        self.supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
-        self.logger = logger
-        self.max_retries = 3
-        self._init_database()
-
-    def _init_database(self):
-        """Initialize database connection with error handling"""
-        try:
-            if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
-                self.logger.warning("Supabase credentials missing, using demo mode")
-        except Exception as e:
-            self.logger.error(f"Database initialization error: {e}")
-
-    @retry(max_attempts=3, backoff_factor=2)
-    async def record_fee(self, fee_type: str, amount: Decimal, transaction_id: str) -> bool:
-        await self.supabase.table("revenue").insert({
-            "revenue_type": fee_type,
-            "amount": float(amount),
-            "currency": "USDS",
-            "transaction_id": transaction_id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "month": datetime.utcnow().month,
-            "year": datetime.utcnow().year
-        }).execute()
-        
-        self.logger.info(f"Recorded {fee_type} fee: {amount} USDS")
-        await self.update_daily_revenue(datetime.utcnow().date().isoformat(), fee_type, amount)
-        return True
-
-    async def update_daily_revenue(self, date: str, fee_type: str, amount: Decimal) -> None:
-        try:
-            response = await self.supabase.table("daily_revenue").select("*").eq("date", date).execute()
+            await self._log_revenue(final_fee, fee_type, transaction_id)
             
-            if response.data:
-                existing = response.data[0]
-                update_data = {
-                    f"{fee_type}_fees": float(existing.get(f"{fee_type}_fees", 0) + amount),
-                    "total": float(existing.get("total", 0) + amount)
-                }
-                await self.supabase.table("daily_revenue").update(update_data).eq("date", date).execute()
-            else:
-                await self.supabase.table("daily_revenue").insert({
-                    "date": date,
-                    f"{fee_type}_fees": float(amount),
-                    "total": float(amount),
-                    "created_at": datetime.utcnow().isoformat()
-                }).execute()
-                
-            self.logger.info(f"Updated daily revenue for {date}")
+            logger.info(f"Fee collected for tx {transaction_id}: {final_fee} ({fee_type})")
+            return final_fee
             
         except Exception as e:
-            self.logger.error(f"Daily revenue update failed: {e}")
-            raise
+            logger.error(f"Fee collection failed for tx {transaction_id}: {e}", exc_info=True)
+            return Decimal('0')
 
-    async def get_monthly_target(self, month: int, year: int) -> Optional[Decimal]:
+    async def collect_trading_fee(self, profit_amount: Decimal, transaction_id: str) -> Decimal:
+        """Calculates and logs a performance fee from trading profits."""
         try:
-            response = await self.supabase.table("monthly_targets").select("target_amount").eq("month", month).eq("year", year).execute()
-            if response.data:
-                return Decimal(str(response.data[0]["target_amount"]))
-            return None
+            # Assuming a simple 20% performance fee, can be moved to config
+            performance_fee_rate = Decimal('0.20')
+            fee_amount = profit_amount * performance_fee_rate
+            
+            await self._log_revenue(fee_amount, 'trading_performance', transaction_id)
+            
+            logger.info(f"Trading fee collected: {fee_amount} from {profit_amount} profit")
+            return fee_amount
+            
         except Exception as e:
-            self.logger.error(f"Monthly target fetch failed: {e}")
-            return None
+            logger.error(f"Trading fee collection failed: {e}", exc_info=True)
+            return Decimal('0')
+
+    async def get_revenue_summary(self) -> Dict[str, Any]:
+        """Gets a real revenue summary for a dashboard by querying the database."""
+        try:
+            # These complex queries should be handled by dedicated methods in the DatabaseService
+            # to keep this service clean and focused on business logic.
+            today_summary = await self.db_service.get_revenue_summary_for_period(days=1)
+            total_summary = await self.db_service.get_revenue_summary_for_period()
+            
+            total_revenue = Decimal(str(total_summary.get('total_revenue', '0')))
+            total_count = total_summary.get('transaction_count', 0)
+            
+            return {
+                'today_revenue': float(today_summary.get('total_revenue', 0)),
+                'today_transactions': today_summary.get('transaction_count', 0),
+                'total_revenue': float(total_revenue),
+                'total_transactions': total_count,
+                'avg_fee': float(total_revenue / total_count) if total_count > 0 else 0.0
+            }
+            
+        except Exception as e:
+            logger.error(f"Revenue summary generation failed: {e}", exc_info=True)
+            return {
+                'today_revenue': 0.0,
+                'today_transactions': 0,
+                'total_revenue': 0.0,
+                'total_transactions': 0,
+                'avg_fee': 0.0,
+                'error': 'Could not generate revenue summary.'
+            }
