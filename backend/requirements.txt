@@ -15,9 +15,9 @@ python-jose[cryptography]>=3.3.0
 pyjwt[crypto]>=2.8.0
 cryptography>=42.0.0
 
-# --- Blockchain & DEX ---
+# --- Blockchain ---
 py-algorand-sdk>=2.0.0
-tinyman-py-sdk # <-- THE CORRECTED, FINAL NAME
+# tinyman-py-sdk has been permanently removed due to build incompatibility.
 
 # --- Email ---
 fastapi-mail>=1.4.1
