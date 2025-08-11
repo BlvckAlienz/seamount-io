@@ -17,7 +17,7 @@ cryptography>=42.0.0
 
 # --- Blockchain & DEX ---
 py-algorand-sdk>=2.0.0
-tinyman-py-sdk # <-- THE CRITICAL NEW DEPENDENCY
+tinyman-py-sdk-v2 # <-- THE CRITICAL FIX IS HERE
 
 # --- Email ---
 fastapi-mail>=1.4.1
