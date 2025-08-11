@@ -1,7 +1,3 @@
-# File Location: backend/services/algorand_service.py
-# Description: The definitive, complete service for all Algorand blockchain interactions.
-# Forged from the robust logic of usds_asset_manager.py.
-
 import os
 import logging
 from decimal import Decimal
@@ -18,7 +14,6 @@ from algosdk.transaction import (
 )
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# Assumes config.py is in the root of the backend directory
 from config import Settings
 
 logger = logging.getLogger(__name__)
@@ -30,19 +25,25 @@ class AlgorandService:
     """
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.algod_client = algod.AlgodClient(settings.ALGORAND_API_KEY, settings.ALGORAND_NODE_URL)
+        self.algod_client = algod.AlgodClient(
+            settings.ALGORAND_API_KEY.get_secret_value(), 
+            settings.ALGORAND_NODE_URL
+        )
         self.usds_asset_id = settings.USDS_ASSET_ID
-        self.decimals = 6  # Standard for USDS on Algorand
+        self.decimals = 6
 
         if not settings.ALGORAND_CREATOR_MNEMONIC:
             raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
         
         try:
-            self.treasury_private_key = mnemonic.to_private_key(settings.ALGORAND_CREATOR_MNEMONIC)
+            # --- THE CRITICAL FIX IS HERE ---
+            # We must call .get_secret_value() to access the raw string from the SecretStr object
+            mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
+            self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
             self.treasury_address = account.address_from_private_key(self.treasury_private_key)
             logger.info(f"AlgorandService initialized. Treasury Address: {self.treasury_address}")
         except Exception as e:
-            logger.critical(f"Failed to derive treasury account from mnemonic: {e}")
+            logger.critical(f"Failed to derive treasury account from mnemonic: {e}", exc_info=True)
             raise
 
     @retry(
@@ -66,13 +67,10 @@ class AlgorandService:
                 self.algod_client.status_after_block(last_round + 1)
                 last_round += 1
             except AlgodHTTPError as e:
-                # If transaction is not found, it might already be confirmed and pruned from pending list
                 if 'not found' in str(e).lower():
                     logger.warning(f"Pending transaction {tx_id} not found, checking confirmed transactions.")
-                    # Fallback to check confirmed transaction history (requires indexer)
-                    # confirmed_tx = self.indexer_client.transaction(tx_id)
-                    # return confirmed_tx
-                    pass # Placeholder if no indexer
+                    # In a production system with an indexer, you would query it here as a fallback.
+                    pass
         raise TimeoutError(f"Transaction {tx_id} was not confirmed after multiple rounds.")
 
     async def get_usds_balance(self, address: str) -> Decimal:
