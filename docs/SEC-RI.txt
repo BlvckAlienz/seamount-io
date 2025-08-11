@@ -1,0 +1,167 @@
+SEC REGULATORY INCUBATION PROGRAMME
+1. Regulatory Incubation for FinTech Entrepreneurs: 
+The SEC Regulatory Incubation (RI) Program is designed to apply prescribed basic but limited regulation to supervise new Fintech business models and processes carrying out full or ancillary Capital Market activities. It is aimed at innovators who have been assessed and deemed eligible for SEC regulation, but for which no Rules exist or for which amendment of current Rules are required. The RI guidelines thus, prescribes limited regulatory requirements that allow a set of potential market operators (Fintech Firms) to operate for a specified period.  Click to Download the RI Guidelines
+
+2. The  Accelerated Regulatory Incubation Program (ARIP):
+The ARIP is to accelerate the onboarding of  Virtual Assets Service Providers (VASPs) and other Digital Investment Service providers (DISPs) seeking  to be registered with Commission. Click to Download the ARIP Framework
+
+Regulatory Incubation (RI) Program as it relates to the Capital Market
+
+The Regulatory Incubation (RI) program of the Commission is designed for promoters of new business models and processes that are currently carrying out full or ancillary Capital Market activities without the required authorization through the use of technology. The RI Program is an interim measure to aid the evolution of effective regulation without compromising market integrity and within limits that ensure investor protection. The Program will admit eligible business models and processes in batches for a period of one-year.  The categories to be admitted will be determined by submissions received via an initial assessment form.
+
+A. Who can Apply
+
+Registered Capital Market Operators
+Unregistered Fintech innovators that require regulation
+Firms of all sizes
+Special interest in firms that want to enhance investor participation in the Nigeria Capital Market 
+B. Eligibility Requirements for Application to participate in RI
+
+If you want to apply to participate in the Regulatory Incubation Program, you must demonstrate that you meet our 5 eligibility criteria below:
+
+Your innovation is:
+
+for application in the Nigeria Capital Market
+safe for investors
+a genuine innovation that introduces a new product/process to serve specific investor needs
+able to solves existing compliance or supervisory issues (optional)
+ready for testing
+Please provide as much information as possible about how you meet these criteria when submitting your application.
+
+C. Please Note: If your model is any of the following, we already have regulations for them and you should not apply for Regulatory Incubation:
+
+Crowdfunding
+Robo Advisory/Digital Investment Advisory
+Sub-broker Serving Multiple brokers using a digital platform
+Digital Fund/Portfolio Management
+Please visit our Rules & Regulations portal for guidance on registration requirements.
+
+Steps for Admission into the RI Program
+
+The RI program operates by admitting identified Fintech business models and processes in cohorts for a one-year period. Participation in the RI program encompasses an Initial Assessment Phase and the Regulatory Incubation Phase. Applicants must first complete the initial assessment phase before approval is granted to proceed to the regulatory incubation phase. The categories to be admitted into each cohort is determined based on submissions received through the initial assessment form.
+Phase 1: Initial Assessment
+Activity
+Step 1	Access and complete the RI Initial Assessment (RIA) Form
+Step 2	Receive response/acknowledgment of Submission:
+1.    Where a framework exists for regulating the applicant’s innovation, guidance will be provided on the next steps;
+2.    Where the proposed innovation is eligible for further consideration, but no framework exists for its regulation, the applicant will be directed to fill and submit the Regulatory Incubation (RI) Application Form.
+Step 3	Comply with steps provided in Step 2 above or complete and submit the RI application Form as applicable
+Step 4	Receive response on submitted RI application on one of the following: a)    Whether or not admission has been granted to the RI Program and the Terms and Conditions of Admission; b)    An indication of a future date when Applicant will be admitted to the Regulatory Incubation Program; c)    Reasons for rejecting the innovation and the next steps to take where application is declined.
+Phase 2: Regulatory Incubation Program
+Step 1	File undertaking to abide by the terms, conditions and restrictions of admittance into the RI Program
+Step 2	Commence Regulatory Incubation Process
+Step 3	File quarterly report to the Commission Receive feedback from the RI Team on quarterly filings
+Step 4	Receive guidance on applicable regulatory regime and regulatory requirements within at 10 Months of successful operation
+Step 5	Exit from the program with clear directives on next steps to take at 12th Month
+Step 6	Commence registration process or terminate activity where RI process is not successful.
+
+
+Accessing and Completing the RI Initial Assessment Form (IAF)
+If you are an individual, group or a business (registered or seeking to register with the Commission) that intends to launch an innovative product, process or platform in the SEC Regulatory Incubation Program, you are required to fill the Initial Assessment Form (via the link below) to enable the Commission provide guidance on the RI application process, the eligibility criteria and the information to be furnished to the Commission.
+
+Note: Before you access the form, please have available and ready to provide the following:
+
+Fee of Fifty Thousand Naira (N50,000.00 ), only (paid online via the portal and Non-refundable)
+An end-to-end schematic diagram illustrating proposed business process (with explanatory notes)
+Certified copies of all incorporation documents
+Copy of any previous registration, regulatory license or authorization
+
+
+FREQUENTLY ASKED QUESTIONS ON SEC REGULATORY INCUBATION (RI) PROGRAM
+ 
+
+Q1: What is the Objective of RI?
+RI is designed to enable the Commission gain clearer understanding of new innovations in the Capital Market to ensure that it provides the necessary regulations that will both facilitate innovation and enhance investor protection and Market integrity. It entails the provision of basic requirements that allow potential operators (Fintech Firms) to operate under some prescribed but limited provisions for a specified period.
+
+Q2: Who can apply for SEC Regulatory Incubation?
+Any Company incorporated in Nigeria or licensed by a Securities Market Regulator in an equivalent jurisdiction offering or intending to offer innovative product, solutions or service or applying technology in an innovative way to provide investment and securities business in the Nigerian Capital Market.
+
+Q3: Where should an application be submitted to?
+All applications are completed and submitted online through the SEC website (www.sec.gov.ng/finport/). Access is granted based on pre-eligibility assessment.
+
+Q4: Is there a specific period for RI Application?
+There is a specific period for applications which will be announced periodically. However Interested applicants need to complete an initial assessment form to first ascertain eligibility prior to each announcement.
+
+Q5: Would application to be in the Regulatory Incubation incur any administrative fee(s)?
+Applicants are required to pay a filing fee of N50,000. at the submission of initial assessment form and N200,000. at the submission of the RI application.
+
+Q7: What happens to an application assessed ineligible for Regulatory Incubation
+Firms found not to be eligible for RI will be advised by the Commission on the next course of action.
+
+Q8: Are unsuccessful applicants refunded?
+Both Initial eligibility assessment and RI application fees are non-refundable.
+
+Q9: How long is the Regulatory Incubation Process?
+The RI process is for a period of one Year. However, this period may be extended if the Commission determines the need for it.
+
+Q10: Can a FinTech Firm be asked to exit the RI before the expiration period?
+A FinTech Firm may be asked to exit the RI if it is deemed ineligible to continue or when substantive rules are issued for regulation of the specific innovation
+
+Q11: What happens if a Firm does not contact the Commission for eligibility assessment?
+Firms operating illegally in the SEC Regulatory sphere without a SEC Registration or admittance into the RI process will face enforcement actions.
+
+Q12: How long will an assessment of an RI application take?
+The process of assessment and admittance into the RI program spans a period not exceeding 60-days.
+
+Q13: Are FinTech Firms admitted into RI program recognised as SEC Registered Capital Market Operators (CMOs)?
+Approval into SEC RI is NOT SEC Registration as a CMO. Successful Fintech Entrepreneurs at the end of the RI process are required to apply for a full SEC registration.
+
+Q14. If I have made a submission already via the FinTech Assessment Form, do I need to make another submission to determine my eligibility for the RI program?
+Yes. You will have to complete and submit a new FinTech Assessment form.
+
+
+The ARIP framework is to facilitate the onboarding of Entities that proposed to carry on virtual asset activities and whose applications have been filed with the Commission, and for other potential applicants that perform such activities. It enables qualified entities to obtain approval in principle from the Commission pending when the Digital Assets Rules become operational. 
+
+Eligibility
+
+Entities who can apply into the ARIP shall:
+
+be incorporated and have an office in Nigeria and its Chief Executive Officer/Managing Director or its equivalent shall be resident in Nigeria;
+be performing investments and securities business;
+be seeking registration or have pending virtual asset related applications with the Commission.
+Application Steps
+Participation in the ARIP shall encompass an Initial Assessment Phase and an Application Phase.
+An applicant for ARIP shall first complete and submit an initial assessment form via the SEC ePortal. (A non-refundable assessment fee of 200,000 (Two Hundred Thousand) Naira only, shall apply. 
+On receipt of an initial assessment submission, the Commission shall review and notify the applicant of its eligibility status.
+Where the applicant is found eligible, the applicant shall be directed to complete and submit an application into the ARIP.
+Where the application is cleared by the Commission, it shall issue an approval-in-principle (AIP) to the eligible applicant to operate in line with the ISA, 2007 and the Commission’s Rules and regulations.
+Qualified applicants shall operate within the ARIP for a period to be determined by the Commission.
+The Commission may defer approval or reject applications to ensure the orderliness of the capital market.
+Any decision by the Commission to deny admission into the ARIP shall be communicated with justification.
+Application Requirements – Checklist
+
+An Entity seeking to operate within ARIP shall:
+
+File an applicant through a registered solicitor or adviser;
+Where an applicant is regulated by another sectoral regulator, the applicant shall submit to the Commission a “no objection” or approval letter from the relevant sectorial regulator;
+Pay a non-refundable processing fee of 2,000,000.00 (Two Million) Naira, only;
+Show evidence of required shareholders’ fund and Current Fidelity Bond covering at least 25% of the required shareholders’ fund;
+An application shall be accompanied by the following:
+a) Form SEC 2 and 2D – (A minimum of 4 Sponsored Individuals who shall be principal officers including Managing Director and Compliance Officers).
+
+b) A copy each of the following corporate documents duly certified by the CAC;
+
+i. Certificate of Incorporation (original to be sighted);
+
+ii. Memorandum and Articles of Association which shall include the power to perform the specified function;
+
+iii. CAC Form(s) showing Statement of Share Capital, Return of Allotment, and particulars of Directors;
+
+c) Latest audited accounts or audited statement of affairs of the company in the case of a new company;
+
+d) Tax Identification Number and Clearance Certificate;
+
+e) Valid means of identification (including NIN and BVN) of the sponsored individuals;
+
+f) Evidence of registration with Nigerian Financial Intelligence Unit (NFIU);
+
+g) A sworn undertaking:
+
+by a director or the company secretary, to abide by SEC Rules and Regulations and Investments and Securities Act No.29 of 2007 as may be amended from time to time;
+That the information or document that is furnished by the applicant to the Commission is not false or misleading nor does it contain any material omission;
+the applicant will be able to operate an orderly, fair and transparent market in relation to the securities that are offered or traded, on or through its platform;
+to keep proper records and render returns as may be specified by the Commission from time to time, signed by a director or the company secretary;
+Please refer to the ARIP framework for additional requirements.
+
+Click here to Download the ARIP Framework>>
+Click here to commence the application process>>
