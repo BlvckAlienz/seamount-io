@@ -8,6 +8,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthModal from './components/auth/AuthModal';
+import InvestorContact from './components/InvestorContact'; // Added
 
 // --- Page Imports ---
 import LandingPage from './pages/LandingPage';
@@ -23,7 +24,6 @@ import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 // --- Context ---
 import { AuthProvider } from './contexts/AuthContext';
 
-// AppContent handles the routing and modal state, keeping the main App component clean.
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
@@ -38,6 +38,7 @@ const AppContent: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+        <Route path="/contact" element={<InvestorContact />} /> {/* Added */}
         
         {/* Protected Routes with Progressive KYC Levels */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
@@ -51,7 +52,7 @@ const AppContent: React.FC = () => {
         {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
 
-        {/* Fallback Route - redirect unknown paths to the landing page */}
+        {/* Fallback Route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <AuthModal 
@@ -66,7 +67,6 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <ErrorBoundary>
-      {/* The Router MUST be the parent of the AuthProvider to fix the crash */}
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <Toaster position="top-right" />

@@ -1,9 +1,10 @@
+// File Location: frontend/src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
 import { UserProfile } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface AuthState {
   session: Session | null;
@@ -14,8 +15,8 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  signUp: (email: string, password: string, country_code: string) => Promise<{ success: boolean; error?: string }>;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, country_code: string, options?: { captchaToken?: string }) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string, options?: { captchaToken?: string }) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   enterDemoMode: () => void;
   onboardingStep?: number;
@@ -35,7 +36,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
-    loading: true, // Start in a loading state
+    loading: true,
     error: null,
     isDemoMode: false,
   });
@@ -43,8 +44,8 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const fetchUserProfile = useCallback(async () => {
     try {
-      const { data } = await apiClient.get<UserProfile>(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/profile`);
-      setState(prev => ({ ...prev, user: data })); // Keep loading true until the whole check is done
+      const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
+      setState(prev => ({ ...prev, user: data }));
     } catch (error) {
       console.error("AuthContext: Failed to fetch user profile, signing out.", error);
       await supabase.auth.signOut();
@@ -80,28 +81,61 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => subscription.unsubscribe();
   }, [fetchUserProfile, navigate]);
 
-  const signUp = async (email: string, password: string, country_code: string) => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    const { error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: { data: { country_code } }
-    });
-    setState(prev => ({ ...prev, loading: false }));
-    if (error) {
-      return { success: false, error: error.message };
+  const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        if (err.status >= 400 && err.status < 500) {
+          attempt++;
+          const delay = Math.pow(2, attempt) * 1000;
+          console.error(`Auth retry ${attempt}/${maxRetries} after ${delay}ms: ${err.message}`);
+          await new Promise(res => setTimeout(res, delay));
+        } else {
+          throw err;
+        }
+      }
     }
-    return { success: true };
+    throw new Error('Max retries reached');
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, country_code: string, options: { captchaToken?: string } = {}) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setState(prev => ({ ...prev, loading: false }));
-    if (error) {
-      return { success: false, error: error.message };
+    try {
+      const { error } = await retryWithBackoff(() => 
+        supabase.auth.signUp({ 
+          email, 
+          password,
+          options: { data: { country_code }, captchaToken: options.captchaToken }
+        })
+      );
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      setState(prev => ({ ...prev, error: err.message }));
+      console.error('SignUp error:', err);
+      return { success: false, error: err.message };
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
     }
-    return { success: true };
+  };
+
+  const signIn = async (email: string, password: string, options: { captchaToken?: string } = {}) => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const { error } = await retryWithBackoff(() => 
+        supabase.auth.signInWithPassword({ email, password, options })
+      );
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      console.error('SignIn error:', err);
+      setState(prev => ({ ...prev, error: err.message }));
+      return { success: false, error: err.message };
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const signOut = async () => {
