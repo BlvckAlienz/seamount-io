@@ -1,8 +1,8 @@
 #!/bin/bash
 
 API_URL="https://seamount-api.onrender.com/api/v1"
-BEARER_TOKEN="REPLACE_WITH_REAL_USER_JWT"
-API_KEY="REPLACE_WITH_REAL_WHITELABEL_KEY"
+BEARER_TOKEN="I6hCDIA5CkpdCKEsrQdqflpzckUoDKBkJ446zY88+2lPeGozVPYHT+1nikdAjD2Twmu3S2PrhJNbDtQqPRvh6Q=="
+API_KEY="smnt_test_-GKRaXHivxucWFE-m_Tz4MQLMT_IxKQ1VcXxD1gOcxw"
 
 echo "=== 🚀 Seamount API Smoke Test Suite ==="
 echo "API URL: $API_URL"

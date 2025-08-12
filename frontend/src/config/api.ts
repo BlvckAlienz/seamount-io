@@ -1,36 +1,33 @@
 // File Location: /frontend/src/config/api.ts
-// The definitive, simplified API client for a unified monorepo deployment.
+// Updated to support staging token override for automated smoke tests.
 
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
-// Vite automatically makes VITE_ variables available via import.meta.env
-// The baseURL should be the relative path to our API, as defined in vercel.json rewrites.
+// Base URL (Vercel will set VITE_API_URL in environment vars)
 const baseURL = import.meta.env.VITE_API_URL || '/api';
+
+// Staging override token (optional, only used if no Supabase session)
+const STAGING_TOKEN = import.meta.env.VITE_STAGING_TOKEN || '';
 
 export const apiClient = axios.create({
   baseURL: baseURL,
 });
 
-// This interceptor is critical. It automatically adds the user's login token
-// to every single request sent to our backend.
 apiClient.interceptors.request.use(
   async (config) => {
-    // Get the active session from Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.access_token) {
-      // If a session exists, add the JWT as a Bearer token
-      config.headers.Authorization = `Bearer ${session.access_token}`;
+    let token = STAGING_TOKEN;
+
+    if (!token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token || '';
     }
-    
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
   },
-  (error) => {
-    // Handle any request errors
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
-
-// We no longer need the complex getApiBaseUrl or buildApiUrl functions.
-// The setup is now simple, robust, and correct for the Vercel monorepo architecture.
