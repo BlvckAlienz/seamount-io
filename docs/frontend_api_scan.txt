@@ -1,0 +1,16 @@
+$ cd frontend/src
+grep -R '/api/v1/' --include=\*.{js,jsx,ts,tsx}
+components/admin/AlertsTable.tsx:        const response = await apiClient.get<Alert[]>(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/compliance/alerts?status=pending`);
+components/payments/CrossBorderPayment.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
+components/payments/FlutterwavePayment.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/initialize-deposit`, {
+components/payments/P2PPayment.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
+components/payments/PaymentFlow.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/initialize-deposit`, {
+contexts/AuthContext.tsx:      const { data } = await apiClient.get<UserProfile>(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/profile`);
+hooks/useMarketData.ts:      // This assumes your backend has an endpoint like '/api/v1/portfolio/summary'
+hooks/useMarketData.ts:      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/portfolio/summary`);
+hooks/useWallet.ts:      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/balance`);
+hooks/useWallet.ts:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/provision-wallets`);
+hooks/useWallet.ts:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
+pages/admin/ComplianceDashboard.tsx:        const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/compliance/dashboard`);
+pages/LandingPage.tsx:      await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/consent/cookies`, { preferences });
+pages/LandingPage.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/investor-contact`, formState);
