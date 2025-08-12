@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { User, Mail, Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -192,7 +192,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               {validRequirements.lowercase ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains lowercase
             </li>
             <li className={validRequirements.number ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.number ? <CheckCircle size=16} className="inline mr-1" /> : '•'} Contains number
+              {validRequirements.number ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains number
             </li>
             <li className={validRequirements.special ? 'text-green-500' : 'text-red-500'}>
               {validRequirements.special ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains special character
