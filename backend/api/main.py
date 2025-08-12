@@ -68,6 +68,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://seamount.io",
+        "https://www.seamount.io",  # Added for www subdomain
         "http://localhost:3000"
     ],
     allow_credentials=True,

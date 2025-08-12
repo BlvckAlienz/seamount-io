@@ -1,10 +1,11 @@
 // File Location: /frontend/src/config/api.ts
 // Updated to support staging token override for automated smoke tests.
+// Fixed baseURL to avoid path duplication.
 
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
-// Base URL (Vercel will set VITE_API_URL in environment vars)
+// Base URL (no trailing /api/v1 – calls will append it)
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 // Staging override token (optional, only used if no Supabase session)
