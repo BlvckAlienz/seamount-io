@@ -1,35 +1,28 @@
-# --- Production WSGI Server (CRITICAL for Render) ---
-gunicorn
+# --- Production WSGI Server ---
+gunicorn==21.2.0
 
 # --- Core FastAPI Stack ---
 fastapi==0.110.0
 uvicorn[standard]==0.27.1
+fastapi-mail==1.5.0
 
-# --- Database & Cache ---
-supabase>=2.0.0,<3.0.0
-upstash-redis>=1.1.0
+# --- Database ---
+supabase==2.0.0
 
 # --- Security & Auth ---
-passlib[bcrypt]>=1.7.4
-python-jose[cryptography]>=3.3.0
-pyjwt[crypto]>=2.8.0
-cryptography>=42.0.0
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+pyjwt[crypto]==2.8.0
+cryptography==42.0.5
 
 # --- Blockchain ---
-py-algorand-sdk>=2.0.0
-# tinyman-py-sdk has been permanently removed due to build incompatibility.
-
-# --- Email ---
-fastapi-mail>=1.4.1
+py-algorand-sdk==2.0.0
 
 # --- HTTP & Data ---
-httpx>=0.26.0
-requests>=2.31.0
-yfinance
-numpy
-aiohttp>=3.9.0
+httpx==0.24.1
+aiohttp==3.9.3
 
 # --- Utilities ---
-python-dotenv>=1.0.0
-pydantic-settings>=2.1.0
-tenacity>=8.2.3
+python-dotenv==1.0.1
+pydantic-settings==2.6.1
+tenacity==8.2.3
