@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { User, Mail, Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
+import countryList from 'react-select-country-list';
 
 interface IRegisterFormProps {
   onSuccess?: () => void;
@@ -18,12 +20,14 @@ interface FormData {
   firstName: string;
   lastName: string;
   countryCode: string;
+  captchaToken: string | null;
 }
 
 interface FormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  captcha?: string;
   form?: string;
 }
 
@@ -35,6 +39,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     firstName: '',
     lastName: '',
     countryCode: 'US',
+    captchaToken: null,
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [validRequirements, setValidRequirements] = useState<Record<string, boolean>>({
@@ -48,6 +53,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   const [authError, setAuthError] = useState<string | null>(null);
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const countryOptions = useMemo(() => countryList().getData(), []);
 
   const validatePassword = (password: string) => {
     const requirements = {
@@ -67,11 +73,22 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     if (name === 'password') validatePassword(value);
   };
 
+  const handleCaptchaVerify = (token: string) => {
+    setFormData((prev) => ({ ...prev, captchaToken: token }));
+    setFormErrors((prev) => ({ ...prev, captcha: undefined }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({});
     setAuthError(null);
-    console.log('Sign Up submitted:', formData);
+    console.log('Sign Up submitted:', { ...formData, captchaToken: 'REDACTED' });
+
+    if (!formData.captchaToken) {
+      setFormErrors({ captcha: 'Please complete the CAPTCHA.' });
+      toast.error('Please complete the CAPTCHA');
+      return;
+    }
 
     if (!validatePassword(formData.password)) {
       setFormErrors({ password: 'Password does not meet all requirements.' });
@@ -92,6 +109,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
         firstName: formData.firstName,
         lastName: formData.lastName,
         countryCode: formData.countryCode,
+        captchaToken: formData.captchaToken,
       });
       console.log('Sign Up successful:', formData.email);
       toast.success('Registration successful! Check your email to verify.');
@@ -228,10 +246,22 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
             onChange={handleInputChange}
             className="w-full pl-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
           >
-            <option value="US">United States</option>
-            <option value="KE">Kenya</option>
-            {/* Add more countries as needed */}
+            {countryOptions.map((country: { value: string; label: string }) => (
+              <option key={country.value} value={country.value}>
+                {country.label}
+              </option>
+            ))}
           </select>
+        </div>
+        <div>
+          <HCaptcha
+            sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY}
+            onVerify={handleCaptchaVerify}
+            theme="dark"
+          />
+          {formErrors.captcha && (
+            <p className="text-sm text-red-400 mt-2">{formErrors.captcha}</p>
+          )}
         </div>
         {(authError || formErrors.form || formErrors.password || formErrors.confirmPassword) && (
           <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
