@@ -1,0 +1,2 @@
+Sitekey: dbfa4782-ecb6-4090-8c0e-bc867bfe8aac
+A secret is used to verify your hCaptcha account: ES_2868c004a0494b0c9ee3fb6b2082b221

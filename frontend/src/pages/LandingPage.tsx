@@ -95,10 +95,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const calculateYield = useCallback(() => {
     const amount = parseFloat(stakeAmount) || 0;
-    let apy = 0.045;
-    if (stakePeriod === '30') apy = 0.035;
-    else if (stakePeriod === '90') apy = 0.040;
-    else if (stakePeriod === '180') apy = 0.042;
+    let apy = 0.039;
+    if (stakePeriod === '30') apy = 0.030;
+    else if (stakePeriod === '90') apy = 0.033;
+    else if (stakePeriod === '180') apy = 0.036;
     const annualYield = amount * apy;
     setRewards(`$${annualYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   }, [stakeAmount, stakePeriod]);
@@ -135,10 +135,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, []);
 
   const faqs = [
-    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle within seconds, not days. Our blockchain technology, powered by Algorand, enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
+    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle in < 10mins, not days. Our blockchain technology, powered by Algorand, enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
     { question: "What are the fees for using Seamount?", answer: "Our fees are typically just 2.6-3.8% per transaction, compared to 12-15% with traditional banks. There are no hidden fees or exchange rate markups." },
-    { question: "Is USDS stablecoin regulated and secure?", answer: "Yes, USDS is fully compliant with local regulations and maintains a 1:1 USD peg. All USDS tokens are fully backed by USD reserves, ensuring stability and security." },
-    { question: "Which African countries are supported?", answer: "We currently support 60+ countries including US, Nigeria, South Africa, Kenya, Ghana, Uganda, with more countries being added regularly. Our platform integrates with local payment methods including Flutterwave, Paystack, and bank transfers." }
+    { question: "Is USDS stablecoin regulated and secure?", answer: "Yes, USDS is fully compliant with local SEC & CBN regulations and maintains a 1:1 USD peg. All USDS tokens are fully backed by USD reserves, ensuring stability and security." },
+    { question: "Which African countries are supported?", answer: "We currently support 60+ countries including Nigeria, South Africa, Kenya, Ghana, Uganda, with more countries being added regularly. Our platform integrates with local payment methods including Flutterwave, Transfi, Paystack, and bank transfers." }
   ];
 
   return (
@@ -146,7 +146,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       <nav className="bg-black/60 backdrop-blur-lg sticky top-0 z-50 border-b border-gray-800/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
-            <a href="/" className="flex items-center space-x-3"><img src="/seamount-logo.png" alt="Seamount Logo" className="w-10 h-10 object-contain" /><span className="text-xl font-bold">Seamount.io</span></a>
+            <a href="/" className="flex items-center space-x-3"><img src="frontend/public/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain" /><span className="text-xl font-bold">Seamount.io</span></a>
             <div className="hidden md:flex items-center space-x-8"><a href="#features" className="text-gray-300 hover:text-white">Features</a><a href="#stablecoin" className="text-gray-300 hover:text-white">USDS</a><a href="#about" className="text-gray-300 hover:text-white">About</a><a href="#contact" className="text-gray-300 hover:text-white">Contact</a></div>
             <div className="flex items-center space-x-2"><Button variant="ghost" onClick={() => onOpenAuth('login')}>Sign In</Button><Button onClick={() => onOpenAuth('register')} elevated>Sign Up</Button></div>
           </div>
@@ -172,7 +172,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in"><h2 className="text-3xl md:text-4xl font-bold mb-4">Revolutionizing Financial Access</h2><p className="text-gray-400 max-w-2xl mx-auto">Our platform is designed to solve real-world challenges of cross-border payments for emerging African markets.</p></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[ { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in minutes, not days. Our blockchain technology, powered by Algorand, enables immediate settlement across borders." }, { icon: <DollarSign className="h-8 w-8 text-green-500" />, title: "Ultra-Low Fees", description: "Pay pennies, not percentages. Save up to 87% compared to traditional banks and remittance services." }, { icon: <Shield className="h-8 w-8 text-purple-500" />, title: "USDS Stablecoin", description: "Our fully-reserved, USD-pegged stablecoin ensures stable value and offers staking rewards." }, { icon: <TrendingUp className="h-8 w-8 text-yellow-500" />, title: "AI-Powered Trading", description: "Let AI optimize your investment portfolio with advanced algorithmic trading and risk management." }, { icon: <Zap className="h-8 w-8 text-red-500" />, title: "Staking Rewards", description: "Earn competitive yields by holding USDS tokens. The longer you stake, the higher your returns." }, { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for Flutterwave, Paystack, bank transfers, and mobile money." } ].map((feature, index) => (<div key={index} className="p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 hover:border-blue-700/50 transition-all duration-300 shadow-xl backdrop-blur-sm hover:-translate-y-2 fade-in"><div className="rounded-full w-14 h-14 flex items-center justify-center bg-gray-800/80 mb-5 border border-gray-700/50 shadow-inner">{feature.icon}</div><h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3><p className="text-gray-400">{feature.description}</p></div>))}
+              {[ { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in < 10mins, not days. Our blockchain technology, powered by Algorand, enables immediate settlement across borders." }, { icon: <DollarSign className="h-8 w-8 text-green-500" />, title: "Ultra-Low Fees", description: "Pay pennies, not percentages. Save up to 87% compared to traditional banks and remittance services." }, { icon: <Shield className="h-8 w-8 text-purple-500" />, title: "USDS Stablecoin", description: "Our fully-reserved, USD-pegged stablecoin ensures stable value and offers staking rewards." }, { icon: <TrendingUp className="h-8 w-8 text-yellow-500" />, title: "AI-Powered Trading", description: "Let AI optimize your investment portfolio with advanced algorithmic trading and risk management." }, { icon: <Zap className="h-8 w-8 text-red-500" />, title: "Staking Rewards", description: "Earn competitive yields by holding USDS tokens. The longer you stake, the higher your returns." }, { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for Flutterwave, Paystack, bank transfers, and mobile money." } ].map((feature, index) => (<div key={index} className="p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 hover:border-blue-700/50 transition-all duration-300 shadow-xl backdrop-blur-sm hover:-translate-y-2 fade-in"><div className="rounded-full w-14 h-14 flex items-center justify-center bg-gray-800/80 mb-5 border border-gray-700/50 shadow-inner">{feature.icon}</div><h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3><p className="text-gray-400">{feature.description}</p></div>))}
             </div>
           </div>
         </section>
@@ -181,8 +181,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in"><h2 className="text-3xl md:text-4xl font-bold mb-4">About Seamount</h2><p className="text-gray-400 max-w-2xl mx-auto">A stablecoin network that bridges traditional finance and Web3 to democratize financial access for emerging African markets.</p></div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="fade-in"><div className="mb-8"><h3 className="text-2xl font-bold mb-4 text-white">Our Mission</h3><p className="text-gray-300 leading-relaxed">Seamount is on a mission to transform cross-border payments in emerging African markets. We're building a stablecoin infrastructure that enables instant, low-cost transfers between countries, making financial services accessible to everyone regardless of location.</p></div></div>
-              <div className="fade-in"><div className="grid grid-cols-2 gap-4"><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-blue-400">60+</div><div className="text-gray-400">Countries Reached</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-purple-400">500K USDS</div><div className="text-gray-400">Total Token Supply</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-green-400">87%</div><div className="text-gray-400">Cost Savings</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-yellow-400">1.5K+</div><div className="text-gray-400">Projected Users (3-6 months)</div></div></div></div>
+              <div className="fade-in"><div className="mb-8"><h3 className="text-2xl font-bold mb-4 text-white">Our Mission</h3><p className="text-gray-300 leading-relaxed">Seamount is on a mission to transform cross-border payments in emerging African markets by building stablecoin infrastructure that enables near instant, low-cost transfers between countries, making financial services accessible to everyone regardless of location.</p></div></div>
+              <div className="fade-in"><div className="grid grid-cols-2 gap-4"><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-blue-400">60+</div><div className="text-gray-400">Countries Reached</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-purple-400">500K USDS</div><div className="text-gray-400">Total Token Supply</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-green-400">87%</div><div className="text-gray-400">Cost Savings</div></div><div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50"><div className="text-3xl font-bold text-yellow-400">6K+</div><div className="text-gray-400">Projected Users (12 months)</div></div></div></div>
             </div>
           </div>
         </section>
@@ -235,8 +235,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div>
               <h4 className="text-white font-medium mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/legal/privacy-policy" className="text-gray-400 hover:text-white">Privacy Policy</a></li>
-                <li><a href="/legal/terms-of-service" className="text-gray-400 hover:text-white">Terms of Service</a></li>
+                <li><a href="frontend/public/legal/privacy-policy.html" className="text-gray-400 hover:text-white">Privacy Policy</a></li>
+                <li><a href="frontend/public/legal/terms-of-service.html" className="text-gray-400 hover:text-white">Terms of Service</a></li>
               </ul>
             </div>
           </div>
