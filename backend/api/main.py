@@ -28,11 +28,11 @@ logger = logging.getLogger(__name__)
 class Settings:
     VITE_SUPABASE_URL: str = os.getenv("VITE_SUPABASE_URL", "https://opqnoficlhbylxfpaehp.supabase.co")
     SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY")
-    ALGORAND_API_URL: str = os.getenv("ALGORAND_API_URL", "https://testnet-algorand.api.purestake.io/ps2")
+    ALGORAND_NODE_URL: str = os.getenv("ALGORAND_NODE_URL", "https://mainnet-algorand.api.purestake.io/ps2")
     ALGORAND_API_KEY: str = os.getenv("ALGORAND_API_KEY")
-    ALGORAND_MNEMONIC: str = os.getenv("ALGORAND_MNEMONIC")
-    USDS_APP_ID: int = int(os.getenv("USDS_APP_ID", 0))
-    RESERVE_ADDRESS: str = os.getenv("RESERVE_ADDRESS")
+    ALGORAND_CREATOR_MNEMONIC: str = os.getenv("ALGORAND_CREATOR_MNEMONIC")
+    USDS_ASSET_ID: int = int(os.getenv("USDS_ASSET_ID", 0))
+    TREASURY_ADDRESS: str = os.getenv("TREASURY_ADDRESS")
     MAIL_SERVER: str = os.getenv("MAIL_SERVER", "workplace.truehost.cloud")
     MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
     MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "no-reply@seamount.io")
@@ -40,7 +40,7 @@ class Settings:
     MAIL_FROM: str = os.getenv("MAIL_FROM", "no-reply@seamount.io")
     MAIL_STARTTLS: bool = os.getenv("MAIL_STARTTLS", "True") == "True"
     MAIL_SSL_TLS: bool = os.getenv("MAIL_SSL_TLS", "False") == "True"
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
+    JWT_SECRET: str = os.getenv("JWT_SECRET")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -51,11 +51,11 @@ def get_settings() -> Settings:
     required_vars = [
         "VITE_SUPABASE_URL",
         "SUPABASE_SERVICE_KEY",
-        "ALGORAND_API_URL",
+        "ALGORAND_NODE_URL",
         "ALGORAND_API_KEY",
-        "ALGORAND_MNEMONIC",
-        "USDS_APP_ID",
-        "RESERVE_ADDRESS",
+        "ALGORAND_CREATOR_MNEMONIC",
+        "USDS_ASSET_ID",
+        "TREASURY_ADDRESS",
         "MAIL_SERVER",
         "MAIL_PORT",
         "MAIL_USERNAME",
@@ -63,7 +63,7 @@ def get_settings() -> Settings:
         "MAIL_FROM",
         "MAIL_STARTTLS",
         "MAIL_SSL_TLS",
-        "JWT_SECRET_KEY",
+        "JWT_SECRET",
     ]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     if missing_vars:
@@ -192,7 +192,7 @@ async def get_algorand_client() -> algod.AlgodClient:
     try:
         algod_client = algod.AlgodClient(
             settings.ALGORAND_API_KEY,
-            settings.ALGORAND_API_URL,
+            settings.ALGORAND_NODE_URL,
             headers={"X-API-Key": settings.ALGORAND_API_KEY}
         )
         logger.info("Algorand client initialized successfully")
@@ -278,7 +278,7 @@ class TreasuryService:
                     sp=self.algorand_client.suggested_params(),
                     receiver=self.reserve_address,
                     amt=0,  # Minting logic placeholder
-                    index=settings.USDS_APP_ID
+                    index=settings.USDS_ASSET_ID
                 )
                 # Sign and send txn
             elif action == "burn":
@@ -297,7 +297,7 @@ class TreasuryService:
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
     try:
         settings = get_settings()
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
         user_id: str = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -312,7 +312,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
 
 async def get_api_key(api_key: str = Security(api_key_header)):
     settings = get_settings()
-    if api_key != settings.JWT_SECRET_KEY:
+    if api_key != settings.JWT_SECRET:
         raise HTTPException(status_code=403, detail="Invalid API key")
     return api_key
 
@@ -372,7 +372,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = jwt.encode(
             {"sub": user.data["id"], "exp": datetime.utcnow() + access_token_expires},
-            settings.JWT_SECRET_KEY,
+            settings.JWT_SECRET,
             algorithm=settings.JWT_ALGORITHM
         )
         return {"access_token": access_token, "token_type": "bearer"}
@@ -470,7 +470,7 @@ async def send_payment(payment: PaymentRequest, current_user: Dict[str, Any] = D
             amt=int(payment.amount * 1_000_000),  # Assuming 6 decimals for USDS
             note=f"USDS payment: {payment.amount}"
         )
-        signed_tx = tx.sign(mnemonic.to_private_key(settings.ALGORAND_MNEMONIC))
+        signed_tx = tx.sign(mnemonic.to_private_key(settings.ALGORAND_CREATOR_MNEMONIC))
         tx_id = algorand_client.send_transaction(signed_tx)
         await supabase.from_("transactions").insert({
             "sender_id": current_user["id"],
@@ -523,7 +523,7 @@ async def receive_payment(payment: PaymentRequest, current_user: Dict[str, Any] 
             amt=int(payment.amount * 1_000_000),
             note=f"USDS receipt: {payment.amount}"
         )
-        signed_tx = tx.sign(mnemonic.to_private_key(settings.ALGORAND_MNEMONIC))
+        signed_tx = tx.sign(mnemonic.to_private_key(settings.ALGORAND_CREATOR_MNEMONIC))
         tx_id = algorand_client.send_transaction(signed_tx)
         await supabase.from_("transactions").insert({
             "sender_id": sender.data["id"],
@@ -562,7 +562,7 @@ async def mint_usds(mint: MintRequest, current_user: Dict[str, Any] = Depends(ge
         raise HTTPException(status_code=403, detail="Admin access required")
     algorand_client = await get_algorand_client()
     supabase = await get_supabase_client()
-    treasury = TreasuryService(algorand_client, supabase, get_settings().RESERVE_ADDRESS)
+    treasury = TreasuryService(algorand_client, supabase, get_settings().TREASURY_ADDRESS)
     try:
         demand = await treasury.monitor_demand()
         if demand["utilization"] < 80:
@@ -580,7 +580,7 @@ async def burn_usds(burn: BurnRequest, current_user: Dict[str, Any] = Depends(ge
         raise HTTPException(status_code=403, detail="Admin access required")
     algorand_client = await get_algorand_client()
     supabase = await get_supabase_client()
-    treasury = TreasuryService(algorand_client, supabase, get_settings().RESERVE_ADDRESS)
+    treasury = TreasuryService(algorand_client, supabase, get_settings().TREASURY_ADDRESS)
     try:
         await treasury.adjust_supply(burn.amount, "burn")
         logger.info(f"Burned {burn.amount} USDS from {burn.sender_address}")
