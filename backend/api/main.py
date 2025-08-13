@@ -731,7 +731,7 @@ async def startup_event():
         logger.error(f"Startup error: {str(e)}")
         raise
 
-@app.shutdown_event
+@app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     try:
