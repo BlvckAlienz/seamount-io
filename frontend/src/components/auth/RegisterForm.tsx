@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { User, Mail, Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
@@ -51,9 +51,14 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   });
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const captchaRef = useRef<HCaptcha>(null);
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const countryOptions = useMemo(() => countryList().getData(), []);
+
+  // Check if hCaptcha is properly configured
+  const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY;
+  const isHcaptchaEnabled = hcaptchaSiteKey && hcaptchaSiteKey !== 'your-site-key-here';
 
   const validatePassword = (password: string) => {
     const requirements = {
@@ -78,13 +83,31 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     setFormErrors((prev) => ({ ...prev, captcha: undefined }));
   };
 
+  const handleCaptchaError = () => {
+    setFormErrors({ captcha: 'CAPTCHA verification failed. Please try again.' });
+    setFormData((prev) => ({ ...prev, captchaToken: null }));
+  };
+
+  const handleCaptchaExpire = () => {
+    setFormData((prev) => ({ ...prev, captchaToken: null }));
+    setFormErrors({ captcha: 'CAPTCHA expired. Please verify again.' });
+  };
+
+  const resetCaptcha = () => {
+    if (captchaRef.current) {
+      captchaRef.current.resetCaptcha();
+    }
+    setFormData((prev) => ({ ...prev, captchaToken: null }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({});
     setAuthError(null);
     console.log('Sign Up submitted:', { ...formData, captchaToken: 'REDACTED' });
 
-    if (!formData.captchaToken) {
+    // Only check CAPTCHA if it's enabled
+    if (isHcaptchaEnabled && !formData.captchaToken) {
       setFormErrors({ captcha: 'Please complete the CAPTCHA.' });
       toast.error('Please complete the CAPTCHA');
       return;
@@ -105,12 +128,14 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
     setLoading(true);
     try {
-      await signUp(formData.email, formData.password, {
+      const signUpData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         countryCode: formData.countryCode,
-        captchaToken: formData.captchaToken,
-      });
+        ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken }),
+      };
+
+      await signUp(formData.email, formData.password, signUpData);
       console.log('Sign Up successful:', formData.email);
       toast.success('Registration successful! Check your email to verify.');
       if (onSuccess) onSuccess();
@@ -120,6 +145,11 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
       setAuthError(errorMessage);
       console.error('Sign Up error:', errorMessage);
       toast.error(errorMessage);
+      
+      // Reset CAPTCHA on error
+      if (isHcaptchaEnabled) {
+        resetCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -253,16 +283,24 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
             ))}
           </select>
         </div>
-        <div>
-          <HCaptcha
-            sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY}
-            onVerify={handleCaptchaVerify}
-            theme="dark"
-          />
-          {formErrors.captcha && (
-            <p className="text-sm text-red-400 mt-2">{formErrors.captcha}</p>
-          )}
-        </div>
+        
+        {/* Conditionally render hCaptcha only if properly configured */}
+        {isHcaptchaEnabled && (
+          <div>
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={hcaptchaSiteKey}
+              onVerify={handleCaptchaVerify}
+              onError={handleCaptchaError}
+              onExpire={handleCaptchaExpire}
+              theme="dark"
+            />
+            {formErrors.captcha && (
+              <p className="text-sm text-red-400 mt-2">{formErrors.captcha}</p>
+            )}
+          </div>
+        )}
+
         {(authError || formErrors.form || formErrors.password || formErrors.confirmPassword) && (
           <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
             <p className="text-sm text-red-400">
