@@ -13,9 +13,7 @@ from datetime import datetime, timedelta
 import os
 import aiohttp
 from algosdk.v2client import algod
-from algosdk import account, mnemonic
-# Fixed import - use algosdk directly, not py_algorand_sdk
-from algosdk.future import transaction
+from algosdk import account, mnemonic, transaction
 import smtplib
 from email.mime.text import MIMEText
 from jose import JWTError, jwt
