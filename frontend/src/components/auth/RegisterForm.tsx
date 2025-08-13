@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { User, Mail, Lock, CheckCircle } from 'lucide-react';
+import { User, Mail, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -49,6 +49,8 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     number: false,
     special: false,
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const captchaRef = useRef<HCaptcha>(null);
@@ -114,7 +116,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     }
 
     if (!validatePassword(formData.password)) {
-      setFormErrors({ password: 'Password does not meet all requirements.' });
+      setFormErrors({ password: 'Password does not meet requirements.' });
       console.error('Password validation failed:', validRequirements);
       toast.error('Password does not meet requirements');
       return;
@@ -156,8 +158,8 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   };
 
   return (
-    <Card className="w-full max-w-md p-6 bg-gray-900 text-gray-100">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Card className="w-full max-w-sm p-4 bg-gray-900 text-gray-100">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-1">
             First Name
@@ -221,31 +223,24 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
             <input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
               placeholder="Password"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
           </div>
-          <ul className="text-sm text-gray-400 mt-2">
-            <li className={validRequirements.length ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.length ? <CheckCircle size={16} className="inline mr-1" /> : '•'} At least 8 characters
-            </li>
-            <li className={validRequirements.uppercase ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.uppercase ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains uppercase
-            </li>
-            <li className={validRequirements.lowercase ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.lowercase ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains lowercase
-            </li>
-            <li className={validRequirements.number ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.number ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains number
-            </li>
-            <li className={validRequirements.special ? 'text-green-500' : 'text-red-500'}>
-              {validRequirements.special ? <CheckCircle size={16} className="inline mr-1" /> : '•'} Contains special character
-            </li>
-          </ul>
+          <p className="text-xs text-gray-400 mt-1">
+            Must be 8+ characters with uppercase, lowercase, number, and special character (!@#$%^&*).
+          </p>
         </div>
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
@@ -256,13 +251,20 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
             <input
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
               placeholder="Confirm password"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            >
+              {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
           </div>
         </div>
         <div>
@@ -296,19 +298,19 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               theme="dark"
             />
             {formErrors.captcha && (
-              <p className="text-sm text-red-400 mt-2">{formErrors.captcha}</p>
+              <p className="text-sm text-red-400 mt-1">{formErrors.captcha}</p>
             )}
           </div>
         )}
 
         {(authError || formErrors.form || formErrors.password || formErrors.confirmPassword) && (
-          <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
-            <p className="text-sm text-red-400">
+          <div className="p-2 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
+            <p className="text-xs text-red-400">
               {authError || formErrors.form || formErrors.password || formErrors.confirmPassword}
             </p>
           </div>
         )}
-        <div className="pt-2">
+        <div className="pt-1">
           <Button
             type="submit"
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
@@ -318,8 +320,8 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           </Button>
         </div>
         {onLoginClick && (
-          <div className="text-center pt-4">
-            <p className="text-sm text-gray-400">
+          <div className="text-center pt-2">
+            <p className="text-xs text-gray-400">
               Already have an account?{' '}
               <button type="button" onClick={onLoginClick} className="font-semibold text-blue-400 hover:underline">
                 Sign in
