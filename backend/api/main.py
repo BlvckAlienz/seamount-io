@@ -217,17 +217,21 @@ class AuditService:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def log_action(self, user_id: str, action: str, details: Dict[str, Any]):
+        """
+        Write to compliance_logs without ever taking the app down if logging fails.
+        Columns used: user_id, action_taken, details, created_at
+        """
         try:
             self.supabase.from_("compliance_logs").insert({
                 "user_id": user_id,
                 "action_taken": action,
                 "details": details,
-                "timestamp": datetime.utcnow().isoformat(),
+                "created_at": datetime.utcnow().isoformat(),
             }).execute()
             logger.info(f"Logged action: {action} for user {user_id}")
         except Exception as e:
+            # Log and swallow to avoid crashing startup/shutdown
             logger.error(f"Failed to log action: {str(e)}")
-            raise
 
 class TreasuryService:
     def __init__(self, algorand_client: algod.AlgodClient, supabase: Client, reserve_address: str):
