@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from supabase import Client
+from postgrest import APIError  # postgrest exceptions are used by the client
 
 # Assuming config is in the parent directory
 from config import get_settings
@@ -28,7 +29,9 @@ class AuditEventType:
 class AuditService:
     """
     A modern, dependency-injected audit logging service.
+    Minimal, robust implementation that writes audit events to Supabase.
     """
+
     def __init__(self, supabase_client: Client):
         """
         Initializes the service with a pre-configured Supabase client,
@@ -43,7 +46,7 @@ class AuditService:
     def _compute_hash(self, event: Dict[str, Any], previous_hash: Optional[str] = None) -> str:
         """Computes a cryptographic hash for an event, chaining it to the previous hash."""
         safe_event = {k: v for k, v in event.items() if k != "hash"}
-        data_to_hash = json.dumps(safe_event, sort_keys=True)
+        data_to_hash = json.dumps(safe_event, sort_keys=True, default=str)
         if previous_hash:
             data_to_hash = previous_hash + data_to_hash
         return hashlib.sha256(data_to_hash.encode()).hexdigest()
@@ -56,11 +59,9 @@ class AuditService:
                        severity: str = "info") -> None:
         """
         Logs an audit event with a cryptographic hash chain for tamper evidence.
+        This writes into the 'audit_logs' table (generic audit table).
         """
         try:
-            # In a high-throughput system, you might fetch the last hash from Redis or DB.
-            # For this implementation, we'll keep it simple for now.
-            
             event = {
                 "type": event_type,
                 "timestamp": datetime.utcnow().isoformat(),
@@ -70,7 +71,7 @@ class AuditService:
                 "severity": severity,
             }
 
-            # Chaining would be more robust with a persistent last_hash
+            # Keep hash chaining logic available if you enable persistence of last_hash.
             # event["previous_hash"] = self.last_hash
             # event["hash"] = self._compute_hash(event, self.last_hash)
             # self.last_hash = event["hash"]
@@ -81,14 +82,75 @@ class AuditService:
             logger.info(log_message)
 
         except Exception as e:
-            logger.error(f"Failed to write audit event to Supabase: {e}")
-            # In a production system, you would push this failed log to a fallback queue (like Redis).
+            logger.error(f"Failed to write audit event to Supabase: {e}", exc_info=True)
+            # In production, push failed logs to a fallback reliable store (e.g., SQS, Redis)
 
     async def get_audit_trail(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Retrieves the most recent audit trail events."""
         try:
             response = await self.supabase.table("audit_logs").select("*").order("timestamp", desc=True).limit(limit).execute()
-            return response.data
+            # Many clients attach .data; if not, return response directly.
+            return getattr(response, "data", response)
         except Exception as e:
-            logger.error(f"Failed to retrieve audit trail: {e}")
+            logger.error(f"Failed to retrieve audit trail: {e}", exc_info=True)
             return []
+
+    # -------------------------------------------------------------------------
+    # Compatibility method specifically for compliance_logs insert issues.
+    # main.py calls something like: audit_service.log_action("system", "application_started", {...})
+    # The schema in Supabase uses 'action_taken' (not 'action') — map it here.
+    # -------------------------------------------------------------------------
+    async def log_action(self, actor: str, action: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Insert an action record into the 'compliance_logs' table.
+        This method is defensive:
+          - writes 'action_taken' instead of 'action' (matches the actual schema)
+          - falls back to 'audit_logs' if compliance_logs is missing/has different schema
+        """
+        record = {
+            "actor": actor,
+            # map to the actual column name your DB uses
+            "action_taken": action,
+            "metadata": metadata or {},
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        try:
+            logger.info(f"Audit Logger: Writing compliance action: actor={actor}, action_taken={action}")
+            # Primary attempt: write to compliance_logs using action_taken column
+            await self.supabase.table("compliance_logs").insert(record).execute()
+            logger.info("Audit Logger: compliance_logs insert succeeded.")
+            return
+        except Exception as e:
+            # Detect PostgREST schema error patterns (PostgREST returns structured JSON)
+            # postgrest.exceptions.APIError may be thrown; be defensive.
+            logger.warning("Audit Logger: Insert into compliance_logs failed; attempting fallbacks.", exc_info=True)
+
+            # Try alternative key name if server still expects 'action' (some older code paths)
+            alt_record = record.copy()
+            alt_record.pop("action_taken", None)
+            alt_record["action"] = action
+
+            try:
+                logger.info("Audit Logger: Retrying compliance_logs insert with 'action' column.")
+                await self.supabase.table("compliance_logs").insert(alt_record).execute()
+                logger.info("Audit Logger: compliance_logs insert with 'action' succeeded.")
+                return
+            except Exception as e2:
+                logger.error("Audit Logger: compliance_logs insert with 'action' also failed.", exc_info=True)
+
+            # Final fallback: write to generic audit_logs so we don't fail startup
+            try:
+                fallback = {
+                    "type": "compliance_log_passthrough",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "user_id": actor,
+                    "details": {"action": action, "metadata": metadata or {}},
+                    "resource_id": None,
+                    "severity": "warning",
+                }
+                await self.supabase.table("audit_logs").insert(fallback).execute()
+                logger.info("Audit Logger: Wrote fallback record to audit_logs to avoid startup failure.")
+            except Exception as final_exc:
+                logger.critical("Audit Logger: Failed to write fallback audit log. Application may continue but audit is degraded.", exc_info=True)
+
