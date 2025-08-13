@@ -14,7 +14,7 @@ import os
 import aiohttp
 from algosdk.v2client import algod
 from algosdk import account, mnemonic
-from py-algorand-sdk import ApplicationClient
+from py_algorand_sdk import ApplicationClient
 import smtplib
 from email.mime.text import MIMEText
 from jose import JWTError, jwt
