@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from supabase import Client
 from postgrest import APIError  # postgrest exceptions are used by the client
+import uuid
 
 # Assuming config is in the parent directory
 from config import get_settings
@@ -71,11 +72,6 @@ class AuditService:
                 "severity": severity,
             }
 
-            # Keep hash chaining logic available if you enable persistence of last_hash.
-            # event["previous_hash"] = self.last_hash
-            # event["hash"] = self._compute_hash(event, self.last_hash)
-            # self.last_hash = event["hash"]
-            
             await self.supabase.table("audit_logs").insert(event).execute()
             
             log_message = f"AUDIT: [{event_type}] User: {user_id or 'System'}, Resource: {resource_id}"
@@ -89,44 +85,44 @@ class AuditService:
         """Retrieves the most recent audit trail events."""
         try:
             response = await self.supabase.table("audit_logs").select("*").order("timestamp", desc=True).limit(limit).execute()
-            # Many clients attach .data; if not, return response directly.
             return getattr(response, "data", response)
         except Exception as e:
             logger.error(f"Failed to retrieve audit trail: {e}", exc_info=True)
             return []
 
-    # -------------------------------------------------------------------------
-    # Compatibility method specifically for compliance_logs insert issues.
-    # main.py calls something like: audit_service.log_action("system", "application_started", {...})
-    # The schema in Supabase uses 'action_taken' (not 'action') — map it here.
-    # -------------------------------------------------------------------------
     async def log_action(self, actor: str, action: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """
         Insert an action record into the 'compliance_logs' table.
         This method is defensive:
           - writes 'action_taken' instead of 'action' (matches the actual schema)
+          - ensures actor is a valid UUID or null
           - falls back to 'audit_logs' if compliance_logs is missing/has different schema
         """
+
+        # Ensure actor is a valid UUID or None
+        actor_uuid = None
+        try:
+            if actor and uuid.UUID(str(actor)):
+                actor_uuid = str(actor)
+        except (ValueError, TypeError):
+            actor_uuid = None  # Not a valid UUID → store as NULL
+
         record = {
-            "actor": actor,
-            # map to the actual column name your DB uses
+            "actor": actor_uuid,
             "action_taken": action,
             "metadata": metadata or {},
             "timestamp": datetime.utcnow().isoformat(),
         }
 
         try:
-            logger.info(f"Audit Logger: Writing compliance action: actor={actor}, action_taken={action}")
-            # Primary attempt: write to compliance_logs using action_taken column
+            logger.info(f"Audit Logger: Writing compliance action: actor={actor_uuid}, action_taken={action}")
             await self.supabase.table("compliance_logs").insert(record).execute()
             logger.info("Audit Logger: compliance_logs insert succeeded.")
             return
-        except Exception as e:
-            # Detect PostgREST schema error patterns (PostgREST returns structured JSON)
-            # postgrest.exceptions.APIError may be thrown; be defensive.
+        except Exception:
             logger.warning("Audit Logger: Insert into compliance_logs failed; attempting fallbacks.", exc_info=True)
 
-            # Try alternative key name if server still expects 'action' (some older code paths)
+            # Try alternative key name if server still expects 'action'
             alt_record = record.copy()
             alt_record.pop("action_taken", None)
             alt_record["action"] = action
@@ -136,21 +132,20 @@ class AuditService:
                 await self.supabase.table("compliance_logs").insert(alt_record).execute()
                 logger.info("Audit Logger: compliance_logs insert with 'action' succeeded.")
                 return
-            except Exception as e2:
+            except Exception:
                 logger.error("Audit Logger: compliance_logs insert with 'action' also failed.", exc_info=True)
 
-            # Final fallback: write to generic audit_logs so we don't fail startup
+            # Final fallback to audit_logs
             try:
                 fallback = {
                     "type": "compliance_log_passthrough",
                     "timestamp": datetime.utcnow().isoformat(),
-                    "user_id": actor,
+                    "user_id": actor_uuid,
                     "details": {"action": action, "metadata": metadata or {}},
                     "resource_id": None,
                     "severity": "warning",
                 }
                 await self.supabase.table("audit_logs").insert(fallback).execute()
                 logger.info("Audit Logger: Wrote fallback record to audit_logs to avoid startup failure.")
-            except Exception as final_exc:
+            except Exception:
                 logger.critical("Audit Logger: Failed to write fallback audit log. Application may continue but audit is degraded.", exc_info=True)
-
