@@ -15,6 +15,7 @@ python-jose[cryptography]==3.3.0
 pyjwt[crypto]==2.8.0
 cryptography==42.0.5
 pyotp==2.9.0
+python-multipart==0.0.9
 
 # --- Blockchain ---
 py-algorand-sdk==2.0.0
