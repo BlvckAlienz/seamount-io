@@ -21,7 +21,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const [expandedFaqs, setExpandedFaqs] = useState<number[]>([]);
   const [stakeAmount, setStakeAmount] = useState('10000');
   const [stakePeriod, setStakePeriod] = useState('365');
-  const [rewards, setRewards] = useState('$450.00');
+  const [rewards, setRewards] = useState('$390.00');
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
@@ -135,7 +135,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, []);
 
   const faqs = [
-    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle in < 10mins, not days. Our blockchain technology, powered by Algorand, enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
+    { question: "How fast are Seamount cross-border transfers?", answer: "Seamount transfers settle in <10mins, not days. Our blockchain technology, powered by Algorand, enables instant settlement across borders, dramatically faster than traditional banking which can take 3-5 business days." },
     { question: "What are the fees for using Seamount?", answer: "Our fees are typically just 2.6-3.8% per transaction, compared to 12-15% with traditional banks. There are no hidden fees or exchange rate markups." },
     { question: "Is USDS stablecoin regulated and secure?", answer: "Yes, USDS is fully compliant with local SEC & CBN regulations and maintains a 1:1 USD peg. All USDS tokens are fully backed by USD reserves, ensuring stability and security." },
     { question: "Which African countries are supported?", answer: "We currently support 60+ countries including Nigeria, South Africa, Kenya, Ghana, Uganda, with more countries being added regularly. Our platform integrates with local payment methods including Flutterwave, Transfi, Paystack, and bank transfers." }
@@ -146,7 +146,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       <nav className="bg-black/60 backdrop-blur-lg sticky top-0 z-50 border-b border-gray-800/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
-            <a href="/" className="flex items-center space-x-3"><img src="frontend/public/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain" /><span className="text-xl font-bold">Seamount.io</span></a>
+            <a href="/" className="flex items-center space-x-3"><img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain" /><span className="text-xl font-bold">Seamount.io</span></a>
             <div className="hidden md:flex items-center space-x-8"><a href="#features" className="text-gray-300 hover:text-white">Features</a><a href="#stablecoin" className="text-gray-300 hover:text-white">USDS</a><a href="#about" className="text-gray-300 hover:text-white">About</a><a href="#contact" className="text-gray-300 hover:text-white">Contact</a></div>
             <div className="flex items-center space-x-2"><Button variant="ghost" onClick={() => onOpenAuth('login')}>Sign In</Button><Button onClick={() => onOpenAuth('register')} elevated>Sign Up</Button></div>
           </div>
@@ -172,7 +172,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-16 fade-in"><h2 className="text-3xl md:text-4xl font-bold mb-4">Revolutionizing Financial Access</h2><p className="text-gray-400 max-w-2xl mx-auto">Our platform is designed to solve real-world challenges of cross-border payments for emerging African markets.</p></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[ { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in < 10mins, not days. Our blockchain technology, powered by Algorand, enables immediate settlement across borders." }, { icon: <DollarSign className="h-8 w-8 text-green-500" />, title: "Ultra-Low Fees", description: "Pay pennies, not percentages. Save up to 87% compared to traditional banks and remittance services." }, { icon: <Shield className="h-8 w-8 text-purple-500" />, title: "USDS Stablecoin", description: "Our fully-reserved, USD-pegged stablecoin ensures stable value and offers staking rewards." }, { icon: <TrendingUp className="h-8 w-8 text-yellow-500" />, title: "AI-Powered Trading", description: "Let AI optimize your investment portfolio with advanced algorithmic trading and risk management." }, { icon: <Zap className="h-8 w-8 text-red-500" />, title: "Staking Rewards", description: "Earn competitive yields by holding USDS tokens. The longer you stake, the higher your returns." }, { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for Flutterwave, Paystack, bank transfers, and mobile money." } ].map((feature, index) => (<div key={index} className="p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 hover:border-blue-700/50 transition-all duration-300 shadow-xl backdrop-blur-sm hover:-translate-y-2 fade-in"><div className="rounded-full w-14 h-14 flex items-center justify-center bg-gray-800/80 mb-5 border border-gray-700/50 shadow-inner">{feature.icon}</div><h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3><p className="text-gray-400">{feature.description}</p></div>))}
+              {[ { icon: <Send className="h-8 w-8 text-blue-500" />, title: "Instant Transfers", description: "Send money globally in <10mins, not days. Our blockchain technology, powered by Algorand, enables immediate settlement across borders." }, { icon: <DollarSign className="h-8 w-8 text-green-500" />, title: "Ultra-Low Fees", description: "Pay pennies, not percentages. Save up to 87% compared to traditional banks and remittance services." }, { icon: <Shield className="h-8 w-8 text-purple-500" />, title: "USDS Stablecoin", description: "Our fully-reserved, USD-pegged stablecoin ensures stable value and offers staking rewards." }, { icon: <TrendingUp className="h-8 w-8 text-yellow-500" />, title: "AI-Powered Trading", description: "Let AI optimize your investment portfolio with advanced algorithmic trading and risk management." }, { icon: <Zap className="h-8 w-8 text-red-500" />, title: "Staking Rewards", description: "Earn competitive yields by holding USDS tokens. The longer you stake, the higher your returns." }, { icon: <Globe className="h-8 w-8 text-teal-500" />, title: "African-First Design", description: "Built for African markets with integration for Flutterwave, Paystack, bank transfers, and mobile money." } ].map((feature, index) => (<div key={index} className="p-6 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 hover:border-blue-700/50 transition-all duration-300 shadow-xl backdrop-blur-sm hover:-translate-y-2 fade-in"><div className="rounded-full w-14 h-14 flex items-center justify-center bg-gray-800/80 mb-5 border border-gray-700/50 shadow-inner">{feature.icon}</div><h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3><p className="text-gray-400">{feature.description}</p></div>))}
             </div>
           </div>
         </section>
@@ -195,7 +195,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         <h3 className="text-2xl font-bold mb-6 text-blue-300">1:1 USD Peg & Transparency</h3><p className="text-gray-300 mb-4">USDS maintains a stable value pegged 1:1 to the US Dollar, ensuring your money retains its value during cross-border transfers.</p><ul className="space-y-3 text-gray-300">{[ "Fully backed by audited USD reserves", "Regulated and compliant across jurisdictions", "Regular public attestations ensure transparency", "Instant settlement on the Algorand network" ].map((feature, i) => (<li key={i} className="flex items-start"><Check className="h-5 w-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" /><span>{feature}</span></li>))}</ul>
                     </div>
                     <div className="lg:col-span-2 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl p-8 border border-gray-800/80 backdrop-blur-sm fade-in">
-                        <h3 className="text-xl font-bold mb-4 text-center">Yield Calculator</h3><div className="space-y-4"><div><label htmlFor="stake-amount" className="text-sm text-gray-400">Investment Amount</label><input id="stake-amount" name="stake-amount" type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white" /></div><div><label htmlFor="stake-period" className="text-sm text-gray-400">Period</label><select id="stake-period" name="stake-period" value={stakePeriod} onChange={(e) => setStakePeriod(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"><option value="30">1 Month (3.5% APY)</option><option value="90">3 Months (4.0% APY)</option><option value="180">6 Months (4.2% APY)</option><option value="365">1 Year (4.5% APY)</option></select></div><div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-lg p-4 text-center"><div className="text-2xl font-bold">{rewards}</div><div className="text-sm opacity-80">Estimated Annual Yield</div></div></div>
+                        <h3 className="text-xl font-bold mb-4 text-center">Yield Calculator</h3><div className="space-y-4"><div><label htmlFor="stake-amount" className="text-sm text-gray-400">Investment Amount</label><input id="stake-amount" name="stake-amount" type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white" /></div><div><label htmlFor="stake-period" className="text-sm text-gray-400">Period</label><select id="stake-period" name="stake-period" value={stakePeriod} onChange={(e) => setStakePeriod(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"><option value="30">1 Month (3.0% APY)</option><option value="90">3 Months (3.3% APY)</option><option value="180">6 Months (3.6% APY)</option><option value="365">1 Year (3.9% APY)</option></select></div><div className="bg-gradient-to-r from-green-600 to-teal-600 rounded-lg p-4 text-center"><div className="text-2xl font-bold">{rewards}</div><div className="text-sm opacity-80">Estimated Annual Yield</div></div></div>
                     </div>
                 </div>
             </div>
@@ -222,7 +222,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center space-x-3 mb-4"><img src="/seamount-logo.png" alt="Seamount Logo" className="w-8 h-8 object-contain" /><span className="text-xl font-bold">Seamount.io</span></div><p className="text-gray-400 text-sm">The future of cross-border payments for emerging markets</p>
+              <div className="flex items-center space-x-3 mb-4"><img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-8 h-8 object-contain" /><span className="text-xl font-bold">Seamount.io</span></div><p className="text-gray-400 text-sm">The future of cross-border payments for emerging markets</p>
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Product</h4>
@@ -235,8 +235,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div>
               <h4 className="text-white font-medium mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="frontend/public/legal/privacy-policy.html" className="text-gray-400 hover:text-white">Privacy Policy</a></li>
-                <li><a href="frontend/public/legal/terms-of-service.html" className="text-gray-400 hover:text-white">Terms of Service</a></li>
+                <li><a href="/legal/privacy-policy.html" className="text-gray-400 hover:text-white">Privacy Policy</a></li>
+                <li><a href="/legal/terms-of-service.html" className="text-gray-400 hover:text-white">Terms of Service</a></li>
               </ul>
             </div>
           </div>
