@@ -5,6 +5,7 @@ import { apiClient } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';
+import toast from 'react-hot-toast';
 
 interface AuthState {
   session: Session | null;
@@ -46,31 +47,90 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const navigate = useNavigate();
 
-  const fetchUserProfile = useCallback(async () => {
+  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 2000) => {
     try {
-      const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
-      setState((prev) => ({ ...prev, user: data }));
-    } catch (error) {
-      console.error('AuthContext: Failed to fetch user profile, signing out.', error);
-      await supabase.auth.signOut();
-      setState((prev) => ({ ...prev, user: null, session: null }));
+      const { data } = await retryWithBackoff(
+        () => apiClient.get<UserProfile>('/api/v1/user/profile'),
+        maxRetries,
+        delayMs
+      );
+      setState((prev) => ({ ...prev, user: data, error: null }));
+      return data;
+    } catch (error: any) {
+      console.error('AuthContext: Failed to fetch user profile after retries:', error);
+      
+      // Don't sign out immediately - this is too aggressive
+      // Instead, set error state and let user retry or continue with limited functionality
+      if (error?.response?.status === 404) {
+        // Profile not found - might be still creating, wait longer
+        toast.error('Profile still being created. Please wait...');
+        setState((prev) => ({ ...prev, error: 'Profile creation in progress' }));
+        
+        // Try one more time with longer delay for new users
+        try {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
+          setState((prev) => ({ ...prev, user: data, error: null }));
+          return data;
+        } catch (secondError) {
+          console.error('Second profile fetch attempt failed:', secondError);
+          setState((prev) => ({ ...prev, error: 'Profile fetch failed - continuing with limited access' }));
+        }
+      } else if (error?.response?.status === 401) {
+        // Unauthorized - sign out only if token is definitely invalid
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('No valid session, signing out');
+          await supabase.auth.signOut();
+          setState((prev) => ({ ...prev, user: null, session: null, error: 'Authentication expired' }));
+        } else {
+          // We have a session but API rejects it - might be API issue
+          setState((prev) => ({ ...prev, error: 'API authentication issue - please contact support' }));
+          toast.error('Authentication issue detected. Some features may be limited.');
+        }
+      } else {
+        // Other errors - don't sign out, just set error state
+        setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
+        toast.error('Profile loading issue - some features may be limited');
+      }
+      
+      return null;
     }
   }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setState((prev) => ({ ...prev, session, loading: true }));
-      if (session) await fetchUserProfile();
-      setState((prev) => ({ ...prev, loading: false }));
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setState((prev) => ({ ...prev, session, loading: true }));
+        
+        if (session) {
+          await fetchUserProfile();
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        setState((prev) => ({ ...prev, error: 'Authentication initialization failed' }));
+      } finally {
+        setState((prev) => ({ ...prev, loading: false }));
+      }
     };
 
     initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
       setState((prev) => ({ ...prev, session, loading: true }));
-      if (session) await fetchUserProfile();
-      else setState((prev) => ({ ...prev, user: null }));
+      
+      if (session && event === 'SIGNED_IN') {
+        // Give the backend time to sync for new users
+        const delay = event === 'SIGNED_UP' ? 3000 : 1000;
+        setTimeout(async () => {
+          await fetchUserProfile(5, 2000); // More retries for new users
+        }, delay);
+      } else if (!session) {
+        setState((prev) => ({ ...prev, user: null, error: null }));
+      }
+      
       setState((prev) => ({ ...prev, loading: false }));
     });
 
@@ -85,41 +145,54 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     options: { firstName?: string; lastName?: string; countryCode?: string; captchaToken?: string } = {}
   ) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
+    
     try {
-      const signUpOptions: any = { email, password };
-      if (options.captchaToken) signUpOptions.options = { captchaToken: options.captchaToken };
-      const { data, error } = await retryWithBackoff(() =>
-        supabase.auth.signUp({
-          ...signUpOptions,
-          options: {
-            ...signUpOptions.options,
-            data: {
-              firstName: options.firstName || '',
-              lastName: options.lastName || '',
-              countryCode: options.countryCode || 'US',
-            },
+      const signUpOptions: any = {
+        email,
+        password,
+        options: {
+          data: {
+            firstName: options.firstName || '',
+            lastName: options.lastName || '',
+            countryCode: options.countryCode || 'US',
           },
-        })
-      );
-      if (error) throw error;
-      if (data.user) {
-        await supabase.from('user_profiles').insert({
-          id: data.user.id,
-          email: data.user.email,
-          first_name: options.firstName || '',
-          last_name: options.lastName || '',
-          country_code: options.countryCode || 'US',
-          kyc_level: 0,
-          kyc_status: 'pending',
-          is_admin: false,
-          created_at: new Date().toISOString(),
-        });
-        await fetchUserProfile();
+        },
+      };
+      
+      if (options.captchaToken) {
+        signUpOptions.options.captchaToken = options.captchaToken;
       }
+
+      const { data, error } = await retryWithBackoff(() =>
+        supabase.auth.signUp(signUpOptions)
+      );
+      
+      if (error) throw error;
+      
+      if (data.user && !data.user.email_confirmed_at) {
+        toast.success('Please check your email to confirm your account');
+      }
+      
+      // REMOVED: Manual profile insert - let the database trigger handle this
+      // The database trigger will automatically create the profile
+      
+      console.log('Sign up successful, profile will be created automatically');
       return { success: true };
+      
     } catch (err: any) {
       setState((prev) => ({ ...prev, error: err.message }));
       console.error('SignUp error:', err);
+      
+      if (err.message.includes('User already registered')) {
+        toast.error('Email already registered. Try signing in instead.');
+      } else if (err.message.includes('Email not confirmed')) {
+        toast.error('Please check your email and confirm your account');
+      } else if (err.message.includes('Password')) {
+        toast.error('Password requirements not met');
+      } else {
+        toast.error(err.message || 'Sign up failed');
+      }
+      
       return { success: false, error: err.message };
     } finally {
       setState((prev) => ({ ...prev, loading: false }));
@@ -128,16 +201,34 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signIn = async (email: string, password: string, options: { captchaToken?: string } = {}) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
+    
     try {
+      const signInOptions: any = { email, password };
+      if (options.captchaToken) {
+        signInOptions.options = { captchaToken: options.captchaToken };
+      }
+
       const { error } = await retryWithBackoff(() =>
-        supabase.auth.signInWithPassword({ email, password, options })
+        supabase.auth.signInWithPassword(signInOptions)
       );
+      
       if (error) throw error;
-      await fetchUserProfile();
+      
+      // Profile will be fetched by the auth state change listener
       return { success: true };
+      
     } catch (err: any) {
       console.error('SignIn error:', err);
       setState((prev) => ({ ...prev, error: err.message }));
+      
+      if (err.message.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password');
+      } else if (err.message.includes('Email not confirmed')) {
+        toast.error('Please confirm your email before signing in');
+      } else {
+        toast.error(err.message || 'Sign in failed');
+      }
+      
       return { success: false, error: err.message };
     } finally {
       setState((prev) => ({ ...prev, loading: false }));
@@ -145,9 +236,20 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setState((prev) => ({ ...prev, session: null, user: null, error: null, isDemoMode: false }));
-    navigate('/login');
+    try {
+      await supabase.auth.signOut();
+      setState((prev) => ({ 
+        ...prev, 
+        session: null, 
+        user: null, 
+        error: null, 
+        isDemoMode: false 
+      }));
+      navigate('/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast.error('Sign out failed');
+    }
   };
 
   const enterDemoMode = () => {
@@ -156,9 +258,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       user: {
         id: 'demo-user-123',
         email: 'demo@seamount.io',
+        first_name: 'Demo',
+        last_name: 'User',
         kyc_level: 3,
         kyc_status: 'approved',
         is_admin: false,
+        country_code: 'US',
+        created_at: new Date().toISOString(),
       } as UserProfile,
       loading: false,
       error: null,
@@ -171,11 +277,19 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('Updating onboarding step:', step, data);
     try {
       if (state.user) {
-        await supabase.from('user_profiles').update({ kyc_level: step }).eq('id', state.user.id);
-        await fetchUserProfile();
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ kyc_level: step })
+          .eq('id', state.user.id);
+          
+        if (error) throw error;
+        
+        // Fetch updated profile
+        await fetchUserProfile(3, 1000);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update onboarding error:', err);
+      toast.error('Failed to update onboarding step');
     }
   };
 
@@ -183,12 +297,23 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('Completing onboarding...');
     try {
       if (state.user) {
-        await supabase.from('user_profiles').update({ kyc_status: 'completed', kyc_level: 1 }).eq('id', state.user.id);
-        await fetchUserProfile();
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ 
+            kyc_status: 'completed', 
+            kyc_level: 1 
+          })
+          .eq('id', state.user.id);
+          
+        if (error) throw error;
+        
+        await fetchUserProfile(3, 1000);
         navigate('/dashboard');
+        toast.success('Onboarding completed successfully!');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Complete onboarding error:', err);
+      toast.error('Failed to complete onboarding');
     }
   };
 

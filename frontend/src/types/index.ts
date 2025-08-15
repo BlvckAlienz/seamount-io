@@ -7,6 +7,27 @@ export interface User {
   lastLogin?: Date;
 }
 
+// Add UserProfile interface for Supabase user profiles
+export interface UserProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  country_code: string;
+  kyc_level: number;
+  kyc_status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
+  is_admin: boolean;
+  phone?: string;
+  date_of_birth?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface Portfolio {
   totalBalance: number;
   totalPnL: number;
