@@ -1,27 +1,29 @@
+// frontend/src/config/api.ts
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
 const baseURL = import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
-const STAGING_TOKEN = import.meta.env.VITE_STAGING_TOKEN || '';
 
-export const apiClient = axios.create({
-  baseURL,
-});
+export const apiClient = axios.create({ baseURL });
 
 apiClient.interceptors.request.use(
   async (config) => {
-    let token = STAGING_TOKEN;
-    if (!token) {
+    try {
       const { data: { session } } = await supabase.auth.getSession();
-      token = session?.access_token || '';
+      const token = session?.access_token;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        console.warn('[api] no Supabase session token — request will be unauthenticated');
+      }
+      return config;
+    } catch (e) {
+      console.error('[api] failed to get session token', e);
+      return config;
     }
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
   },
   (error) => {
-    console.error('API request error:', error);
+    console.error('[api] request setup error:', error);
     return Promise.reject(error);
   }
 );
