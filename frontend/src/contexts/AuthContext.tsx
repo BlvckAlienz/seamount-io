@@ -47,8 +47,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const navigate = useNavigate();
 
-  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 2000) => {
+  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
     try {
+      // Use the robust retry utility you already have
       const { data } = await retryWithBackoff(
         () => apiClient.get<UserProfile>('/api/v1/user/profile'),
         maxRetries,
@@ -59,39 +60,21 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error: any) {
       console.error('AuthContext: Failed to fetch user profile after retries:', error);
       
-      // Don't sign out immediately - this is too aggressive
-      // Instead, set error state and let user retry or continue with limited functionality
-      if (error?.response?.status === 404) {
-        // Profile not found - might be still creating, wait longer
-        toast.error('Profile still being created. Please wait...');
-        setState((prev) => ({ ...prev, error: 'Profile creation in progress' }));
-        
-        // Try one more time with longer delay for new users
-        try {
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          const { data } = await apiClient.get<UserProfile>('/api/v1/user/profile');
-          setState((prev) => ({ ...prev, user: data, error: null }));
-          return data;
-        } catch (secondError) {
-          console.error('Second profile fetch attempt failed:', secondError);
-          setState((prev) => ({ ...prev, error: 'Profile fetch failed - continuing with limited access' }));
-        }
-      } else if (error?.response?.status === 401) {
-        // Unauthorized - sign out only if token is definitely invalid
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.log('No valid session, signing out');
-          await supabase.auth.signOut();
-          setState((prev) => ({ ...prev, user: null, session: null, error: 'Authentication expired' }));
-        } else {
-          // We have a session but API rejects it - might be API issue
-          setState((prev) => ({ ...prev, error: 'API authentication issue - please contact support' }));
-          toast.error('Authentication issue detected. Some features may be limited.');
-        }
+      // If the error is 401 Unauthorized, the session is invalid. Sign out.
+      if (error?.response?.status === 401) {
+        toast.error('Your session has expired. Please sign in again.');
+        // Don't call signOut() directly here to avoid state loops.
+        // The onAuthStateChange listener will handle the user/session cleanup.
+        await supabase.auth.signOut();
+      } else if (error?.response?.status === 404) {
+        // This means the profile isn't created yet. The retry should handle this.
+        // If it fails after all retries, then there's a real issue.
+        toast.error('Failed to load user profile. Please try again later.');
+        setState((prev) => ({ ...prev, error: 'Profile not found.' }));
       } else {
-        // Other errors - don't sign out, just set error state
+        // For all other errors (e.g., 5xx), just show an error.
+        toast.error('Could not connect to the server. Some features may be unavailable.');
         setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
-        toast.error('Profile loading issue - some features may be limited');
       }
       
       return null;
