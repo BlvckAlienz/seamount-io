@@ -1,4 +1,3 @@
-// frontend/src/config/api.ts
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
@@ -13,6 +12,7 @@ apiClient.interceptors.request.use(
       const token = session?.access_token;
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('[api] Setting token prefix: ' + token.slice(0,6));
       } else {
         console.warn('[api] no Supabase session token — request will be unauthenticated');
       }
