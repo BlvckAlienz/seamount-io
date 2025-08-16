@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Set
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
-# --- Static Business Logic Configuration ---
+# --- Static Business Logic Configuration (Hardcoded) ---
 FEE_STRUCTURE = {
     'conversion': {'base_fee': 0.020}, 'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 'network': {'base_fee': 0.00}, 'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 'staking': {'reward_rate': 4.5}
 }
@@ -16,13 +16,14 @@ VOLUME_DISCOUNTS = {
 
 class Settings(BaseSettings):
     """
-    Defines and validates all environment variables. This class is the single source of truth for configuration.
+    Defines and validates all environment variables. This is the single source of truth for configuration.
+    Version: 1.1.0 (Cleaned and Corrected)
     """
     # --- Core & Security ---
     DATABASE_URL: SecretStr
-    JWT_SECRET: SecretStr
     COMPLYCUBE_API_KEY: SecretStr
     ENCRYPTION_KEY: SecretStr
+    IPINFO_TOKEN: SecretStr  # FIXED: Added missing field
     
     # --- Supabase ---
     VITE_SUPABASE_URL: str
@@ -61,8 +62,7 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS: bool = False
 
     # --- Operational ---
-    API_URL: str
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "production"
     
     # --- CORS Configuration (from .env) ---
     ALLOWED_ORIGINS_STR: str = Field("", alias='ALLOWED_ORIGINS')
@@ -79,7 +79,8 @@ class Settings(BaseSettings):
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         if not self.ALLOWED_ORIGINS_STR:
-            return []
+            # Provide a sensible default for development if the env var is not set
+            return ["http://localhost:3000", "http://localhost:5173"]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
     
     @property
@@ -93,6 +94,7 @@ class Settings(BaseSettings):
         env_file_encoding = 'utf-8'
 
 _settings_instance = None
+
 def get_settings() -> Settings:
     global _settings_instance
     if _settings_instance is None:
