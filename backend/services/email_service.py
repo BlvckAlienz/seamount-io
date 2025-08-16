@@ -1,26 +1,30 @@
-import asyncio
+import logging
 from typing import List
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # --- Core Dependencies ---
-from config import Settings, logger # Import the base logger and Settings type
+from config import Settings # Correctly import the Settings class for type hinting
+
+# Make the service self-contained by defining its own logger
+logger = logging.getLogger(__name__)
 
 class EmailService:
     """
-    A modern, dependency-injected service for sending transactional emails.
+    A modern, dependency-injected service for sending transactional emails,
+    aligned with the master config.py.
     """
     def __init__(self, settings: Settings):
         """
-        Initializes the service with a pre-configured settings object,
-        following a clean dependency injection pattern.
+        Initializes the service with a pre-configured settings object.
         """
         if not all([settings.MAIL_USERNAME, settings.MAIL_PASSWORD, settings.MAIL_FROM]):
             raise ValueError("Mail credentials are not fully configured.")
             
         self.conf = ConnectionConfig(
             MAIL_USERNAME=settings.MAIL_USERNAME,
-            MAIL_PASSWORD=settings.MAIL_PASSWORD.get_secret_value(), # Use .get_secret_value() for SecretStr
+            # This now correctly works with the SecretStr type from your master config.py
+            MAIL_PASSWORD=settings.MAIL_PASSWORD.get_secret_value(),
             MAIL_FROM=settings.MAIL_FROM,
             MAIL_PORT=settings.MAIL_PORT,
             MAIL_SERVER=settings.MAIL_SERVER,
@@ -54,7 +58,3 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send email to {recipients}. Error: {e}")
             raise
-
-# Note: The test functions `send_test_email` and the `if __name__ == "__main__"` block
-# are removed as they are not needed for the production service and can cause
-# circular dependencies or other issues when run as part of the main application.
