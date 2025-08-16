@@ -1,10 +1,15 @@
 # ==============================================================================
 # Seamount.io API - Production Dependencies
-# Version: 1.1.0 (Clean & Conflict-Free)
+# Version: 1.1.1 (Corrected Production Server)
 # ==============================================================================
 
-# Core FastAPI framework and server
+# Core FastAPI framework
 fastapi
+
+# Production-grade ASGI Server (Required by Render's start command)
+gunicorn
+
+# ASGI Server Implementation for FastAPI
 uvicorn[standard]
 
 # Supabase client and its dependencies
