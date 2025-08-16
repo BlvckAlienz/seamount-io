@@ -1,29 +1,23 @@
 import axios from 'axios';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase'; // Adjust path if needed
 
-const baseURL = import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
+// This line is critical. It reads the URL of your Render backend from the Vercel env vars.
+const baseURL = import.meta.env.VITE_API_URL;
+
+if (!baseURL) {
+  console.error("FATAL: VITE_API_URL is not defined. API calls will fail.");
+}
 
 export const apiClient = axios.create({ baseURL });
 
 apiClient.interceptors.request.use(
   async (config) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log('[api] Setting token prefix: ' + token.slice(0,6));
-      } else {
-        console.warn('[api] no Supabase session token — request will be unauthenticated');
-      }
-      return config;
-    } catch (e) {
-      console.error('[api] failed to get session token', e);
-      return config;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
   },
-  (error) => {
-    console.error('[api] request setup error:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );

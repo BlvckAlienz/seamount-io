@@ -1,10 +1,14 @@
+# ==============================================================================
+# Seamount.io API - Main Application
+# Version: 1.1.0 (Comprehensive & Production-Ready)
+# ==============================================================================
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security.api_key import APIKeyHeader
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field, EmailStr
 from supabase import create_client, Client
 from decimal import Decimal
@@ -13,738 +17,288 @@ from uuid import uuid4
 from datetime import datetime, timedelta
 import os
 import aiohttp
-from algosdk.v2client import algod
-from algosdk import account, mnemonic, transaction
 import smtplib
 from email.mime.text import MIMEText
 from jose import JWTError, jwt
-from jose.constants import ALGORITHMS
 from passlib.context import CryptContext
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import pyotp
 import json
 import base64
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-import asyncio
+from cryptography.hazmat.primitives.asymmetric import rsa
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# --- 1. SETUP LOGGING ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Global services
-database_service = None
-audit_service = None
-algorand_client = None
-jwks_cache = {}
-jwks_cache_expiry = None
+# --- 2. GLOBAL STATE (Managed by Lifespan) ---
+_supabase_client: Optional[Client] = None
+_database_service: Optional['DatabaseService'] = None
+_audit_service: Optional['AuditService'] = None
+jwks_cache: Dict[str, Any] = {}
+jwks_cache_expiry: Optional[datetime] = None
 
+# --- 3. CONFIGURATION ---
 class Settings:
-    VITE_SUPABASE_URL: str = os.getenv("VITE_SUPABASE_URL", "https://opqnoficlhbylxfpaehp.supabase.co")
-    SUPABASE_SERVICE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_KEY")  # Optional
-    ALGORAND_NODE_URL: str = os.getenv("ALGORAND_NODE_URL", "https://mainnet-algorand.api.purestake.io/ps2")
-    ALGORAND_API_KEY: Optional[str] = os.getenv("ALGORAND_API_KEY")
-    ALGORAND_CREATOR_MNEMONIC: Optional[str] = os.getenv("ALGORAND_CREATOR_MNEMONIC")
-    USDS_ASSET_ID: int = int(os.getenv("USDS_ASSET_ID", 0))
-    TREASURY_ADDRESS: Optional[str] = os.getenv("TREASURY_ADDRESS")
-    MAIL_SERVER: str = os.getenv("MAIL_SERVER", "workplace.truehost.cloud")
-    MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
-    MAIL_USERNAME: str = os.getenv("MAIL_USERNAME", "no-reply@seamount.io")
-    MAIL_PASSWORD: Optional[str] = os.getenv("MAIL_PASSWORD")
-    MAIL_FROM: str = os.getenv("MAIL_FROM", "no-reply@seamount.io")
-    MAIL_STARTTLS: bool = os.getenv("MAIL_STARTTLS", "True") == "True"
-    MAIL_SSL_TLS: bool = os.getenv("MAIL_SSL_TLS", "False") == "True"
+    VITE_SUPABASE_URL: str = os.getenv("VITE_SUPABASE_URL")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY")
     PORT: int = int(os.getenv("PORT", 8000))
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
+    MAIL_SERVER: Optional[str] = os.getenv("MAIL_SERVER")
+    MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
+    MAIL_USERNAME: Optional[str] = os.getenv("MAIL_USERNAME")
+    MAIL_PASSWORD: Optional[str] = os.getenv("MAIL_PASSWORD")
+    MAIL_FROM: Optional[str] = os.getenv("MAIL_FROM")
     
     @property
-    def JWKS_URL(self) -> str:
-        """Construct the JWKS URL from Supabase URL."""
+    def JWKS_URL(self) -> Optional[str]:
+        if not self.VITE_SUPABASE_URL: return None
         return f"{self.VITE_SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
 
-def get_settings() -> Settings:
-    try:
-        settings = Settings()
-        if not settings.VITE_SUPABASE_URL:
-            logger.critical("FATAL: VITE_SUPABASE_URL must be set.")
-            raise ValueError("Missing critical Supabase environment variable: VITE_SUPABASE_URL")
-        logger.info(f"Settings loaded successfully. JWKS URL: {settings.JWKS_URL}")
-        return settings
-    except Exception as e:
-        logger.error(f"Failed to load settings: {str(e)}")
-        raise
+    @property
+    def ALLOWED_ORIGINS_LIST(self) -> List[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',')] if self.ALLOWED_ORIGINS else []
 
-# Models
-class UserProfile(BaseModel):
-    id: str
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    country_code: Optional[str] = None
-    kyc_level: int = 0
-    kyc_status: str = "pending"
-    is_admin: bool = False
-    algorand_address: Optional[str] = None
+settings = Settings()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/token")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-class InvestorContactPayload(BaseModel):
-    name: str
-    email: EmailStr
-    company: Optional[str] = None
-    checkSize: Optional[str] = None
-    message: Optional[str] = None
-
-class WhitelabelQuotePayload(BaseModel):
-    amount: Decimal
-    from_currency: str
-    to_currency: str
-
-class ConsentPayload(BaseModel):
-    preferences: Dict[str, bool]
-
-class KYCSubmission(BaseModel):
-    user_id: str
-    document_type: str
-    document_data: str
-    submitted_at: Optional[datetime] = None
-
-class KYCDocument(BaseModel):
-    id: str
-    user_id: str
-    document_type: str
-    document_data: str
-    status: str
-    submitted_at: datetime
-    reviewed_at: Optional[datetime] = None
-
-class PaymentRequest(BaseModel):
-    sender_id: str
-    recipient_email: EmailStr
-    amount: float
-    currency: str = "USDS"
-
-class PaymentResponse(BaseModel):
-    transaction_id: str
-    status: str
-    amount: float
-    currency: str
-    timestamp: datetime
-
-class MintRequest(BaseModel):
-    amount: float
-    recipient_address: str
-
-class BurnRequest(BaseModel):
-    amount: float
-    sender_address: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class MFASetupResponse(BaseModel):
-    secret: str
-    qr_code_url: str
-
-class MFAVerifyRequest(BaseModel):
-    token: str
-
-class PortfolioHolding(BaseModel):
-    id: str
-    user_id: str
-    asset: str
-    amount: float
-    currency: str
-    acquired_at: datetime
-    value_usd: float
-
-# JWKS Authentication Implementation
-async def fetch_jwks(jwks_url: str) -> Dict[str, Any]:
-    """Fetch JWKS from Supabase with caching and retry logic"""
+# --- 4. AUTHENTICATION & DEPENDENCIES ---
+async def fetch_jwks() -> Dict[str, Any]:
     global jwks_cache, jwks_cache_expiry
-    
     if jwks_cache and jwks_cache_expiry and datetime.utcnow() < jwks_cache_expiry:
-        logger.debug("Using cached JWKS")
         return jwks_cache
-    
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            async with session.get(jwks_url) as response:
+            async with session.get(settings.JWKS_URL) as response:
                 response.raise_for_status()
                 jwks_data = await response.json()
-                jwks_cache = jwks_data
-                jwks_cache_expiry = datetime.utcnow() + timedelta(hours=1)
+                jwks_cache, jwks_cache_expiry = jwks_data, datetime.utcnow() + timedelta(hours=1)
                 logger.info("JWKS fetched and cached successfully")
                 return jwks_data
-    except aiohttp.ClientResponseError as e:
-        logger.error(f"Failed to fetch JWKS: HTTP {e.status} - {e.message}")
-        raise HTTPException(status_code=503, detail="JWKS service unavailable")
     except Exception as e:
-        logger.error(f"Unexpected JWKS fetch error: {str(e)}")
-        raise HTTPException(status_code=503, detail="JWKS fetch failed")
+        logger.error(f"FATAL: JWKS fetch failed: {e}")
+        raise HTTPException(status_code=503, detail="Authentication service is unavailable.")
 
-def get_public_key(jwk: Dict[str, Any]) -> Any:
-    """Extract RSA public key from JWK"""
-    try:
-        if jwk['kty'] == 'RSA':
-            n = int.from_bytes(base64.urlsafe_b64decode(jwk['n'] + '==='), 'big')
-            e = int.from_bytes(base64.urlsafe_b64decode(jwk['e'] + '==='), 'big')
-            return rsa.RSAPublicNumbers(e, n).public_key()
-        elif jwk['kty'] == 'EC':
-            x = int.from_bytes(base64.urlsafe_b64decode(jwk['x'] + '==='), 'big')
-            y = int.from_bytes(base64.urlsafe_b64decode(jwk['y'] + '==='), 'big')
-            curve = {'P-256': ec.SECP256R1, 'P-384': ec.SECP384R1, 'P-521': ec.SECP521R1}.get(jwk.get('crv'))
-            if not curve:
-                raise ValueError(f"Unsupported EC curve: {jwk.get('crv')}")
-            return ec.EllipticCurvePublicNumbers(x, y, curve()).public_key()
-        else:
-            raise ValueError(f"Unsupported key type: {jwk['kty']}")
-    except Exception as e:
-        logger.error(f"Public key extraction error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Invalid JWK format")
+def jwk_to_pem(jwk: Dict[str, Any]) -> bytes:
+    if jwk.get('kty') != 'RSA': raise ValueError("Unsupported key type")
+    n = int.from_bytes(base64.urlsafe_b64decode(jwk['n'] + '=='), 'big')
+    e = int.from_bytes(base64.urlsafe_b64decode(jwk['e'] + '=='), 'big')
+    return rsa.RSAPublicNumbers(e, n).public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
 
-async def get_current_user(token: str = Security(OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token"))):
-    settings = get_settings()
+async def verify_token(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
     try:
-        header = jwt.get_unverified_header(token)
-        kid = header.get('kid')
-        if not kid:
-            raise JWTError("Missing 'kid' in token header")
+        unverified_header = jwt.get_unverified_header(token)
+        kid, alg = unverified_header.get('kid'), unverified_header.get('alg')
+        if not kid or alg != 'RS256': raise JWTError("Invalid token format")
         
-        jwks = await fetch_jwks(settings.JWKS_URL)
-        matching_key = next((key for key in jwks.get('keys', []) if key['kid'] == kid), None)
-        if not matching_key:
-            raise JWTError("No matching JWK found for kid")
-        
-        public_key = get_public_key(matching_key)
-        
-        payload = jwt.decode(
-            token,
-            public_key,
-            algorithms=[matching_key.get('alg', 'RS256')],
-            audience="authenticated",
-            options={"verify_signature": True, "verify_aud": True, "verify_exp": True}
-        )
-        
-        user_id = payload.get("sub")
-        user_email = payload.get("email")
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: missing sub claim")
-        
-        supabase = await get_supabase_client()
-        profile = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
-        
-        if profile.data:
-            return profile.data
-        
-        logger.info(f"Auto-creating profile for new user: {user_id}")
-        new_profile = {
-            "id": user_id,
-            "email": user_email,
-            "kyc_level": 0,
-            "kyc_status": "pending",
-            "is_admin": False,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        create_res = supabase.from_("user_profiles").insert(new_profile).execute()
-        
-        if not create_res.data:
-            raise HTTPException(status_code=500, detail="Failed to create user profile")
-        
-        return create_res.data[0]
-        
+        jwks = await fetch_jwks()
+        key = next((k for k in jwks.get('keys', []) if k.get('kid') == kid), None)
+        if not key: raise JWTError("Public key for token not found")
+
+        return jwt.decode(token, jwk_to_pem(key), algorithms=[alg], audience='authenticated')
     except JWTError as e:
-        logger.warning(f"JWT validation failed: {str(e)}")
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
-    except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {e}")
 
-# Services
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def get_supabase_client() -> Client:
-    settings = get_settings()
-    try:
-        client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY or "")
-        logger.info("Supabase client initialized successfully")
-        return client
-    except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {str(e)}")
-        raise
+# Service Dependencies
+def get_supabase_client() -> Client:
+    if _supabase_client is None: raise HTTPException(status_code=503, detail="Database client not initialized")
+    return _supabase_client
+def get_db() -> 'DatabaseService':
+    if _database_service is None: raise HTTPException(status_code=503, detail="Database service not initialized")
+    return _database_service
+def get_audit() -> 'AuditService':
+    if _audit_service is None: raise HTTPException(status_code=503, detail="Audit service not initialized")
+    return _audit_service
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def get_algorand_client() -> Optional[algod.AlgodClient]:
-    settings = get_settings()
-    if not all([settings.ALGORAND_NODE_URL, settings.ALGORAND_API_KEY]):
-        logger.warning("Algorand client not configured - skipping initialization")
-        return None
-    try:
-        headers = {"X-API-Key": settings.ALGORAND_API_KEY}
-        client = algod.AlgodClient("", settings.ALGORAND_NODE_URL, headers=headers)
-        status = client.status()
-        logger.info(f"Algorand client initialized - current round: {status.get('last-round')}")
-        return client
-    except Exception as e:
-        logger.error(f"Failed to initialize Algorand client: {str(e)}")
-        raise
+# User Dependencies
+async def get_current_user(payload: Dict[str, Any] = Depends(verify_token), supabase: Client = Depends(get_supabase_client)) -> Dict[str, Any]:
+    user_id = payload.get("sub")
+    if not user_id: raise HTTPException(status_code=401, detail="Invalid token payload")
+    
+    profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
+    if profile_res.data:
+        return profile_res.data
 
-class DatabaseService:
-    def __init__(self, supabase: Client):
-        self.supabase = supabase
-
-    def select(self, table: str, query: Dict[str, Any]) -> List[Dict]:
-        try:
-            res = self.supabase.from_(table).select("*").match(query).execute()
-            return res.data or []
-        except Exception as e:
-            logger.error(f"DB select error [{table}]: {str(e)}")
-            raise
-
-    def insert(self, table: str, data: Dict, upsert: bool = False) -> Dict:
-        try:
-            if upsert:
-                res = self.supabase.from_(table).upsert(data).execute()
-            else:
-                res = self.supabase.from_(table).insert(data).execute()
-            return res.data[0] if res.data else {}
-        except Exception as e:
-            logger.error(f"DB insert error [{table}]: {str(e)}")
-            raise
-
-class AuditService:
-    def __init__(self, supabase: Client):
-        self.supabase = supabase
-
-    async def log_action(self, user_id: str, action: str, details: Dict):
-        try:
-            log_entry = {
-                "user_id": user_id,
-                "action": action,
-                "details": json.dumps(details),
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            self.supabase.from_("audit_logs").insert(log_entry).execute()
-        except Exception as e:
-            logger.error(f"Audit log error: {str(e)}")
-
-class TreasuryService:
-    def __init__(self, algorand_client: Optional[algod.AlgodClient], supabase: Client, treasury_address: str):
-        self.algorand_client = algorand_client
-        self.supabase = supabase
-        self.treasury_address = treasury_address
-
-    def monitor_demand(self) -> Dict:
-        if not self.algorand_client:
-            return {"status": "unavailable", "message": "Algorand not configured"}
-        try:
-            account_info = self.algorand_client.account_info(self.treasury_address)
-            circulating_supply = account_info.get('amount', 0)
-            utilization = (circulating_supply / 1000000000) * 100 if circulating_supply else 0
-            return {
-                "circulating_supply": circulating_supply,
-                "utilization": utilization,
-                "status": "healthy" if utilization < 80 else "high"
-            }
-        except Exception as e:
-            logger.error(f"Treasury monitor error: {str(e)}")
-            raise HTTPException(status_code=503, detail="Treasury monitor failed")
-
-# Dependency Injection Helpers
-async def get_db() -> DatabaseService:
-    global database_service
-    supabase = await get_supabase_client()
-    if not database_service:
-        database_service = DatabaseService(supabase)
-    return database_service
-
-async def get_audit() -> AuditService:
-    global audit_service
-    supabase = await get_supabase_client()
-    if not audit_service:
-        audit_service = AuditService(supabase)
-    return audit_service
-
-async def get_algo() -> Optional[algod.AlgodClient]:
-    global algorand_client
-    if not algorand_client:
-        algorand_client = await get_algorand_client()
-    return algorand_client
+    logger.warning(f"Profile for user {user_id} not found. Attempting to auto-create.")
+    new_profile_data = {"id": user_id, "email": payload.get("email")}
+    creation_res = supabase.from_("user_profiles").insert(new_profile_data, returning="representation").single().execute()
+    if not creation_res.data:
+        raise HTTPException(status_code=500, detail="Failed to retrieve or create user profile.")
+    return creation_res.data
 
 def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)):
     if not current_user.get("is_admin", False):
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
-# App setup
-app = FastAPI(
-    title="Seamount API",
-    description="Seamount backend API for stablecoin operations",
-    version="1.0.0"
-)
+# --- 5. DATA MODELS (PYDANTIC) ---
+class UserProfile(BaseModel):
+    id: str; email: EmailStr; first_name: Optional[str] = None; last_name: Optional[str] = None;
+class InvestorContactPayload(BaseModel):
+    name: str; email: EmailStr; company: Optional[str] = None; checkSize: Optional[str] = None; message: Optional[str] = None
+class KYCSubmission(BaseModel):
+    document_type: str; document_data: str # Base64 encoded string
+class PaymentRequest(BaseModel):
+    recipient_email: EmailStr; amount: float; currency: str = "USDS"
+class PaymentResponse(BaseModel):
+    transaction_id: str; status: str; amount: float; currency: str; timestamp: datetime
+class MFASetupResponse(BaseModel):
+    secret: str; qr_code_url: str
+class MFAVerifyRequest(BaseModel):
+    token: str
+class PortfolioHolding(BaseModel):
+    id: str; user_id: str; asset: str; amount: float; value_usd: float
+class ConsentPayload(BaseModel):
+    preferences: Dict[str, bool]
 
+# --- 6. SERVICE CLASSES ---
+class DatabaseService:
+    def __init__(self, supabase: Client): self.supabase = supabase
+    def insert(self, table: str, data: Dict[str, Any], returning="minimal"):
+        return self.supabase.from_(table).insert(data, returning=returning).execute()
+    def update(self, table: str, match_query: Dict[str, Any], data: Dict[str, Any]):
+        return self.supabase.from_(table).update(data).match(match_query).execute()
+
+class AuditService:
+    def __init__(self, db_service: DatabaseService): self.db = db_service
+    async def log(self, user_id: Optional[str], action: str, details: Dict[str, Any]):
+        try:
+            self.db.insert("compliance_logs", {
+                "user_id": user_id, "action_taken": action, "details": details
+            })
+            logger.info(f"AUDIT: {action} by {user_id or 'System'}")
+        except Exception as e:
+            logger.error(f"Failed to log audit action '{action}': {e}")
+
+# --- 7. LIFESPAN MANAGER ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _supabase_client, _database_service, _audit_service
+    logger.info("Application startup...")
+    try:
+        if not all([settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY]):
+            raise ValueError("FATAL: VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY must be set.")
+        _supabase_client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+        _supabase_client.from_("user_profiles").select("id", head=True).limit(1).execute()
+        logger.info("Supabase client connected.")
+        
+        _database_service = DatabaseService(_supabase_client)
+        _audit_service = AuditService(_database_service)
+        
+        if settings.JWKS_URL: await fetch_jwks()
+        
+        await _audit_service.log(user_id="system", action="api_startup", details={"status": "success"})
+        yield
+    finally:
+        logger.info("Application shutdown.")
+
+# --- 8. FASTAPI APP ---
+app = FastAPI(title="Seamount.io API", version="1.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS_LIST,
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
+@app.exception_handler(Exception)
+async def general_exception_handler(req: Request, exc: Exception):
+    logger.error(f"Unhandled exception for {req.url}: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "An internal server error occurred."})
 
-# Routes
-@app.post("/api/v1/investor/contact", response_model=dict, tags=["Investor"])
-async def investor_contact(
-    contact: InvestorContactPayload,
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit)
-):
-    try:
-        contact_data = contact.dict(exclude_unset=True)
-        contact_data["id"] = str(uuid4())
-        contact_data["created_at"] = datetime.utcnow().isoformat()
-        db.insert("investor_contacts", contact_data)
-        
-        settings = get_settings()
-        if not all([settings.MAIL_USERNAME, settings.MAIL_PASSWORD]):
-            logger.warning("Email service not fully configured - skipping send")
-        else:
-            msg = MIMEText(contact.message or "")
-            msg['Subject'] = f"Investor Contact: {contact.name}"
-            msg['From'] = settings.MAIL_FROM
-            msg['To'] = "investors@seamount.io"
-        
-            with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
-                if settings.MAIL_STARTTLS:
-                    server.starttls()
-                server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-                server.send_message(msg)
-        
-        await audit.log_action(None, "investor_contact", contact_data)
-        return {"message": "Contact request submitted successfully"}
-    except Exception as e:
-        logger.error(f"Investor contact error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+# --- 9. API ROUTES ---
 
-@app.post("/api/v1/quote/whitelabel", response_model=dict, tags=["Quote"])
-async def get_whitelabel_quote(quote: WhitelabelQuotePayload):
-    try:
-        base_rate = 1.0
-        fee_rate = 0.002
-        fee_amount = float(quote.amount) * fee_rate
-        net_amount = float(quote.amount) - fee_amount
-        
-        return {
-            "from_amount": float(quote.amount),
-            "from_currency": quote.from_currency,
-            "to_amount": net_amount,
-            "to_currency": quote.to_currency,
-            "exchange_rate": base_rate,
-            "fee": fee_amount,
-            "quote_id": str(uuid4()),
-            "expires_at": (datetime.utcnow() + timedelta(minutes=10)).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Quote generation error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/v1/user/consent", response_model=dict, tags=["User"])
-async def update_consent(
-    consent: ConsentPayload,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit)
-):
-    try:
-        consent_data = {
-            "user_id": current_user["id"],
-            "preferences": json.dumps(consent.preferences),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        db.insert("user_consent", consent_data, upsert=True)
-        await audit.log_action(current_user["id"], "consent_updated", consent_data)
-        return {"message": "Consent preferences updated"}
-    except Exception as e:
-        logger.error(f"Consent update error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/v1/user/mfa/setup", response_model=MFASetupResponse, tags=["Security"])
-async def setup_mfa(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit)
-):
-    try:
-        secret = pyotp.random_base32()
-        totp = pyotp.TOTP(secret)
-        qr_code_url = totp.provisioning_uri(name=current_user["email"], issuer_name="Seamount.io")
-        mfa_data = {
-            "user_id": current_user["id"],
-            "secret": secret,
-            "enabled": False,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        db.insert("user_mfa", mfa_data, upsert=True)
-        await audit.log_action(current_user["id"], "mfa_setup_initiated", {})
-        logger.info(f"MFA setup initiated for user: {current_user['id']}")
-        return MFASetupResponse(secret=secret, qr_code_url=qr_code_url)
-    except Exception as e:
-        logger.error(f"MFA setup error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/api/v1/user/mfa/verify", response_model=dict, tags=["Security"])
-async def verify_mfa(
-    mfa_request: MFAVerifyRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit)
-):
-    try:
-        mfa_data = db.select("user_mfa", {"user_id": current_user["id"]})
-        if not mfa_data:
-            raise HTTPException(status_code=404, detail="MFA not set up")
-        
-        totp = pyotp.TOTP(mfa_data[0]["secret"])
-        if not totp.verify(mfa_request.token):
-            raise HTTPException(status_code=400, detail="Invalid MFA token")
-        
-        db.insert("user_mfa", {
-            "user_id": current_user["id"],
-            "secret": mfa_data[0]["secret"],
-            "enabled": True,
-            "verified_at": datetime.utcnow().isoformat()
-        }, upsert=True)
-        
-        await audit.log_action(current_user["id"], "mfa_enabled", {})
-        logger.info(f"MFA enabled for user: {current_user['id']}")
-        return {"message": "MFA enabled successfully"}
-    except Exception as e:
-        logger.error(f"MFA verification error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/api/v1/portfolio", response_model=List[PortfolioHolding], tags=["Portfolio"])
-async def get_portfolio(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db)
-):
-    try:
-        holdings = db.select("portfolio_holdings", {"user_id": current_user["id"]})
-        return holdings
-    except Exception as e:
-        logger.error(f"Portfolio fetch error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
+# Section: Public Routes
 @app.get("/api/v1/health", tags=["System"])
-async def health_check():
-    try:
-        supabase = await get_supabase_client()
-        supabase.from_("user_profiles").select("id").limit(1).execute()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "services": {
-                "database": "connected",
-                "api": "running"
-            }
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "error": str(e)
-        }
+def health_check(): return {"status": "healthy", "timestamp": datetime.utcnow()}
 
-@app.get("/api/v1/treasury/status", tags=["Treasury"])
-async def get_treasury_status(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    algo: Optional[algod.AlgodClient] = Depends(get_algo),
-    db: DatabaseService = Depends(get_db)
-):
-    if not current_user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
+@app.post("/api/v1/investor-contact", tags=["Public"])
+async def investor_contact(payload: InvestorContactPayload, db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit)):
+    contact_data = payload.dict()
+    db.insert("investor_contacts", contact_data)
+    await audit.log(user_id=None, action="investor_contact_form", details={"email": payload.email})
+    # Optional: Email logic can be added here
+    return {"message": "Contact request submitted successfully."}
+
+# Section: Authenticated User Routes
+@app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])
+def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
+    return current_user
+
+@app.post("/api/v1/user/kyc", tags=["User"])
+async def update_kyc(submission: KYCSubmission, current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit)):
+    user_id = current_user["id"]
+    kyc_data = {"user_id": user_id, "document_type": submission.document_type, "document_data": submission.document_data, "status": "pending"}
+    db.insert("kyc_documents", kyc_data)
+    db.update("user_profiles", {"id": user_id}, {"kyc_status": "in_progress"})
+    await audit.log(user_id, "kyc_submitted", {"document_type": submission.document_type})
+    return {"message": "KYC documents submitted for review."}
+
+@app.get("/api/v1/user/kyc-status", tags=["User"])
+def get_kyc_status(current_user: Dict[str, Any] = Depends(get_current_user)):
+    return {"kyc_status": current_user.get("kyc_status", "pending"), "kyc_level": current_user.get("kyc_level", 0)}
+
+@app.post("/api/v1/payments/send", response_model=PaymentResponse, tags=["Payments"])
+async def send_payment(req: PaymentRequest, current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit), supabase: Client = Depends(get_supabase_client)):
+    recipient_res = supabase.from_("user_profiles").select("id").eq("email", req.recipient_email).single().execute()
+    if not recipient_res.data: raise HTTPException(status_code=404, detail="Recipient not found")
     
-    try:
-        treasury = TreasuryService(algo, db.supabase, get_settings().TREASURY_ADDRESS or "")
-        demand_metrics = treasury.monitor_demand()
-        return {
-            "circulating_supply": demand_metrics["circulating_supply"],
-            "utilization_rate": demand_metrics["utilization"],
-            "status": "healthy" if demand_metrics["utilization"] < 90 else "high_demand",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Treasury status error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+    tx_id = str(uuid4())
+    tx_data = {"id": tx_id, "sender_id": current_user["id"], "recipient_id": recipient_res.data["id"], "amount": req.amount, "currency": req.currency, "status": "completed"}
+    db.insert("transactions", tx_data)
+    await audit.log(current_user["id"], "payment_sent", {"tx_id": tx_id, "to": req.recipient_email, "amount": req.amount})
+    return PaymentResponse(**tx_data, timestamp=datetime.utcnow())
 
-@app.get("/api/v1/admin/users", response_model=List[dict], tags=["Admin"], dependencies=[Depends(require_admin)])
-async def get_all_users(db: DatabaseService = Depends(get_db)):
-    try:
-        users = db.select("user_profiles", {})
-        return users
-    except Exception as e:
-        logger.error(f"Admin users fetch error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/api/v1/payments/history", response_model=List[Dict], tags=["Payments"])
+def get_payment_history(current_user: Dict[str, Any] = Depends(get_current_user), supabase: Client = Depends(get_supabase_client)):
+    user_id = current_user["id"]
+    sent = supabase.from_("transactions").select("*").eq("sender_id", user_id).execute().data or []
+    received = supabase.from_("transactions").select("*").eq("recipient_id", user_id).execute().data or []
+    return sorted(sent + received, key=lambda x: x.get("created_at", ""), reverse=True)
 
-@app.post("/api/v1/admin/kyc/approve/{user_id}", response_model=dict, tags=["Admin"], dependencies=[Depends(require_admin)])
-async def approve_kyc(
-    user_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit)
-):
-    try:
-        db.insert("user_profiles", {
-            "id": user_id,
-            "kyc_status": "approved",
-            "kyc_level": 2
-        }, upsert=True)
-        
-        db.insert("kyc_documents", {
-            "user_id": user_id,
-            "status": "approved",
-            "reviewed_at": datetime.utcnow().isoformat()
-        }, upsert=True)
-        
-        await audit.log_action(current_user["id"], "kyc_approved", {"approved_user_id": user_id})
-        return {"message": "KYC approved successfully"}
-    except Exception as e:
-        logger.error(f"KYC approval error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/api/v1/user/portfolio", response_model=List[PortfolioHolding], tags=["Portfolio"])
+def get_portfolio(current_user: Dict[str, Any] = Depends(get_current_user), supabase: Client = Depends(get_supabase_client)):
+    holdings = supabase.from_("user_portfolios").select("*").eq("user_id", current_user["id"]).execute()
+    return holdings.data or []
 
-@app.get("/api/v1/dev/jwks-test", tags=["Development"])
-async def test_jwks():
-    try:
-        settings = get_settings()
-        jwks = await fetch_jwks(settings.JWKS_URL)
-        return {
-            "status": "success",
-            "jwks_url": settings.JWKS_URL,
-            "keys_count": len(jwks.get("keys", [])),
-            "algorithms": [key.get("alg") for key in jwks.get("keys", [])]
-        }
-    except Exception as e:
-        logger.error(f"JWKS test error: {str(e)}")
-        raise HTTPException(status_code=503, detail=f"JWKS test failed: {str(e)}")
+@app.post("/api/v1/user/consent", tags=["User"])
+async def update_consent(consent: ConsentPayload, current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit)):
+    user_id = current_user["id"]
+    db.update("user_profiles", {"id": user_id}, {"consent": consent.preferences})
+    await audit.log(user_id, "consent_updated", consent.preferences)
+    return {"message": "Consent preferences updated."}
 
-@app.post("/api/v1/stablecoin/mint", response_model=dict, tags=["Stablecoin"], dependencies=[Depends(require_admin)])
-async def mint_usds(
-    mint_request: MintRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit),
-    algo: Optional[algod.AlgodClient] = Depends(get_algo)
-):
-    if not algo or not get_settings().ALGORAND_CREATOR_MNEMONIC:
-        raise HTTPException(status_code=503, detail="Algorand service not configured for minting.")
-    try:
-        mint_data = {
-            "id": str(uuid4()),
-            "amount": str(mint_request.amount),
-            "recipient_address": mint_request.recipient_address,
-            "status": "pending",
-            "minted_by": current_user["id"]
-        }
-        db.insert("mint_transactions", mint_data)
-        await audit.log_action(current_user["id"], "usds_minted", mint_data)
-        return {"message": "Mint transaction created", "mint_id": mint_data["id"]}
-    except Exception as e:
-        logger.error(f"Mint error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+# Section: Security Routes
+@app.post("/api/v1/user/mfa/setup", response_model=MFASetupResponse, tags=["Security"])
+async def setup_mfa(current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit)):
+    secret = pyotp.random_base32()
+    qr_url = pyotp.TOTP(secret).provisioning_uri(current_user["email"], issuer_name="Seamount.io")
+    db.insert("user_mfa", {"user_id": current_user["id"], "secret": secret, "enabled": False}, returning="minimal")
+    await audit.log(current_user["id"], "mfa_setup_initiated", {})
+    return MFASetupResponse(secret=secret, qr_code_url=qr_url)
 
-@app.post("/api/v1/stablecoin/burn", response_model=dict, tags=["Stablecoin"], dependencies=[Depends(require_admin)])
-async def burn_usds(
-    burn_request: BurnRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit),
-    algo: Optional[algod.AlgodClient] = Depends(get_algo)
-):
-    if not algo or not get_settings().ALGORAND_CREATOR_MNEMONIC:
-        raise HTTPException(status_code=503, detail="Algorand service not configured for burning.")
-    try:
-        burn_data = {
-            "id": str(uuid4()),
-            "amount": str(burn_request.amount),
-            "sender_address": burn_request.sender_address,
-            "status": "pending",
-            "burned_by": current_user["id"]
-        }
-        db.insert("burn_transactions", burn_data)
-        await audit.log_action(current_user["id"], "usds_burned", burn_data)
-        return {"message": "Burn transaction created", "burn_id": burn_data["id"]}
-    except Exception as e:
-        logger.error(f"Burn error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+@app.post("/api/v1/user/mfa/verify", tags=["Security"])
+async def verify_mfa(req: MFAVerifyRequest, current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit), supabase: Client = Depends(get_supabase_client)):
+    user_id = current_user["id"]
+    mfa_res = supabase.from_("user_mfa").select("secret").eq("user_id", user_id).single().execute()
+    if not mfa_res.data or not pyotp.TOTP(mfa_res.data["secret"]).verify(req.token):
+        raise HTTPException(status_code=401, detail="Invalid MFA token")
+    db.update("user_mfa", {"user_id": user_id}, {"enabled": True})
+    await audit.log(user_id, "mfa_enabled", {})
+    return {"message": "MFA verified and enabled successfully."}
 
-@app.get("/api/v1/treasury/stats", response_model=dict, tags=["Treasury"])
-async def get_treasury_stats(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    algo: Optional[algod.AlgodClient] = Depends(get_algo),
-    db: DatabaseService = Depends(get_db)
-):
-    if not get_settings().TREASURY_ADDRESS:
-        raise HTTPException(status_code=501, detail="Treasury not configured")
-    try:
-        service = TreasuryService(algo, db.supabase, get_settings().TREASURY_ADDRESS)
-        return service.monitor_demand()
-    except Exception as e:
-        logger.error(f"Treasury stats error: {str(e)}")
-        raise HTTPException(status_code=503, detail="Treasury stats failed")
+# Section: Admin Routes
+@app.get("/api/v1/admin/users", response_model=List[UserProfile], tags=["Admin"], dependencies=[Depends(require_admin)])
+def get_all_users(supabase: Client = Depends(get_supabase_client)):
+    return supabase.from_("user_profiles").select("*").execute().data or []
 
-@app.post("/api/v1/payment", response_model=PaymentResponse, tags=["Payment"])
-async def process_payment(
-    payment: PaymentRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: DatabaseService = Depends(get_db),
-    audit: AuditService = Depends(get_audit),
-    algo: Optional[algod.AlgodClient] = Depends(get_algo)
-):
-    try:
-        recipient = db.select("user_profiles", {"email": payment.recipient_email})
-        if not recipient:
-            raise HTTPException(status_code=404, detail="Recipient not found")
-        
-        tx_id = str(uuid4())
-        tx_data = {
-            "id": tx_id,
-            "sender_id": current_user["id"],
-            "recipient_id": recipient[0]["id"],
-            "amount": payment.amount,
-            "currency": payment.currency,
-            "status": "pending",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        db.insert("transactions", tx_data)
-        await audit.log_action(current_user["id"], "payment_initiated", tx_data)
-        
-        if algo and recipient[0].get("algorand_address"):
-            # Placeholder for Algorand transaction
-            tx_data["status"] = "completed"
-            db.insert("transactions", tx_data, upsert=True)
-        
-        return PaymentResponse(
-            transaction_id=tx_id,
-            status=tx_data["status"],
-            amount=payment.amount,
-            currency=payment.currency,
-            timestamp=datetime.utcnow()
-        )
-    except Exception as e:
-        logger.error(f"Payment error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+@app.post("/api/v1/admin/kyc/approve/{user_id}", tags=["Admin"], dependencies=[Depends(require_admin)])
+async def approve_kyc(user_id: str, current_user: Dict[str, Any] = Depends(get_current_user), db: DatabaseService = Depends(get_db), audit: AuditService = Depends(get_audit)):
+    db.update("user_profiles", {"id": user_id}, {"kyc_status": "approved", "kyc_level": 2})
+    await audit.log(current_user["id"], "admin_kyc_approved", {"target_user_id": user_id})
+    return {"message": f"KYC for user {user_id} approved."}
 
+# --- 10. MAIN EXECUTION ---
 if __name__ == "__main__":
     import uvicorn
-    settings = get_settings()
-    logger.info("Starting Seamount.io API server...")
-    logger.info(f"JWKS URL: {settings.JWKS_URL}")
-    logger.info(f"Supabase URL: {settings.VITE_SUPABASE_URL}")
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=settings.PORT,
-        reload=True,
-        log_level="info"
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)
