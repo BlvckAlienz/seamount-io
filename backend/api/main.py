@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application
-# Version: 1.2.1 (Final & Comprehensive)
+# Version: 1.3.1 (Final & Comprehensive w/ Service Integration)
 # ==============================================================================
 
 import logging
@@ -20,11 +20,16 @@ from jose import JWTError, jwt
 import base64
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+# --- Project-specific Imports ---
+from services.email_service import EmailService
+from services.notification_service import NotificationService
+
 # --- 1. SETUP LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 _supabase_client: Optional[Client] = None
+_notification_service: Optional[NotificationService] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
@@ -35,6 +40,13 @@ class Settings:
     IPINFO_TOKEN: str = os.getenv("IPINFO_TOKEN")
     PORT: int = int(os.getenv("PORT", 8000))
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
+    MAIL_USERNAME: str = os.getenv("MAIL_USERNAME")
+    MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD")
+    MAIL_FROM: str = os.getenv("MAIL_FROM")
+    MAIL_PORT: int = int(os.getenv("MAIL_PORT", 587))
+    MAIL_SERVER: str = os.getenv("MAIL_SERVER")
+    MAIL_STARTTLS: bool = os.getenv("MAIL_STARTTLS", "True").lower() in ("true", "1")
+    MAIL_SSL_TLS: bool = os.getenv("MAIL_SSL_TLS", "False").lower() in ("true", "1")
     
     @property
     def JWKS_URL(self) -> Optional[str]:
@@ -86,34 +98,41 @@ async def get_current_user(payload: Dict[str, Any] = Depends(verify_token), supa
     profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
     if not profile_res.data: raise HTTPException(status_code=404, detail="User profile not found")
     return profile_res.data
+
+def get_notification_service() -> NotificationService:
+    if _notification_service is None: raise HTTPException(status_code=503, detail="Notification service not initialized")
+    return _notification_service
     
 def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)):
     if not current_user.get("is_admin", False): raise HTTPException(status_code=403, detail="Admin privileges required")
 
 # --- 4. PYDANTIC MODELS ---
-class UserProfile(BaseModel): id: str; email: EmailStr; first_name: Optional[str] = None; last_name: Optional[str] = None;
+class UserProfile(BaseModel): id: str; email: EmailStr; first_name: Optional[str] = None; last_name: Optional[str] = None
 class SessionResponse(BaseModel): session_id: UUID
 class ConsentUpdatePayload(BaseModel): session_id: UUID; preferences: Dict[str, bool]
 class InvestorContactPayload(BaseModel): name: str; email: EmailStr; company: Optional[str] = None; checkSize: Optional[str] = None; message: Optional[str] = None
-class PaymentRequest(BaseModel): recipient_email: EmailStr; amount: float; currency: str = "USDS"
-class PaymentResponse(BaseModel): transaction_id: str; status: str; amount: float; currency: str; timestamp: datetime
 
 # --- 5. LIFESPAN MANAGER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _supabase_client
+    global _supabase_client, _notification_service
     logger.info("Application startup...")
     try:
         if not all([settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY, settings.IPINFO_TOKEN]):
-            raise ValueError("FATAL: VITE_SUPABASE_URL, SUPABASE_SERVICE_KEY, and IPINFO_TOKEN must be set.")
+            raise ValueError("FATAL: Core environment variables are not set.")
+        
         _supabase_client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
         _supabase_client.from_("user_profiles").select("id").limit(1).execute()
         logger.info("Supabase client connected.")
+        
+        email_service = EmailService(settings)
+        _notification_service = NotificationService(email_service)
+        
         yield
     finally: logger.info("Application shutdown.")
 
 # --- 6. FASTAPI APP ---
-app = FastAPI(title="Seamount.io API", version="1.2.1", lifespan=lifespan)
+app = FastAPI(title="Seamount.io API", version="1.3.1", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.ALLOWED_ORIGINS_LIST, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # --- 7. API ROUTES ---
@@ -129,10 +148,7 @@ async def initialize_session(request: Request, user_agent: Optional[str] = Heade
             async with http_session.get(f"https://ipinfo.io/{ip_address}?token={settings.IPINFO_TOKEN}") as response:
                 if response.status == 200:
                     ip_data = await response.json()
-                    session_data.update({
-                        "isp": ip_data.get("org"), "country": ip_data.get("country"), "city": ip_data.get("city"),
-                        "is_vpn": ip_data.get("privacy", {}).get("vpn", False)
-                    })
+                    session_data.update({"isp": ip_data.get("org"), "country": ip_data.get("country"), "city": ip_data.get("city"), "is_vpn": ip_data.get("privacy", {}).get("vpn", False)})
     except Exception as e: logger.error(f"IPinfo enrichment failed for IP {ip_address}: {e}")
     
     insert_res = supabase.from_("user_sessions").insert(session_data).execute()
@@ -150,24 +166,17 @@ async def update_consent(payload: ConsentUpdatePayload, supabase: Client = Depen
     return {"message": "Consent updated successfully"}
 
 @app.post("/api/v1/investor-contact", tags=["Public"])
-async def investor_contact(payload: InvestorContactPayload, supabase: Client = Depends(get_supabase_client)):
+async def investor_contact(payload: InvestorContactPayload, supabase: Client = Depends(get_supabase_client), notifier: NotificationService = Depends(get_notification_service)):
     supabase.from_("investor_contacts").insert(payload.dict()).execute()
+    subject = f"New Investor Contact: {payload.name}"
+    body = f"""<html><body><p><strong>Name:</strong> {payload.name}</p><p><strong>Email:</strong> {payload.email}</p><p><strong>Company:</strong> {payload.company or 'N/A'}</p><p><strong>Check Size:</strong> {payload.checkSize or 'N/A'}</p><hr><p><strong>Message:</strong></p><p>{payload.message}</p></body></html>"""
+    await notifier.email_service.send_email(subject, ["investors@seamount.io"], body)
     return {"message": "Contact request submitted successfully."}
 
 @app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])
 def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
     return current_user
-    
-@app.post("/api/v1/payments/send", response_model=PaymentResponse, tags=["Payments"])
-async def send_payment(req: PaymentRequest, current_user: Dict[str, Any] = Depends(get_current_user), supabase: Client = Depends(get_supabase_client)):
-    recipient_res = supabase.from_("user_profiles").select("id").eq("email", req.recipient_email).single().execute()
-    if not recipient_res.data: raise HTTPException(status_code=404, detail="Recipient not found")
-    
-    tx_id = str(uuid4())
-    tx_data = {"id": tx_id, "sender_id": current_user["id"], "recipient_id": recipient_res.data["id"], "amount": req.amount, "currency": req.currency, "status": "completed"}
-    supabase.from_("transactions").insert(tx_data).execute()
-    return PaymentResponse(**tx_data, timestamp=datetime.utcnow())
-    
+
 @app.get("/api/v1/admin/users", response_model=List[UserProfile], tags=["Admin"], dependencies=[Depends(require_admin)])
 def get_all_users(supabase: Client = Depends(get_supabase_client)):
     return supabase.from_("user_profiles").select("*").execute().data or []
