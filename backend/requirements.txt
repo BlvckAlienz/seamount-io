@@ -1,105 +1,36 @@
-aiohttp==3.9.3
-aiosignal==1.4.0
-aiosmtplib==3.0.2
-annotated-types==0.7.0
-anyio==4.10.0
-attrs==25.3.0
-bcrypt==4.3.0
-blinker==1.9.0
-build==1.3.0
-CacheControl==0.14.3
-certifi==2025.8.3
-cffi==1.17.1
-charset-normalizer==3.4.3
-cleo==2.1.0
-click==8.2.1
-colorama==0.4.6
-crashtest==0.4.1
-cryptography==42.0.5
-deprecation==2.1.0
-distlib==0.4.0
-dnspython==2.7.0
-dulwich==0.22.8
-ecdsa==0.19.1
-email_validator==2.2.0
-fastapi==0.110.0
-fastapi-mail==1.5.0
-fastjsonschema==2.21.1
-filelock==3.18.0
-findpython==0.6.3
-frozenlist==1.7.0
-gotrue==1.3.1
-gunicorn==21.2.0
-h11==0.14.0
-h2==4.2.0
-hpack==4.1.0
-httpcore==0.17.3
-httptools==0.6.4
-httpx==0.24.1
-hyperframe==6.1.0
-idna==3.10
-installer==0.7.0
-jaraco.classes==3.4.0
-jaraco.context==6.0.1
-jaraco.functools==4.2.1
-Jinja2==3.1.6
-keyring==25.6.0
-MarkupSafe==3.0.2
-more-itertools==10.7.0
-msgpack==1.1.1
-multidict==6.6.4
-packaging==25.0
-passlib==1.7.4
-pbs-installer==2025.8.8
-pipenv==2025.0.4
-pkginfo==1.12.1.2
-platformdirs==4.3.8
-poetry==2.1.4
-poetry-core==2.1.3
-postgrest==0.13.2
-propcache==0.3.2
-py-algorand-sdk==2.0.0
-pyasn1==0.6.1
-pycparser==2.22
-pycryptodomex==3.23.0
-pydantic==2.11.7
-pydantic-settings==2.6.1
-pydantic_core==2.33.2
-PyJWT==2.8.0
-PyNaCl==1.5.0
-pyotp==2.9.0
-pyproject_hooks==1.2.0
-python-dateutil==2.9.0.post0
-python-dotenv==1.0.1
-python-jose==3.3.0
-python-multipart==0.0.20
-pywin32-ctypes==0.2.3
-PyYAML==6.0.2
-RapidFuzz==3.13.0
-realtime==1.0.6
-requests==2.32.4
-requests-toolbelt==1.0.0
-rsa==4.9.1
-setuptools==80.9.0
-shellingham==1.5.4
-six==1.17.0
-sniffio==1.3.1
-starlette==0.36.3
-storage3==0.6.1
-StrEnum==0.4.15
-supabase==2.0.0
-supafunc==0.3.3
-tenacity==8.2.3
-tomlkit==0.13.3
-trove-classifiers==2025.8.6.13
-typing-inspection==0.4.1
-typing_extensions==4.14.1
-upstash-redis==1.4.0
-urllib3==2.5.0
-uvicorn==0.27.1
-virtualenv==20.32.0
-watchfiles==1.1.0
-websockets==12.0
-wheel==0.45.1
-yarl==1.20.1
-zstandard==0.23.0
+# ==============================================================================
+# Seamount.io API - Production Dependencies
+# Version: 1.1.0 (Clean & Conflict-Free)
+# ==============================================================================
+
+# Core FastAPI framework and server
+fastapi
+uvicorn[standard]
+
+# Supabase client and its dependencies
+supabase
+
+# Asynchronous HTTP requests
+aiohttp
+
+# Email services
+fastapi-mail
+
+# Authentication and security
+passlib[bcrypt]
+python-jose[cryptography]
+
+# Environment variable management
+python-dotenv
+
+# Data validation
+pydantic
+
+# Robust retry logic
+tenacity
+
+# One-time password generation for MFA
+pyotp
+
+# Algorand SDK for blockchain interactions
+py-algorand-sdk
