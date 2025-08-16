@@ -10,15 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hcaptcha/react-hcaptcha": "^1.8.0",
     "@supabase/supabase-js": "^2.39.3",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.6.7",
     "clsx": "^2.1.1",
-    "@hcaptcha/react-hcaptcha": "^1.8.0",
     "lucide-react": "^0.323.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.62.0",
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.22.0",
     "react-select-country-list": "^2.2.3",
