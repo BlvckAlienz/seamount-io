@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application
-# Version: 1.1.1 (Startup Hotfix)
+# Version: 1.1.2 (Audit Log Hotfix)
 # ==============================================================================
 
 import logging
@@ -181,10 +181,7 @@ async def lifespan(app: FastAPI):
         if not all([settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY]):
             raise ValueError("FATAL: VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY must be set.")
         _supabase_client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-        
-        # CORRECTED: This is the compatible way to perform a lightweight connection check.
         _supabase_client.from_("user_profiles").select("id").limit(1).execute()
-        
         logger.info("Supabase client connected.")
         
         _database_service = DatabaseService(_supabase_client)
@@ -192,13 +189,18 @@ async def lifespan(app: FastAPI):
         
         if settings.JWKS_URL: await fetch_jwks()
         
-        await _audit_service.log(user_id="system", action="api_startup", details={"status": "success"})
+        # CORRECTED: Pass None for system-level actions without a user.
+        await _audit_service.log(user_id=None, action="api_startup", details={"status": "success"})
+        
         yield
     finally:
         logger.info("Application shutdown.")
+        if _audit_service:
+            # CORRECTED: Pass None for system-level actions without a user.
+            await _audit_service.log(user_id=None, action="api_shutdown", details={"status": "complete"})
 
 # --- 8. FASTAPI APP ---
-app = FastAPI(title="Seamount.io API", version="1.1.1", lifespan=lifespan)
+app = FastAPI(title="Seamount.io API", version="1.1.2", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS_LIST,
