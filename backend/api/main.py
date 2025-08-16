@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application
-# Version: 1.1.0 (Comprehensive & Production-Ready)
+# Version: 1.1.1 (Startup Hotfix)
 # ==============================================================================
 
 import logging
@@ -181,7 +181,10 @@ async def lifespan(app: FastAPI):
         if not all([settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY]):
             raise ValueError("FATAL: VITE_SUPABASE_URL and SUPABASE_SERVICE_KEY must be set.")
         _supabase_client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-        _supabase_client.from_("user_profiles").select("id", head=True).limit(1).execute()
+        
+        # CORRECTED: This is the compatible way to perform a lightweight connection check.
+        _supabase_client.from_("user_profiles").select("id").limit(1).execute()
+        
         logger.info("Supabase client connected.")
         
         _database_service = DatabaseService(_supabase_client)
@@ -195,7 +198,7 @@ async def lifespan(app: FastAPI):
         logger.info("Application shutdown.")
 
 # --- 8. FASTAPI APP ---
-app = FastAPI(title="Seamount.io API", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="Seamount.io API", version="1.1.1", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS_LIST,
@@ -217,7 +220,6 @@ async def investor_contact(payload: InvestorContactPayload, db: DatabaseService 
     contact_data = payload.dict()
     db.insert("investor_contacts", contact_data)
     await audit.log(user_id=None, action="investor_contact_form", details={"email": payload.email})
-    # Optional: Email logic can be added here
     return {"message": "Contact request submitted successfully."}
 
 # Section: Authenticated User Routes
