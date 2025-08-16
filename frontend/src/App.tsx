@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import { apiClient } from './config/api';
 
 // --- Core Components & Pages ---
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthModal from './components/auth/AuthModal';
-import InvestorContact from './components/InvestorContact'; // Added
+import InvestorContact from './components/InvestorContact';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 
 // --- Page Imports ---
 import LandingPage from './pages/LandingPage';
@@ -24,9 +26,49 @@ import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 // --- Context ---
 import { AuthProvider } from './contexts/AuthContext';
 
+// Custom Hook for Session Management
+const useSession = () => {
+  const [session, setSession] = useState<{ id: string | null; consentGiven: boolean }>({
+    id: null,
+    consentGiven: localStorage.getItem('seamount_consent_given') === 'true',
+  });
+
+  useEffect(() => {
+    // If consent is already given, no need to initialize a new session fingerprint
+    if (session.consentGiven) {
+      return;
+    }
+
+    const initializeSession = async () => {
+      try {
+        const { data } = await apiClient.post('/api/v1/session/initialize');
+        setSession({ id: data.session_id, consentGiven: false });
+      } catch (error) {
+        console.error("Failed to initialize session:", error);
+        // If this fails, we treat it as if consent was given to not block the UI
+        setSession({ id: null, consentGiven: true }); 
+      }
+    };
+    
+    initializeSession();
+  }, [session.consentGiven]);
+
+  const handleConsentGiven = () => {
+    localStorage.setItem('seamount_consent_given', 'true');
+    setSession(prev => ({ ...prev, consentGiven: true }));
+  };
+  
+  return {
+    sessionId: session.id,
+    consentGiven: session.consentGiven,
+    handleConsentGiven,
+  };
+};
+
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
+  const { sessionId, consentGiven, handleConsentGiven } = useSession();
 
   const handleOpenAuth = (view: 'login' | 'register') => {
     setAuthView(view);
@@ -38,7 +80,7 @@ const AppContent: React.FC = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
-        <Route path="/contact" element={<InvestorContact />} /> {/* Added */}
+        <Route path="/contact" element={<InvestorContact />} />
         
         {/* Protected Routes with Progressive KYC Levels */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
@@ -55,11 +97,16 @@ const AppContent: React.FC = () => {
         {/* Fallback Route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => setShowAuthModal(false)} 
         initialView={authView}
       />
+
+      {!consentGiven && sessionId && (
+        <CookieConsentBanner sessionId={sessionId} onConsentGiven={handleConsentGiven} />
+      )}
     </>
   );
 }
@@ -67,7 +114,7 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Router>
         <AuthProvider>
           <Toaster position="top-right" />
           <AppContent />
