@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Session, SupabaseClient } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
@@ -85,16 +85,10 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setState((prev) => ({ ...prev, session, loading: true }));
-        
-        if (session) {
-          await fetchUserProfile();
-        }
+        setState((prev) => ({ ...prev, session, loading: false }));
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        setState((prev) => ({ ...prev, error: 'Authentication initialization failed' }));
-      } finally {
-        setState((prev) => ({ ...prev, loading: false }));
+        setState((prev) => ({ ...prev, error: 'Authentication initialization failed', loading: false }));
       }
     };
 
@@ -102,15 +96,14 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
+      
+      // Update session state
       setState((prev) => ({ ...prev, session, loading: true }));
       
-      if (session && event === 'SIGNED_IN') {
-        // Give the backend time to sync for new users
-        const delay = event === 'SIGNED_UP' ? 3000 : 1000;
-        setTimeout(async () => {
-          await fetchUserProfile(5, 2000); // More retries for new users
-        }, delay);
-      } else if (!session) {
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        // Fetch user profile when we have a valid session
+        await fetchUserProfile(5, 2000);
+      } else if (event === 'SIGNED_OUT') {
         setState((prev) => ({ ...prev, user: null, error: null }));
       }
       
@@ -155,9 +148,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.user && !data.user.email_confirmed_at) {
         toast.success('Please check your email to confirm your account');
       }
-      
-      // REMOVED: Manual profile insert - let the database trigger handle this
-      // The database trigger will automatically create the profile
       
       console.log('Sign up successful, profile will be created automatically');
       return { success: true };
@@ -228,7 +218,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         error: null, 
         isDemoMode: false 
       }));
-      navigate('/login');
+      navigate('/');
     } catch (error) {
       console.error('Sign out error:', error);
       toast.error('Sign out failed');
