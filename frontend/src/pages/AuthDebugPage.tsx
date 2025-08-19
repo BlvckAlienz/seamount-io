@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { jwtDecode } from 'jwt-decode';
+import jwtDecode from 'jwt-decode'; // Corrected import
 
 const AuthDebugPage: React.FC = () => {
   const [session, setSession] = useState<any>(null);

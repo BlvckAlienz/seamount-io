@@ -8,6 +8,7 @@
     "build": "npm run build:frontend",
     "build:frontend": "cd frontend && npm run build",
     "install:all": "npm install && cd frontend && npm install",
+    "install:backend": "cd backend && pip install -r requirements.txt",
     "lint": "npm run lint:frontend",
     "lint:frontend": "cd frontend && npm run lint"
   },
