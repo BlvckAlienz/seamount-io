@@ -4,37 +4,25 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // --- Core Plugins ---
   plugins: [react()],
-
-  // --- Path Aliases for Clean Imports ---
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-
-  // =============================================================================
-  // DEFINITIVE PRODUCTION BUILD CONFIGURATION
-  // =============================================================================
   build: {
     outDir: 'dist',
     minify: 'esbuild', 
-    
-    // Use default tree shaking which is safe and efficient
     esbuild: {
       treeShaking: true,
     },
-    
-    // Ensure react/jsx-runtime is not externalized
     rollupOptions: {
-      external: [],
+      external: [
+        // Add any packages that should be treated as external
+        // (usually for SSR or special cases)
+      ],
     },
   },
-
-  // =============================================================================
-  // DEFINITIVE LOCAL DEVELOPMENT SERVER CONFIGURATION
-  // =============================================================================
   server: {
     proxy: {
       '/api': {
@@ -43,8 +31,6 @@ export default defineConfig({
       },
     },
   },
-  
-  // Ensure React JSX runtime is properly handled
   optimizeDeps: {
     include: ['react', 'react-dom', 'react/jsx-runtime'],
   },
