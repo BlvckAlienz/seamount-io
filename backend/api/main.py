@@ -1,6 +1,6 @@
 # ==============================================================================
-# Seamount.io API - Production Hardened Authentication
-# Version: 2.2.0
+# Seamount.io API - Production Hardened Authentication with Detailed Logging
+# Version: 2.3.0
 # ==============================================================================
 
 import logging
@@ -22,11 +22,6 @@ import base64
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import pyotp
-
-# --- Project-specific Imports ---
-from config import get_settings, Settings
-from services.email_service import EmailService
-from services.notification_service import NotificationService
 
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(funcName)s:%(lineno)d - %(message)s')
@@ -52,10 +47,10 @@ async def fetch_jwks(current_settings: Settings = Depends(get_settings)) -> Dict
                 response.raise_for_status()
                 jwks_data = await response.json()
                 jwks_cache, jwks_cache_expiry = jwks_data, datetime.utcnow() + timedelta(hours=1)
-                logger.info("JWKS fetched and cached successfully")
+                logger.info(f"JWKS fetched successfully. Keys found: {len(jwks_data.get('keys', []))}")
                 return jwks_data
     except Exception as e:
-        logger.error(f"CRITICAL: Could not fetch JWKS. Auth will fail. Error: {e}")
+        logger.error(f"CRITICAL: Could not fetch JWKS from {current_settings.SUPABASE_JWKS_URI}. Error: {e}")
         raise HTTPException(status_code=503, detail="Authentication service is currently unavailable.")
 
 def jwk_to_pem(jwk: Dict[str, Any]) -> str:
@@ -85,29 +80,32 @@ def jwk_to_pem(jwk: Dict[str, Any]) -> str:
 
 async def verify_token(token: str = Depends(oauth2_scheme), current_settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
     try:
-        logger.debug(f"Verifying token: {token[:50]}...")
+        logger.info(f"Starting JWT verification for token: {token[:50]}...")
         
         # Decode token header to get key ID
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
-        logger.debug(f"Token KID: {kid}")
+        logger.info(f"Token KID: {kid}")
         
         if not kid:
+            logger.error("Token missing key ID (kid)")
             raise JWTError("Token missing key ID (kid)")
         
         # Fetch JWKS
         jwks = await fetch_jwks(current_settings)
+        logger.info(f"JWKS contains {len(jwks.get('keys', []))} keys")
         
         # Find the matching key
         key = next((k for k in jwks.get('keys', []) if k.get('kid') == kid), None)
         if not key:
-            logger.error(f"Public key for KID {kid} not found in JWKS")
+            logger.error(f"Public key for KID {kid} not found in JWKS. Available KIDs: {[k.get('kid') for k in jwks.get('keys', [])]}")
             raise JWTError("Public key for token not found in JWKS.")
         
-        logger.debug(f"Found matching key for KID: {kid}")
+        logger.info(f"Found matching key for KID: {kid}")
         
         # Convert JWK to PEM format
         public_key = jwk_to_pem(key)
+        logger.debug(f"Converted public key: {public_key[:100]}...")
         
         # Verify and decode token
         payload = jwt.decode(
@@ -118,16 +116,18 @@ async def verify_token(token: str = Depends(oauth2_scheme), current_settings: Se
             options={"verify_aud": True}
         )
         
-        logger.debug(f"Token verified successfully for user: {payload.get('sub')}")
+        logger.info(f"Token verified successfully for user: {payload.get('sub')}")
         return payload
         
     except JWTError as e:
-        logger.warning(f"Token validation failed: {e}")
+        logger.error(f"Token validation failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     except Exception as e:
         error_id = str(uuid4())[:8]
         logger.error(f"Unexpected error in token verification [{error_id}]: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Could not process token. Error ID: {error_id}")
+
+# ... rest of your main.py code remains the same ...
 
 def get_supabase_client() -> Client:
     if _supabase_client is None: 

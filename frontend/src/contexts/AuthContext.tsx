@@ -49,7 +49,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
     try {
-      // Use the robust retry utility you already have
       const { data } = await retryWithBackoff(
         () => apiClient.get<UserProfile>('/api/v1/user/profile'),
         maxRetries,
@@ -60,19 +59,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error: any) {
       console.error('AuthContext: Failed to fetch user profile after retries:', error);
       
-      // If the error is 401 Unauthorized, the session is invalid. Sign out.
       if (error?.response?.status === 401) {
         toast.error('Your session has expired. Please sign in again.');
-        // Don't call signOut() directly here to avoid state loops.
-        // The onAuthStateChange listener will handle the user/session cleanup.
         await supabase.auth.signOut();
       } else if (error?.response?.status === 404) {
-        // This means the profile isn't created yet. The retry should handle this.
-        // If it fails after all retries, then there's a real issue.
         toast.error('Failed to load user profile. Please try again later.');
         setState((prev) => ({ ...prev, error: 'Profile not found.' }));
       } else {
-        // For all other errors (e.g., 5xx), just show an error.
         toast.error('Could not connect to the server. Some features may be unavailable.');
         setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
       }
@@ -97,12 +90,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id);
       
-      // Update session state
       setState((prev) => ({ ...prev, session, loading: true }));
       
       if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        // Fetch user profile when we have a valid session
-        await fetchUserProfile(5, 2000);
+        // Add a small delay to ensure tokens are properly processed
+        setTimeout(async () => {
+          await fetchUserProfile(5, 2000);
+        }, 1000);
       } else if (event === 'SIGNED_OUT') {
         setState((prev) => ({ ...prev, user: null, error: null }));
       }
