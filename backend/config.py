@@ -17,13 +17,13 @@ VOLUME_DISCOUNTS = {
 class Settings(BaseSettings):
     """
     Defines and validates all environment variables. This is the single source of truth for configuration.
-    Version: 1.1.0 (Cleaned and Corrected)
+    Version: 2.0.0 (Definitive)
     """
     # --- Core & Security ---
     DATABASE_URL: SecretStr
     COMPLYCUBE_API_KEY: SecretStr
     ENCRYPTION_KEY: SecretStr
-    IPINFO_TOKEN: SecretStr  # FIXED: Added missing field
+    IPINFO_TOKEN: SecretStr
     
     # --- Supabase ---
     VITE_SUPABASE_URL: str
@@ -79,8 +79,8 @@ class Settings(BaseSettings):
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         if not self.ALLOWED_ORIGINS_STR:
-            # Provide a sensible default for development if the env var is not set
-            return ["http://localhost:3000", "http://localhost:5173"]
+            # Provide a sensible default if the env var is not set
+            return ["http://localhost:3000", "http://localhost:5173", "https://seamount.io", "https://www.seamount.io"]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
     
     @property
