@@ -314,4 +314,4 @@ return (
 );
 };
 
-export default AuthProviderContent;
+export { AuthProviderContent as AuthProvider };
