@@ -420,6 +420,57 @@ async def update_consent(
         logger.error(f"Consent update failed [{error_id}]: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Could not update consent preferences. Error ID: {error_id}")
 
+@app.get("/api/v1/portfolio/summary", tags=["Portfolio"])
+async def get_portfolio_summary(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Get user portfolio summary"""
+    try:
+        # Return mock data for now - you can implement real logic later
+        return {
+            "total_balance": 0.0,
+            "usds_balance": 0.0,
+            "day_change": 0.0,
+            "total_pnl": 0.0,
+            "assets": []
+        }
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Portfolio summary error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching portfolio. Error ID: {error_id}")
+ 
+@app.post("/api/kyc/start-verification", tags=["KYC"])
+async def start_kyc_verification(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Start KYC verification process"""
+    try:
+        # TODO: Implement ComplyCube integration here
+        return {
+            "success": True,
+            "session_id": str(uuid4()),
+            "message": "KYC verification started"
+        }
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"KYC start error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error starting KYC. Error ID: {error_id}")
+
+@app.post("/api/kyc/verify-documents", tags=["KYC"])
+async def verify_documents(
+    document_type: str = Form(...),
+    id_document: UploadFile = File(...),
+    selfie: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Upload and verify KYC documents"""
+    try:
+        # TODO: Implement document processing and ComplyCube integration
+        return {
+            "success": True,
+            "message": "Documents received for verification"
+        }
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Document verification error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error verifying documents. Error ID: {error_id}")
+        
 # --- 7. DEBUG ENDPOINTS (For authentication troubleshooting) ---
 @app.get("/api/v1/debug/token", tags=["Debug"])
 async def debug_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
