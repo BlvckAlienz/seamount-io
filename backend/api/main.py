@@ -1,23 +1,25 @@
 # ==============================================================================
 # Seamount.io API - Production Hardened Authentication with Detailed Logging
-# Version: 2.3.0
+# Version: 2.4.0 (Fixed Authentication)
 # ==============================================================================
 
 import logging
 import traceback
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, Request, Header
+from fastapi import FastAPI, Depends, HTTPException, Request, Header, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, ValidationError
 from supabase import create_client, Client
 from typing import List, Dict, Any, Optional
 from uuid import uuid4, UUID
 from datetime import datetime, timedelta
 import aiohttp
-from jose import JWTError, jwt
+from jose import JWTError, jwt, jwk
+from jose.utils import base64url_decode
+import json
 import base64
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -34,11 +36,13 @@ _supabase_client: Optional[Client] = None
 _notification_service: Optional[NotificationService] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/token")
+security = HTTPBearer()
 
-# --- 2. AUTHENTICATION & DEPENDENCIES (Hardened) ---
+# --- 2. AUTHENTICATION & DEPENDENCIES (Fixed for Supabase) ---
 async def fetch_jwks(current_settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
     global jwks_cache, jwks_cache_expiry
+    
+    # Return cached JWKS if still valid
     if jwks_cache and jwks_cache_expiry and datetime.utcnow() < jwks_cache_expiry:
         logger.debug("Using cached JWKS")
         return jwks_cache
@@ -49,82 +53,59 @@ async def fetch_jwks(current_settings: Settings = Depends(get_settings)) -> Dict
             async with session.get(current_settings.SUPABASE_JWKS_URI) as response:
                 response.raise_for_status()
                 jwks_data = await response.json()
-                jwks_cache, jwks_cache_expiry = jwks_data, datetime.utcnow() + timedelta(hours=1)
+                jwks_cache = jwks_data
+                jwks_cache_expiry = datetime.utcnow() + timedelta(hours=1)
                 logger.info(f"JWKS fetched successfully. Keys found: {len(jwks_data.get('keys', []))}")
                 return jwks_data
     except Exception as e:
         logger.error(f"CRITICAL: Could not fetch JWKS from {current_settings.SUPABASE_JWKS_URI}. Error: {e}")
         raise HTTPException(status_code=503, detail="Authentication service is currently unavailable.")
 
-def jwk_to_pem(jwk: Dict[str, Any]) -> str:
+async def verify_supabase_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_settings: Settings = Depends(get_settings)
+) -> Dict[str, Any]:
+    """
+    Properly verify Supabase JWT tokens using their JWKS
+    """
     try:
-        # Check if this is an RSA key
-        if jwk.get('kty') != 'RSA':
-            raise JWTError(f"Unsupported key type: {jwk.get('kty')}")
+        token = credentials.credentials
+        logger.info(f"Starting JWT verification for token: {token[:20]}...")
         
-        # Ensure required parameters are present
-        if 'n' not in jwk or 'e' not in jwk:
-            raise JWTError("JWK missing required RSA parameters (n or e)")
-        
-        # Decode the base64url-encoded values with proper padding
-        n = base64.urlsafe_b64decode(jwk['n'] + '=='[: (4 - len(jwk['n']) % 4) % 4])
-        e = base64.urlsafe_b64decode(jwk['e'] + '=='[: (4 - len(jwk['e']) % 4) % 4])
-        
-        # Convert to integers
-        n_int = int.from_bytes(n, 'big')
-        e_int = int.from_bytes(e, 'big')
-        
-        # Create RSA public key
-        public_numbers = rsa.RSAPublicNumbers(e_int, n_int)
-        public_key = public_numbers.public_key()
-        
-        # Serialize to PEM format
-        pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-        
-        return pem.decode('utf-8')
-    except Exception as e:
-        logger.error(f"JWK to PEM conversion failed for JWK: {jwk}. Error: {e}")
-        raise JWTError(f"Invalid key format in JWKS: {e}")
-
-async def verify_token(token: str = Depends(oauth2_scheme), current_settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
-    try:
-        logger.info(f"Starting JWT verification for token: {token[:50]}...")
-        
-        # Decode token header to get key ID
+        # Get unverified header to extract key ID
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
-        logger.info(f"Token KID: {kid}")
+        alg = unverified_header.get('alg', 'RS256')
         
         if not kid:
             logger.error("Token missing key ID (kid)")
             raise JWTError("Token missing key ID (kid)")
         
+        logger.info(f"Token KID: {kid}, Algorithm: {alg}")
+        
         # Fetch JWKS
         jwks = await fetch_jwks(current_settings)
-        logger.info(f"JWKS contains {len(jwks.get('keys', []))} keys")
         
         # Find the matching key
-        key = next((k for k in jwks.get('keys', []) if k.get('kid') == kid), None)
+        key = None
+        for jwk_key in jwks.get('keys', []):
+            if jwk_key.get('kid') == kid:
+                key = jwk_key
+                break
+        
         if not key:
-            logger.error(f"Public key for KID {kid} not found in JWKS. Available KIDs: {[k.get('kid') for k in jwks.get('keys', [])]}")
-            raise JWTError("Public key for token not found in JWKS.")
+            logger.error(f"Public key for KID {kid} not found in JWKS")
+            raise JWTError(f"Public key for KID {kid} not found in JWKS")
         
         logger.info(f"Found matching key for KID: {kid}")
         
-        # Convert JWK to PEM format
-        public_key = jwk_to_pem(key)
-        logger.debug(f"Converted public key: {public_key[:100]}...")
-        
-        # Verify and decode token
+        # Verify and decode token using the correct key
         payload = jwt.decode(
-            token, 
-            public_key, 
-            algorithms=[key.get('alg', 'RS256')], 
+            token,
+            key,
+            algorithms=[alg],
             audience='authenticated',
-            options={"verify_aud": True}
+            options={"verify_aud": True, "verify_exp": True}
         )
         
         logger.info(f"Token verified successfully for user: {payload.get('sub')}")
@@ -132,31 +113,63 @@ async def verify_token(token: str = Depends(oauth2_scheme), current_settings: Se
         
     except JWTError as e:
         logger.error(f"Token validation failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except Exception as e:
         error_id = str(uuid4())[:8]
         logger.error(f"Unexpected error in token verification [{error_id}]: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Could not process token. Error ID: {error_id}")
-
-# ... rest of your main.py code remains the same ...
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not process token. Error ID: {error_id}"
+        )
 
 def get_supabase_client() -> Client:
     if _supabase_client is None: 
         raise HTTPException(status_code=503, detail="Database client not initialized")
     return _supabase_client
 
-async def get_current_user(payload: Dict[str, Any] = Depends(verify_token), supabase: Client = Depends(get_supabase_client)) -> Dict[str, Any]:
+async def get_current_user(
+    payload: Dict[str, Any] = Depends(verify_supabase_token),
+    supabase: Client = Depends(get_supabase_client)
+) -> Dict[str, Any]:
     user_id = payload.get("sub")
     if not user_id: 
         raise HTTPException(status_code=401, detail="Invalid token payload: missing user identifier.")
     
     try:
-        profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
-        if not profile_res.data: 
-            raise HTTPException(status_code=404, detail="User profile not found.")
+        # Try to get user profile from the profiles table
+        profile_res = supabase.from_("profiles").select("*").eq("id", user_id).execute()
+        
+        if not profile_res.data:
+            # If profile doesn't exist, try to create it from auth data
+            logger.info(f"Profile not found for user {user_id}, creating new profile")
+            
+            # Get user info from auth
+            auth_user = supabase.auth.admin.get_user(user_id)
+            if not auth_user.user:
+                raise HTTPException(status_code=404, detail="User not found in auth system")
+                
+            # Create profile
+            new_profile = {
+                "id": user_id,
+                "email": auth_user.user.email,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            profile_res = supabase.from_("profiles").insert(new_profile).execute()
+            
+            if not profile_res.data:
+                raise HTTPException(status_code=500, detail="Failed to create user profile")
         
         logger.debug(f"User profile retrieved for: {user_id}")
-        return profile_res.data
+        return profile_res.data[0]
+        
+    except HTTPException:
+        raise
     except Exception as e:
         error_id = str(uuid4())[:8]
         logger.error(f"Failed to fetch profile for user {user_id} [{error_id}]: {e}")
@@ -239,7 +252,7 @@ async def lifespan(app: FastAPI):
         )
         
         # Test connection
-        _supabase_client.from_("user_profiles").select("id").limit(1).execute()
+        _supabase_client.from_("profiles").select("id").limit(1).execute()
         logger.info("Supabase client connected successfully.")
         
         # Initialize notification service
@@ -258,7 +271,7 @@ async def lifespan(app: FastAPI):
 # --- 5. FASTAPI APP ---
 app = FastAPI(
     title="Seamount.io API", 
-    version="2.2.0", 
+    version="2.4.0", 
     lifespan=lifespan,
     docs_url="/api/docs" if get_settings().ENVIRONMENT != "production" else None,
     redoc_url=None
@@ -277,7 +290,7 @@ app.add_middleware(
 
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "2.2.0", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "version": "2.4.0", "timestamp": datetime.utcnow()}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -407,11 +420,12 @@ async def update_consent(
         logger.error(f"Consent update failed [{error_id}]: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Could not update consent preferences. Error ID: {error_id}")
 
-# --- 7. DEBUG ENDPOINT (For authentication troubleshooting) ---
+# --- 7. DEBUG ENDPOINTS (For authentication troubleshooting) ---
 @app.get("/api/v1/debug/token", tags=["Debug"])
-async def debug_token(token: str = Depends(oauth2_scheme)):
+async def debug_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Endpoint to help debug JWT token issues"""
     try:
+        token = credentials.credentials
         # Get unverified header
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
@@ -429,3 +443,26 @@ async def debug_token(token: str = Depends(oauth2_scheme)):
         error_id = str(uuid4())[:8]
         logger.error(f"Token debug failed [{error_id}]: {e}")
         return {"error": f"Could not parse token: {e}", "error_id": error_id}
+
+@app.get("/api/v1/debug/auth-test", tags=["Debug"])
+async def debug_auth_test(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Test endpoint to verify authentication is working"""
+    return {
+        "status": "success",
+        "user_id": current_user.get("id"),
+        "email": current_user.get("email"),
+        "message": "Authentication is working correctly!"
+    }
+
+# --- 8. ERROR HANDLING MIDDLEWARE ---
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Unhandled exception in request {request.url} [{error_id}]: {e}\n{traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal server error. Error ID: {error_id}"}
+        )
