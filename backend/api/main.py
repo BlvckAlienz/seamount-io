@@ -22,6 +22,7 @@ import base64
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import pyotp
+from services.notification_service import NotificationService
 
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(funcName)s:%(lineno)d - %(message)s')
