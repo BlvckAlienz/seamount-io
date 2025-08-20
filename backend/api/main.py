@@ -7,7 +7,7 @@ import logging
 import traceback
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, Request, Header, status, Form
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Request, Header, status,
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
