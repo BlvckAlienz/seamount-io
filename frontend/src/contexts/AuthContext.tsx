@@ -274,14 +274,14 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const completeOnboarding = async () => {
+const completeOnboarding = async () => {
   console.log('Completing onboarding...');
   try {
     if (state.user) {
       const { error } = await supabase
         .from('user_profiles')
         .update({ 
-          kyc_status: 'pending', // Changed from 'completed' to 'pending'
+          kyc_status: 'pending',
           kyc_level: 1 
         })
         .eq('id', state.user.id);
@@ -297,3 +297,21 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     toast.error('Failed to complete onboarding');
   }
 };
+
+// Add the return statement for the component
+return (
+  <AuthContext.Provider value={{
+    ...state,
+    signUp,
+    signIn,
+    signOut,
+    enterDemoMode,
+    updateOnboardingStep,
+    completeOnboarding
+  }}>
+    {children}
+  </AuthContext.Provider>
+);
+};
+
+export default AuthProviderContent;
