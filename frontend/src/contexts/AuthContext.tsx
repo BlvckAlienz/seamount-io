@@ -275,43 +275,25 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const completeOnboarding = async () => {
-    console.log('Completing onboarding...');
-    try {
-      if (state.user) {
-        const { error } = await supabase
-          .from('user_profiles')
-          .update({ 
-            kyc_status: 'completed', 
-            kyc_level: 1 
-          })
-          .eq('id', state.user.id);
-          
-        if (error) throw error;
+  console.log('Completing onboarding...');
+  try {
+    if (state.user) {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          kyc_status: 'pending', // Changed from 'completed' to 'pending'
+          kyc_level: 1 
+        })
+        .eq('id', state.user.id);
         
-        await fetchUserProfile(3, 1000);
-        navigate('/dashboard');
-        toast.success('Onboarding completed successfully!');
-      }
-    } catch (err: any) {
-      console.error('Complete onboarding error:', err);
-      toast.error('Failed to complete onboarding');
+      if (error) throw error;
+      
+      await fetchUserProfile(3, 1000);
+      navigate('/dashboard');
+      toast.success('Onboarding completed successfully!');
     }
-  };
-
-  const value = {
-    ...state,
-    signUp,
-    signIn,
-    signOut,
-    enterDemoMode,
-    onboardingStep: state.user?.kyc_level === 0 ? 1 : undefined,
-    updateOnboardingStep,
-    completeOnboarding,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  return <AuthProviderContent>{children}</AuthProviderContent>;
+  } catch (err: any) {
+    console.error('Complete onboarding error:', err);
+    toast.error('Failed to complete onboarding');
+  }
 };
