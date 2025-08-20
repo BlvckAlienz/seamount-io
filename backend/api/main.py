@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Production Hardened Authentication with Detailed Logging
-# Version: 2.4.0 (Fixed Authentication)
+# Version: 2.4.1 (Fixed Table Name)
 # ==============================================================================
 
 import logging
@@ -140,8 +140,8 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token payload: missing user identifier.")
     
     try:
-        # Try to get user profile from the profiles table
-        profile_res = supabase.from_("profiles").select("*").eq("id", user_id).execute()
+        # Try to get user profile from the user_profiles table
+        profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
         
         if not profile_res.data:
             # If profile doesn't exist, try to create it from auth data
@@ -160,7 +160,7 @@ async def get_current_user(
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            profile_res = supabase.from_("profiles").insert(new_profile).execute()
+            profile_res = supabase.from_("user_profiles").insert(new_profile).execute()
             
             if not profile_res.data:
                 raise HTTPException(status_code=500, detail="Failed to create user profile")
@@ -251,8 +251,8 @@ async def lifespan(app: FastAPI):
             current_settings.SUPABASE_SERVICE_KEY.get_secret_value()
         )
         
-        # Test connection
-        _supabase_client.from_("profiles").select("id").limit(1).execute()
+        # Test connection with the correct table name
+        _supabase_client.from_("user_profiles").select("id").limit(1).execute()
         logger.info("Supabase client connected successfully.")
         
         # Initialize notification service
@@ -271,7 +271,7 @@ async def lifespan(app: FastAPI):
 # --- 5. FASTAPI APP ---
 app = FastAPI(
     title="Seamount.io API", 
-    version="2.4.0", 
+    version="2.4.1", 
     lifespan=lifespan,
     docs_url="/api/docs" if get_settings().ENVIRONMENT != "production" else None,
     redoc_url=None
@@ -290,7 +290,7 @@ app.add_middleware(
 
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "2.4.0", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "version": "2.4.1", "timestamp": datetime.utcnow()}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
