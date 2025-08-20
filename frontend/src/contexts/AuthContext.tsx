@@ -74,6 +74,20 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  // NEW: Automatic redirect after successful authentication
+  useEffect(() => {
+    if (state.session && state.user && !state.loading) {
+      console.log('Auth successful, redirecting to appropriate page');
+      
+      // Check if we need to redirect to onboarding first
+      if (state.user.kyc_level === 0 || !state.user.kyc_status) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [state.session, state.user, state.loading, navigate]);
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
