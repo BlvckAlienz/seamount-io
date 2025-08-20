@@ -55,9 +55,17 @@ async def fetch_jwks(current_settings: Settings = Depends(get_settings)) -> Dict
 
 def jwk_to_pem(jwk: Dict[str, Any]) -> str:
     try:
-        # Decode the base64url-encoded values
-        n = base64.urlsafe_b64decode(jwk['n'] + '==')
-        e = base64.urlsafe_b64decode(jwk['e'] + '==')
+        # Check if this is an RSA key
+        if jwk.get('kty') != 'RSA':
+            raise JWTError(f"Unsupported key type: {jwk.get('kty')}")
+        
+        # Ensure required parameters are present
+        if 'n' not in jwk or 'e' not in jwk:
+            raise JWTError("JWK missing required RSA parameters (n or e)")
+        
+        # Decode the base64url-encoded values with proper padding
+        n = base64.urlsafe_b64decode(jwk['n'] + '=='[: (4 - len(jwk['n']) % 4) % 4])
+        e = base64.urlsafe_b64decode(jwk['e'] + '=='[: (4 - len(jwk['e']) % 4) % 4])
         
         # Convert to integers
         n_int = int.from_bytes(n, 'big')
@@ -75,7 +83,7 @@ def jwk_to_pem(jwk: Dict[str, Any]) -> str:
         
         return pem.decode('utf-8')
     except Exception as e:
-        logger.error(f"JWK to PEM conversion failed: {e}")
+        logger.error(f"JWK to PEM conversion failed for JWK: {jwk}. Error: {e}")
         raise JWTError(f"Invalid key format in JWKS: {e}")
 
 async def verify_token(token: str = Depends(oauth2_scheme), current_settings: Settings = Depends(get_settings)) -> Dict[str, Any]:
@@ -366,7 +374,35 @@ async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_us
         logger.error(f"Failed to process user profile for {current_user.get('id')} [{error_id}]: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error processing profile data. Error ID: {error_id}")
 
-# ... [other routes with similar error handling] ...
+# Add this route with your other API routes
+@app.post("/api/v1/consent/update", tags=["Session"])
+async def update_consent(
+    payload: ConsentUpdatePayload,
+    supabase: Client = Depends(get_supabase_client)
+):
+    try:
+        # Update the user_sessions table with consent preferences
+        update_data = {
+            "consent_preferences": payload.preferences,
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Update the session record with consent preferences
+        result = supabase.from_("user_sessions").update(update_data).eq("id", str(payload.session_id)).execute()
+        
+        if not result.data:
+            logger.warning(f"Session not found for consent update: {payload.session_id}")
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        logger.info(f"Consent preferences updated for session: {payload.session_id}")
+        return {"message": "Consent preferences updated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Consent update failed [{error_id}]: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Could not update consent preferences. Error ID: {error_id}")
 
 # --- 7. DEBUG ENDPOINT (For authentication troubleshooting) ---
 @app.get("/api/v1/debug/token", tags=["Debug"])
