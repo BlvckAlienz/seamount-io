@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import pyotp
 from services.notification_service import NotificationService
+from services.email_service import EmailService
 from config import Settings, get_settings
 
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
