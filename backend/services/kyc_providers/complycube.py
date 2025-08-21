@@ -1,9 +1,10 @@
 import os
 from complycube import ComplyCubeClient
 from supabase import create_client, Client
+import os
 
 # Initialize Supabase client
-supabase: Client = create_client(
+supabase = create_client(
     os.getenv('SUPABASE_URL'),
     os.getenv('SUPABASE_SERVICE_KEY')
 )
