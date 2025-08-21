@@ -36,12 +36,6 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from api.routes import kyc, webhooks
-
-# Add these lines to include the routers
-app.include_router(kyc.router, prefix="/api", tags=["kyc"])
-app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
-
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(funcName)s:%(lineno)d - %(message)s')
 logger = logging.getLogger(__name__)
@@ -299,6 +293,13 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+# Import routers after app is created
+from api.routes import kyc, webhooks
+
+# Include routers
+app.include_router(kyc.router, prefix="/api", tags=["kyc"])
+app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 
 # --- 6. API ROUTES (Hardened with Route-Level Exception Handling) ---
 
