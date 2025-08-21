@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from services.kyc_providers.complycube import complycube_service
-from ...dependencies import get_current_user
+from dependencies import get_current_user
 
 router = APIRouter()
 

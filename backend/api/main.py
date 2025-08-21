@@ -29,6 +29,14 @@ import pyotp
 from services.notification_service import NotificationService
 from services.email_service import EmailService
 from config import Settings, get_settings
+import sys
+from pathlib import Path
+
+# Add the backend directory to Python path
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
+
+# Now use absolute imports
 from api.routes import kyc, webhooks
 
 # Add these lines to include the routers

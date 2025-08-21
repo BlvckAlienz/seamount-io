@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 import hmac
 import hashlib
 import json
-from ...services.kyc_providers.complycube import complycube_service
+from services.kyc_providers.complycube import complycube_service
 
 router = APIRouter()
 
