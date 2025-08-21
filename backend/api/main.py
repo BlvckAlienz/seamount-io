@@ -36,7 +36,7 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from .routes import kyc, webhooks
+from api.routes import kyc, webhooks
 
 # Add these lines to include the routers
 app.include_router(kyc.router, prefix="/api", tags=["kyc"])
