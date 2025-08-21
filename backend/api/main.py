@@ -29,6 +29,11 @@ import pyotp
 from services.notification_service import NotificationService
 from services.email_service import EmailService
 from config import Settings, get_settings
+from .routes import kyc, webhooks
+
+# Add these lines to include the routers
+app.include_router(kyc.router, prefix="/api", tags=["kyc"])
+app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
 
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(funcName)s:%(lineno)d - %(message)s')

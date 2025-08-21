@@ -1,113 +1,62 @@
-# File Location: backend/services/kyc_providers/complycube.py
-# Description: Specific implementation for the ComplyCube KYC provider.
-
 import os
-import logging
-import httpx
-from typing import Dict, Any
+from complycube import ComplyCubeClient
+from supabase import create_client, Client
 
-logger = logging.getLogger(__name__)
+# Initialize Supabase client
+supabase: Client = create_client(
+    os.getenv('SUPABASE_URL'),
+    os.getenv('SUPABASE_SERVICE_KEY')
+)
 
-class ComplyCubeVerifier:
-    def __init__(self, api_key: str):
-        if not api_key:
-            raise ValueError("ComplyCube API key is required.")
-        self.api_key = api_key
-        self.base_url = "https://api.complycube.com/v1"
-        self.headers = {"Authorization": f"Bearer {self.api_key}"}
-
-    async def create_verification_session(self, user_id: str, email: str, country_code: str) -> Dict[str, Any]:
-        """Create a verification flow for a user"""
+class ComplyCubeService:
+    def __init__(self):
+        self.client = ComplyCubeClient(api_key=os.getenv('COMPLYCUBE_API_KEY'))
+    
+    def create_applicant(self, user_data):
+        """Create a new applicant in ComplyCube"""
         try:
-            # Create client profile
-            client_data = {
-                "type": "person",
-                "id": user_id, 
-                "email": email,
-                "countryCode": country_code
-            }
-            
-            client_response = requests.post(
-                f"{self.base_url}/clients",
-                headers=self.headers,
-                json=client_data
+            applicant = self.client.clients.create(
+                type='person',
+                email=user_data['email'],
+                personDetails={
+                    'firstName': user_data.get('first_name', ''),
+                    'lastName': user_data.get('last_name', '')
+                }
             )
-            client_response.raise_for_status()
-            client_id = client_response.json()["id"]
-            
-            # Create flow configuration
-            flow_data = {
-                "clientId": client_id,
-                "language": "en",
-                "redirectUrl": os.getenv("KYC_REDIRECT_URL", "https://seamount.io/verify/complete"),
-                "steps": ["welcome", "identity", "selfie"]
-            }
-            
-            flow_response = requests.post(
-                f"{self.base_url}/flow-sessions",
-                headers=self.headers,
-                json=flow_data
-            )
-            flow_response.raise_for_status()
-            flow_data = flow_response.json()
-            
-            return {
-                "success": True,
-                "client_id": client_id,
-                "session_id": flow_data["id"],
-                "flow_url": flow_data["url"]
-            }
-            
-        except RequestException as e:
-            error_message = str(e)
-            if e.response:
-                try:
-                    error_data = e.response.json()
-                    error_message = error_data.get("message", str(e))
-                except:
-                    pass
-            
-            logger.error(f"Failed to create verification session: {error_message}")
-            return {"success": False, "error": error_message}
-            
+            return applicant
         except Exception as e:
-            logger.error(f"Verification session creation failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    async def get_verification_status(self, check_id: str) -> Dict[str, Any]:
-        """Get status of a verification check"""
+            print(f"Failed to create ComplyCube applicant: {e}")
+            raise
+    
+    def create_verification_token(self, applicant_id):
+        """Create a verification token for frontend use"""
         try:
-            response = requests.get(
-                f"{self.base_url}/checks/{check_id}",
-                headers=self.headers
-            )
-            response.raise_for_status()
-            check_data = response.json()
-            
-            # Normalize status
-            status = check_data.get("status", "pending")
-            result = check_data.get("outcome", "pending")
-            
-            return {
-                "success": True,
-                "status": status,
-                "result": result,
-                "details": check_data.get("details", {}),
-                "completed": status == "completed"
-            }
-            
-        except RequestException as e:
-            logger.error(f"Failed to get verification status: {str(e)}")
-            return {
-                "success": False,
-                "status": "error",
-                "error": str(e)
-            }
-            
+            token = self.client.tokens.create(applicant_id, '*://*/*')
+            return token
         except Exception as e:
-            logger.error(f"Verification status check failed: {e}")
-            return {
-                "success": False,
-                "status": "error",
-                "error": str(e)
-            }
+            print(f"Failed to create verification token: {e}")
+            raise
+    
+    def update_user_kyc_status(self, applicant_id, status):
+        """Update user KYC status in Supabase"""
+        try:
+            # Find user by applicant_id
+            user_profile = supabase.table('user_profiles') \
+                .select('*') \
+                .eq('complycube_applicant_id', applicant_id) \
+                .execute()
+            
+            if user_profile.data:
+                # Update KYC status
+                supabase.table('user_profiles') \
+                    .update({
+                        'kyc_status': status,
+                        'kyc_level': 3 if status == 'approved' else 0
+                    }) \
+                    .eq('complycube_applicant_id', applicant_id) \
+                    .execute()
+        except Exception as e:
+            print(f"Failed to update user KYC status: {e}")
+            raise
+
+complycube_service = ComplyCubeService()
