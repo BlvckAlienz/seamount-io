@@ -1,6 +1,6 @@
 import os
 from complycube import ComplyCubeClient
-from supabase import create_client, Client
+from supabase import create_client
 import os
 
 # Initialize Supabase client

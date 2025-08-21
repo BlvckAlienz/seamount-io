@@ -29,11 +29,7 @@ import pyotp
 from services.notification_service import NotificationService
 from services.email_service import EmailService
 from config import Settings, get_settings
-from .routes import kyc, webhooks
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).parent.parent))
+from api.routes import kyc, webhookss
 
 # Add these lines to include the routers
 app.include_router(kyc.router, prefix="/api", tags=["kyc"])
