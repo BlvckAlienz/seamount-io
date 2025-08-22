@@ -50,20 +50,20 @@ class WalletService:
             logger.critical("Failed to decrypt wallet data - InvalidToken. This could indicate a key mismatch or data corruption.")
             raise HTTPException(status_code=500, detail="Wallet data decryption failed due to a key error.")
     
-    // Add this method to the WalletService class
+  
 async createWalletForUser(userId: string): Promise<{ success: boolean; address?: string; error?: string }> {
   try {
-    // Check if user already has a wallet
+    
     const existingWallet = await this.getUserWallet(userId);
     if (existingWallet) {
       return { success: true, address: existingWallet.address };
     }
     
-    // Create new wallet
+ 
     const wallet = this.createAlgorandWallet();
     const encryptedPk = this._encrypt(wallet.private_key);
     
-    // Save to database
+   
     const response = await this.supabase.rpc('provision_user_wallet', {
       'user_id_input': userId,
       'algorand_address_input': wallet.address,
