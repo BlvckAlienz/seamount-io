@@ -13,6 +13,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   isDemoMode: boolean;
+  role: 'tribe' | 'alien';
 }
 
 interface AuthContextType extends AuthState {
@@ -27,6 +28,8 @@ interface AuthContextType extends AuthState {
   onboardingStep?: number;
   updateOnboardingStep: (step: number, data: any) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+   updateUserRole: (role: 'tribe' | 'alien') => void;
+  triggerWalletCreation: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,7 +47,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading: true,
     error: null,
     isDemoMode: false,
+	role: 'alien', // Default role
   });
+   
   const navigate = useNavigate();
 
   const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
@@ -298,10 +303,27 @@ const completeOnboarding = async () => {
   }
 };
 
+// Add these functions
+const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
+  setState(prev => ({ ...prev, role }));
+}, []);
+
+const triggerWalletCreation = useCallback(async () => {
+  try {
+    const response = await apiClient.post('/api/wallet/create');
+    return response.data.success;
+  } catch (error) {
+    console.error('Wallet creation failed:', error);
+    return false;
+  }
+}, []);
+
 // Add the return statement for the component
 return (
   <AuthContext.Provider value={{
     ...state,
+	updateUserRole,
+	triggerWalletCreation,
     signUp,
     signIn,
     signOut,

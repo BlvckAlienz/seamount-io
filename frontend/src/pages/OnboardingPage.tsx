@@ -49,7 +49,7 @@ const WelcomeStep: React.FC<StepProps> = ({ onNext }) => {
       <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left">
         <h4 className="font-semibold text-blue-900 mb-3">What you'll get:</h4>
         <ul className="text-blue-800 text-sm space-y-2">
-          {["Instant global transfers with USDS stablecoin", "Minimal network fees (~$0.01 per transaction)", "24/7/365 decentralized settlement", "Auto-conversion to preferred currencies"].map(item => (
+          {["Instant global transfers with USDS stablecoin", "Low remittance fees (2.6% per transaction)", "24/7/365 decentralized settlement", "Auto-conversion to preferred currencies"].map(item => (
             <li key={item} className="flex items-center">
               <svg className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
               {item}
@@ -67,9 +67,112 @@ const WelcomeStep: React.FC<StepProps> = ({ onNext }) => {
   );
 };
 
+// Replace the IdentityStep component with this implementation
 const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev, stepData }) => {
-    // ... [This component's code from your file is well-structured and remains unchanged] ...
-    return <div>Identity Step Placeholder</div>; // Placeholder for brevity
+  const { user, updateUserRole, triggerWalletCreation } = useAuth();
+  const [verifying, setVerifying] = useState(false);
+  const [complycubeLoaded, setComplycubeLoaded] = useState(false);
+
+  const loadComplyCube = async () => {
+    if (typeof window !== 'undefined' && !complycubeLoaded) {
+      try {
+        // Load ComplyCube script
+        const script = document.createElement('script');
+        script.src = 'https://assets.complycube.com/web-sdk/v1/complycube.min.js';
+        script.async = true;
+        script.onload = () => setComplycubeLoaded(true);
+        document.head.appendChild(script);
+      } catch (error) {
+        console.error('Failed to load ComplyCube:', error);
+      }
+    }
+  };
+
+  const startVerification = async () => {
+    setVerifying(true);
+    try {
+      // Get verification token from backend
+      const response = await apiClient.post('/api/kyc/start-verification');
+      const { token } = response.data;
+      
+      // Initialize ComplyCube
+      (window as any).ComplyCube.mount({
+        token: token,
+        onComplete: async (data: any) => {
+          // Update user role to Tribe
+          updateUserRole('tribe');
+          
+          // Create wallet automatically
+          const walletCreated = await triggerWalletCreation();
+          
+          if (walletCreated) {
+            toast.success('Verification complete! Wallet created successfully.');
+            onNext();
+          } else {
+            toast.error('Verification complete but wallet creation failed.');
+          }
+        },
+        onError: (error: any) => {
+          console.error('Verification error:', error);
+          toast.error('Verification failed. Please try again.');
+          setVerifying(false);
+        }
+      });
+    } catch (error) {
+      console.error('Failed to start verification:', error);
+      toast.error('Failed to start verification process.');
+      setVerifying(false);
+    }
+  };
+
+  const deferVerification = () => {
+    toast('You can complete verification later from your profile settings.');
+    // Redirect to dashboard but keep as Alien
+    window.location.href = '/dashboard';
+  };
+
+  useEffect(() => {
+    loadComplyCube();
+  }, []);
+
+  return (
+    <div className="text-center">
+      <div className="mb-8">
+        <Shield className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold mb-2">Identity Verification</h3>
+        <p className="text-gray-600">
+          Verify your identity to unlock full access to Seamount's features.
+        </p>
+      </div>
+      
+      <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left">
+        <h4 className="font-semibold text-blue-900 mb-3">Why verify?</h4>
+        <ul className="text-blue-800 text-sm space-y-2">
+          <li>• Send and receive USDS stablecoins</li>
+          <li>• Access cross-border payment features</li>
+          <li>• Higher transaction limits</li>
+          <li>• Enhanced security features</li>
+        </ul>
+      </div>
+      
+      <div className="space-y-4">
+        <button
+          onClick={startVerification}
+          disabled={verifying}
+          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {verifying ? 'Starting Verification...' : 'Verify Now'}
+        </button>
+        
+        <button
+          onClick={deferVerification}
+          className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+        >
+          Skip for Now
+        </button>
+      </div>
+    </div>
+  );
 };
 
 const WalletStep: React.FC<StepProps> = ({ onNext, onPrev, stepData }) => {
@@ -100,11 +203,11 @@ const onboardingSteps: OnboardingStepConfig[] = [
 ];
 
 const stepMessages = [
-    "Welcome to Seamount.io! Ready to navigate the trading seas?",
+    "Welcome to Seamount.io! Ready to navigate the web3 space with USDS stablecoin?",
     "Tell us about yourself—no treasure map required!",
-    "Upload your documents. Lost on the trading route? Our 404 page won’t help here!",
+    "Upload your documents. Lost in the metaverse? Our 404 page won’t help here!",
     "Verifying you now. Almost ready to sail the blockchain waves!",
-    "Congrats! You’ve docked at Seamount.io—time to profit!",
+    "Congrats! You’ve docked at Seamount.io—time to experience the power of USDS!",
 ];
 
 const OnboardingPage: React.FC = () => {
