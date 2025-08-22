@@ -28,9 +28,16 @@ from cryptography.hazmat.primitives import serialization
 import pyotp
 from services.notification_service import NotificationService
 from services.email_service import EmailService
+from services.wallet_service import WalletService  # Added import
 from config import Settings, get_settings
 import sys
 from pathlib import Path
+from .middleware.role_check import require_role
+
+from enum import Enum
+class UserRole(str, Enum):
+    TRIBE = "tribe"
+    ALIEN = "alien"
 
 # Add the backend directory to Python path
 backend_dir = Path(__file__).parent.parent
@@ -42,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 _supabase_client: Optional[Client] = None
 _notification_service: Optional[NotificationService] = None
+_wallet_service: Optional[WalletService] = None  # Added wallet service
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 security = HTTPBearer()
@@ -139,6 +147,11 @@ def get_supabase_client() -> Client:
         raise HTTPException(status_code=503, detail="Database client not initialized")
     return _supabase_client
 
+def get_wallet_service() -> WalletService:
+    if _wallet_service is None: 
+        raise HTTPException(status_code=503, detail="Wallet service not initialized")
+    return _wallet_service
+
 async def get_current_user(
     payload: Dict[str, Any] = Depends(verify_supabase_token),
     supabase: Client = Depends(get_supabase_client)
@@ -198,6 +211,7 @@ class UserProfile(BaseModel):
     email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    role: UserRole = UserRole.ALIEN
 
 class SessionResponse(BaseModel): 
     session_id: UUID
@@ -246,7 +260,7 @@ class PortfolioHolding(BaseModel):
 # --- 4. LIFESPAN MANAGER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _supabase_client, _notification_service
+    global _supabase_client, _notification_service, _wallet_service
     logger.info("--- Seamount API Starting Up ---")
     
     try:
@@ -267,6 +281,10 @@ async def lifespan(app: FastAPI):
         email_service = EmailService(current_settings)
         _notification_service = NotificationService(email_service)
         logger.info("Notification service initialized.")
+        
+        # Initialize wallet service
+        _wallet_service = WalletService(current_settings, _supabase_client)
+        logger.info("Wallet service initialized.")
         
         yield
         
@@ -361,6 +379,91 @@ async def initialize_session(
         logger.error(f"Session initialization failed [{error_id}]: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Could not initialize session. Error ID: {error_id}")
 
+# Add these endpoints
+@app.post("/api/kyc/start-verification", tags=["KYC"])
+async def start_kyc_verification(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Start KYC verification process with ComplyCube"""
+    try:
+        # TODO: Implement ComplyCube integration
+        # Generate a client token for frontend
+        token = "complycube_test_token"  # Replace with actual token generation
+        
+        return {
+            "success": True,
+            "token": token,
+            "message": "KYC verification started"
+        }
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"KYC start error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error starting KYC. Error ID: {error_id}")
+
+# Protect sensitive endpoints with role requirements
+@app.post("/api/payments/send", tags=["Payments"])
+async def send_payment(
+    payment_data: PaymentRequest,
+    current_user: Dict[str, Any] = Depends(require_role("tribe")),
+    supabase: Client = Depends(get_supabase_client)
+):
+    # Your payment logic here
+    pass
+
+@app.post("/api/wallet/create", tags=["Wallet"])
+async def create_wallet(
+    current_user: Dict[str, Any] = Depends(require_role("tribe")),
+    wallet_service: WalletService = Depends(get_wallet_service),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Create a wallet for the user"""
+    try:
+        # Check if user already has a wallet
+        wallet_res = supabase.from_("user_wallets").select("*").eq("user_id", current_user["id"]).execute()
+        
+        if wallet_res.data:
+            return {
+                "success": True,
+                "message": "Wallet already exists",
+                "address": wallet_res.data[0]["algorand_address"]
+            }
+        
+        # Create wallet for user
+        result = await wallet_service.provision_user_wallet(current_user["id"])
+        
+        return {
+            "success": True,
+            "message": "Wallet created successfully",
+            "address": result["algorand_address"]
+        }
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Wallet creation error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creating wallet. Error ID: {error_id}")
+
+@app.post("/api/user/update-role", tags=["User"])
+async def update_user_role(
+    role: UserRole,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Update user role (admin only)"""
+    try:
+        # Check if user is admin
+        if not current_user.get("is_admin", False):
+            raise HTTPException(status_code=403, detail="Admin privileges required")
+        
+        # Update user role in database
+        update_data = {"role": role}
+        result = supabase.from_("user_profiles").update(update_data).eq("id", current_user["id"]).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"success": True, "message": f"User role updated to {role}"}
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"Role update error [{error_id}]: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating role. Error ID: {error_id}")
+
 @app.post("/api/v1/investor-contact", tags=["Public"])
 async def investor_contact(
     payload: InvestorContactPayload, 
@@ -452,21 +555,6 @@ async def get_portfolio_summary(current_user: Dict[str, Any] = Depends(get_curre
         logger.error(f"Portfolio summary error [{error_id}]: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching portfolio. Error ID: {error_id}")
  
-@app.post("/api/kyc/start-verification", tags=["KYC"])
-async def start_kyc_verification(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Start KYC verification process"""
-    try:
-        # TODO: Implement ComplyCube integration here
-        return {
-            "success": True,
-            "session_id": str(uuid4()),
-            "message": "KYC verification started"
-        }
-    except Exception as e:
-        error_id = str(uuid4())[:8]
-        logger.error(f"KYC start error [{error_id}]: {e}")
-        raise HTTPException(status_code=500, detail=f"Error starting KYC. Error ID: {error_id}")
-
 @app.post("/api/kyc/verify-documents", tags=["KYC"])
 async def verify_documents(
     document_type: str = Form(...),

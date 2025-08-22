@@ -9,7 +9,10 @@ import AdvancedChart from '../components/charts/AdvancedChart';
 import { CardSkeleton, ChartSkeleton } from '../components/ui/LoadingSkeleton';
 import { generateMockChartData } from '../data/mockData';
 import { useWallet } from '../hooks/useWallet';
-import { useMarketData } from '../hooks/useMarketData'; // Assuming you refactored this hook
+import { useMarketData } from '../hooks/useMarketData';
+import { useAuth } from '../contexts/AuthContext';
+import VerificationModal from '../components/VerificationModal';
+import toast from 'react-hot-toast';
 
 // A new component for the Send Money form, extracted for clarity
 const SendMoneyForm = ({ onSend, loading }: { onSend: (to: string, amount: number, memo: string) => void, loading: boolean }) => {
@@ -67,15 +70,44 @@ const SendMoneyForm = ({ onSend, loading }: { onSend: (to: string, amount: numbe
 const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState(generateMockChartData(30));
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
   // Use our new, unified hooks
-  const { address, balance, isConnected, provisionWallet, sendPayment, loading: walletLoading } = useWallet();
-  const { portfolio, assets, loading: marketLoading, error: marketError } = useMarketData(); // Assumes this hook exists
+  const { address, balance, isConnected, provisionWallet, loading: walletLoading } = useWallet();
+  const { portfolio, assets, loading: marketLoading, error: marketError } = useMarketData();
+  const { user, role } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500); // Simulate initial page load
     return () => clearTimeout(timer);
   }, []);
+
+  // Add this function to handle transaction requests
+  const handleTransactionRequest = (action: () => void) => {
+    if (role === 'alien') {
+      setPendingAction(() => action);
+      setShowVerificationModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  // Add the sendPayment function
+  const sendPayment = async (to: string, amount: number, memo: string) => {
+    const canProceed = handleTransactionRequest(() => sendPayment(to, amount, memo));
+    if (!canProceed) return;
+    
+    try {
+      // Your existing send payment logic here
+      console.log(`Sending ${amount} USDS to ${to} with memo: ${memo}`);
+      // await apiClient.post('/api/payments/send', { to, amount, memo });
+      toast.success('Payment sent successfully!');
+    } catch (error) {
+      console.error('Payment failed:', error);
+      toast.error('Payment failed. Please try again.');
+    }
+  };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   const formatPercentage = (percentage: number) => `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
@@ -100,6 +132,20 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Add a notification for unverified users */}
+      {role === 'alien' && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
+          <p className="font-bold">Verification Required</p>
+          <p>Complete identity verification to unlock all features including sending and receiving USDS.</p>
+          <button 
+            onClick={() => window.location.href = '/onboarding'}
+            className="mt-2 bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+          >
+            Complete Verification
+          </button>
+        </div>
+      )}
+
       {/* KPI Cards from Analytics.tsx */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
@@ -158,6 +204,19 @@ const DashboardPage: React.FC = () => {
             </Card>
         </div>
       </div>
+
+      {/* Add the VerificationModal component */}
+      <VerificationModal
+        isOpen={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        actionDescription="send payments"
+        onVerify={() => {
+          setShowVerificationModal(false);
+          if (pendingAction) {
+            pendingAction();
+          }
+        }}
+      />
     </div>
   );
 };
