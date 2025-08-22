@@ -49,38 +49,7 @@ class WalletService:
         except InvalidToken:
             logger.critical("Failed to decrypt wallet data - InvalidToken. This could indicate a key mismatch or data corruption.")
             raise HTTPException(status_code=500, detail="Wallet data decryption failed due to a key error.")
-    
-  
-async createWalletForUser(userId: string): Promise<{ success: boolean; address?: string; error?: string }> {
-  try {
-    
-    const existingWallet = await this.getUserWallet(userId);
-    if (existingWallet) {
-      return { success: true, address: existingWallet.address };
-    }
-    
- 
-    const wallet = this.createAlgorandWallet();
-    const encryptedPk = this._encrypt(wallet.private_key);
-    
-   
-    const response = await this.supabase.rpc('provision_user_wallet', {
-      'user_id_input': userId,
-      'algorand_address_input': wallet.address,
-      'encrypted_pk_input': encryptedPk
-    }).execute();
-    
-    if (response.error) {
-      throw new Error(response.error.message);
-    }
-    
-    return { success: true, address: wallet.address };
-  } catch (error) {
-    console.error('Wallet creation error:', error);
-    return { success: false, error: error.message };
-  }
-}
-    
+
     def create_algorand_wallet(self) -> dict:
         """
         Generates a new Algorand account keypair and mnemonic.
@@ -124,6 +93,23 @@ async createWalletForUser(userId: string): Promise<{ success: boolean; address?:
             logger.error(f"A critical error occurred during wallet provisioning for user {user_id}: {e}")
             raise HTTPException(status_code=500, detail="A critical error occurred during wallet provisioning.")
 
+    async def create_wallet_for_user(self, user_id: str):
+        """
+        Create a wallet for a user (Python version of the TypeScript function)
+        """
+        try:
+            result = await self.provision_user_wallet(user_id)
+            return {
+                "success": True,
+                "address": result["algorand_address"]
+            }
+        except Exception as e:
+            logger.error(f"Wallet creation failed for user {user_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     async def get_decrypted_private_key(self, user_id: str) -> str:
         """
         Securely retrieves and decrypts a user's private key.
@@ -145,5 +131,5 @@ async createWalletForUser(userId: string): Promise<{ success: boolean; address?:
             logger.error(f"Value error while retrieving private key for user {user_id}: {ve}")
             raise HTTPException(status_code=404, detail="Secure wallet data not found for user.")
         except Exception as e:
-            logger.critical(f"Catastrophic failure retrieving private key for user {user_gand_service.pyid}: {e}")
+            logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}")
             raise HTTPException(status_code=500, detail="Could not retrieve secure wallet data.")
