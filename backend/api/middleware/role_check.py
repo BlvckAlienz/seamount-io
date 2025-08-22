@@ -1,6 +1,8 @@
 from fastapi import HTTPException, Depends
 from supabase import Client
-from ..auth import get_current_user
+
+# Import from the correct path - use absolute import instead of relative
+from api.main import get_current_user, get_supabase_client
 
 def require_role(required_role: str):
     def role_checker(
