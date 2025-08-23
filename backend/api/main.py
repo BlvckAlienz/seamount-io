@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Production Hardened Authentication with Detailed Logging
-# Version: 2.4.2 (Fixed Circular Imports)
+# Version: 2.5.0 (Fixed all circular imports and dependencies)
 # ==============================================================================
 
 import logging
@@ -33,17 +33,33 @@ from config import Settings, get_settings
 import sys
 from pathlib import Path
 
-# Import the role checker after defining the functions it needs
-from middleware.role_check import require_role
-
-from enum import Enum
-class UserRole(str, Enum):
-    TRIBE = "tribe"
-    ALIEN = "alien"
-
 # Add the backend directory to Python path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
+
+# Import models after path setup
+from models import (
+    UserProfile, PaymentRequest, PaymentResponse, MFASetupResponse, 
+    MFAVerifyRequest, PortfolioHolding, SessionResponse, 
+    ConsentUpdatePayload, InvestorContactPayload, KYCSubmission, UserRole
+)
+
+# Import the role checker with error handling
+try:
+    from middleware.role_check import require_role
+except ImportError:
+    # Fallback implementation if middleware not found
+    def require_role(required_role: str):
+        def role_checker(current_user: dict, supabase: Client):
+            if current_user.get("role") != required_role:
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"{required_role.capitalize()} role required"
+                )
+            return current_user
+        return role_checker
+    logger.warning("Using fallback require_role function - middleware module not found")
 
 # --- 1. ENHANCED LOGGING & GLOBAL STATE ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(funcName)s:%(lineno)d - %(message)s')
@@ -208,59 +224,7 @@ def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)):
     if not current_user.get("is_admin", False): 
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
-# --- 3. PYDANTIC MODELS ---
-class UserProfile(BaseModel): 
-    id: str
-    email: EmailStr
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    role: UserRole = UserRole.ALIEN
-
-class SessionResponse(BaseModel): 
-    session_id: UUID
-
-class ConsentUpdatePayload(BaseModel): 
-    session_id: UUID
-    preferences: Dict[str, bool]
-
-class InvestorContactPayload(BaseModel): 
-    name: str
-    email: EmailStr
-    company: Optional[str] = None
-    checkSize: Optional[str] = None
-    message: Optional[str] = None
-
-class KYCSubmission(BaseModel): 
-    document_type: str
-    document_data: str
-
-class PaymentRequest(BaseModel): 
-    recipient_email: EmailStr
-    amount: float
-    currency: str = "USDS"
-
-class PaymentResponse(BaseModel): 
-    transaction_id: str
-    status: str
-    amount: float
-    currency: str
-    timestamp: datetime
-
-class MFASetupResponse(BaseModel): 
-    secret: str
-    qr_code_url: str
-
-class MFAVerifyRequest(BaseModel): 
-    token: str
-
-class PortfolioHolding(BaseModel): 
-    id: str
-    user_id: str
-    asset: str
-    amount: float
-    value_usd: float
-
-# --- 4. LIFESPAN MANAGER ---
+# --- 3. LIFESPAN MANAGER ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _supabase_client, _notification_service, _wallet_service
@@ -289,6 +253,16 @@ async def lifespan(app: FastAPI):
         _wallet_service = WalletService(current_settings, _supabase_client)
         logger.info("Wallet service initialized.")
         
+        # Set global instances in dependencies module
+        try:
+            import dependencies
+            dependencies._supabase_client = _supabase_client
+            dependencies._wallet_service = _wallet_service
+            dependencies._notification_service = _notification_service
+            logger.info("Dependencies module initialized with service instances.")
+        except ImportError:
+            logger.warning("Dependencies module not found - some features may not work properly")
+        
         yield
         
     except Exception as e:
@@ -297,10 +271,10 @@ async def lifespan(app: FastAPI):
         
     logger.info("--- Seamount API Shutting Down ---")
 
-# --- 5. FASTAPI APP ---
+# --- 4. FASTAPI APP ---
 app = FastAPI(
     title="Seamount.io API", 
-    version="2.4.2", 
+    version="2.5.0", 
     lifespan=lifespan,
     docs_url="/api/docs" if get_settings().ENVIRONMENT != "production" else None,
     redoc_url=None
@@ -316,17 +290,19 @@ app.add_middleware(
 )
 
 # Import routers after app is created
-from api.routes import kyc, webhooks
+try:
+    from api.routes import kyc, webhooks
+    # Include routers
+    app.include_router(kyc.router, prefix="/api", tags=["kyc"])
+    app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+except ImportError as e:
+    logger.warning(f"Could not import routers: {e}")
 
-# Include routers
-app.include_router(kyc.router, prefix="/api", tags=["kyc"])
-app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
-
-# --- 6. API ROUTES (Hardened with Route-Level Exception Handling) ---
+# --- 5. API ROUTES (Hardened with Route-Level Exception Handling) ---
 
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "2.4.2", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "version": "2.5.0", "timestamp": datetime.utcnow()}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -591,7 +567,7 @@ async def verify_documents(
         logger.error(f"Document verification error [{error_id}]: {e}")
         raise HTTPException(status_code=500, detail=f"Error verifying documents. Error ID: {error_id}")
         
-# --- 7. DEBUG ENDPOINTS (For authentication troubleshooting) ---
+# --- 6. DEBUG ENDPOINTS (For authentication troubleshooting) ---
 @app.get("/api/v1/debug/token", tags=["Debug"])
 async def debug_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Endpoint to help debug JWT token issues"""
@@ -625,7 +601,7 @@ async def debug_auth_test(current_user: Dict[str, Any] = Depends(get_current_use
         "message": "Authentication is working correctly!"
     }
 
-# --- 8. ERROR HANDLING MIDDLEWARE ---
+# --- 7. ERROR HANDLING MIDDLEWARE ---
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
     try:

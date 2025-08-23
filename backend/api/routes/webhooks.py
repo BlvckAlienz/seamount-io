@@ -1,7 +1,11 @@
+# File Location: backend/api/routes/webhooks.py
 from fastapi import APIRouter, Request, HTTPException, Depends
 from supabase import Client
 import logging
-from config import Settings, get_settings
+import hmac
+import hashlib
+from dependencies import get_supabase_client, get_settings
+from services.wallet_service import WalletService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -14,7 +18,9 @@ async def handle_complycube_webhook(
 ):
     # Verify webhook signature
     signature = request.headers.get("X-ComplyCube-Signature")
-    if not verify_signature(request.body(), signature, settings.COMPLYCUBE_WEBHOOK_SECRET):
+    body = await request.body()
+    
+    if not verify_signature(body, signature, settings.COMPLYCUBE_WEBHOOK_SECRET.get_secret_value()):
         raise HTTPException(status_code=401, detail="Invalid signature")
     
     event = await request.json()
@@ -44,9 +50,17 @@ async def handle_complycube_webhook(
     return {"status": "success"}
 
 def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
-    # Implement signature verification logic
-    # This is a simplified example - use proper verification for production
-    import hmac
-    import hashlib
-    expected_signature = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected_signature, signature)
+    # Implement proper signature verification logic
+    if not signature or not secret:
+        return False
+        
+    try:
+        expected_signature = hmac.new(
+            secret.encode(), 
+            payload, 
+            hashlib.sha256
+        ).hexdigest()
+        
+        return hmac.compare_digest(expected_signature, signature)
+    except Exception:
+        return False
