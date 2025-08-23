@@ -3,6 +3,9 @@ from typing import Dict, Any, List, Set
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
+# Add to config.py
+TINYMAN_V2_APP_ID: int = Field(..., env="TINYMAN_V2_APP_ID")
+
 # --- Static Business Logic Configuration (Hardcoded) ---
 FEE_STRUCTURE = {
     'conversion': {'base_fee': 0.020}, 'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 'network': {'base_fee': 0.00}, 'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 'staking': {'reward_rate': 4.5}

@@ -1,46 +1,58 @@
 # ==============================================================================
 # Seamount.io API - Production Dependencies
-# Version: 1.1.1 (Corrected Production Server)
+# Version: 1.2.0 (Updated for production)
 # ==============================================================================
 
 # Core FastAPI framework
-fastapi
+fastapi==0.104.1
 
 # Production-grade ASGI Server (Required by Render's start command)
-gunicorn
+gunicorn==21.2.0
 
 # ASGI Server Implementation for FastAPI
-uvicorn[standard]
+uvicorn[standard]==0.24.0
 
 # Supabase client and its dependencies
-supabase
+supabase==1.0.3
 
 # Asynchronous HTTP requests
-aiohttp
+aiohttp==3.9.1
 
 # Email services
-fastapi-mail
+fastapi-mail==2.0.4
 
 # Authentication and security
-passlib[bcrypt]
-python-jose[cryptography]
-python-multipart
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
 
 # Environment variable management
-python-dotenv
+python-dotenv==1.0.0
 
 # Data validation
-pydantic
+pydantic==2.5.0
+pydantic-settings==2.1.0
 
 # Robust retry logic
-tenacity
+tenacity==8.2.3
 
 # One-time password generation for MFA
-pyotp
+pyotp==2.9.0
 
 # Algorand SDK for blockchain interactions
-py-algorand-sdk
+py-algorand-sdk==2.6.0
 
-pydantic-settings
+# ComplyCube for KYC
+complycube==1.2.0
 
-complycube
+# JWT handling
+jose==1.0.0
+
+# Cryptography
+cryptography==41.0.7
+
+# HTTP client
+httpx==0.25.2
+
+tinyman-py-sdk>=2.0.0
+aiohttp>=3.8.0

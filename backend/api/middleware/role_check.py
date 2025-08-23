@@ -1,22 +1,20 @@
+# File Location: backend/middleware/role_check.py
 from fastapi import HTTPException, Depends
 from supabase import Client
 
-# Import from the correct path - use absolute import instead of relative
-from api.main import get_current_user, get_supabase_client
-
 def require_role(required_role: str):
-    def role_checker(
-        current_user: dict = Depends(get_current_user),
-        supabase: Client = Depends(get_supabase_client)
-    ):
-        user_profile = supabase.from_("user_profiles").select("role").eq("id", current_user["id"]).single().execute()
-        
-        if not user_profile.data or user_profile.data["role"] != required_role:
+    """
+    Factory function that creates a role checking dependency.
+    This avoids circular imports by not importing from main.py directly.
+    """
+    def role_checker(current_user: dict, supabase: Client):
+        # Check if user has the required role
+        if current_user.get("role") != required_role:
             raise HTTPException(
-                status_code=403,
-                detail=f"Required role: {required_role}. Your role: {user_profile.data.get('role', 'unknown')}"
+                status_code=403, 
+                detail=f"{required_role.capitalize()} role required"
             )
-        
         return current_user
-    
     return role_checker
+
+# Note: We removed the get_supabase_client function as it's not needed here
