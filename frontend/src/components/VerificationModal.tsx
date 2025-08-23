@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Shield, ArrowRight } from 'lucide-react';
-import Button from './Button';
+import Button from './ui/Button';  // This is correct
 import { useAuth } from '../contexts/AuthContext';
 
 interface VerificationModalProps {
