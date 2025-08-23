@@ -4,7 +4,8 @@ from supabase import Client
 import logging
 import hmac
 import hashlib
-from dependencies import get_supabase_client, get_settings
+from dependencies import get_supabase_client
+from config import get_settings, Settings  # Import Settings class
 from services.wallet_service import WalletService
 
 router = APIRouter()
