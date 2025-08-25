@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiClient, API_ENDPOINTS } from '../config/api';
+import { apiClient } from '../config/api';
 
 export const useMarketData = () => {
   const [marketData, setMarketData] = useState<any>(null);
@@ -9,8 +9,8 @@ export const useMarketData = () => {
   const fetchMarketData = async () => {
     try {
       setLoading(true);
-      // Use the properly defined endpoint
-      const response = await apiClient.get(API_ENDPOINTS.PORTFOLIO.SUMMARY);
+      // Use the correct endpoint path
+      const response = await apiClient.get('/api/v1/portfolio/summary');
       setMarketData(response.data);
       setError(null);
     } catch (err: any) {
