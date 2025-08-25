@@ -457,6 +457,7 @@ async def update_user_role(
         logger.error(f"Role update error [{error_id}]: {e}")
         raise HTTPException(status_code=500, detail=f"Error updating role. Error ID: {error_id}")
 
+# Update the investor contact endpoint
 @app.post("/api/v1/investor-contact", tags=["Public"])
 async def investor_contact(
     payload: InvestorContactPayload, 
@@ -464,8 +465,13 @@ async def investor_contact(
     notifier: NotificationService = Depends(get_notification_service)
 ):
     try:
-        supabase.from_("investor_contacts").insert(payload.dict()).execute()
+        # Insert into database
+        result = supabase.table('investor_contacts').insert(payload.dict()).execute()
         
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to save contact information")
+        
+        # Send notification email
         subject = f"New Investor Contact: {payload.name}"
         body = f"""
         <html>
@@ -479,7 +485,13 @@ async def investor_contact(
         </html>
         """
         
-        asyncio.create_task(notifier.email_service.send_email(subject, ["investors@seamount.io"], body))
+        # Use asyncio to run the email sending in background
+        asyncio.create_task(notifier.email_service.send_email(
+            subject, 
+            ["investors@seamount.io"], 
+            body
+        ))
+        
         return {"message": "Contact request submitted successfully."}
         
     except Exception as e:

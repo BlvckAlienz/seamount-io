@@ -1,9 +1,22 @@
 // src/config/env.ts
 // LIVE DATA CONFIGURATION - NO MOCK MODE
 
+// Debug all environment variables
+console.log('Environment variables available:');
+console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('VITE_COMPLYCUBE_API_KEY:', import.meta.env.VITE_COMPLYCUBE_API_KEY ? 'SET' : 'NOT SET');
+console.log('MODE:', import.meta.env.MODE);
+console.log('PROD:', import.meta.env.PROD);
+console.log('DEV:', import.meta.env.DEV);
+
 // Supabase Configuration
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// API Configuration - CRITICAL FIX
+// Use VITE_API_BASE_URL if available, otherwise fall back to production URL
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-api.onrender.com';
 
 // API Keys (Optional - we have fallbacks)
 export const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || '';
@@ -63,6 +76,14 @@ export const RATE_LIMITS = {
   FRED: 120
 };
 
+// ComplyCube Configuration
+export const COMPLYCUBE_CONFIG = {
+  API_KEY: COMPLYCUBE_API_KEY,
+  SDK_SCRIPT: 'https://assets.complycube.com/web-sdk/v1/complycube.min.js',
+  SDK_STYLES: 'https://assets.complycube.com/web-sdk/v1/style.css',
+  ENABLED: !!COMPLYCUBE_API_KEY
+};
+
 // Environment Validation Interface
 export interface EnvironmentStatus {
   isValid: boolean;
@@ -88,6 +109,24 @@ export const validateEnvironment = (): EnvironmentStatus => {
 
   // Critical Services (Required for core functionality)
   
+  // API Base URL - This is CRITICAL
+  if (!API_BASE_URL) {
+    errors.push('API_BASE_URL is not configured');
+    criticalServices.push({
+      name: 'API Server',
+      status: 'error',
+      description: 'API base URL not configured',
+      required: true
+    });
+  } else {
+    criticalServices.push({
+      name: 'API Server',
+      status: 'connected',
+      description: `Connected to ${API_BASE_URL}`,
+      required: true
+    });
+  }
+
   // Yahoo Finance - Always available, no config needed
   criticalServices.push({
     name: 'Yahoo Finance',
@@ -179,7 +218,7 @@ export const validateEnvironment = (): EnvironmentStatus => {
   }
 
   // CompyCube (KYC/AML)
-  if (COMPLYCUBE_API_KEY) {
+  if (COMPLYCUBE_CONFIG.ENABLED) {
     optionalServices.push({
       name: 'ComplyCube',
       status: 'configured',
@@ -214,6 +253,7 @@ const envStatus = validateEnvironment();
 
 // Debug Info
 console.log('🚀 SEAMOUNT.IO - LIVE DATA MODE ENABLED');
+console.log('🌐 API Base URL:', API_BASE_URL);
 console.log('📊 Data Sources:', {
   stocks: DATA_SOURCES.STOCK_PRIMARY,
   crypto: DATA_SOURCES.CRYPTO_PRIMARY,
@@ -227,7 +267,8 @@ console.log('🔧 Environment Status:', {
   valid: envStatus.isValid,
   critical: envStatus.criticalServices.length,
   optional: envStatus.optionalServices.filter(s => s.status === 'configured').length,
-  warnings: envStatus.warnings.length
+  warnings: envStatus.warnings.length,
+  errors: envStatus.errors.length
 });
 
 if (envStatus.warnings.length > 0) {
@@ -238,4 +279,28 @@ if (envStatus.errors.length > 0) {
   console.error('❌ Errors:', envStatus.errors);
 }
 
-console.log('✅ Core trading infrastructure ready!');
+if (envStatus.isValid) {
+  console.log('✅ Core trading infrastructure ready!');
+} else {
+  console.error('❌ Core infrastructure not ready due to configuration errors');
+}
+
+export default {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  API_BASE_URL,
+  ALPHA_VANTAGE_API_KEY,
+  COINGECKO_API_KEY,
+  CIRCLE_API_KEY,
+  COMPLYCUBE_API_KEY,
+  MOCK_MODE,
+  DATA_SOURCES,
+  isAlphaVantageConfigured,
+  isCoinGeckoConfigured,
+  isCircleConfigured,
+  isSupabaseConfigured,
+  API_ENDPOINTS,
+  RATE_LIMITS,
+  COMPLYCUBE_CONFIG,
+  validateEnvironment
+};
