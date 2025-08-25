@@ -29,6 +29,8 @@ import pyotp
 from services.notification_service import NotificationService
 from services.email_service import EmailService
 from services.wallet_service import WalletService
+from api.routes import kyc, webhooks
+from api.routes.portfolio import router as portfolio_router
 from config import Settings, get_settings
 import sys
 from pathlib import Path
@@ -295,6 +297,7 @@ try:
     # Include routers
     app.include_router(kyc.router, prefix="/api", tags=["kyc"])
     app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+    app.include_router(portfolio_router, prefix="/api/v1", tags=["Portfolio"])
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
