@@ -3,28 +3,43 @@ from typing import Dict, Any, List, Set
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
-# Add to config.py
-TINYMAN_V2_APP_ID: int = Field(..., env="TINYMAN_V2_APP_ID")
+# Configure logger first to avoid reference errors
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# --- Static Business Logic Configuration (Hardcoded) ---
+# Static business logic configuration
 FEE_STRUCTURE = {
-    'conversion': {'base_fee': 0.020}, 'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 'network': {'base_fee': 0.00}, 'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 'staking': {'reward_rate': 4.5}
+    'conversion': {'base_fee': 0.020}, 
+    'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 
+    'network': {'base_fee': 0.00}, 
+    'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 
+    'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 
+    'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 
+    'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 
+    'staking': {'reward_rate': 4.5}
 }
+
 GEOGRAPHIC_TIERS = {
-    'tier_1': ['US', 'CA', 'GB', 'DE', 'FR', 'AU', 'JP', 'SG', 'NL', 'CH', 'SE', 'NO', 'DK', 'AT', 'BE', 'FI', 'IE', 'LU', 'NZ', 'ZA'], 'tier_2_standard': ['MX', 'BR', 'IN', 'CN', 'KR', 'TH', 'MY', 'PH', 'ID', 'VN', 'TW', 'HK', 'AE', 'SA', 'CL', 'CO', 'PE', 'AR', 'UY'], 'tier_2_african': ['NG', 'KE', 'EG', 'UG', 'ZW', 'TZ'], 'tier_3': ['BD', 'PK', 'LK', 'MM', 'NP', 'ET', 'RW', 'BF', 'ML', 'SN', 'CI', 'GH', 'VE', 'MA', 'DO']
+    'tier_1': ['US', 'CA', 'GB', 'DE', 'FR', 'AU', 'JP', 'SG', 'NL', 'CH', 'SE', 'NO', 'DK', 'AT', 'BE', 'FI', 'IE', 'LU', 'NZ', 'ZA'], 
+    'tier_2_standard': ['MX', 'BR', 'IN', 'CN', 'KR', 'TH', 'MY', 'PH', 'ID', 'VN', 'TW', 'HK', 'AE', 'SA', 'CL', 'CO', 'PE', 'AR', 'UY'], 
+    'tier_2_african': ['NG', 'KE', 'EG', 'UG', 'ZW', 'TZ'], 
+    'tier_3': ['BD', 'PK', 'LK', 'MM', 'NP', 'ET', 'RW', 'BF', 'ML', 'SN', 'CI', 'GH', 'VE', 'MA', 'DO']
 }
+
 VOLUME_DISCOUNTS = {
-    'startup': {'threshold': 0, 'discount': 0.00}, 'growth': {'threshold': 100000, 'discount': 0.10}, 'enterprise': {'threshold': 1000000, 'discount': 0.15}, 'institutional': {'threshold': 10000000, 'discount': 0.20}
+    'startup': {'threshold': 0, 'discount': 0.00}, 
+    'growth': {'threshold': 100000, 'discount': 0.10}, 
+    'enterprise': {'threshold': 1000000, 'discount': 0.15}, 
+    'institutional': {'threshold': 10000000, 'discount': 0.20}
 }
 
 class Settings(BaseSettings):
-    """
-    Defines and validates all environment variables. This is the single source of truth for configuration.
-    Version: 2.0.0 (Definitive)
-    """
+    """Defines and validates all environment variables."""
+    
     # --- Core & Security ---
     DATABASE_URL: SecretStr
     COMPLYCUBE_API_KEY: SecretStr
+    COMPLYCUBE_WEBHOOK_SECRET: SecretStr  # Added missing webhook secret
     ENCRYPTION_KEY: SecretStr
     IPINFO_TOKEN: SecretStr
     
@@ -67,10 +82,10 @@ class Settings(BaseSettings):
     # --- Operational ---
     ENVIRONMENT: str = "production"
     
-    # --- CORS Configuration (from .env) ---
+    # --- CORS Configuration ---
     ALLOWED_ORIGINS_STR: str = Field("", alias='ALLOWED_ORIGINS')
     
-    # --- Whitelabel API Service (from .env) ---
+    # --- Whitelabel API Service ---
     WHITELISTED_API_KEYS_STR: str = Field("", alias='WHITELISTED_API_KEYS')
 
     # --- Static Business Logic (Not from .env) ---
@@ -82,8 +97,14 @@ class Settings(BaseSettings):
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         if not self.ALLOWED_ORIGINS_STR:
-            # Provide a sensible default if the env var is not set
-            return ["http://localhost:3000", "http://localhost:5173", "https://seamount.io", "https://www.seamount.io"]
+            # Updated with your production domains
+            return [
+                "http://localhost:3000", 
+                "http://localhost:5173", 
+                "https://seamount.io", 
+                "https://www.seamount.io",
+                "https://seamount.vercel.app"
+            ]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
     
     @property
@@ -108,6 +129,3 @@ def get_settings() -> Settings:
             logger.critical(f"FATAL: FAILED TO LOAD OR VALIDATE CONFIGURATION. Error: {e}")
             raise
     return _settings_instance
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
-logger = logging.getLogger(__name__)
