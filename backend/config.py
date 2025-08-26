@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Optional  # Added Optional import
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
