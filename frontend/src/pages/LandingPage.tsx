@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Globe, Shield, Zap, DollarSign, TrendingUp, Check, Send, Twitter, Instagram, Mail, MapPin, Phone, ChevronDown, ChevronUp, Linkedin } from 'lucide-react';
+import { ArrowRight, Globe, Shield, Zap, DollarSign, Users, Briefcase, Check, Send, Mail, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { apiClient } from '@/config/api';
 
