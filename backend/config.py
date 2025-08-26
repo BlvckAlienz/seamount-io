@@ -93,7 +93,40 @@ class Settings(BaseSettings):
     GEOGRAPHIC_TIERS: Dict[str, List[str]] = GEOGRAPHIC_TIERS
     VOLUME_DISCOUNTS: Dict[str, Any] = VOLUME_DISCOUNTS
 
-    # --- Dynamically Parsed Properties ---
+    # Add validation for critical settings
+    VITE_SUPABASE_URL: str = Field(..., env="VITE_SUPABASE_URL")
+    SUPABASE_SERVICE_KEY: str = Field(..., env="SUPABASE_SERVICE_KEY")
+    
+    # Make ComplyCube optional with proper validation
+    COMPLYCUBE_API_KEY: Optional[str] = Field(None, env="COMPLYCUBE_API_KEY")
+    
+    # Add debug mode
+    DEBUG: bool = Field(False, env="DEBUG")
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
+
+def get_settings():
+    settings = Settings()
+    
+    # Validate critical settings
+    if not settings.VITE_SUPABASE_URL:
+        raise ValueError("VITE_SUPABASE_URL is required")
+    
+    if not settings.SUPABASE_SERVICE_KEY:
+        raise ValueError("SUPABASE_SERVICE_KEY is required")
+    
+    # Log configuration status
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Supabase URL: {'Configured' if settings.VITE_SUPABASE_URL else 'Missing'}")
+    logger.info(f"ComplyCube API Key: {'Configured' if settings.COMPLYCUBE_API_KEY else 'Missing'}")
+    logger.info(f"Debug Mode: {settings.DEBUG}")
+    
+    return settings
+    
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         if not self.ALLOWED_ORIGINS_STR:
