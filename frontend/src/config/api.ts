@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
-import { API_BASE_URL } from './env'; // Import the configured base URL
+import { API_BASE_URL } from './env';
 
 // Create axios instance with configured base URL
 export const apiClient = axios.create({
@@ -11,11 +11,44 @@ export const apiClient = axios.create({
   },
 });
 
+// Define API endpoints with proper paths
+export const API_ENDPOINTS = {
+  PORTFOLIO: {
+    SUMMARY: '/api/v1/portfolio/summary',
+    HOLDINGS: '/api/v1/portfolio/holdings',
+  },
+  USER: {
+    PROFILE: '/api/v1/user/profile',
+    WALLET: '/api/v1/user/wallet',
+  },
+  KYC: {
+    TOKEN: '/api/kyc/token',
+    VERIFY: '/api/kyc/verify-documents',
+    START_VERIFICATION: '/api/kyc/start-verification',
+  },
+  INVESTOR: {
+    CONTACT: '/api/v1/investor-contact',
+  },
+  WALLET: {
+    CREATE: '/api/wallet/create',
+  },
+  CONSENT: {
+    UPDATE: '/api/v1/consent/update',
+    COOKIES: '/api/v1/consent/cookies',
+  }
+};
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   async (config) => {
-    // Add debug info about the request
-    console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // FIX: Ensure URL is properly constructed
+    if (config.url && !config.url.startsWith('/')) {
+      config.url = '/' + config.url;
+    }
+    
+    // Log the full URL being called
+    const fullUrl = `${config.baseURL}${config.url}`;
+    console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${fullUrl}`);
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -31,7 +64,7 @@ apiClient.interceptors.request.use(
       return config;
     } catch (error) {
       console.error('❌ Failed to get session:', error);
-      return config; // Continue without token rather than failing
+      return config;
     }
   },
   (error) => {
@@ -53,13 +86,12 @@ apiClient.interceptors.response.use(
     
     console.error(`❌ API Request Failed: ${status} ${url} - ${message}`);
     
-    // Specific handling for 404 errors
     if (error.response?.status === 404) {
       console.error(`🔍 404 Error Details:`, {
-        url: error.config.url,
+        fullUrl: `${error.config.baseURL}${error.config.url}`,
         baseURL: error.config.baseURL,
-        method: error.config.method,
-        data: error.config.data
+        endpoint: error.config.url,
+        method: error.config.method
       });
     }
     
@@ -67,7 +99,12 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Add a helper function for API health check
+// Helper function to get full URL
+export const getFullUrl = (endpoint: string): string => {
+  return `${API_BASE_URL}${endpoint}`;
+};
+
+// Health check
 export const checkApiHealth = async (): Promise<boolean> => {
   try {
     const response = await apiClient.get('/api/v1/health');
@@ -78,19 +115,5 @@ export const checkApiHealth = async (): Promise<boolean> => {
     return false;
   }
 };
-
-// Export a function to get the full URL for debugging
-export const getFullUrl = (endpoint: string): string => {
-  return `${API_BASE_URL}${endpoint}`;
-};
-
-// Perform health check on module load
-checkApiHealth().then(healthy => {
-  if (healthy) {
-    console.log('✅ API connection established successfully');
-  } else {
-    console.error('❌ API connection failed - check configuration');
-  }
-});
 
 export default apiClient;

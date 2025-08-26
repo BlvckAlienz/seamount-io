@@ -26,8 +26,9 @@ const InvestorContact: React.FC = () => {
     try {
       console.log('Submitting investor contact form:', data);
       
-      // Use the correct endpoint
-      await apiClient.post('/api/v1/investor-contact', data);
+      // Use the correct endpoint - fixed URL construction
+      const response = await apiClient.post('/api/v1/investor-contact', data);
+      console.log('Investor contact response:', response.data);
       
       toast.success('Thank you! Your message has been sent.', { id: toastId });
       reset();

@@ -58,6 +58,17 @@ const WelcomeStep: React.FC<StepProps> = ({ onNext }) => {
 // Step 2: Identity Verification
 const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
   const [loading, setLoading] = useState(false);
+  const [verificationStarted, setVerificationStarted] = useState(false);
+
+  useEffect(() => {
+    // Ensure ComplyCube mount point exists in the DOM
+    if (!document.getElementById('complycube-mount')) {
+      const mountPoint = document.createElement('div');
+      mountPoint.id = 'complycube-mount';
+      mountPoint.style.display = 'none'; // Hidden by default
+      document.body.appendChild(mountPoint);
+    }
+  }, []);
 
   const startVerification = async () => {
     setLoading(true);
@@ -66,10 +77,20 @@ const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
       const response = await apiClient.post('/api/kyc/start-verification');
       const { token } = response.data;
       
+      // Show the mount point
+      const mountPoint = document.getElementById('complycube-mount');
+      if (mountPoint) {
+        mountPoint.style.display = 'block';
+        mountPoint.style.minHeight = '500px'; // Ensure it has space
+      }
+      
+      setVerificationStarted(true);
+      
       // Initialize ComplyCube
       if (window.ComplyCube) {
         window.ComplyCube.mount({
           token: token,
+          mount: '#complycube-mount', // Explicitly specify mount point
           onComplete: (data: any) => {
             console.log('Verification complete', data);
             toast.success('Identity verification completed successfully!');
@@ -79,16 +100,19 @@ const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
             console.error('Verification error', error);
             toast.error('Verification failed. Please try again.');
             setLoading(false);
+            setVerificationStarted(false);
           }
         });
       } else {
         toast.error('Verification service not available');
         setLoading(false);
+        setVerificationStarted(false);
       }
     } catch (error) {
       console.error('Failed to start verification', error);
       toast.error('Failed to start verification process.');
       setLoading(false);
+      setVerificationStarted(false);
     }
   };
 
@@ -111,22 +135,29 @@ const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
         </ul>
       </div>
       
-      <div className="space-y-4">
-        <button
-          onClick={startVerification}
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Starting Verification...' : 'Verify Now'}
-        </button>
-        
-        <button
-          onClick={onNext}
-          className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-        >
-          Skip for Now
-        </button>
-      </div>
+      {!verificationStarted ? (
+        <div className="space-y-4">
+          <button
+            onClick={startVerification}
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Starting Verification...' : 'Verify Now'}
+          </button>
+          
+          <button
+            onClick={onNext}
+            className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Skip for Now
+          </button>
+        </div>
+      ) : (
+        <div>
+          <p className="text-blue-600 mb-4">Verification in progress...</p>
+          <div id="complycube-mount" className="block"></div>
+        </div>
+      )}
     </div>
   );
 };
@@ -134,16 +165,27 @@ const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
 // Step 3: Wallet Setup
 const WalletStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const setupWallet = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await apiClient.post('/api/wallet/create');
       toast.success('Wallet created successfully!');
       onNext();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create wallet', error);
-      toast.error('Failed to create wallet. Please try again.');
+      const errorMsg = error.response?.data?.detail || 'Failed to create wallet. Please try again later.';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      
+      // Even if wallet creation fails, allow the user to continue
+      // with a limited demo wallet
+      setTimeout(() => {
+        toast('Continuing with demo wallet features');
+        onNext();
+      }, 2000);
     } finally {
       setLoading(false);
     }
@@ -157,6 +199,12 @@ const WalletStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
           Create your secure wallet to send, receive, and trade USDS.
         </p>
       </div>
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
       
       <div className="space-y-4">
         <button
@@ -172,6 +220,13 @@ const WalletStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
           className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
         >
           Back
+        </button>
+        
+        <button
+          onClick={onNext}
+          className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+        >
+          Use Demo Wallet
         </button>
       </div>
     </div>
