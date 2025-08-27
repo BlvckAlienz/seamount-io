@@ -226,7 +226,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Product</h4>
-              <ul className="space-y-2 text-sm"><li><a href="#features" className="text-gray-400 hover:text-white">Features</a></li><li><a href="#stablecoin" className="text-gray-400 hover:text-white">USDS Stablecoin</a></li><li><a href="#" className="text-gray-400 hover:text-white">Treasury MGT./ Payroll</a></li><li><a href="#" className="text-gray-400 hover:text-white">Trade Finance</a></li></ul>
+              <ul className="space-y-2 text-sm"><li><a href="#features" className="text-gray-400 hover:text-white">Features</a></li><li><a href="#stablecoin" className="text-gray-400 hover:text-white">USDS Stablecoin</a></li><li><a href="#" className="text-gray-400 hover:text-white">Treasury & Payroll</a></li><li><a href="#" className="text-gray-400 hover:text-white">Trade Finance</a></li></ul>
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Company</h4>

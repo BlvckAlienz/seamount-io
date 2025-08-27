@@ -2,53 +2,46 @@ import axios from 'axios';
 import { supabase } from '../lib/supabase';
 import { API_BASE_URL } from './env';
 
-// Create axios instance with configured base URL
+/**
+ * A centralized Axios client for all API communications with Seamount backend.
+ * It includes interceptors to automatically handle authentication tokens and provide
+ * robust, consistent logging for both successful and failed requests.
+ */
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 30000, // 30-second timeout for requests
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Define API endpoints with proper paths
+/**
+ * A typed object of all API endpoints.
+ * Using this ensures type safety and prevents typos in API route strings.
+ */
 export const API_ENDPOINTS = {
-  PORTFOLIO: {
-    SUMMARY: '/api/v1/portfolio/summary',
-    HOLDINGS: '/api/v1/portfolio/holdings',
-  },
-  USER: {
-    PROFILE: '/api/v1/user/profile',
-    WALLET: '/api/v1/user/wallet',
+  LEADS: {
+    BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
   KYC: {
-    TOKEN: '/api/kyc/token',
-    VERIFY: '/api/kyc/verify-documents',
     START_VERIFICATION: '/api/kyc/start-verification',
-  },
-  INVESTOR: {
-    CONTACT: '/api/v1/investor-contact',
   },
   WALLET: {
     CREATE: '/api/wallet/create',
   },
-  CONSENT: {
-    UPDATE: '/api/v1/consent/update',
-    COOKIES: '/api/v1/consent/cookies',
-  }
+  USER: {
+    PROFILE: '/api/v1/user/profile',
+  },
+  HEALTH: '/api/v1/health',
 };
 
-// Request interceptor to add auth token
+// --- Axios Interceptors ---
+
+// 1. Request Interceptor: Automatically injects the Supabase JWT into every outgoing request.
 apiClient.interceptors.request.use(
   async (config) => {
-    // FIX: Ensure URL is properly constructed
-    if (config.url && !config.url.startsWith('/')) {
-      config.url = '/' + config.url;
-    }
-    
-    // Log the full URL being called
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${fullUrl}`);
+    const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
+    console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -56,64 +49,48 @@ apiClient.interceptors.request.use(
       
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log(`🔑 Adding auth token to request: ${token.substring(0, 10)}...`);
       } else {
-        console.log('⚠️ No auth token available for request');
+        // This is not an error, just a state for public routes like the contact form.
+        console.log(`[API Auth] No active session token found for request.`);
       }
-      
       return config;
     } catch (error) {
-      console.error('❌ Failed to get session:', error);
+      console.error('[API Auth Error] Failed to get session for auth token:', error);
+      // Still proceed with the request, but without auth.
       return config;
     }
   },
   (error) => {
-    console.error('❌ Request interceptor error:', error);
+    // This part handles errors that happen *before* the request is even sent.
+    console.error('[API Request Error] Error creating request:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for error handling
+// 2. Response Interceptor: Centralizes logging and error handling for all API responses.
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.url}`);
+    console.log(`[API Response] <-- ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
     return response;
   },
   (error) => {
-    const url = error.config?.url || 'unknown';
-    const status = error.response?.status || 'no status';
-    const message = error.response?.data?.message || error.message;
+    const config = error.config;
+    const response = error.response;
+    const url = config?.url || 'unknown endpoint';
+    const status = response?.status || 'Network Error';
+    const detail = response?.data?.detail || error.message;
+
+    console.error(`[API Response Error] <-- ${status} on ${url} | Detail: ${detail}`);
     
-    console.error(`❌ API Request Failed: ${status} ${url} - ${message}`);
-    
-    if (error.response?.status === 404) {
-      console.error(`🔍 404 Error Details:`, {
-        fullUrl: `${error.config.baseURL}${error.config.url}`,
-        baseURL: error.config.baseURL,
-        endpoint: error.config.url,
-        method: error.config.method
-      });
-    }
+    // You can add global error handling here, e.g., redirecting on 401 Unauthorized
+    // if (status === 401) {
+    //   // Handle session expiry globally
+    // }
     
     return Promise.reject(error);
   }
 );
 
-// Helper function to get full URL
-export const getFullUrl = (endpoint: string): string => {
-  return `${API_BASE_URL}${endpoint}`;
-};
+export default apiClient;```
 
-// Health check
-export const checkApiHealth = async (): Promise<boolean> => {
-  try {
-    const response = await apiClient.get('/api/v1/health');
-    console.log('🏥 API Health Check:', response.data);
-    return response.status === 200;
-  } catch (error) {
-    console.error('❌ API Health Check Failed:', error);
-    return false;
-  }
-};
-
-export default apiClient;
+This file is now the definitive standard for your frontend's communication. Please approve, and we will proceed to update the `AuthContext.tsx` to correctly manage the user's state during the new, seamless onboarding flow.

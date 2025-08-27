@@ -1,304 +1,231 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient } from '../config/api';
+import { apiClient, API_ENDPOINTS } from '../config/api';
 import toast from 'react-hot-toast';
+import { Eye, EyeOff, Copy, ArrowLeft } from 'lucide-react';
+import Button from '../components/ui/Button'; // Assuming you have a Button component
 
+// Make sure ComplyCube is declared on the window object
+declare global {
+  interface Window {
+    ComplyCube?: {
+      mount: (options: any) => { mount: (selector: string) => void };
+    };
+  }
+}
+
+// --- Step Interfaces ---
 interface StepProps {
   onNext: (data?: any) => void;
-  onPrev: () => void;
   stepData: any;
 }
 
-interface OnboardingStepConfig {
-  id: number;
-  title: string;
-  description: string;
-  component: React.FC<StepProps>;
-}
-
-// Step 1: Welcome
-const WelcomeStep: React.FC<StepProps> = ({ onNext }) => {
-  return (
-    <div className="text-center">
-      <div className="mb-8">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" />
-          </svg>
-        </div>
-        <h3 className="text-xl font-semibold mb-2">
-          Welcome to the Future of Cross-Border Payments
-        </h3>
-        <p className="text-gray-600">
-          Send USDS stablecoins globally with minimal fees and instant settlement.
-        </p>
-      </div>
-      <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left">
-        <h4 className="font-semibold text-blue-900 mb-3">What you'll get:</h4>
-        <ul className="text-blue-800 text-sm space-y-2">
-          {["Instant global transfers with USDS stablecoin", "Low remittance fees (2.6% per transaction)", "24/7/365 decentralized settlement", "Auto-conversion to preferred currencies"].map(item => (
-            <li key={item} className="flex items-center">
-              <svg className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <button
-        onClick={() => onNext()}
-        className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-      >
-        Let's Get Started
-      </button>
-    </div>
-  );
-};
-
-// Step 2: Identity Verification
-const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
+// --- STEP 1: Identity Verification ---
+const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
   const [loading, setLoading] = useState(false);
-  const [verificationStarted, setVerificationStarted] = useState(false);
-
-  useEffect(() => {
-    // Ensure ComplyCube mount point exists in the DOM
-    if (!document.getElementById('complycube-mount')) {
-      const mountPoint = document.createElement('div');
-      mountPoint.id = 'complycube-mount';
-      mountPoint.style.display = 'none'; // Hidden by default
-      document.body.appendChild(mountPoint);
-    }
-  }, []);
+  const [sdkInitialized, setSdkInitialized] = useState(false);
+  const { completeOnboarding } = useAuth();
 
   const startVerification = async () => {
     setLoading(true);
-    try {
-      // Get verification token from backend
-      const response = await apiClient.post('/api/kyc/start-verification');
-      const { token } = response.data;
-      
-      // Show the mount point
-      const mountPoint = document.getElementById('complycube-mount');
-      if (mountPoint) {
-        mountPoint.style.display = 'block';
-        mountPoint.style.minHeight = '500px'; // Ensure it has space
-      }
-      
-      setVerificationStarted(true);
-      
-      // Initialize ComplyCube
-      if (window.ComplyCube) {
-        window.ComplyCube.mount({
-          token: token,
-          mount: '#complycube-mount', // Explicitly specify mount point
-          onComplete: (data: any) => {
-            console.log('Verification complete', data);
-            toast.success('Identity verification completed successfully!');
-            onNext();
-          },
-          onError: (error: any) => {
-            console.error('Verification error', error);
-            toast.error('Verification failed. Please try again.');
-            setLoading(false);
-            setVerificationStarted(false);
-          }
-        });
-      } else {
-        toast.error('Verification service not available');
-        setLoading(false);
-        setVerificationStarted(false);
-      }
-    } catch (error) {
-      console.error('Failed to start verification', error);
-      toast.error('Failed to start verification process.');
+    const toastId = toast.loading('Initializing secure verification...');
+
+    if (!window.ComplyCube) {
+      toast.error('Verification service failed to load. Please refresh and try again.', { id: toastId });
       setLoading(false);
-      setVerificationStarted(false);
+      return;
     }
-  };
 
-  return (
-    <div className="text-center">
-      <div className="mb-8">
-        <h3 className="text-xl font-semibold mb-2">Identity Verification</h3>
-        <p className="text-gray-600">
-          Verify your identity to unlock full access to Seamount's features.
-        </p>
-      </div>
-      
-      <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left">
-        <h4 className="font-semibold text-blue-900 mb-3">Why verify?</h4>
-        <ul className="text-blue-800 text-sm space-y-2">
-          <li>• Send and receive USDS stablecoins</li>
-          <li>• Access cross-border payment features</li>
-          <li>• Higher transaction limits</li>
-          <li>• Enhanced security features</li>
-        </ul>
-      </div>
-      
-      {!verificationStarted ? (
-        <div className="space-y-4">
-          <button
-            onClick={startVerification}
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Starting Verification...' : 'Verify Now'}
-          </button>
-          
-          <button
-            onClick={onNext}
-            className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-          >
-            Skip for Now
-          </button>
-        </div>
-      ) : (
-        <div>
-          <p className="text-blue-600 mb-4">Verification in progress...</p>
-          <div id="complycube-mount" className="block"></div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Step 3: Wallet Setup
-const WalletStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const setupWallet = async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const response = await apiClient.post('/api/wallet/create');
-      toast.success('Wallet created successfully!');
-      onNext();
+      const { data } = await apiClient.post<{ token: string }>(API_ENDPOINTS.KYC.START_VERIFICATION);
+      if (!data.token) throw new Error("Verification token was not provided by the server.");
+
+      toast.success('Starting verification...', { id: toastId });
+      setSdkInitialized(true);
+      
+      // ComplyCube's mount returns an object with another mount method
+      const session = window.ComplyCube.mount({
+        token: data.token,
+        onComplete: (data: any) => {
+          console.log('KYC Verification complete:', data);
+          toast.success('Identity verification submitted successfully!');
+          onNext();
+        },
+        onError: (error: any) => {
+          console.error('ComplyCube SDK error:', error);
+          toast.error('Verification failed. You can skip and try again later.');
+          setSdkInitialized(false);
+          setLoading(false);
+        }
+      });
+      session.mount('#complycube-mount');
+
     } catch (error: any) {
-      console.error('Failed to create wallet', error);
-      const errorMsg = error.response?.data?.detail || 'Failed to create wallet. Please try again later.';
-      setError(errorMsg);
-      toast.error(errorMsg);
-      
-      // Even if wallet creation fails, allow the user to continue
-      // with a limited demo wallet
-      setTimeout(() => {
-        toast('Continuing with demo wallet features');
-        onNext();
-      }, 2000);
-    } finally {
+      console.error('Failed to start verification flow:', error);
+      const errorMsg = error.response?.data?.detail || 'Could not start verification.';
+      toast.error(`Error: ${errorMsg}`, { id: toastId });
+      setSdkInitialized(false);
       setLoading(false);
     }
+  };
+  
+  const handleSkip = async () => {
+    toast('You can complete verification later from your settings.');
+    await completeOnboarding(); // This updates user state and redirects to dashboard
   };
 
   return (
     <div className="text-center">
-      <div className="mb-8">
-        <h3 className="text-xl font-semibold mb-2">Wallet Setup</h3>
-        <p className="text-gray-600">
-          Create your secure wallet to send, receive, and trade USDS.
-        </p>
-      </div>
+      <h3 className="text-xl font-semibold mb-2">Verify Your Identity</h3>
+      <p className="text-gray-600 mb-6">For your security, we need to confirm you're you. This unlocks all platform features.</p>
       
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+      {sdkInitialized ? (
+        <div id="complycube-mount" style={{ minHeight: '450px' }} className="w-full"></div>
+      ) : (
+        <div className="space-y-4">
+          <Button
+            onClick={startVerification}
+            loading={loading}
+            className="w-full"
+          >
+            Start Secure Verification
+          </Button>
+          <button
+            onClick={handleSkip}
+            className="w-full text-sm text-gray-600 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            I'll Do This Later
+          </button>
         </div>
       )}
-      
-      <div className="space-y-4">
-        <button
-          onClick={setupWallet}
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Creating Wallet...' : 'Create Secure Wallet'}
-        </button>
-        
-        <button
-          onClick={onPrev}
-          className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-        >
-          Back
-        </button>
-        
-        <button
-          onClick={onNext}
-          className="w-full border border-gray-300 text-gray-600 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-        >
-          Use Demo Wallet
-        </button>
-      </div>
     </div>
   );
 };
 
-// Main Onboarding Component
-const onboardingSteps: OnboardingStepConfig[] = [
-  { id: 1, title: "Welcome to Seamount", description: "Let's get you set up for cross-border payments", component: WelcomeStep },
-  { id: 2, title: "Identity Verification", description: "Verify your identity for secure transactions", component: IdentityStep },
-  { id: 3, title: "Wallet Setup", description: "Create your digital wallet", component: WalletStep },
-];
+// --- STEP 2: Wallet Backup (Self-Custody) ---
+const WalletBackupStep: React.FC<StepProps & { mnemonic: string }> = ({ onNext, mnemonic }) => {
+    const [showMnemonic, setShowMnemonic] = useState(false);
+    const words = mnemonic.split(' ');
 
+    const handleCopy = () => {
+        navigator.clipboard.writeText(mnemonic);
+        toast.success('Mnemonic phrase copied to clipboard!');
+    };
+
+    return (
+        <div className="text-left">
+            <h3 className="text-xl font-semibold mb-2 text-center">Back Up Your Wallet</h3>
+            <p className="text-gray-600 mb-6 text-center">This is your master key. Write it down and store it somewhere safe.</p>
+            
+            <div className="relative border border-gray-200 rounded-lg p-4 mb-4">
+                <div className={`grid grid-cols-3 gap-2 text-gray-800 ${!showMnemonic ? 'blur-sm' : ''}`}>
+                    {words.map((word, index) => (
+                        <div key={index} className="flex items-center">
+                            <span className="text-gray-400 w-6 text-sm">{index + 1}.</span>
+                            <span>{word}</span>
+                        </div>
+                    ))}
+                </div>
+                {!showMnemonic && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                         <Button onClick={() => setShowMnemonic(true)} icon={Eye}>Reveal Phrase</Button>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex justify-center gap-4 mb-6">
+                 <Button onClick={handleCopy} variant="secondary" icon={Copy} disabled={!showMnemonic}>Copy</Button>
+                 <Button onClick={() => setShowMnemonic(!showMnemonic)} variant="secondary" icon={showMnemonic ? EyeOff : Eye}>
+                     {showMnemonic ? 'Hide' : 'Reveal'}
+                 </Button>
+            </div>
+
+            <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-4 rounded-r-lg">
+                <p className="font-bold">Do NOT lose this phrase.</p>
+                <p className="text-sm">Seamount cannot recover your wallet if you lose your mnemonic. You are in control.</p>
+            </div>
+
+            <Button onClick={() => onNext()} disabled={!showMnemonic} className="w-full mt-8">I've Backed It Up, Finish</Button>
+        </div>
+    );
+};
+
+
+// --- Main Onboarding Component ---
 const OnboardingPage: React.FC = () => {
+  const [step, setStep] = useState<'identity' | 'walletBackup'>('identity');
+  const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const { completeOnboarding, triggerWalletCreation } = useAuth();
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [stepData, setStepData] = useState({});
 
-  const handleNext = (data?: any) => {
-    if (data) {
-      setStepData(prev => ({ ...prev, [currentStep]: data }));
-    }
-    
-    if (currentStep < onboardingSteps.length) {
-      setCurrentStep(currentStep + 1);
+  // Load ComplyCube SDK when the component mounts
+  useEffect(() => {
+    const scriptId = 'complycube-sdk';
+    if (document.getElementById(scriptId)) return; // Already loaded
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = "https://assets.complycube.com/web-sdk/v1/complycube.min.js";
+    script.async = true;
+    script.onload = () => console.log('ComplyCube SDK loaded.');
+    script.onerror = () => toast.error('Could not load verification service. Please refresh.');
+    document.body.appendChild(script);
+
+    return () => {
+      const sdkScript = document.getElementById(scriptId);
+      if (sdkScript) document.body.removeChild(sdkScript);
+    };
+  }, []);
+
+  const handleIdentityComplete = async () => {
+    const toastId = toast.loading('Creating your secure wallet...');
+    const { success, mnemonic: receivedMnemonic } = await triggerWalletCreation();
+
+    if (success && receivedMnemonic) {
+        toast.success('Wallet created! Please back up your recovery phrase.', { id: toastId });
+        setMnemonic(receivedMnemonic);
+        setStep('walletBackup');
     } else {
-      // Onboarding complete
-      toast.success('Onboarding completed successfully!');
-      navigate('/dashboard');
+        toast.error('Could not create your wallet. You can try again later from your settings.', { id: toastId });
+        await completeOnboarding(); // Redirect to dashboard even if wallet fails
     }
   };
 
-  const handlePrev = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
+  const handleBackupComplete = async () => {
+      await completeOnboarding();
   };
 
-  const CurrentStepComponent = onboardingSteps[currentStep - 1].component;
-  const progress = (currentStep / onboardingSteps.length) * 100;
+  const progressPercentage = step === 'identity' ? '50%' : '100%';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Get Started with Seamount</h1>
-          <p className="mt-2 text-gray-600">
-            Complete these steps to unlock global payments.
-          </p>
-        </div>
-        
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
-          <div>
-            <div className="flex justify-between text-sm text-gray-500 mb-2">
-              <span>Step {currentStep} of {onboardingSteps.length}</span>
-              <span>{Math.round(progress)}%</span>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+          <div className="mb-6">
+            <div className="flex justify-between items-center text-sm text-gray-500 mb-2">
+              <h2 className="font-semibold text-lg text-gray-800">
+                {step === 'identity' ? 'Step 1: Identity' : 'Step 2: Wallet Backup'}
+              </h2>
+              <span>{step === 'identity' ? '1 of 2' : '2 of 2'}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${progress}%` }}
+                className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-in-out"
+                style={{ width: progressPercentage }}
               />
             </div>
           </div>
           
-          <div>
-            <CurrentStepComponent
-              onNext={handleNext}
-              onPrev={handlePrev}
-              stepData={stepData}
-            />
-          </div>
+          {step === 'identity' ? (
+            <IdentityStep onNext={handleIdentityComplete} stepData={{}} />
+          ) : mnemonic ? (
+            <WalletBackupStep onNext={handleBackupComplete} stepData={{}} mnemonic={mnemonic} />
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-gray-600">Loading wallet...</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -4,145 +4,123 @@ from supabase import Client
 from cryptography.fernet import Fernet, InvalidToken
 from algosdk import account, mnemonic
 from fastapi import HTTPException
-from postgrest import APIError
 from uuid import uuid4
 
-# Assumes config.py is in the root of the backend directory
 from config import Settings
 
 logger = logging.getLogger(__name__)
 
 class WalletService:
     """
-    Handles the secure creation, encryption, and storage of user wallets.
-    This service is the gatekeeper for all sensitive key material.
+    Handles the secure creation, encryption, and storage of user wallets
+    in the 'wallet_balances' table. This service is architected to support
+    a self-custody model by separating key generation from storage.
     """
     def __init__(self, settings: Settings, supabase_client: Client):
         """
-        Initializes the WalletService with necessary configurations and clients.
+        Initializes the WalletService.
         """
-        # FIX: Handle the case where encryption key might not be available
         if not settings.ENCRYPTION_KEY:
-            logger.warning("ENCRYPTION_KEY is not configured. Using demo mode for wallets.")
-            self.demo_mode = True
-            self.cipher = None
-        else:
-            self.demo_mode = False
-            try:
-                encryption_key_bytes = settings.ENCRYPTION_KEY.get_secret_value().encode()
-                self.cipher = Fernet(encryption_key_bytes)
-            except (ValueError, TypeError):
-                logger.error("Invalid ENCRYPTION_KEY. Falling back to demo mode.")
-                self.demo_mode = True
-                self.cipher = None
+            logger.critical("FATAL: ENCRYPTION_KEY is not configured. Wallet service cannot operate securely.")
+            raise ValueError("ENCRYPTION_KEY must be set for wallet operations.")
+
+        try:
+            encryption_key_bytes = settings.ENCRYPTION_KEY.get_secret_value().encode()
+            self.cipher = Fernet(encryption_key_bytes)
+        except (ValueError, TypeError) as e:
+            logger.critical(f"Invalid ENCRYPTION_KEY provided. Cannot initialize cipher. Error: {e}")
+            raise ValueError("Invalid ENCRYPTION_KEY.")
 
         self.supabase = supabase_client
-        logger.info("WalletService initialized successfully.")
+        logger.info("WalletService initialized successfully in secure mode.")
 
     def _encrypt(self, data: str) -> str:
-        """Encrypts sensitive data if encryption is available"""
-        if self.demo_mode or not self.cipher:
-            return data  # Return plaintext in demo mode
+        """Encrypts sensitive data using the configured key."""
         return self.cipher.encrypt(data.encode()).decode()
 
     def _decrypt(self, encrypted_data: str) -> str:
-        """Decrypts sensitive data if encryption is available"""
-        if self.demo_mode or not self.cipher:
-            return encrypted_data  # Return as-is in demo mode
+        """Decrypts sensitive data using the configured key."""
         try:
             return self.cipher.decrypt(encrypted_data.encode()).decode()
         except InvalidToken:
-            logger.critical("Failed to decrypt wallet data - InvalidToken.")
-            raise HTTPException(status_code=500, detail="Wallet data decryption failed.")
+            logger.critical("Failed to decrypt wallet data - InvalidToken. The encryption key may have changed or data is corrupt.")
+            raise HTTPException(status_code=500, detail="Wallet data decryption failed due to an invalid token.")
+        except Exception as e:
+            logger.critical(f"An unexpected error occurred during decryption: {e}")
+            raise HTTPException(status_code=500, detail="A critical error occurred during wallet data decryption.")
 
     def create_algorand_wallet(self) -> dict:
-        """Generates a new Algorand account keypair and mnemonic."""
+        """
+        Generates a new, live Algorand keypair and its corresponding mnemonic phrase.
+        This is the source of all key material for a new user.
+        """
         try:
-            if self.demo_mode:
-                # Return demo wallet data in demo mode
-                demo_id = str(uuid4())[:8]
-                return {
-                    "address": f"ALGO_DEMO_{demo_id}",
-                    "private_key": f"demo_private_key_{demo_id}",
-                    "mnemonic": " ".join(["demo"] * 12),
-                    "is_demo": True
-                }
-            
+            logger.info("Generating a new LIVE Algorand keypair and mnemonic phrase.")
             private_key, address = account.generate_account()
             mnemonic_phrase = mnemonic.from_private_key(private_key)
+            
             return {
                 "address": address,
-                "private_key": private_key,
-                "mnemonic": mnemonic_phrase,
+                "private_key": private_key,       # This is handled ephemerally and encrypted for storage.
+                "mnemonic": mnemonic_phrase,      # This is returned to the user ONCE and never stored.
                 "is_demo": False
             }
         except Exception as e:
-            logger.error(f"Failed to generate Algorand keypair: {e}")
-            raise HTTPException(status_code=500, detail="Could not generate a new wallet.")
+            logger.error(f"Failed to generate Algorand keypair: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not generate a new wallet keypair.")
 
-    async def provision_user_wallet(self, user_id: str) -> dict:
+    async def store_encrypted_wallet(self, user_id: str, wallet_data: dict) -> dict:
         """
-        Atomically provisions and saves a new Algorand wallet for a user.
+        Encrypts the private key from the generated wallet data and stores the
+        non-sensitive parts in the 'wallet_balances' table.
+
+        **CRITICAL:** This function does NOT handle or store the mnemonic phrase.
         """
-        logger.info(f"Attempting to provision wallet for user_id: {user_id}")
+        logger.info(f"Preparing to store encrypted wallet for user_id: {user_id}")
+        
+        if "private_key" not in wallet_data or "address" not in wallet_data:
+            raise ValueError("Wallet data is missing required keys for storage.")
+
         try:
-            algo_wallet = self.create_algorand_wallet()
-            encrypted_pk = self._encrypt(algo_wallet["private_key"])
+            # Step 1: Encrypt the private key for secure storage.
+            encrypted_pk = self._encrypt(wallet_data["private_key"])
             
-            wallet_data = {
+            # Step 2: Prepare data matching the 'wallet_balances' schema.
+            # The mnemonic is intentionally excluded.
+            db_record = {
                 "user_id": user_id,
-                "algorand_address": algo_wallet["address"],
+                "wallet_address": wallet_data["address"],
                 "algorand_private_key": encrypted_pk,
-                "is_demo": algo_wallet.get("is_demo", False),
-                "created_at": "now()"
+                "is_demo": wallet_data.get("is_demo", False),
             }
             
-            result = self.supabase.from_("user_wallets").insert(wallet_data).execute()
+            # Step 3: Insert into the 'wallet_balances' table.
+            response = self.supabase.from_("wallet_balances").insert(db_record).execute()
             
-            if not result.data:
-                raise Exception("Failed to create wallet record")
+            if not response.data:
+                logger.error(f"Supabase insert failed for user {user_id}. Response: {response.error}")
+                raise Exception(f"Failed to create wallet record in database: {response.error.message if response.error else 'No data returned'}")
                 
-            logger.info(f"Successfully created wallet for user: {user_id}")
-            return result.data[0]
+            logger.info(f"Successfully stored encrypted wallet for user: {user_id}")
+            return response.data[0]
             
         except Exception as e:
-            logger.error(f"Error provisioning wallet for user {user_id}: {str(e)}")
-            # Return a demo wallet instead of failing completely
-            return {
-                "user_id": user_id,
-                "algorand_address": f"ALGO_DEMO_{user_id[:8]}",
-                "usds_balance": 1000.0,  # Demo balance
-                "is_demo": True,
-                "created_at": "now()"
-            }
-
-    async def create_wallet_for_user(self, user_id: str):
-        """
-        Create a wallet for a user (Python version of the TypeScript function)
-        """
-        try:
-            result = await self.provision_user_wallet(user_id)
-            return {
-                "success": True,
-                "address": result["algorand_address"]
-            }
-        except Exception as e:
-            logger.error(f"Wallet creation failed for user {user_id}: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            logger.error(f"Critical error storing wallet for user {user_id}: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="A server error occurred during wallet storage.")
 
     async def get_decrypted_private_key(self, user_id: str) -> str:
         """
-        Securely retrieves and decrypts a user's private key.
+        Securely retrieves and decrypts a user's private key from the 'wallet_balances' table.
+        This should be used ephemerally and with extreme caution for signing transactions.
         """
         logger.warning(f"SECURITY: Requesting decrypted private key for user {user_id}.")
         try:
-            response = self.supabase.table("user_wallets").select("algorand_private_key").eq("user_id", user_id).single().execute()
+            # Query the correct table and column
+            response = self.supabase.table("wallet_balances").select("algorand_private_key").eq("user_id", user_id).single().execute()
 
             if not response.data or not response.data.get("algorand_private_key"):
-                raise ValueError(f"No private key found for user {user_id}.")
+                logger.error(f"No wallet record or private key found for user {user_id}.")
+                raise HTTPException(status_code=404, detail="Secure wallet data not found for user.")
 
             encrypted_pk = response.data["algorand_private_key"]
             decrypted_pk = self._decrypt(encrypted_pk)
@@ -150,9 +128,8 @@ class WalletService:
             logger.info(f"Successfully decrypted private key for user {user_id} for ephemeral use.")
             return decrypted_pk
 
-        except ValueError as ve:
-            logger.error(f"Value error while retrieving private key for user {user_id}: {ve}")
-            raise HTTPException(status_code=404, detail="Secure wallet data not found for user.")
+        except HTTPException:
+            raise # Re-raise known HTTP exceptions
         except Exception as e:
-            logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}")
+            logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not retrieve secure wallet data.")

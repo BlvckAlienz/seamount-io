@@ -1,92 +1,94 @@
 import logging
-from complycube import ComplyCubeClient, Client
-from supabase import create_client
+from complycube import ComplyCubeClient
+from supabase import create_client, Client as SupabaseClient
 from config import get_settings
 from fastapi import HTTPException
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+# Define a Pydantic model for the Applicant object for type safety and clarity.
+# This ensures we know what to expect from the ComplyCube API response.
+class ComplyCubeApplicant(BaseModel):
+    id: str
+    type: str
+    email: str | None = None
+
 class ComplyCubeService:
     def __init__(self):
+        """Initializes the ComplyCube service and its Supabase dependency."""
+        self.client = None
+        self.supabase = None
         try:
             settings = get_settings()
-            # Check if API key is available
-            if not settings.COMPLYCUBE_API_KEY:
-                logger.warning("COMPLYCUBE_API_KEY not configured. KYC features will be disabled.")
-                self.client = None
+            if not settings.COMPLYCUBE_API_KEY or not settings.COMPLYCUBE_API_KEY.get_secret_value():
+                logger.warning("COMPLYCUBE_API_KEY is not configured. KYC features will be disabled.")
                 return
-                
+
             self.client = ComplyCubeClient(api_key=settings.COMPLYCUBE_API_KEY.get_secret_value())
             self.supabase = create_client(
                 settings.VITE_SUPABASE_URL,
                 settings.SUPABASE_SERVICE_KEY.get_secret_value()
             )
-            logger.info("ComplyCube service initialized successfully")
+            logger.info("ComplyCube service initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize ComplyCube service: {e}")
+            logger.critical(f"Failed to initialize ComplyCube service: {e}", exc_info=True)
             self.client = None
-    
-    def is_available(self):
+            self.supabase = None
+
+    def is_available(self) -> bool:
+        """Checks if the ComplyCube client was successfully initialized."""
         return self.client is not None
-    
-    def create_applicant(self, user_data: dict) -> Client:
-        """Create a new applicant in ComplyCube"""
+
+    def create_applicant(self, user_data: dict) -> ComplyCubeApplicant:
+        """Creates a new applicant in ComplyCube and returns a validated data model."""
         if not self.is_available():
-            raise HTTPException(status_code=503, detail="KYC service not available")
-            
+            raise HTTPException(status_code=503, detail="KYC service is currently unavailable.")
+
         try:
-            applicant = self.client.clients.create(
+            # The API call returns a dictionary.
+            applicant_dict = self.client.clients.create(
                 type='person',
-                email=user_data['email'],
+                email=user_data.get('email'),
                 personDetails={
                     'firstName': user_data.get('first_name', ''),
                     'lastName': user_data.get('last_name', '')
                 }
             )
-            logger.info(f"Created ComplyCube applicant: {applicant.id}")
+            # We parse the dictionary into our Pydantic model for type safety.
+            applicant = ComplyCubeApplicant(**applicant_dict)
+            logger.info(f"Successfully created ComplyCube applicant: {applicant.id}")
             return applicant
         except Exception as e:
-            logger.error(f"Failed to create ComplyCube applicant: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create KYC applicant: {str(e)}")
-    
-    def create_verification_token(self, applicant_id: str) -> str:
-        """Create a verification token for frontend use"""
-        if not self.is_available():
-            # Return a demo token in development mode
-            return "complycube_demo_token_placeholder"
-            
-        try:
-            token = self.client.tokens.create(
-                client_id=applicant_id,
-                referrer='*://*/*'  # Allow from any origin
-            )
-            logger.info(f"Created verification token for applicant: {applicant_id}")
-            return token.client_token
-        except Exception as e:
-            logger.error(f"Failed to create verification token: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to create verification token: {str(e)}")
-    
-    def update_user_kyc_status(self, user_id: str, applicant_id: str, status: str):
-        """Update user KYC status in Supabase"""
-        try:
-            # Update user profile with KYC status
-            update_data = {
-                'kyc_status': status,
-                'kyc_level': 3 if status == 'approved' else 1,
-                'complycube_applicant_id': applicant_id,
-                'updated_at': 'now()'
-            }
-            
-            result = self.supabase.table('user_profiles') \
-                .update(update_data) \
-                .eq('id', user_id) \
-                .execute()
-                
-            logger.info(f"Updated KYC status for user {user_id} to {status}")
-            return result
-        except Exception as e:
-            logger.error(f"Failed to update user KYC status: {e}")
-            raise
+            logger.error(f"Failed to create ComplyCube applicant: {e}", exc_info=True)
+            # Provide a generic but informative error to the client.
+            raise HTTPException(status_code=500, detail="Could not create KYC applicant profile.")
 
-# Global instance
+    def create_verification_token(self, applicant_id: str) -> str:
+        """Creates a short-lived SDK token for the frontend to initialize the ComplyCube UI."""
+        if not self.is_available():
+            logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
+            # This allows frontend development to continue even if the API key is missing locally.
+            return "sdk_demo_token"
+
+        try:
+            token_response = self.client.tokens.create(
+                client_id=applicant_id,
+                # Using a wildcard referrer is acceptable for development, but for production,
+                # this should be locked down to your specific domain (e.g., "https://seamount.io/*").
+                referrer='*://*/*'
+            )
+            
+            client_token = token_response.get('clientToken')
+            if not client_token:
+                logger.error(f"ComplyCube API response did not contain a 'clientToken' for applicant {applicant_id}.")
+                raise ValueError("clientToken not found in ComplyCube API response.")
+            
+            logger.info(f"Successfully created verification SDK token for applicant: {applicant_id}")
+            return client_token
+        except Exception as e:
+            logger.error(f"Failed to create verification token for applicant {applicant_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not generate a secure verification token.")
+
+# Create a single, globally accessible instance of the service.
 complycube_service = ComplyCubeService()
