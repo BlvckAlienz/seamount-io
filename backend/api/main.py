@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
-# Version: 3.0.0 (Restored critical authentication endpoints)
+# Version: 3.0.1 (Fixed NameError on startup)
 # ==============================================================================
 
 import logging
@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client
+from supabase import create_client, Client # CORRECTED: Added Client import
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
 from uuid import uuid4
@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Seamount.io API",
-    version="3.0.0",
+    version="3.0.1",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
@@ -85,7 +85,7 @@ app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "3.0.0"}
+    return {"status": "healthy", "version": "3.0.1"}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -93,10 +93,6 @@ async def initialize_session(
     user_agent: Optional[str] = Header(None, alias="User-Agent"),
     supabase: Client = Depends(get_supabase_client)
 ):
-    """
-    Initializes a new user session, performs IP enrichment, and returns a session ID.
-    This endpoint is now correctly restored.
-    """
     settings = get_settings()
     ip_address = request.client.host if request.client else "unknown"
     session_data = {
@@ -127,10 +123,6 @@ async def initialize_session(
 
 @app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])
 async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """
-    Retrieves the full profile for the currently authenticated user.
-    This endpoint is now correctly restored.
-    """
     return UserProfile(**current_user)
 
 @app.post("/api/v1/leads/business-contact", tags=["Public"])
