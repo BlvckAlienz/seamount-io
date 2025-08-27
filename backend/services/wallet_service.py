@@ -5,6 +5,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from algosdk import account, mnemonic
 from fastapi import HTTPException
 from uuid import uuid4
+from datetime import datetime
 
 from config import Settings
 
@@ -13,8 +14,7 @@ logger = logging.getLogger(__name__)
 class WalletService:
     """
     Handles the secure creation, encryption, and storage of user wallets
-    in the 'wallet_balances' table. This service is architected to support
-    a self-custody model by separating key generation from storage.
+    in the 'wallet_balances' table. Updated to match actual database schema.
     """
     def __init__(self, settings: Settings, supabase_client: Client):
         """
@@ -75,6 +75,7 @@ class WalletService:
         non-sensitive parts in the 'wallet_balances' table.
 
         **CRITICAL:** This function does NOT handle or store the mnemonic phrase.
+        Updated to match the actual wallet_balances table schema.
         """
         logger.info(f"Preparing to store encrypted wallet for user_id: {user_id}")
         
@@ -85,13 +86,19 @@ class WalletService:
             # Step 1: Encrypt the private key for secure storage.
             encrypted_pk = self._encrypt(wallet_data["private_key"])
             
-            # Step 2: Prepare data matching the 'wallet_balances' schema.
-            # The mnemonic is intentionally excluded.
+            # Step 2: Prepare data matching the ACTUAL 'wallet_balances' schema.
+            # Store encrypted private key in metadata JSONB field
             db_record = {
                 "user_id": user_id,
-                "wallet_address": wallet_data["address"],
-                "algorand_private_key": encrypted_pk,
-                "is_demo": wallet_data.get("is_demo", False),
+                "wallet_address": wallet_data["address"],  # Match column name in DB
+                "algo_balance": 0,  # Initialize with 0 balance
+                "usds_balance": 0,  # Initialize with 0 balance
+                "last_updated": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "encrypted_private_key": encrypted_pk,
+                    "is_demo": wallet_data.get("is_demo", False),
+                    "created_at": datetime.utcnow().isoformat()
+                }
             }
             
             # Step 3: Insert into the 'wallet_balances' table.
@@ -111,25 +118,35 @@ class WalletService:
     async def get_decrypted_private_key(self, user_id: str) -> str:
         """
         Securely retrieves and decrypts a user's private key from the 'wallet_balances' table.
-        This should be used ephemerally and with extreme caution for signing transactions.
+        Updated to read from metadata JSONB field.
         """
         logger.warning(f"SECURITY: Requesting decrypted private key for user {user_id}.")
         try:
-            # Query the correct table and column
-            response = self.supabase.table("wallet_balances").select("algorand_private_key").eq("user_id", user_id).single().execute()
+            # Query the wallet_balances table and extract from metadata
+            response = self.supabase.from_("wallet_balances") \
+                .select("metadata") \
+                .eq("user_id", user_id) \
+                .single() \
+                .execute()
 
-            if not response.data or not response.data.get("algorand_private_key"):
-                logger.error(f"No wallet record or private key found for user {user_id}.")
+            if not response.data or not response.data.get("metadata"):
+                logger.error(f"No wallet record or metadata found for user {user_id}.")
                 raise HTTPException(status_code=404, detail="Secure wallet data not found for user.")
 
-            encrypted_pk = response.data["algorand_private_key"]
+            metadata = response.data["metadata"]
+            encrypted_pk = metadata.get("encrypted_private_key")
+            
+            if not encrypted_pk:
+                logger.error(f"No encrypted private key found in metadata for user {user_id}.")
+                raise HTTPException(status_code=404, detail="Encrypted private key not found in wallet data.")
+
             decrypted_pk = self._decrypt(encrypted_pk)
             
             logger.info(f"Successfully decrypted private key for user {user_id} for ephemeral use.")
             return decrypted_pk
 
         except HTTPException:
-            raise # Re-raise known HTTP exceptions
+            raise
         except Exception as e:
             logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not retrieve secure wallet data.")
