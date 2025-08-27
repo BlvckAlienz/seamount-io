@@ -3,12 +3,11 @@ from complycube import ComplyCubeClient
 from supabase import create_client, Client as SupabaseClient
 from config import get_settings
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 # Define a Pydantic model for the Applicant object for type safety and clarity.
-# This ensures we know what to expect from the ComplyCube API response.
 class ComplyCubeApplicant(BaseModel):
     id: str
     type: str
@@ -21,10 +20,13 @@ class ComplyCubeService:
         self.supabase = None
         try:
             settings = get_settings()
-            if not settings.COMPLYCUBE_API_KEY or not settings.COMPLYCUBE_API_KEY.get_secret_value():
+            
+            # CORRECTED LOGIC: Check the SecretStr object itself, not its value.
+            if not settings.COMPLYCUBE_API_KEY:
                 logger.warning("COMPLYCUBE_API_KEY is not configured. KYC features will be disabled.")
                 return
 
+            # Now we can safely call .get_secret_value() because the type is correct.
             self.client = ComplyCubeClient(api_key=settings.COMPLYCUBE_API_KEY.get_secret_value())
             self.supabase = create_client(
                 settings.VITE_SUPABASE_URL,
@@ -46,7 +48,6 @@ class ComplyCubeService:
             raise HTTPException(status_code=503, detail="KYC service is currently unavailable.")
 
         try:
-            # The API call returns a dictionary.
             applicant_dict = self.client.clients.create(
                 type='person',
                 email=user_data.get('email'),
@@ -55,28 +56,23 @@ class ComplyCubeService:
                     'lastName': user_data.get('last_name', '')
                 }
             )
-            # We parse the dictionary into our Pydantic model for type safety.
             applicant = ComplyCubeApplicant(**applicant_dict)
             logger.info(f"Successfully created ComplyCube applicant: {applicant.id}")
             return applicant
         except Exception as e:
             logger.error(f"Failed to create ComplyCube applicant: {e}", exc_info=True)
-            # Provide a generic but informative error to the client.
             raise HTTPException(status_code=500, detail="Could not create KYC applicant profile.")
 
     def create_verification_token(self, applicant_id: str) -> str:
         """Creates a short-lived SDK token for the frontend to initialize the ComplyCube UI."""
         if not self.is_available():
             logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
-            # This allows frontend development to continue even if the API key is missing locally.
             return "sdk_demo_token"
 
         try:
             token_response = self.client.tokens.create(
                 client_id=applicant_id,
-                # Using a wildcard referrer is acceptable for development, but for production,
-                # this should be locked down to your specific domain (e.g., "https://seamount.io/*").
-                referrer='*://*/*'
+                referrer='*://*/*' # Use a stricter referrer in production, e.g., 'https://seamount.io/*'
             )
             
             client_token = token_response.get('clientToken')

@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
-# Version: 2.8.0 (Refactored to use centralized dependencies)
+# Version: 2.9.0 (Fixed configuration errors)
 # ==============================================================================
 
 import logging
@@ -21,11 +21,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Import core components and services
-from config import Settings, get_settings
+from config import get_settings
 from services.email_service import EmailService
 from services.notification_service import NotificationService
 from services.wallet_service import WalletService
-from dependencies import initialize_dependencies # New import to initialize our dependency module
+from dependencies import initialize_dependencies
 from api.routes import kyc, webhooks, portfolio
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,11 @@ async def lifespan(app: FastAPI):
     try:
         settings = get_settings()
         
-        # Initialize core clients and services
         supabase_client = create_client(settings.VITE_SUPABASE_URL, settings.SUPABASE_SERVICE_KEY.get_secret_value())
         email_service = EmailService(settings)
         notification_service = NotificationService(email_service)
         wallet_service = WalletService(settings, supabase_client)
 
-        # CRITICAL: Pass the initialized services to our dependency module
         initialize_dependencies(
             supabase_client=supabase_client,
             wallet_service=wallet_service,
@@ -66,7 +64,6 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-        # Raising an exception here will prevent the app from starting
         raise
         
     logger.info("--- Seamount API Shutting Down ---")
@@ -74,11 +71,12 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Seamount.io API",
-    version="2.8.0",
+    version="2.9.0",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
 
+# CORRECTED: Access the computed 'ALLOWED_ORIGINS' property from the settings instance.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().ALLOWED_ORIGINS,
@@ -88,7 +86,6 @@ app.add_middleware(
 )
 
 # --- Include Routers from other files ---
-# This keeps the main file clean and modular.
 app.include_router(kyc.router, prefix="/api", tags=["KYC"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
@@ -97,15 +94,12 @@ app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
     """Provides a simple health check for monitoring services."""
-    return {"status": "healthy", "version": "2.8.0"}
+    return {"status": "healthy", "version": "2.9.0"}
 
 @app.post("/api/v1/leads/business-contact", tags=["Public"])
 async def business_contact(payload: BusinessLeadPayload):
-    """
-    Public endpoint to capture business leads from the landing page.
-    This demonstrates depending on services within a route.
-    """
-    from dependencies import get_supabase_client, get_notification_service # Import locally inside the function
+    """Public endpoint to capture business leads from the landing page."""
+    from dependencies import get_supabase_client, get_notification_service
     
     supabase = get_supabase_client()
     notifier = get_notification_service()
@@ -131,6 +125,6 @@ async def global_exception_handler(request: Request, exc: Exception):
     error_id = str(uuid4())[:8]
     logger.critical(f"Unhandled exception for request {request.url} [Error ID: {error_id}]: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=500,
         content={"detail": f"An unexpected internal server error occurred. Please contact support with Error ID: {error_id}"},
     )
