@@ -82,15 +82,9 @@ apiClient.interceptors.response.use(
 
     console.error(`[API Response Error] <-- ${status} on ${url} | Detail: ${detail}`);
     
-    // You can add global error handling here, e.g., redirecting on 401 Unauthorized
-    // if (status === 401) {
-    //   // Handle session expiry globally
-    // }
-    
     return Promise.reject(error);
   }
 );
 
-export default apiClient;```
-
-This file is now the definitive standard for your frontend's communication. Please approve, and we will proceed to update the `AuthContext.tsx` to correctly manage the user's state during the new, seamless onboarding flow.
+export default apiClient;
+// NOTE: The erroneous conversational text that was here has been removed.
