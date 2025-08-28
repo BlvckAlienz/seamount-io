@@ -11,9 +11,17 @@ interface LandingPageProps {
 
 // --- COOKIE PREFERENCES TYPE ---
 interface CookiePreferences {
-  functional: boolean; // Always true
+  functional: boolean;
   analytics: boolean;
   advertising: boolean;
+}
+
+// --- FORM STATE TYPE ---
+interface ContactFormState {
+  name: string;
+  businessName: string;
+  email: string;
+  message: string;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
@@ -22,7 +30,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const [stakeAmount, setStakeAmount] = useState('10000');
   const [stakePeriod, setStakePeriod] = useState('365');
   const [rewards, setRewards] = useState('$390.00');
-  const [formState, setFormState] = useState({ name: '', email: '', message: '' });
+  const [formState, setFormState] = useState<ContactFormState>({ 
+    name: '', 
+    businessName: '', 
+    email: '', 
+    message: '' 
+  });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
   // --- COOKIE CONSENT STATE ---
@@ -57,7 +70,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const sendConsentToServer = async (preferences: CookiePreferences) => {
     try {
-      await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/consent/cookies`, { preferences });
+      await apiClient.post('/api/v1/consent/update', { 
+        session_id: 'landing-page-session', 
+        preferences 
+      });
       console.log("Cookie consent saved to server.", preferences);
     } catch (error) {
       console.error("Failed to save cookie consent to server:", error);
@@ -111,10 +127,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     e.preventDefault();
     setFormStatus('sending');
     try {
-      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/investor-contact`, formState);
+      const response = await apiClient.post('/api/v1/leads/business-contact', {
+        name: formState.name,
+        business_name: formState.businessName,
+        email: formState.email,
+        message: formState.message
+      });
       if (response.status !== 200) throw new Error('Network response was not ok.');
       setFormStatus('success');
-      setFormState({ name: '', email: '', message: '' });
+      setFormState({ name: '', businessName: '', email: '', message: '' });
       setTimeout(() => setFormStatus('idle'), 3000);
     } catch (error) {
       console.error('Contact form submission error:', error);
@@ -206,7 +227,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-16 fade-in"><h2 className="text-3xl md:text-4xl font-bold mb-4">Get in Touch</h2><p className="text-gray-400 max-w-2xl mx-auto">Have questions or interested in our business solutions? Our team is here to help.</p></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6 fade-in">{[ { icon: <MapPin className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />, title: "Our Address", detail: "Wood Avenue, Kilimani, Nairobi, Kenya" }, { icon: <Mail className="h-6 w-6 text-green-500 flex-shrink-0 mt-1" />, title: "Email Us", detail: "support@seamount.io" }, { icon: <Phone className="h-6 w-6 text-purple-500 flex-shrink-0 mt-1" />, title: "Call Us", detail: "+254 751 875 374" } ].map((item, i) => (<div key={i} className="flex items-start space-x-4"><div className="p-3 bg-gray-800/50 rounded-full">{item.icon}</div><div><h3 className="font-semibold text-lg text-white mb-1">{item.title}</h3><p className="text-gray-300">{item.detail}</p></div></div>))}</div>
-              <div className="fade-in"><form onSubmit={handleContactSubmit} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 p-6 backdrop-blur-sm"><h3 className="text-xl font-bold mb-4">Send Us a Message</h3><div className="space-y-4"><div><label htmlFor="contact-name" className="block text-sm font-medium text-gray-300 mb-1">Your Name</label><input id="contact-name" name="name" type="text" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Full Name" required /></div><div><label htmlFor="contact-business" className="block text-sm font-medium text-gray-300 mb-1">Business Name</label><input id="contact-business" name="name" type="text" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Registered Company Name" required /></div><div><label htmlFor="contact-email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label><input id="contact-email" name="email" type="email" value={formState.email} onChange={(e) => setFormState({...formState, email: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Email" required /></div><div><label htmlFor="contact-message" className="block text-sm font-medium text-gray-300 mb-1">Message</label><textarea id="contact-message" name="message" value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg resize-none" rows={4} placeholder="Your message" required></textarea></div><Button type="submit" loading={formStatus === 'sending'} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">{formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}</Button></div></form></div>
+              <div className="fade-in"><form onSubmit={handleContactSubmit} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 p-6 backdrop-blur-sm"><h3 className="text-xl font-bold mb-4">Send Us a Message</h3><div className="space-y-4"><div><label htmlFor="contact-name" className="block text-sm font-medium text-gray-300 mb-1">Your Name</label><input id="contact-name" name="name" type="text" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Full Name" required /></div><div><label htmlFor="contact-business" className="block text-sm font-medium text-gray-300 mb-1">Business Name</label><input id="contact-business" name="businessName" type="text" value={formState.businessName} onChange={(e) => setFormState({...formState, businessName: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Registered Company Name" required /></div><div><label htmlFor="contact-email" className="block text-sm font-medium text-gray-300 mb-1">Email Address</label><input id="contact-email" name="email" type="email" value={formState.email} onChange={(e) => setFormState({...formState, email: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg" placeholder="Email" required /></div><div><label htmlFor="contact-message" className="block text-sm font-medium text-gray-300 mb-1">Message</label><textarea id="contact-message" name="message" value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})} className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg resize-none" rows={4} placeholder="Your message" required></textarea></div><Button type="submit" loading={formStatus === 'sending'} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">{formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}</Button></div></form></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 bg-gray-950/60">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-12 fade-in">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+              <p className="text-gray-400 max-w-2xl mx-auto">Get answers to common questions about Seamount's cross-border payment platform.</p>
+            </div>
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <div key={index} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 backdrop-blur-sm overflow-hidden fade-in">
+                  <button onClick={() => toggleFaq(index)} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-800/30 transition-colors">
+                    <h3 className="font-semibold text-lg text-white pr-4">{faq.question}</h3>
+                    {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-blue-500 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-blue-500 flex-shrink-0" />}
+                  </button>
+                  {expandedFaqs.includes(index) && (
+                    <div className="px-6 pb-4 border-t border-gray-800/50">
+                      <p className="text-gray-300 pt-4">{faq.answer}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -275,29 +320,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       )}
 
-      <section className="py-16 bg-gray-950/60">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12 fade-in">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">Get answers to common questions about Seamount's cross-border payment platform.</p>
-          </div>
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <div key={index} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 backdrop-blur-sm overflow-hidden fade-in">
-                <button onClick={() => toggleFaq(index)} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-800/30 transition-colors">
-                  <h3 className="font-semibold text-lg text-white pr-4">{faq.question}</h3>
-                  {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-blue-500 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-blue-500 flex-shrink-0" />}
-                </button>
-                {expandedFaqs.includes(index) && (
-                  <div className="px-6 pb-4 border-t border-gray-800/50">
-                    <p className="text-gray-300 pt-4">{faq.answer}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+      {showConsentBanner && (
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto bg-gray-900/95 backdrop-blur-sm border border-gray-800 rounded-xl p-4 z-50 shadow-2xl">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="flex-1">
+              <h4 className="font-medium text-white mb-1">We use cookies</h4>
+              <p className="text-sm text-gray-400">We use cookies to improve your experience and for marketing. By continuing to browse, you agree to our Cookie Policy.</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleOpenOptions} variant="secondary" size="sm">Preferences</Button>
+              <Button onClick={handleApproveAll} size="sm">Accept All</Button>
+            </div>
           </div>
         </div>
-      </section>
+      )}
     </div>
   );
 };

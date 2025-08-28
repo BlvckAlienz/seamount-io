@@ -12,7 +12,7 @@ interface AuthState {
   user: UserProfile | null;
   loading: boolean;
   error: string | null;
-  isDemoMode: boolean; // Retained for potential future use
+  isDemoMode: boolean;
 }
 
 interface AuthContextType extends AuthState {
@@ -51,7 +51,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return data;
     } catch (error: any) {
       console.error('AuthContext: Failed to fetch user profile after retries:', error);
-      // If profile fetch fails, it's a critical error. Sign out to reset state.
       if (error?.response?.status === 401 || error?.response?.status === 404) {
         toast.error('Your session is invalid. Please sign in again.');
         await supabase.auth.signOut();
@@ -64,15 +63,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    let authSubscription: any = null;
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session first
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isMounted) {
+          setState((prev) => ({ ...prev, session, loading: true }));
+          
+          if (session) {
+            const userProfile = await fetchUserProfile();
+            if (userProfile && isMounted) {
+              if (userProfile.kyc_status === 'unverified' && userProfile.kyc_level === 0) {
+                navigate('/onboarding');
+              } else {
+                navigate('/dashboard');
+              }
+            }
+          } else {
+            setState((prev) => ({ ...prev, loading: false }));
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (isMounted) {
+          setState((prev) => ({ ...prev, loading: false }));
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      
       console.log(`[Auth State Change] Event: ${event}`);
       setState((prev) => ({ ...prev, session, loading: true }));
       
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session) {
           const userProfile = await fetchUserProfile();
-          // After fetching profile, we determine where the user should go.
-          if (userProfile) {
+          if (userProfile && isMounted) {
             if (userProfile.kyc_status === 'unverified' && userProfile.kyc_level === 0) {
               navigate('/onboarding');
             } else {
@@ -90,8 +124,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
+    authSubscription = authListener?.subscription;
+
     return () => {
-      authListener.subscription.unsubscribe();
+      isMounted = false;
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
   }, [fetchUserProfile, navigate]);
 
@@ -107,8 +146,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
         options: {
           data: {
-            first_name: options.firstName || '', // Match DB column name
-            last_name: options.lastName || '',   // Match DB column name
+            first_name: options.firstName || '',
+            last_name: options.lastName || '',
           },
         },
       });
@@ -128,7 +167,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // The onAuthStateChange listener will handle fetching the profile and redirecting.
       return { success: true };
     } catch (err: any) {
       console.error('[SignIn Error]', err);
@@ -140,7 +178,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // The onAuthStateChange listener will handle state cleanup and navigation.
   };
 
   const triggerWalletCreation = useCallback(async () => {
@@ -155,9 +192,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    // This function's main job is now to simply re-fetch the user profile.
-    // The backend and KYC flow will have set the correct status.
-    // The useEffect listener will then handle the redirect to the dashboard.
     toast.success('Setup complete! Welcome to your dashboard.');
     await fetchUserProfile();
   }, [fetchUserProfile]);

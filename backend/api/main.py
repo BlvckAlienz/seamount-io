@@ -29,7 +29,7 @@ from services.notification_service import NotificationService
 from services.wallet_service import WalletService
 from services.kyc_providers.complycube import complycube_service
 from dependencies import initialize_dependencies, get_current_user, get_supabase_client, get_notification_service, get_wallet_service
-from api.routes import kyc, webhooks, portfolio
+from api.routes import kyc, webhooks, portfolio, investor, consent
 from models import UserProfile, SessionResponse
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,8 @@ app.add_middleware(
 app.include_router(kyc.router, prefix="/api", tags=["KYC"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
+app.include_router(investor.router, prefix="/api/v1", tags=["Investor"])
+app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
 
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])
