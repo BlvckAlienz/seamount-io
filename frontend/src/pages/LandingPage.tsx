@@ -233,29 +233,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </section>
 
         <section className="py-16 bg-gray-950/60">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-12 fade-in">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-              <p className="text-gray-400 max-w-2xl mx-auto">Get answers to common questions about Seamount's cross-border payment platform.</p>
+  <div className="max-w-6xl mx-auto px-4 sm:px-6">
+    <div className="text-center mb-12 fade-in">
+      <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+      <p className="text-gray-400 max-w-2xl mx-auto">Get answers to common questions about Seamount's cross-border payment platform.</p>
+    </div>
+    <div className="space-y-4">
+      {faqs.map((faq, index) => (
+        <div key={index} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 backdrop-blur-sm overflow-hidden fade-in">
+          <button onClick={() => toggleFaq(index)} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-800/30 transition-colors">
+            <h3 className="font-semibold text-lg text-white pr-4">{faq.question}</h3>
+            {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-blue-500 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-blue-500 flex-shrink-0" />}
+          </button>
+          {expandedFaqs.includes(index) && (
+            <div className="px-6 pb-4 border-t border-gray-800/50">
+              <p className="text-gray-300 pt-4">{faq.answer}</p>
             </div>
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div key={index} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 backdrop-blur-sm overflow-hidden fade-in">
-                  <button onClick={() => toggleFaq(index)} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-800/30 transition-colors">
-                    <h3 className="font-semibold text-lg text-white pr-4">{faq.question}</h3>
-                    {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-blue-500 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-blue-500 flex-shrink-0" />}
-                  </button>
-                  {expandedFaqs.includes(index) && (
-                    <div className="px-6 pb-4 border-t border-gray-800/50">
-                      <p className="text-gray-300 pt-4">{faq.answer}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+          
         <section className="py-20 bg-gradient-to-r from-blue-900/20 to-purple-900/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <div className="max-w-3xl mx-auto"><h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Transform How You Move Money?</h2><Button size="lg" onClick={() => onOpenAuth('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg" elevated animated>Sign Up for Free</Button><p className="mt-4 text-sm text-gray-400">Already have an account? <button onClick={() => onOpenAuth('login')} className="text-blue-400 hover:underline font-semibold">Sign In</button></p></div>
