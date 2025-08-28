@@ -1,13 +1,35 @@
-import React, { useState } from 'react';
+// frontend/src/components/CookieConsentBanner.tsx (replace entire file)
+import React, { useState, useEffect } from 'react';
 import { apiClient } from '../config/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CookieConsentBannerProps {
   sessionId: string;
   onConsentGiven: () => void;
 }
 
-export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ sessionId, onConsentGiven }) => {
+export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ 
+  sessionId, 
+  onConsentGiven 
+}) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { session: authSession } = useAuth();
+
+  useEffect(() => {
+    // If user authenticates while banner is shown, wait a moment for token to propagate
+    if (authSession) {
+      const timer = setTimeout(() => {
+        // Retry consent submission if we had previously failed due to auth
+        const retryConsent = localStorage.getItem('seamount_consent_retry');
+        if (retryConsent) {
+          handleConsent(JSON.parse(retryConsent));
+          localStorage.removeItem('seamount_consent_retry');
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [authSession]);
 
   const handleConsent = async (preferences: Record<string, boolean>) => {
     setIsSubmitting(true);
@@ -17,11 +39,21 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ sessio
         preferences,
       });
       onConsentGiven();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update consent:", error);
-      // Even if it fails, we hide the banner to not block the user.
-      // The backend will know consent wasn't given for this session.
-      onConsentGiven();
+      
+      // If it's an authentication error, store the preferences for retry
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.setItem('seamount_consent_retry', JSON.stringify(preferences));
+        
+        // Wait a bit for auth state to propagate, then retry
+        setTimeout(() => {
+          handleConsent(preferences);
+        }, 1000);
+      } else {
+        // For other errors, just hide the banner to not block the user
+        onConsentGiven();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -33,7 +65,7 @@ export const CookieConsentBanner: React.FC<CookieConsentBannerProps> = ({ sessio
       bottom: 0,
       left: 0,
       right: 0,
-      backgroundColor: '#1a202c', // dark gray
+      backgroundColor: '#1a202c',
       color: 'white',
       padding: '1.5rem',
       zIndex: 1000,

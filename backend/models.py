@@ -70,3 +70,22 @@ class InvestorContactPayload(BaseModel):
 class KYCSubmission(BaseModel): 
     document_type: str
     document_data: str
+    
+class UserSession(BaseModel):
+    id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
+    ip_address: str
+    user_agent: str
+    device_type: str
+    browser: str
+    platform: str
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True

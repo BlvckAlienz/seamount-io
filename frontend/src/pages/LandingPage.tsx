@@ -9,13 +9,6 @@ interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
 }
 
-// --- COOKIE PREFERENCES TYPE ---
-interface CookiePreferences {
-  functional: boolean;
-  analytics: boolean;
-  advertising: boolean;
-}
-
 // --- FORM STATE TYPE ---
 interface ContactFormState {
   name: string;
@@ -37,73 +30,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     message: '' 
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
-
-  // --- COOKIE CONSENT STATE ---
-  const [showConsentBanner, setShowConsentBanner] = useState(false);
-  const [showOptionsModal, setShowOptionsModal] = useState(false);
-  const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences>({
-    functional: true,
-    analytics: true,
-    advertising: true,
-  });
-
-  // --- COOKIE HELPER FUNCTIONS ---
-  const getCookie = (name: string): string | null => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-        const popped = parts.pop();
-        return popped ? popped.split(';').shift() || null : null;
-    }
-    return null;
-  };
-
-  const setCookie = (name: string, value: string, days: number) => {
-    let expires = "";
-    if (days) {
-      const date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = `${name}=${value || ""}${expires}; path=/; SameSite=Lax; Secure`;
-  };
-
-  const sendConsentToServer = async (preferences: CookiePreferences) => {
-    try {
-      await apiClient.post('/api/v1/consent/update', { 
-        session_id: 'landing-page-session', 
-        preferences 
-      });
-      console.log("Cookie consent saved to server.", preferences);
-    } catch (error) {
-      console.error("Failed to save cookie consent to server:", error);
-    }
-  };
-
-  useEffect(() => {
-    const consent = getCookie('seamount_cookie_consent');
-    if (!consent) {
-      setTimeout(() => setShowConsentBanner(true), 1500);
-    }
-  }, []);
-
-  const handleApproveAll = () => {
-    const allPrefs = { functional: true, analytics: true, advertising: true };
-    setCookie('seamount_cookie_consent', JSON.stringify(allPrefs), 365);
-    sendConsentToServer(allPrefs);
-    setShowConsentBanner(false);
-  };
-
-  const handleOpenOptions = () => {
-    setShowConsentBanner(false);
-    setShowOptionsModal(true);
-  };
-  
-  const handleSavePreferences = () => {
-    setCookie('seamount_cookie_consent', JSON.stringify(cookiePreferences), 365);
-    sendConsentToServer(cookiePreferences);
-    setShowOptionsModal(false);
-  };
 
   const toggleFaq = (index: number) => {
     setExpandedFaqs(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
@@ -293,47 +219,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </div>
       </footer>
-
-      {showOptionsModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 rounded-xl max-w-lg w-full p-6 border border-gray-800 shadow-2xl">
-            <h3 className="text-xl font-bold mb-4">Cookie Preferences</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <div><h4 className="font-medium text-white">Functional Cookies</h4><p className="text-xs text-gray-400">Essential for the site to function.</p></div>
-                <input type="checkbox" checked disabled className="h-4 w-4 rounded text-blue-600 bg-gray-700 border-gray-600" />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <div><h4 className="font-medium text-white">Analytics Cookies</h4><p className="text-xs text-gray-400">Help us improve our services.</p></div>
-                <input type="checkbox" checked={cookiePreferences.analytics} onChange={(e) => setCookiePreferences({...cookiePreferences, analytics: e.target.checked})} className="h-4 w-4 rounded text-blue-600 bg-gray-700 border-gray-600" />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                <div><h4 className="font-medium text-white">Advertising Cookies</h4><p className="text-xs text-gray-400">Used for targeted advertising.</p></div>
-                <input type="checkbox" checked={cookiePreferences.advertising} onChange={(e) => setCookiePreferences({...cookiePreferences, advertising: e.target.checked})} className="h-4 w-4 rounded text-blue-600 bg-gray-700 border-gray-600" />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={handleSavePreferences} className="flex-1">Save Preferences</Button>
-              <Button onClick={() => setShowOptionsModal(false)} variant="secondary" className="flex-1">Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showConsentBanner && (
-        <div className="fixed bottom-4 right-4 left-4 md:left-auto bg-gray-900/95 backdrop-blur-sm border border-gray-800 rounded-xl p-4 z-50 shadow-2xl">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div className="flex-1">
-              <h4 className="font-medium text-white mb-1">We use cookies</h4>
-              <p className="text-sm text-gray-400">We use cookies to improve your experience and for marketing. By continuing to browse, you agree to our Cookie Policy.</p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleOpenOptions} variant="secondary" size="sm">Preferences</Button>
-              <Button onClick={handleApproveAll} size="sm">Accept All</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

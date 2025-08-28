@@ -33,6 +33,7 @@ const useSession = () => {
     id: null,
     consentGiven: localStorage.getItem('seamount_consent_given') === 'true',
   });
+  const { session: authSession } = useAuth(); // Get auth state from context
 
   useEffect(() => {
     // If consent is already given, no need to initialize a new session fingerprint
@@ -51,8 +52,12 @@ const useSession = () => {
       }
     };
     
-    initializeSession();
-  }, [session.consentGiven]);
+    // Only initialize session if user is not authenticated
+    // or if we don't have a session ID yet
+    if (!authSession && !session.id) {
+      initializeSession();
+    }
+  }, [session.consentGiven, authSession, session.id]);
 
   const handleConsentGiven = () => {
     localStorage.setItem('seamount_consent_given', 'true');

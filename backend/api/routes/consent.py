@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+# backend/api/routes/consent.py (replace entire file)
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Dict
 from datetime import datetime
 from supabase import Client
 from auth_dependency import get_current_user
-from dependencies import get_supabase_client  # Correct import
+from dependencies import get_supabase_client
 import logging
 import uuid
 
@@ -17,19 +18,20 @@ class ConsentUpdateRequest(BaseModel):
 
 @router.post("/consent/update")
 async def update_consent(
-    request: ConsentUpdateRequest,
+    request: Request,
+    consent_request: ConsentUpdateRequest,
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user)
 ):
     try:
-        logger.info(f"Updating consent for user: {current_user.get('id')}")
+        logger.info(f"Updating consent for user: {current_user.id}")
         
         # Prepare consent data
         consent_data = {
             "id": str(uuid.uuid4()),
-            "user_id": current_user.get('id'),
-            "session_id": request.session_id,
-            "preferences": request.preferences,
+            "user_id": str(current_user.id),
+            "session_id": consent_request.session_id,
+            "preferences": consent_request.preferences,
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()
         }
