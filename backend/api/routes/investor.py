@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime
 from supabase import Client
 from auth_dependency import get_current_user
+from dependencies import get_supabase_client  # Add this import
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ class InvestorContactRequest(BaseModel):
 @router.post("/investor-contact")
 async def submit_investor_contact(
     request: InvestorContactRequest,
-    supabase: Client = Depends(get_supabase_client),
+    supabase: Client = Depends(get_supabase_client),  # This line was causing the error
     current_user: dict = Depends(get_current_user)
 ):
     try:
