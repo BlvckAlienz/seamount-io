@@ -1,3 +1,4 @@
+// frontend/src/App.tsx (updated)
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -22,72 +23,61 @@ import PaymentsPage from './pages/PaymentsPage';
 import SettingsPage from './pages/SettingsPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ComplianceDashboard from './pages/admin/ComplianceDashboard';
-import AuthDebugPage from './pages/AuthDebugPage'; // ADD THIS IMPORT
+import AuthDebugPage from './pages/AuthDebugPage';
 
 // --- Context ---
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-// Custom Hook for Session Management
-const useSession = () => {
-  const [session, setSession] = useState<{ id: string | null; consentGiven: boolean }>({
-    id: null,
-    consentGiven: localStorage.getItem('seamount_consent_given') === 'true',
-  });
-  const { session: authSession } = useAuth(); // Get auth state from context
+const AppContent: React.FC = () => {
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authView, setAuthView] = useState<'login' | 'register'>('register');
+  const { session: authSession } = useAuth(); // Now we have access to useAuth
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [consentGiven, setConsentGiven] = useState<boolean>(
+    localStorage.getItem('seamount_consent_given') === 'true'
+  );
 
   useEffect(() => {
     // If consent is already given, no need to initialize a new session fingerprint
-    if (session.consentGiven) {
+    if (consentGiven) {
       return;
     }
 
     const initializeSession = async () => {
       try {
         const { data } = await apiClient.post('/api/v1/session/initialize');
-        setSession({ id: data.session_id, consentGiven: false });
+        setSessionId(data.session_id);
       } catch (error) {
         console.error("Failed to initialize session:", error);
         // If this fails, we treat it as if consent was given to not block the UI
-        setSession({ id: null, consentGiven: true }); 
+        setConsentGiven(true);
       }
     };
     
     // Only initialize session if user is not authenticated
     // or if we don't have a session ID yet
-    if (!authSession && !session.id) {
+    if (!authSession && !sessionId) {
       initializeSession();
     }
-  }, [session.consentGiven, authSession, session.id]);
+  }, [consentGiven, authSession, sessionId]);
 
   const handleConsentGiven = () => {
     localStorage.setItem('seamount_consent_given', 'true');
-    setSession(prev => ({ ...prev, consentGiven: true }));
+    setConsentGiven(true);
   };
-  
-  return {
-    sessionId: session.id,
-    consentGiven: session.consentGiven,
-    handleConsentGiven,
-  };
-};
-
-const AppContent: React.FC = () => {
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authView, setAuthView] = useState<'login' | 'register'>('register');
-  const { sessionId, consentGiven, handleConsentGiven } = useSession();
 
   const handleOpenAuth = (view: 'login' | 'register') => {
     setAuthView(view);
     setShowAuthModal(true);
   };
-  
+
   return (
     <>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
         <Route path="/contact" element={<InvestorContact />} />
-        <Route path="/debug-auth" element={<AuthDebugPage />} /> {/* ADD THIS ROUTE */}
+        <Route path="/debug-auth" element={<AuthDebugPage />} />
         
         {/* Protected Routes with Progressive KYC Levels */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
@@ -116,7 +106,7 @@ const AppContent: React.FC = () => {
       )}
     </>
   );
-}
+};
 
 function App() {
   return (
