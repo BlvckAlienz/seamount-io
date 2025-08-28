@@ -32,7 +32,7 @@ def initialize_dependencies(
 ):
     """
     Sets the global service instances from the main application startup.
-    This pattern avoids circular imports by centralizing dependency management.
+    This logic avoids circular imports by centralizing dependency management.
     """
     global _supabase_client, _wallet_service, _notification_service
     _supabase_client = supabase_client
