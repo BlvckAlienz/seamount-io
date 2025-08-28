@@ -5,7 +5,8 @@ from supabase import Client
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import aiohttp
-from jose import JWTError, jwt
+from jose import JWTError, jwt, jwk
+from jose.utils import base64url_decode
 
 # Centralized imports from your project structure
 from config import Settings, get_settings
@@ -82,14 +83,26 @@ async def verify_supabase_token(
         token = credentials.credentials
         unverified_header = jwt.get_unverified_header(token)
         jwks = await fetch_jwks(settings)
-        rsa_key = next((key for key in jwks["keys"] if key["kid"] == unverified_header.get("kid")), None)
-        if rsa_key:
-            payload = jwt.decode(
-                token, rsa_key, algorithms=["RS256"],
-                audience="authenticated", issuer=settings.SUPABASE_JWT_ISSUER
-            )
-            return payload
-        raise JWTError("Unable to find appropriate public key for token verification")
+        
+        # Find the correct key based on key ID (kid)
+        rsa_key = None
+        for key in jwks["keys"]:
+            if key["kid"] == unverified_header.get("kid"):
+                rsa_key = key
+                break
+                
+        if not rsa_key:
+            raise JWTError("Unable to find appropriate public key for token verification")
+            
+        # Verify the token using the correct algorithm from the key
+        payload = jwt.decode(
+            token, 
+            rsa_key, 
+            algorithms=[rsa_key.get("alg", "RS256")],  # Use the algorithm specified in the key
+            audience="authenticated", 
+            issuer=settings.SUPABASE_JWT_ISSUER
+        )
+        return payload
     except JWTError as e:
         logger.error(f"Token validation failed: {e}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
