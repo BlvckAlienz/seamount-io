@@ -1,10 +1,9 @@
-# backend/api/routes/consent.py (replace entire file)
+# backend/api/routes/consent.py
 from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime
 from supabase import Client
-from auth_dependency import get_current_user
 from dependencies import get_supabase_client
 import logging
 import uuid
@@ -15,21 +14,37 @@ router = APIRouter()
 class ConsentUpdateRequest(BaseModel):
     session_id: str
     preferences: Dict[str, bool]
+    user_id: Optional[str] = None  # Optional for unauthenticated users
 
 @router.post("/consent/update")
 async def update_consent(
     request: Request,
     consent_request: ConsentUpdateRequest,
-    supabase: Client = Depends(get_supabase_client),
-    current_user: dict = Depends(get_current_user)
+    supabase: Client = Depends(get_supabase_client)
 ):
     try:
-        logger.info(f"Updating consent for user: {current_user.id}")
+        # Extract user ID from authorization header if present
+        user_id = consent_request.user_id
+        auth_header = request.headers.get("authorization")
+        
+        if auth_header and auth_header.startswith("Bearer "):
+            try:
+                # Try to extract user ID from token without requiring full authentication
+                token = auth_header[7:]
+                # Simple decode without verification (for user ID extraction only)
+                import jwt
+                decoded = jwt.decode(token, options={"verify_signature": False})
+                user_id = decoded.get("sub", user_id)
+                logger.info(f"Extracted user ID from token: {user_id}")
+            except Exception as token_error:
+                logger.warning(f"Could not extract user ID from token: {token_error}")
+        
+        logger.info(f"Updating consent for session: {consent_request.session_id}, user: {user_id}")
         
         # Prepare consent data
         consent_data = {
             "id": str(uuid.uuid4()),
-            "user_id": str(current_user.id),
+            "user_id": user_id,
             "session_id": consent_request.session_id,
             "preferences": consent_request.preferences,
             "created_at": datetime.utcnow().isoformat(),

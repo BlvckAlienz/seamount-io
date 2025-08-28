@@ -1,4 +1,4 @@
-// frontend/src/App.tsx (updated)
+// frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -31,14 +31,15 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
-  const { session: authSession } = useAuth(); // Now we have access to useAuth
+  const { session: authSession, user } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState<boolean>(
     localStorage.getItem('seamount_consent_given') === 'true'
   );
+  const [sessionInitialized, setSessionInitialized] = useState<boolean>(false);
 
   useEffect(() => {
-    // If consent is already given, no need to initialize a new session fingerprint
+    // If consent is already given, no need to initialize a new session
     if (consentGiven) {
       return;
     }
@@ -47,6 +48,7 @@ const AppContent: React.FC = () => {
       try {
         const { data } = await apiClient.post('/api/v1/session/initialize');
         setSessionId(data.session_id);
+        setSessionInitialized(true);
       } catch (error) {
         console.error("Failed to initialize session:", error);
         // If this fails, we treat it as if consent was given to not block the UI
@@ -54,12 +56,11 @@ const AppContent: React.FC = () => {
       }
     };
     
-    // Only initialize session if user is not authenticated
-    // or if we don't have a session ID yet
-    if (!authSession && !sessionId) {
+    // Only initialize session if we haven't already and user is not authenticated
+    if (!sessionInitialized && !authSession) {
       initializeSession();
     }
-  }, [consentGiven, authSession, sessionId]);
+  }, [consentGiven, authSession, sessionInitialized]);
 
   const handleConsentGiven = () => {
     localStorage.setItem('seamount_consent_given', 'true');

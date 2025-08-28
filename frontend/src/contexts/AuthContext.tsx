@@ -1,7 +1,8 @@
+// frontend/src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
-import { apiClient, API_ENDPOINTS } from '../config/api';
+import { apiClient, updateApiClientToken } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';
@@ -73,6 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (isMounted) {
           setState((prev) => ({ ...prev, session, loading: true }));
           
+          // Update API client token
+          await updateApiClientToken();
+          
           if (session) {
             const userProfile = await fetchUserProfile();
             if (userProfile && isMounted) {
@@ -102,6 +106,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log(`[Auth State Change] Event: ${event}`);
       setState((prev) => ({ ...prev, session, loading: true }));
+      
+      // Update API client token
+      await updateApiClientToken();
       
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session) {

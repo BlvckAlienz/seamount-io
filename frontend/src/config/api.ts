@@ -1,3 +1,4 @@
+// frontend/src/config/api.ts
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 import { API_BASE_URL } from './env';
@@ -32,8 +33,40 @@ export const API_ENDPOINTS = {
   USER: {
     PROFILE: '/api/v1/user/profile',
   },
+  SESSION: {
+    INITIALIZE: '/api/v1/session/initialize',
+  },
+  CONSENT: {
+    UPDATE: '/api/v1/consent/update',
+  },
   HEALTH: '/api/v1/health',
 };
+
+// Store the latest token to avoid race conditions
+let currentToken: string | null = null;
+
+// Update token function that can be called from outside
+export const updateApiClientToken = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    currentToken = session?.access_token || null;
+  } catch (error) {
+    console.error('Failed to get session for auth token:', error);
+    currentToken = null;
+  }
+};
+
+// Initial token update
+updateApiClientToken();
+
+// Listen for auth state changes
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    currentToken = session?.access_token || null;
+  } else if (event === 'SIGNED_OUT') {
+    currentToken = null;
+  }
+});
 
 // --- Axios Interceptors ---
 
@@ -43,22 +76,15 @@ apiClient.interceptors.request.use(
     const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
     
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        // This is not an error, just a state for public routes like the contact form.
-        console.log(`[API Auth] No active session token found for request.`);
-      }
-      return config;
-    } catch (error) {
-      console.error('[API Auth Error] Failed to get session for auth token:', error);
-      // Still proceed with the request, but without auth.
-      return config;
+    // Use the current token without making an async call
+    if (currentToken) {
+      config.headers.Authorization = `Bearer ${currentToken}`;
+    } else {
+      // This is not an error, just a state for public routes like the contact form.
+      console.log(`[API Auth] No active session token found for request.`);
     }
+    
+    return config;
   },
   (error) => {
     // This part handles errors that happen *before* the request is even sent.
@@ -87,4 +113,3 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
-// NOTE: The erroneous conversational text that was here has been removed.
