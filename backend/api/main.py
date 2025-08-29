@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
-# Version: 3.1.0 (Refactored to use centralized dependencies correctly)
+# Version: 3.1.1 (Fixed syntax error in global exception handler)
 # ==============================================================================
 
 import logging
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# Import core components, services, and the NEW dependency system
+# Import core components, services, and the dependency system
 from config import get_settings
 from services.email_service import EmailService
 from services.notification_service import NotificationService
@@ -54,7 +54,6 @@ async def lifespan(app: FastAPI):
         notification_service = NotificationService(email_service)
         wallet_service = WalletService(settings, supabase_client)
 
-        # CRITICAL: This one line initializes our entire dependency system.
         initialize_dependencies(
             supabase_client=supabase_client,
             wallet_service=wallet_service,
@@ -70,7 +69,7 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Seamount.io API",
-    version="3.1.0",
+    version="3.1.1",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
@@ -93,7 +92,7 @@ app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "3.1.0"}
+    return {"status": "healthy", "version": "3.1.1"}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -158,6 +157,21 @@ async def create_wallet(
         logger.critical(f"[Wallet Create] FAILED for user {user_id} [Error ID: {error_id}]: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"A critical server error occurred. Error ID: {error_id}")
 
+@app.post("/api/v1/leads/business-contact", tags=["Public"])
+async def business_contact(payload: BusinessLeadPayload):
+    supabase = get_supabase_client()
+    notifier = get_notification_service()
+    try:
+        res = supabase.table('business_leads').insert(payload.model_dump()).execute()
+        if not res.data: raise Exception("Failed to save lead.")
+        subject = f"New Seamount Business Lead: {payload.business_name or payload.name}"
+        body = f"<p><b>Name:</b> {payload.name}</p><p><b>Company:</b> {payload.business_name or 'N/A'}</p><p><b>Email:</b> {payload.email}</p><p><b>Message:</b> {payload.message or 'N/A'}</p>"
+        asyncio.create_task(notifier.email_service.send_email(subject, ["sales@seamount.io"], body))
+        return {"message": "Your request has been submitted successfully."}
+    except Exception as e:
+        logger.error(f"Business contact submission failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not process your request.")
+
 # --- Global Exception Handler ---
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -165,5 +179,5 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.critical(f"Unhandled exception for request {request.url} [Error ID: {error_id}]: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"An unexpected internal server error occurred. Please contact support with Error ID: {error_id}"},
-    )```
+        content={"detail": f"An unexpected internal server error occurred. Please contact support with Error ID: {error_id}"}
+    )
