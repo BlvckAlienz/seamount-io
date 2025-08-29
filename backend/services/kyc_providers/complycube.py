@@ -77,32 +77,32 @@ class ComplyCubeService:
             logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
             return "sdk_demo_token"
 
-    try:
-        # FIX: Updated API call based on ComplyCube documentation
-        # Use keyword arguments instead of positional arguments
-        token_response = self.client.tokens.create(
-            client_id=applicant_id,
-            referrer='*://*/*'
-        )
-        
-        # FIX: Handle different response structures
-        if hasattr(token_response, 'client_token'):
-            client_token = token_response.client_token
-        elif hasattr(token_response, 'clientToken'):
-            client_token = token_response.clientToken
-        elif isinstance(token_response, dict) and 'client_token' in token_response:
-            client_token = token_response['client_token']
-        elif isinstance(token_response, dict) and 'clientToken' in token_response:
-            client_token = token_response['clientToken']
-        else:
-            logger.error(f"Unexpected token response format: {token_response}")
-            raise ValueError("clientToken not found in ComplyCube API response.")
-        
+        try:
+            # FIX: Updated API call based on ComplyCube documentation
+            # Use keyword arguments instead of positional arguments
+            token_response = self.client.tokens.create(
+                client_id=applicant_id,
+                referrer='*://*/*'
+            )
+            
+            # FIX: Handle different response structures
+            if hasattr(token_response, 'client_token'):
+                client_token = token_response.client_token
+            elif hasattr(token_response, 'clientToken'):
+                client_token = token_response.clientToken
+            elif isinstance(token_response, dict) and 'client_token' in token_response:
+                client_token = token_response['client_token']
+            elif isinstance(token_response, dict) and 'clientToken' in token_response:
+                client_token = token_response['clientToken']
+            else:
+                logger.error(f"Unexpected token response format: {token_response}")
+                raise ValueError("clientToken not found in ComplyCube API response.")
+            
             logger.info(f"Successfully created verification SDK token for applicant: {applicant_id}")
             return client_token
-        
-    except Exception as e:
-        logger.error(f"Failed to create verification token for applicant {applicant_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Could not generate a secure verification token.")
+            
+        except Exception as e:
+            logger.error(f"Failed to create verification token for applicant {applicant_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not generate a secure verification token.")
 
 complycube_service = ComplyCubeService()
