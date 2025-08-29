@@ -74,7 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const userProfile = await fetchUserProfile();
                 if (userProfile) {
                     setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
-                    if (userProfile.kyc_status === 'unverified' && userProfile.kyc_level === 0) {
+                    
+                    // FIXED ROUTING LOGIC: Check if user needs onboarding
+                    if (!userProfile.kyc_status || userProfile.kyc_status === 'unverified' || userProfile.kyc_level === 0) {
                         navigate('/onboarding');
                     } else {
                         navigate('/dashboard');
@@ -154,7 +156,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const completeOnboarding = useCallback(async () => {
     toast.success('Setup complete! Welcome to your dashboard.');
     await fetchUserProfile();
-  }, [fetchUserProfile]);
+    navigate('/dashboard');
+  }, [fetchUserProfile, navigate]);
 
   return (
     <AuthContext.Provider value={{

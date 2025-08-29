@@ -54,7 +54,7 @@ async def fetch_jwks(settings: Settings = Depends(get_settings)):
         logger.critical(f"CRITICAL: Could not fetch Supabase JWKS. Error: {e}")
         raise HTTPException(status_code=503, detail="Authentication service unavailable.")
 
-# --- RESTORED ORIGINAL TOKEN VERIFICATION LOGIC ---
+# --- FIXED TOKEN VERIFICATION FOR ES256 ALGORITHM ---
 async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     settings: Settings = Depends(get_settings)
@@ -94,10 +94,11 @@ async def verify_supabase_token(
         logger.info(f"Found matching key for KID: {kid}")
         
         # Verify and decode token using the correct key
+        # ADDED ES256 to the allowed algorithms
         payload = jwt.decode(
             token,
             key,
-            algorithms=[alg],
+            algorithms=['RS256', 'ES256'],  # Added ES256 support
             audience='authenticated',
             options={"verify_aud": True, "verify_exp": True}
         )
