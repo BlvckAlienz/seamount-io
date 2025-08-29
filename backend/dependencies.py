@@ -74,32 +74,26 @@ async def verify_supabase_token(
 ) -> Dict[str, Any]:
     """
     Verifies the JWT token from the Authorization header using the cached JWKS.
-    This logic is robust and handles finding the correct key.
+    This logic is now robust against different key types.
     """
     try:
         token = credentials.credentials
         unverified_header = jwt.get_unverified_header(token)
         jwks = await fetch_jwks(settings)
         
-        rsa_key = {}
-        for key in jwks["keys"]:
-            if key["kid"] == unverified_header.get("kid"):
-                rsa_key = {
-                    "kty": key["kty"],
-                    "kid": key["kid"],
-                    "use": key["use"],
-                    "n": key["n"],
-                    "e": key["e"]
-                }
-                break
+        # Find the key in the JWKS that matches the key ID from the token header.
+        rsa_key = next((key for key in jwks["keys"] if key["kid"] == unverified_header.get("kid")), None)
         
         if not rsa_key:
             raise JWTError("Unable to find appropriate public key for token verification")
 
+        # THE CRITICAL FIX: Pass the entire key object directly to jwt.decode.
+        # The library will correctly handle whether it's an RSA key (with 'n' and 'e')
+        # or another type. This prevents the KeyError: 'n'.
         payload = jwt.decode(
             token,
             rsa_key,
-            algorithms=["RS256"],
+            algorithms=["RS256"], # Supabase typically uses RS256
             audience="authenticated",
             issuer=settings.SUPABASE_JWT_ISSUER
         )

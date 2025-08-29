@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
-# Version: 3.1.1 (Fixed syntax error in global exception handler)
+# Version: 3.1.2 (Corrected lead form recipient)
 # ==============================================================================
 
 import logging
@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Seamount.io API",
-    version="3.1.1",
+    version="3.1.2",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
@@ -92,7 +92,7 @@ app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "3.1.1"}
+    return {"status": "healthy", "version": "3.1.2"}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -164,9 +164,13 @@ async def business_contact(payload: BusinessLeadPayload):
     try:
         res = supabase.table('business_leads').insert(payload.model_dump()).execute()
         if not res.data: raise Exception("Failed to save lead.")
+        
         subject = f"New Seamount Business Lead: {payload.business_name or payload.name}"
         body = f"<p><b>Name:</b> {payload.name}</p><p><b>Company:</b> {payload.business_name or 'N/A'}</p><p><b>Email:</b> {payload.email}</p><p><b>Message:</b> {payload.message or 'N/A'}</p>"
-        asyncio.create_task(notifier.email_service.send_email(subject, ["sales@seamount.io"], body))
+        
+        # THE CRITICAL FIX: Changed recipient email address.
+        asyncio.create_task(notifier.email_service.send_email(subject, ["support@seamount.io"], body))
+        
         return {"message": "Your request has been submitted successfully."}
     except Exception as e:
         logger.error(f"Business contact submission failed: {e}")
@@ -179,5 +183,5 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.critical(f"Unhandled exception for request {request.url} [Error ID: {error_id}]: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": f"An unexpected internal server error occurred. Please contact support with Error ID: {error_id}"}
+        content={"detail": f"An unexpected internal server error occurred. Please contact support with Error ID: {error_id}"},
     )
