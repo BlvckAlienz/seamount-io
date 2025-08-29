@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
-import { apiClient, API_ENDPOINTS } from '../config/api'; // Corrected import path
+import { apiClient, API_ENDPOINTS } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';
 import toast from 'react-hot-toast';
 
+// Interfaces remain the same
 interface AuthState {
   session: Session | null;
   user: UserProfile | null;
@@ -36,7 +37,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [state, setState] = useState<AuthState>({
     session: null,
     user: null,
-    loading: true, // Start in loading state until the initial session is checked
+    loading: true,
     error: null,
     isDemoMode: false,
   });
@@ -44,56 +45,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
 
   const fetchUserProfile = useCallback(async () => {
-    // This function now only fetches, it doesn't set loading state directly.
     try {
-      // Use a more conservative retry for profile fetching to avoid long waits on critical errors.
       const { data } = await retryWithBackoff(() => apiClient.get<UserProfile>(API_ENDPOINTS.USER.PROFILE), 2, 1000);
       return data;
     } catch (error: any) {
       console.error('AuthContext: Failed to fetch user profile after retries:', error);
-      // On a 401/404, we know the session is bad. The best action is to sign out to reset everything.
       if (error?.response?.status === 401 || error?.response?.status === 404) {
-        toast.error('Your session has expired. Please sign in again.');
-        // This triggers the SIGNED_OUT event, which will clean up state.
+        toast.error('Your session seems to be invalid. Please sign in again.');
         await supabase.auth.signOut();
       } else {
-        toast.error('Could not connect to the server. Some features may be unavailable.');
+        toast.error('Could not connect to the server. Please check your connection.');
       }
       return null;
     }
   }, []);
 
   useEffect(() => {
-    // Set loading to true when the component mounts to check the initial session
     setState(prev => ({ ...prev, loading: true }));
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[Auth State Change] Event: ${event}`);
       
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session) {
-          const userProfile = await fetchUserProfile();
-          if (userProfile) {
-            setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
-            // Redirect logic now happens based on the fetched profile state.
-            if (userProfile.kyc_status === 'unverified' && userProfile.kyc_level === 0) {
-              navigate('/onboarding');
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        // ** THIS IS THE RESTORED, CRITICAL LOGIC **
+        // A small delay gives Supabase time to propagate the session, especially after email confirmation.
+        setTimeout(async () => {
+            if (session) {
+                const userProfile = await fetchUserProfile();
+                if (userProfile) {
+                    setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
+                    if (userProfile.kyc_status === 'unverified' && userProfile.kyc_level === 0) {
+                        navigate('/onboarding');
+                    } else {
+                        navigate('/dashboard');
+                    }
+                } else {
+                    // Profile fetch failed, which implies an invalid session.
+                    setState(prev => ({ ...prev, session: null, user: null, loading: false, error: 'Failed to retrieve user profile.' }));
+                }
             } else {
-              // Only navigate to dashboard if not already there to prevent loops
-              if (window.location.pathname !== '/dashboard') {
-                 navigate('/dashboard');
-              }
+                // If there's no session, we're not logged in.
+                setState(prev => ({ ...prev, session: null, user: null, loading: false, error: null }));
             }
-          } else {
-            // If profile fetch fails, we consider the user logged out.
-            setState(prev => ({ ...prev, session: null, user: null, loading: false, error: 'Failed to retrieve user profile.' }));
-          }
-        } else {
-          // If there's no session, we are done loading and there's no user.
-          setState(prev => ({ ...prev, session: null, user: null, loading: false, error: null }));
-        }
+        }, 1000); // 1-second delay from your original working code
       } else if (event === 'SIGNED_OUT') {
-        // Synchronously clear all user state and navigate to home. This is the critical fix.
         setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
         navigate('/');
       }
@@ -109,35 +104,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     password: string,
     options: { firstName?: string; lastName?: string } = {}
   ) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { first_name: options.firstName, last_name: options.lastName } }
-      });
-      if (error) throw error;
-      toast.success('Sign up successful! Please check your email to verify your account.');
-      return { success: true };
+        const { error } = await supabase.auth.signUp({
+            email, password,
+            options: { data: { first_name: options.firstName, last_name: options.lastName } }
+        });
+        if (error) throw error;
+        toast.success('Sign up successful! Please check your email to verify your account.');
+        return { success: true };
     } catch (err: any) {
-      console.error('[SignUp Error]', err);
-      toast.error(err.message || 'Sign up failed. Please try again.');
-      setState((prev) => ({ ...prev, error: err.message, loading: false }));
-      return { success: false, error: err.message };
+        console.error('[SignUp Error]', err);
+        toast.error(err.message || 'Sign up failed.');
+        setState(prev => ({ ...prev, error: err.message, loading: false }));
+        return { success: false, error: err.message };
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      // The onAuthStateChange listener will handle the rest.
-      return { success: true };
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // The onAuthStateChange listener handles the rest.
+        return { success: true };
     } catch (err: any) {
-      console.error('[SignIn Error]', err);
-      toast.error(err.message || 'Sign in failed. Please try again.');
-      setState((prev) => ({ ...prev, error: err.message, loading: false }));
-      return { success: false, error: err.message };
+        console.error('[SignIn Error]', err);
+        toast.error(err.message || 'Sign in failed.');
+        setState(prev => ({ ...prev, error: err.message, loading: false }));
+        return { success: false, error: err.message };
     }
   };
 
@@ -171,7 +166,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       triggerWalletCreation,
       fetchUserProfile,
     }}>
-      {children}
+      {!state.loading ? children : <div>Loading Seamount...</div> /* Or a proper loading spinner */}
     </AuthContext.Provider>
   );
 };
