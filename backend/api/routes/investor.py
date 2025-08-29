@@ -3,7 +3,6 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 from supabase import Client
-from auth_dependency import get_current_user
 from dependencies import get_supabase_client  # Correct import
 import logging
 

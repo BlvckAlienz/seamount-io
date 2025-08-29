@@ -48,7 +48,7 @@ const ComplyCubeVerification: React.FC = () => {
     setLoading(true);
     try {
       // Get verification token from backend
-      const response = await apiClient.post('/api/kyc/token');
+      const response = await apiClient.post('/api/kyc/start-verification');
       const { token, applicantId } = response.data;
 
       // Initialize ComplyCube

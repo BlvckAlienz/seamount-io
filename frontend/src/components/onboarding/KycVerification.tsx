@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Shield, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../Button';
@@ -14,6 +14,8 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+  const [sdkToken, setSdkToken] = useState<string | null>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
   const { user, refreshKycStatus } = useAuth();
 
   // Load ComplyCube script
@@ -41,18 +43,38 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
     };
   }, []);
 
-  const startVerification = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Get verification token
+  useEffect(() => {
+    const fetchToken = async () => {
+      try {
+        const response = await apiClient.post('/api/kyc/start-verification'); // Fixed endpoint
+        setSdkToken(response.data.token);
+      } catch (error: any) {
+        console.error('Failed to get verification token:', error);
+        setError(error.response?.data?.detail || 'Failed to start verification');
+        setLoading(false);
+      }
+    };
 
-      // Get token from backend
-      const response = await apiClient.post('/api/kyc/token');
-      const { token } = response.data;
+    if (!loading) {
+      fetchToken();
+    }
+  }, [loading]);
 
-      // Mount ComplyCube
+  // Initialize SDK when token is available and mount element exists
+  useEffect(() => {
+    if (sdkToken && mountRef.current) {
+      // Ensure mount element exists
+      if (!document.getElementById('complycube-mount')) {
+        const mountElement = document.createElement('div');
+        mountElement.id = 'complycube-mount';
+        mountRef.current.appendChild(mountElement);
+      }
+
+      // Initialize ComplyCube
       (window as any).ComplyCube.mount({
-        token: token,
+        token: sdkToken,
+        containerId: 'complycube-mount',
         onComplete: (data: any) => {
           console.log('Verification completed:', data);
           setVerificationStatus('completed');
@@ -71,21 +93,18 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
         },
         onCancel: () => {
           console.log('Verification cancelled by user');
+          if (onCancel) onCancel();
         }
       });
-
-    } catch (error: any) {
-      console.error('Failed to start verification:', error);
-      setError(error.response?.data?.detail || 'Failed to start verification');
-      setLoading(false);
     }
+  }, [sdkToken, mountRef]);
+
+  // Add skip verification function
+  const skipVerification = () => {
+    // Update user status to indicate they skipped verification
+    // This should be handled by your backend
+    if (onCancel) onCancel();
   };
-
-  useEffect(() => {
-    if (!loading) {
-      startVerification();
-    }
-  }, [loading]);
 
   if (loading) {
     return (
@@ -109,7 +128,12 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
           <h3 className="text-xl font-bold text-white mb-2">Verification Failed</h3>
           <p className="text-red-400 mb-4">{error}</p>
-          <Button onClick={startVerification}>Try Again</Button>
+          <div className="flex space-x-4 justify-center">
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+            <Button onClick={skipVerification} variant="outline">
+              Skip Verification
+            </Button>
+          </div>
         </div>
       </Card>
     );
@@ -141,7 +165,17 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
         <Shield className="h-6 w-6 text-blue-500" />
         <h2 className="text-xl font-bold text-white">Identity Verification</h2>
       </div>
-      <div id="complycube-mount"></div>
+      <div className="mb-4">
+        <p className="text-gray-300">
+          Complete identity verification to access all platform features. This process usually takes 2-3 minutes.
+        </p>
+      </div>
+      <div ref={mountRef} className="complycube-container"></div>
+      <div className="mt-4 text-center">
+        <Button onClick={skipVerification} variant="outline" size="sm">
+          Skip for Now
+        </Button>
+      </div>
     </Card>
   );
 };

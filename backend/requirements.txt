@@ -43,7 +43,7 @@ pyotp
 py-algorand-sdk
 
 # ComplyCube for KYC
-complycube
+complycube==1.6.0
 
 # Cryptography
 cryptography

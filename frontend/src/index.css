@@ -28,3 +28,31 @@
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   }
 }
+
+/* ComplyCube SDK Container Styles */
+.complycube-container {
+  min-height: 500px;
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  background: white;
+}
+
+/* ComplyCube SDK overrides for better integration */
+#complycube-mount {
+  width: 100%;
+  min-height: 500px;
+}
+
+#complycube-mount iframe {
+  width: 100% !important;
+  min-height: 500px !important;
+  border: none !important;
+}
+
+/* Dark mode support for ComplyCube */
+.dark .complycube-container {
+  border-color: #374151;
+  background: #1f2937;
+}

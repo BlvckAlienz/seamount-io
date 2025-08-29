@@ -128,8 +128,10 @@ async def get_current_user(
     if not user_id: raise HTTPException(status_code=401, detail="Invalid token payload: user ID is missing.")
     try:
         profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
-        if not profile_res.data:
-            logger.warning(f"Profile not found for user {user_id}. Creating one from auth details.")
+        
+        # FIX: Handle cases where response.data might be None
+        if not profile_res or not hasattr(profile_res, 'data') or profile_res.data is None:
+            logger.warning(f"Profile not found or empty response for user {user_id}. Creating one from auth details.")
             auth_user_res = supabase.auth.admin.get_user_by_id(user_id)
             if not auth_user_res.user: raise HTTPException(status_code=404, detail="User not found in auth system.")
             
