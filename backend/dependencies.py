@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import aiohttp
 from jose import JWTError, jwt
+import json
 
 from config import Settings, get_settings
 from services.wallet_service import WalletService
@@ -53,52 +54,70 @@ async def fetch_jwks(settings: Settings = Depends(get_settings)):
         logger.critical(f"CRITICAL: Could not fetch Supabase JWKS. Error: {e}")
         raise HTTPException(status_code=503, detail="Authentication service unavailable.")
 
-# --- THE DEFINITIVE AUTHENTICATION FIX ---
-# This logic is restored from your original, working main.py file.
+# --- RESTORED ORIGINAL TOKEN VERIFICATION LOGIC ---
 async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     settings: Settings = Depends(get_settings)
 ) -> Dict[str, Any]:
     """
-    Properly verifies Supabase JWT tokens by handling both standard session tokens
-    and special confirmation tokens that may lack an 'alg' header.
+    Properly verify Supabase JWT tokens using their JWKS
     """
     try:
         token = credentials.credentials
+        logger.info(f"Starting JWT verification for token: {token[:20]}...")
+        
+        # Get unverified header to extract key ID
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
+        alg = unverified_header.get('alg', 'RS256')
         
-        # This is the default for standard session tokens
-        alg = unverified_header.get('alg', 'HS256') 
+        if not kid:
+            logger.error("Token missing key ID (kid)")
+            raise JWTError("Token missing key ID (kid)")
         
-        if alg == 'HS256':
-            key = settings.SUPABASE_JWT_SECRET.get_secret_value()
-        elif alg == 'RS256':
-            jwks = await fetch_jwks(settings)
-            key = next((k for k in jwks["keys"] if k["kid"] == kid), None)
-            if not key:
-                raise JWTError("Unable to find appropriate public key for RS256 token")
-        else:
-            # This handles the email confirmation token which might not specify an alg
-            # We default to HS256 as per Supabase standards for these token types.
-            logger.warning(f"Token algorithm '{alg}' not standard. Defaulting to HS256 verification.")
-            alg = 'HS256'
-            key = settings.SUPABASE_JWT_SECRET.get_secret_value()
-
+        logger.info(f"Token KID: {kid}, Algorithm: {alg}")
+        
+        # Fetch JWKS
+        jwks = await fetch_jwks(settings)
+        
+        # Find the matching key
+        key = None
+        for jwk_key in jwks.get('keys', []):
+            if jwk_key.get('kid') == kid:
+                key = jwk_key
+                break
+        
+        if not key:
+            logger.error(f"Public key for KID {kid} not found in JWKS")
+            raise JWTError(f"Public key for KID {kid} not found in JWKS")
+        
+        logger.info(f"Found matching key for KID: {kid}")
+        
+        # Verify and decode token using the correct key
         payload = jwt.decode(
             token,
             key,
             algorithms=[alg],
-            audience="authenticated",
-            issuer=settings.SUPABASE_JWT_ISSUER
+            audience='authenticated',
+            options={"verify_aud": True, "verify_exp": True}
         )
+        
+        logger.info(f"Token verified successfully for user: {payload.get('sub')}")
         return payload
+        
     except JWTError as e:
         logger.error(f"Token validation failed: {e}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except Exception as e:
-        logger.error(f"Unexpected error during token verification: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Could not process authentication token.")
+        logger.error(f"Unexpected error in token verification: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not process token"
+        )
 
 async def get_current_user(
     payload: Dict[str, Any] = Depends(verify_supabase_token),
@@ -128,5 +147,5 @@ async def get_current_user(
         
         return profile_res.data
     except Exception as e:
-        logger.error(f"Failed to fetch or create profile for user {user_id}: {e}", exc_info=True)
+        logger.error(f"Failed to fetch or create profile for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving user profile.")
