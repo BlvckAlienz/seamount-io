@@ -73,7 +73,7 @@ class ComplyCubeService:
             raise HTTPException(status_code=500, detail="Could not create KYC applicant profile.")
 
     def create_verification_token(self, applicant_id: str) -> str:
-    if not self.is_available():
+        if not self.is_available():
         logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
         return "sdk_demo_token"
 
