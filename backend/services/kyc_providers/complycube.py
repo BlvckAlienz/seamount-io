@@ -74,8 +74,8 @@ class ComplyCubeService:
 
     def create_verification_token(self, applicant_id: str) -> str:
         if not self.is_available():
-        logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
-        return "sdk_demo_token"
+            logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
+            return "sdk_demo_token"
 
     try:
         # FIX: Updated API call based on ComplyCube documentation
@@ -98,8 +98,8 @@ class ComplyCubeService:
             logger.error(f"Unexpected token response format: {token_response}")
             raise ValueError("clientToken not found in ComplyCube API response.")
         
-        logger.info(f"Successfully created verification SDK token for applicant: {applicant_id}")
-        return client_token
+            logger.info(f"Successfully created verification SDK token for applicant: {applicant_id}")
+            return client_token
         
     except Exception as e:
         logger.error(f"Failed to create verification token for applicant {applicant_id}: {e}", exc_info=True)
