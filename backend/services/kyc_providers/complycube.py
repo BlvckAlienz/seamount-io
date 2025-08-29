@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# Define a Pydantic model for the Applicant object for type safety and clarity.
 class ComplyCubeApplicant(BaseModel):
     id: str
     type: str
@@ -15,18 +14,15 @@ class ComplyCubeApplicant(BaseModel):
 
 class ComplyCubeService:
     def __init__(self):
-        """Initializes the ComplyCube service and its Supabase dependency."""
         self.client = None
         self.supabase = None
         try:
             settings = get_settings()
             
-            # CORRECTED LOGIC: Check the SecretStr object itself, not its value.
             if not settings.COMPLYCUBE_API_KEY:
                 logger.warning("COMPLYCUBE_API_KEY is not configured. KYC features will be disabled.")
                 return
 
-            # Now we can safely call .get_secret_value() because the type is correct.
             self.client = ComplyCubeClient(api_key=settings.COMPLYCUBE_API_KEY.get_secret_value())
             self.supabase = create_client(
                 settings.VITE_SUPABASE_URL,
@@ -39,16 +35,15 @@ class ComplyCubeService:
             self.supabase = None
 
     def is_available(self) -> bool:
-        """Checks if the ComplyCube client was successfully initialized."""
         return self.client is not None
 
     def create_applicant(self, user_data: dict) -> ComplyCubeApplicant:
-        """Creates a new applicant in ComplyCube and returns a validated data model."""
         if not self.is_available():
             raise HTTPException(status_code=503, detail="KYC service is currently unavailable.")
 
         try:
-            applicant_dict = self.client.clients.create(
+            # FIX: Properly handle the API response structure
+            applicant_response = self.client.clients.create(
                 type='person',
                 email=user_data.get('email'),
                 personDetails={
@@ -56,15 +51,28 @@ class ComplyCubeService:
                     'lastName': user_data.get('last_name', '')
                 }
             )
-            applicant = ComplyCubeApplicant(**applicant_dict)
+            
+            # FIX: Extract the actual applicant data from the response
+            # The response might be a Client object, we need to extract the applicant data
+            if hasattr(applicant_response, 'id'):
+                applicant_data = {
+                    'id': applicant_response.id,
+                    'type': getattr(applicant_response, 'type', 'person'),
+                    'email': getattr(applicant_response, 'email', user_data.get('email'))
+                }
+            else:
+                # If it's already a dictionary
+                applicant_data = applicant_response
+                
+            applicant = ComplyCubeApplicant(**applicant_data)
             logger.info(f"Successfully created ComplyCube applicant: {applicant.id}")
             return applicant
+            
         except Exception as e:
             logger.error(f"Failed to create ComplyCube applicant: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not create KYC applicant profile.")
 
     def create_verification_token(self, applicant_id: str) -> str:
-        """Creates a short-lived SDK token for the frontend to initialize the ComplyCube UI."""
         if not self.is_available():
             logger.warning("KYC service is unavailable. Returning a demo token for non-production environments.")
             return "sdk_demo_token"
@@ -72,19 +80,23 @@ class ComplyCubeService:
         try:
             token_response = self.client.tokens.create(
                 client_id=applicant_id,
-                referrer='*://*/*' # Use a stricter referrer in production, e.g., 'https://seamount.io/*'
+                referrer='*://*/*'
             )
             
-            client_token = token_response.get('clientToken')
-            if not client_token:
-                logger.error(f"ComplyCube API response did not contain a 'clientToken' for applicant {applicant_id}.")
+            # FIX: Handle different response structures
+            if hasattr(token_response, 'clientToken'):
+                client_token = token_response.clientToken
+            elif isinstance(token_response, dict) and 'clientToken' in token_response:
+                client_token = token_response['clientToken']
+            else:
+                logger.error(f"Unexpected token response format: {token_response}")
                 raise ValueError("clientToken not found in ComplyCube API response.")
             
             logger.info(f"Successfully created verification SDK token for applicant: {applicant_id}")
             return client_token
+            
         except Exception as e:
             logger.error(f"Failed to create verification token for applicant {applicant_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not generate a secure verification token.")
 
-# Create a single, globally accessible instance of the service.
 complycube_service = ComplyCubeService()
