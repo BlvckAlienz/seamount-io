@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 from supabase import Client
-from dependencies import get_supabase_client  # Correct import
+from dependencies import get_supabase_client, get_current_user  # Added get_current_user import
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class InvestorContactRequest(BaseModel):
 async def submit_investor_contact(
     request: InvestorContactRequest,
     supabase: Client = Depends(get_supabase_client),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)  # This should now work
 ):
     try:
         logger.info(f"Received investor contact from {request.email}")
