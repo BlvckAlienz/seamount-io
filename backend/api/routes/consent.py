@@ -1,65 +1,60 @@
-# backend/api/routes/consent.py
-from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel
-from typing import Dict, Optional
-from datetime import datetime
-from supabase import Client
-from dependencies import get_supabase_client
 import logging
-import uuid
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import Dict, Any
+from uuid import UUID
+from supabase import Client
+
+# Correctly import dependencies from the central module
+from dependencies import get_supabase_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-class ConsentUpdateRequest(BaseModel):
-    session_id: str
-    preferences: Dict[str, bool]
-    user_id: Optional[str] = None  # Optional for unauthenticated users
+class ConsentUpdatePayload(BaseModel):
+    session_id: UUID = Field(..., description="The anonymous session ID generated on page load.")
+    preferences: Dict[str, bool] = Field(..., description="The user's cookie consent choices.")
 
-@router.post("/consent/update")
-async def update_consent(
-    request: Request,
-    consent_request: ConsentUpdateRequest,
+@router.post("/consent/update", status_code=200)
+async def update_consent_preferences(
+    payload: ConsentUpdatePayload,
     supabase: Client = Depends(get_supabase_client)
 ):
+    """
+    Updates the consent preferences for a given anonymous user session.
+    This is called by the frontend's cookie consent banner.
+    """
+    logger.info(f"Received consent update for session_id: {payload.session_id}")
+
     try:
-        # Extract user ID from authorization header if present
-        user_id = consent_request.user_id
-        auth_header = request.headers.get("authorization")
-        
-        if auth_header and auth_header.startswith("Bearer "):
-            try:
-                # Try to extract user ID from token without requiring full authentication
-                token = auth_header[7:]
-                # Simple decode without verification (for user ID extraction only)
-                import jwt
-                decoded = jwt.decode(token, options={"verify_signature": False})
-                user_id = decoded.get("sub", user_id)
-                logger.info(f"Extracted user ID from token: {user_id}")
-            except Exception as token_error:
-                logger.warning(f"Could not extract user ID from token: {token_error}")
-        
-        logger.info(f"Updating consent for session: {consent_request.session_id}, user: {user_id}")
-        
-        # Prepare consent data
-        consent_data = {
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "session_id": consent_request.session_id,
-            "preferences": consent_request.preferences,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+        # Prepare the data for the JSONB column in the user_sessions table
+        update_data = {
+            "consent_preferences": payload.preferences
         }
-        
-        # Upsert consent record
-        result = supabase.table("user_consents").upsert(consent_data).execute()
-        
+
+        # Perform an UPDATE on the user_sessions table where the ID matches.
+        result = supabase.table("user_sessions") \
+            .update(update_data) \
+            .eq("id", str(payload.session_id)) \
+            .execute()
+
+        # Check if the update was successful. If result.data is empty, no row was found.
         if not result.data:
-            logger.error("Failed to update consent preferences")
-            raise HTTPException(status_code=500, detail="Failed to save consent preferences")
-        
-        return {"success": True, "message": "Consent preferences updated"}
-        
+            logger.warning(f"Attempted to update consent for a non-existent session_id: {payload.session_id}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session with ID {payload.session_id} not found."
+            )
+
+        logger.info(f"Successfully updated consent for session_id: {payload.session_id}")
+        return {"success": True, "message": "Consent preferences have been updated."}
+
+    except HTTPException:
+        # Re-raise known HTTP exceptions to be handled by FastAPI
+        raise
     except Exception as e:
-        logger.error(f"Error updating consent: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to process consent update")
+        logger.error(f"Error updating consent for session {payload.session_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="A server error occurred while updating consent preferences."
+        )

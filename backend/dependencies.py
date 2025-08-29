@@ -5,8 +5,7 @@ from supabase import Client
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 import aiohttp
-from jose import JWTError, jwt, jwk
-from jose.utils import base64url_decode
+from jose import JWTError, jwt
 
 # Centralized imports from your project structure
 from config import Settings, get_settings
@@ -16,7 +15,6 @@ from services.notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 # --- GLOBAL STATE & CACHING ---
-# These will be initialized once by the main application's lifespan manager.
 _supabase_client: Optional[Client] = None
 _wallet_service: Optional[WalletService] = None
 _notification_service: Optional[NotificationService] = None
@@ -30,10 +28,7 @@ def initialize_dependencies(
     wallet_service: WalletService,
     notification_service: NotificationService
 ):
-    """
-    Sets the global service instances from the main application startup.
-    This logic avoids circular imports by centralizing dependency management.
-    """
+    """Sets the global service instances from the main application startup."""
     global _supabase_client, _wallet_service, _notification_service
     _supabase_client = supabase_client
     _wallet_service = wallet_service
@@ -41,7 +36,6 @@ def initialize_dependencies(
     logger.info("Dependencies have been successfully initialized with service instances.")
 
 # --- DEPENDENCY GETTER FUNCTIONS ---
-# These are the clean, reusable functions that your API routes will depend on.
 def get_supabase_client() -> Client:
     if not _supabase_client:
         raise HTTPException(status_code=503, detail="Database client service is not available.")
@@ -78,28 +72,35 @@ async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     settings: Settings = Depends(get_settings)
 ) -> Dict[str, Any]:
-    """Verifies the JWT token from the Authorization header against Supabase's public keys."""
+    """
+    Verifies the JWT token from the Authorization header using the cached JWKS.
+    This logic is robust and handles finding the correct key.
+    """
     try:
         token = credentials.credentials
         unverified_header = jwt.get_unverified_header(token)
         jwks = await fetch_jwks(settings)
         
-        # Find the correct key based on key ID (kid)
-        rsa_key = None
+        rsa_key = {}
         for key in jwks["keys"]:
             if key["kid"] == unverified_header.get("kid"):
-                rsa_key = key
+                rsa_key = {
+                    "kty": key["kty"],
+                    "kid": key["kid"],
+                    "use": key["use"],
+                    "n": key["n"],
+                    "e": key["e"]
+                }
                 break
-                
+        
         if not rsa_key:
             raise JWTError("Unable to find appropriate public key for token verification")
-            
-        # Verify the token using the correct algorithm from the key
+
         payload = jwt.decode(
-            token, 
-            rsa_key, 
-            algorithms=[rsa_key.get("alg", "RS256")],  # Use the algorithm specified in the key
-            audience="authenticated", 
+            token,
+            rsa_key,
+            algorithms=["RS256"],
+            audience="authenticated",
             issuer=settings.SUPABASE_JWT_ISSUER
         )
         return payload
@@ -115,8 +116,8 @@ async def get_current_user(
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
     """
-    The primary dependency for protected routes.
-    Takes a validated token payload and returns the full user profile from the database.
+    The primary dependency for protected routes. Takes a validated token payload
+    and returns the full user profile from the database.
     """
     user_id = payload.get("sub")
     if not user_id:

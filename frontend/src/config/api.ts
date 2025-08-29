@@ -1,10 +1,9 @@
-// frontend/src/config/api.ts
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 import { API_BASE_URL } from './env';
 
 /**
- * A centralized Axios client for all API communications with Seamount backend.
+ * A centralized Axios client for all API communications with the Seamount backend.
  * It includes interceptors to automatically handle authentication tokens and provide
  * robust, consistent logging for both successful and failed requests.
  */
@@ -42,52 +41,33 @@ export const API_ENDPOINTS = {
   HEALTH: '/api/v1/health',
 };
 
-// Store the latest token to avoid race conditions
-let currentToken: string | null = null;
-
-// Update token function that can be called from outside
-export const updateApiClientToken = async () => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    currentToken = session?.access_token || null;
-  } catch (error) {
-    console.error('Failed to get session for auth token:', error);
-    currentToken = null;
-  }
-};
-
-// Initial token update
-updateApiClientToken();
-
-// Listen for auth state changes
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    currentToken = session?.access_token || null;
-  } else if (event === 'SIGNED_OUT') {
-    currentToken = null;
-  }
-});
-
 // --- Axios Interceptors ---
 
 // 1. Request Interceptor: Automatically injects the Supabase JWT into every outgoing request.
+// This is the most reliable pattern as it guarantees the freshest token is used.
 apiClient.interceptors.request.use(
   async (config) => {
     const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
     
-    // Use the current token without making an async call
-    if (currentToken) {
-      config.headers.Authorization = `Bearer ${currentToken}`;
-    } else {
-      // This is not an error, just a state for public routes like the contact form.
-      console.log(`[API Auth] No active session token found for request.`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        // This is normal for public routes (e.g., session initialize, contact form).
+        console.log(`[API Auth] No active session token found for request.`);
+      }
+    } catch (error) {
+      console.error('[API Auth Error] Failed to get session for auth token:', error);
+      // Proceed with the request without auth if getting the session fails.
     }
     
     return config;
   },
   (error) => {
-    // This part handles errors that happen *before* the request is even sent.
     console.error('[API Request Error] Error creating request:', error);
     return Promise.reject(error);
   }

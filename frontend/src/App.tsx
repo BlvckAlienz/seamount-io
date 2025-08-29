@@ -1,10 +1,9 @@
-// frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { apiClient } from './config/api';
+import { apiClient, API_ENDPOINTS } from './config/api';
 
 // --- Core Components & Pages ---
 import ErrorBoundary from './components/ErrorBoundary';
@@ -31,36 +30,32 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
-  const { session: authSession, user } = useAuth();
+  const { session: authSession } = useAuth(); // Only need the session to check for authenticated state
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [consentGiven, setConsentGiven] = useState<boolean>(
-    localStorage.getItem('seamount_consent_given') === 'true' || !!authSession
-  );
-  const [sessionInitialized, setSessionInitialized] = useState<boolean>(false);
+
+  // Simplified state: derive consent directly from localStorage
+  const [consentGiven, setConsentGiven] = useState<boolean>(() => {
+    return localStorage.getItem('seamount_consent_given') === 'true';
+  });
 
   useEffect(() => {
-    // If consent is already given or user is authenticated, skip initialization
-    if (consentGiven || authSession) {
-      return;
-    }
-
-    const initializeSession = async () => {
+    // This effect handles the creation of an anonymous session for unauthenticated users
+    // who have not yet given consent.
+    const initializeAnonymousSession = async () => {
       try {
-        const { data } = await apiClient.post('/api/v1/session/initialize');
+        const { data } = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
         setSessionId(data.session_id);
-        setSessionInitialized(true);
       } catch (error) {
-        console.error("Failed to initialize session:", error);
-        // If this fails, we treat it as if consent was given to not block the UI
-        setConsentGiven(true);
+        console.error("Failed to initialize anonymous session. Cookie banner will not be shown.", error);
+        // If this fails, we don't block the user. The banner simply won't appear.
       }
     };
     
-    // Only initialize session if we haven't already and user is not authenticated
-    if (!sessionInitialized && !authSession) {
-      initializeSession();
+    // Only run this logic if the user is not logged in and has not already given consent.
+    if (!authSession && !consentGiven) {
+      initializeAnonymousSession();
     }
-  }, [consentGiven, authSession, sessionInitialized]);
+  }, [authSession, consentGiven]);
 
   const handleConsentGiven = () => {
     localStorage.setItem('seamount_consent_given', 'true');
@@ -80,14 +75,14 @@ const AppContent: React.FC = () => {
         <Route path="/contact" element={<InvestorContact />} />
         <Route path="/debug-auth" element={<AuthDebugPage />} />
         
-        {/* Protected Routes with Progressive KYC Levels */}
+        {/* Protected Routes */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-        <Route path="/dashboard" element={<ProtectedRoute minKycLevel={1}><DashboardPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute minKycLevel={1}><UserProfilePage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute minKycLevel={1}><SettingsPage /></ProtectedRoute>} />
-        <Route path="/trading" element={<ProtectedRoute minKycLevel={2}><TradingPage /></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute minKycLevel={2}><PaymentsPage /></ProtectedRoute>} />
-        <Route path="/portfolio" element={<ProtectedRoute minKycLevel={3}><PortfolioPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/trading" element={<ProtectedRoute><TradingPage /></ProtectedRoute>} />
+        <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+        <Route path="/portfolio" element={<ProtectedRoute><PortfolioPage /></ProtectedRoute>} />
         
         {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
@@ -102,7 +97,8 @@ const AppContent: React.FC = () => {
         initialView={authView}
       />
 
-      {!consentGiven && sessionId && (
+      {/* The banner will only show if an anonymous session was successfully created */}
+      {!authSession && !consentGiven && sessionId && (
         <CookieConsentBanner sessionId={sessionId} onConsentGiven={handleConsentGiven} />
       )}
     </>
