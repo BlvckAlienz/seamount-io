@@ -1,3 +1,4 @@
+# backend/main.py
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
 # Version: 3.0.3 (Fixed CORS, authentication, and wallet creation flow)
@@ -125,6 +126,8 @@ async def initialize_session(
                             "country": ip_data.get("country"), 
                             "city": ip_data.get("city")
                         })
+        except asyncio.TimeoutError:
+            logger.warning(f"IPinfo timeout for IP {ip_address}")
         except Exception as e:
             logger.warning(f"IPinfo enrichment failed for IP {ip_address}: {e}")
     

@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
-import { apiClient, updateApiClientToken } from '../config/api';
+import { apiClient, updateApiClientToken, API_ENDPOINTS } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';

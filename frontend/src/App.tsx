@@ -34,13 +34,13 @@ const AppContent: React.FC = () => {
   const { session: authSession, user } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState<boolean>(
-    localStorage.getItem('seamount_consent_given') === 'true'
+    localStorage.getItem('seamount_consent_given') === 'true' || !!authSession
   );
   const [sessionInitialized, setSessionInitialized] = useState<boolean>(false);
 
   useEffect(() => {
-    // If consent is already given, no need to initialize a new session
-    if (consentGiven) {
+    // If consent is already given or user is authenticated, skip initialization
+    if (consentGiven || authSession) {
       return;
     }
 
