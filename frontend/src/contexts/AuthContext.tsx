@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';
 import toast from 'react-hot-toast';
 
-// Interfaces remain the same
 interface AuthState {
   session: Session | null;
   user: UserProfile | null;
@@ -23,6 +22,7 @@ interface AuthContextType extends AuthState {
   completeOnboarding: () => Promise<void>;
   triggerWalletCreation: () => Promise<{ success: boolean; mnemonic: string | null }>;
   fetchUserProfile: () => Promise<UserProfile | null>;
+  refreshKycStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +60,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  const refreshKycStatus = useCallback(async () => {
+    try {
+      const userProfile = await fetchUserProfile();
+      if (userProfile) {
+        setState(prev => ({ ...prev, user: userProfile }));
+      }
+    } catch (error) {
+      console.error('Failed to refresh KYC status:', error);
+    }
+  }, [fetchUserProfile]);
+
   useEffect(() => {
     setState(prev => ({ ...prev, loading: true }));
 
@@ -67,7 +78,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`[Auth State Change] Event: ${event}`);
       
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        // ** THIS IS THE RESTORED, CRITICAL LOGIC **
         // A small delay gives Supabase time to propagate the session, especially after email confirmation.
         setTimeout(async () => {
             if (session) {
@@ -75,11 +85,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (userProfile) {
                     setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
                     
-                    // FIXED ROUTING LOGIC: Check if user needs onboarding
-                    if (!userProfile.kyc_status || userProfile.kyc_status === 'unverified' || userProfile.kyc_level === 0) {
-                        navigate('/onboarding');
-                    } else {
+                    // UPDATED ROUTING LOGIC: Handle different KYC states
+                    if (userProfile.kyc_status === 'skipped') {
+                        // Allow access to dashboard with restricted features
                         navigate('/dashboard');
+                    } else if (!userProfile.kyc_status || userProfile.kyc_status === 'unverified' || userProfile.kyc_level === 0) {
+                        navigate('/onboarding');
+                    } else if (userProfile.kyc_status === 'approved') {
+                        navigate('/dashboard');
+                    } else {
+                        // For pending, rejected, or other states, stay on onboarding
+                        navigate('/onboarding');
                     }
                 } else {
                     // Profile fetch failed, which implies an invalid session.
@@ -89,7 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // If there's no session, we're not logged in.
                 setState(prev => ({ ...prev, session: null, user: null, loading: false, error: null }));
             }
-        }, 1000); // 1-second delay from your original working code
+        }, 1000);
       } else if (event === 'SIGNED_OUT') {
         setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
         navigate('/');
@@ -168,8 +184,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       completeOnboarding,
       triggerWalletCreation,
       fetchUserProfile,
+      refreshKycStatus,
     }}>
-      {!state.loading ? children : <div>Loading Seamount...</div> /* Or a proper loading spinner */}
+      {!state.loading ? children : <div>Loading Seamount...</div>}
     </AuthContext.Provider>
   );
 };

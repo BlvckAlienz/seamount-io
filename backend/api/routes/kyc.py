@@ -9,7 +9,6 @@ from services.kyc_providers.complycube import complycube_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# CHANGE: Updated endpoint to match frontend expectation
 @router.post("/kyc/start-verification", tags=["KYC"])
 async def start_kyc_verification(
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -63,3 +62,39 @@ async def start_kyc_verification(
     except Exception as e:
         logger.critical(f"Critical error during KYC initiation for user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@router.post("/kyc/skip", tags=["KYC"])
+async def skip_kyc_verification(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Marks KYC verification as skipped for the authenticated user.
+    Allows restricted access to the platform.
+    """
+    user_id = current_user.get("id")
+    logger.info(f"User {user_id} is skipping KYC verification")
+
+    try:
+        # Update user profile to mark KYC as skipped
+        update_data = {
+            'kyc_status': 'skipped',
+            'kyc_level': 1,  # Basic level access
+            'updated_at': 'now()'
+        }
+        
+        response = supabase.table('user_profiles') \
+            .update(update_data) \
+            .eq('id', user_id) \
+            .execute()
+        
+        if not response.data:
+            logger.error(f"Failed to update KYC status for user {user_id}")
+            raise HTTPException(status_code=500, detail="Could not update KYC status")
+        
+        logger.info(f"User {user_id} KYC status set to 'skipped'")
+        return {"success": True, "message": "KYC verification skipped. You can complete it later."}
+        
+    except Exception as e:
+        logger.error(f"Error skipping KYC for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to skip verification")
