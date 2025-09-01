@@ -12,6 +12,7 @@ class UserRole(str, Enum):
 
 class KYCStatus(str, Enum):
     NOT_STARTED = "not_started"
+    PENDING = "pending"  # ADD THIS LINE
     INITIATED = "initiated"
     IN_PROGRESS = "in_progress"
     UNDER_REVIEW = "under_review"

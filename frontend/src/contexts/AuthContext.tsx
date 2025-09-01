@@ -16,14 +16,14 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  signUp: (email: string, password: string, options?: { firstName?: string; lastName?: string }) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, options?: { firstName?: string; lastName?: string; countryCode?: string }) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
   triggerWalletCreation: () => Promise<{ success: boolean; mnemonic: string | null }>;
   fetchUserProfile: () => Promise<UserProfile | null>;
   refreshKycStatus: () => Promise<void>;
-  skipVerification: () => Promise<void>; // Added skip verification function
+  skipVerification: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -72,7 +72,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [fetchUserProfile]);
 
-  // Add skip verification function
   const skipVerification = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, loading: true }));
@@ -94,31 +93,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log(`[Auth State Change] Event: ${event}`);
       
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        // A small delay gives Supabase time to propagate the session, especially after email confirmation.
         setTimeout(async () => {
             if (session) {
                 const userProfile = await fetchUserProfile();
                 if (userProfile) {
                     setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
                     
-                    // UPDATED ROUTING LOGIC: Handle different KYC states
                     if (userProfile.kyc_status === 'skipped') {
-                        // Allow access to dashboard with restricted features
                         navigate('/dashboard');
                     } else if (!userProfile.kyc_status || userProfile.kyc_status === 'unverified' || userProfile.kyc_level === 0) {
                         navigate('/onboarding');
                     } else if (userProfile.kyc_status === 'approved') {
                         navigate('/dashboard');
                     } else {
-                        // For pending, rejected, or other states, stay on onboarding
                         navigate('/onboarding');
                     }
                 } else {
-                    // Profile fetch failed, which implies an invalid session.
                     setState(prev => ({ ...prev, session: null, user: null, loading: false, error: 'Failed to retrieve user profile.' }));
                 }
             } else {
-                // If there's no session, we're not logged in.
                 setState(prev => ({ ...prev, session: null, user: null, loading: false, error: null }));
             }
         }, 1000);
@@ -136,13 +129,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = async (
     email: string,
     password: string,
-    options: { firstName?: string; lastName?: string } = {}
+    options: { firstName?: string; lastName?: string; countryCode?: string } = {}
   ) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
         const { error } = await supabase.auth.signUp({
-            email, password,
-            options: { data: { first_name: options.firstName, last_name: options.lastName } }
+            email,
+            password,
+            options: {
+              data: {
+                first_name: options.firstName,
+                last_name: options.lastName,
+                country_code: options.countryCode
+              }
+            }
         });
         if (error) throw error;
         toast.success('Sign up successful! Please check your email to verify your account.');
@@ -160,7 +160,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // The onAuthStateChange listener handles the rest.
         return { success: true };
     } catch (err: any) {
         console.error('[SignIn Error]', err);
@@ -201,7 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       triggerWalletCreation,
       fetchUserProfile,
       refreshKycStatus,
-      skipVerification, // Add skip verification function
+      skipVerification,
     }}>
       {!state.loading ? children : <div>Loading Seamount...</div>}
     </AuthContext.Provider>

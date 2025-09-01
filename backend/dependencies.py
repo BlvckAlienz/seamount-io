@@ -132,19 +132,27 @@ async def get_current_user(
         # FIX: Handle cases where response.data might be None
         if not profile_res or not hasattr(profile_res, 'data') or profile_res.data is None:
             logger.warning(f"Profile not found or empty response for user {user_id}. Creating one from auth details.")
-            # Corrected method: use get_user instead of get_user_by_id
-            auth_user_res = supabase.auth.admin.get_user(user_id)
-            if not auth_user_res.user: raise HTTPException(status_code=404, detail="User not found in auth system.")
+            
+            # Get user metadata from the JWT payload (where Supabase stores registration data)
+            user_metadata = payload.get('user_metadata', {})
             
             new_profile_data = {
                 "id": user_id,
-                "email": auth_user_res.user.email,
-                "first_name": auth_user_res.user.user_metadata.get("first_name"),
-                "last_name": auth_user_res.user.user_metadata.get("last_name"),
+                "email": payload.get('email'),
+                "first_name": user_metadata.get("first_name", ""),
+                "last_name": user_metadata.get("last_name", ""),
+                "country_code": user_metadata.get("country_code", "US"),
+                "kyc_status": "not_started",
+                "access_level": "limited",
                 "role": UserRole.ALIEN.value,
+                "created_at": "now()",
+                "updated_at": "now()"
             }
+            
             insert_res = supabase.from_("user_profiles").insert(new_profile_data).execute()
-            if not insert_res.data: raise HTTPException(status_code=500, detail="Could not create user profile.")
+            if not insert_res.data: 
+                logger.error(f"Failed to create profile for user {user_id}")
+                raise HTTPException(status_code=500, detail="Could not create user profile.")
             
             logger.info(f"Successfully created new profile for user {user_id}.")
             return insert_res.data[0]
