@@ -4,7 +4,7 @@ import { apiClient } from '../../config/api';
 import { COMPLYCUBE_CONFIG } from '../../config/env';
 import Button from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import './ComplyCubeVerification.css';
 
 declare global {
   interface Window {
@@ -32,7 +32,7 @@ const ComplyCubeVerification: React.FC = () => {
     email: ''
   });
   const { refreshKycStatus, user } = useAuth();
-  const mountRef = useRef<HTMLDivElement>(null);
+  const [complyCubeSession, setComplyCubeSession] = useState<any>(null);
 
   useEffect(() => {
     // Check profile completeness on component mount
@@ -116,8 +116,17 @@ const ComplyCubeVerification: React.FC = () => {
   };
 
   const startVerification = async () => {
-    if (!profileComplete) {
-      setError('Please complete your profile first');
+    // Double-check profile completeness before starting
+    try {
+      const profileCheck = await apiClient.get('/api/kyc/profile-check');
+      if (!profileCheck.data.profile_complete) {
+        setError('Please complete your profile first');
+        setProfileComplete(false);
+        setMissingFields(profileCheck.data.missing_fields);
+        return;
+      }
+    } catch (error) {
+      setError('Unable to verify profile status. Please try again.');
       return;
     }
 
@@ -146,12 +155,21 @@ const ComplyCubeVerification: React.FC = () => {
             onCancel: () => {
               console.log('Verification cancelled by user');
               setVerificationStarted(false);
+            },
+            onModalClose: () => {
+              console.log('Modal closed by user');
+              setVerificationStarted(false);
+            },
+            onExit: (reason: any) => {
+              console.log('User exited verification:', reason);
+              setVerificationStarted(false);
             }
           });
           
           // Mount to the specific element
           session.mount('#complycube-mount');
           setVerificationStarted(true);
+          setComplyCubeSession(session);
         } else {
           console.error('ComplyCube SDK not loaded');
           setError('Verification service not available. Please refresh and try again.');
@@ -187,67 +205,76 @@ const ComplyCubeVerification: React.FC = () => {
     }
   };
 
+  const exitVerification = () => {
+    setVerificationStarted(false);
+    if (complyCubeSession) {
+      complyCubeSession.unmount();
+    }
+  };
+
   // Show profile completion form if profile is incomplete
   if (!profileComplete) {
     return (
-      <div className="profile-completion-form">
-        <h2>Complete Your Profile</h2>
-        <p>Please complete your profile information before starting verification:</p>
-        
-        <div className="form-fields">
-          {missingFields.includes('first_name') && (
-            <div className="form-field">
-              <label>First Name</label>
-              <input
-                type="text"
-                value={profileData.first_name}
-                onChange={(e) => setProfileData({...profileData, first_name: e.target.value})}
-                placeholder="Enter your first name"
-                required
-              />
-            </div>
-          )}
+      <div className="profile-completion-overlay">
+        <div className="profile-completion-modal">
+          <h2>Complete Your Profile</h2>
+          <p>Please complete your profile information before starting verification:</p>
           
-          {missingFields.includes('last_name') && (
-            <div className="form-field">
-              <label>Last Name</label>
-              <input
-                type="text"
-                value={profileData.last_name}
-                onChange={(e) => setProfileData({...profileData, last_name: e.target.value})}
-                placeholder="Enter your last name"
-                required
-              />
-            </div>
-          )}
-          
-          {missingFields.includes('email') && (
-            <div className="form-field">
-              <label>Email</label>
-              <input
-                type="email"
-                value={profileData.email}
-                onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-          )}
-        </div>
-        
-        {error && (
-          <div className="error-message">
-            {error}
-            <button onClick={() => setError(null)} className="dismiss-btn">
-              Dismiss
-            </button>
+          <div className="profile-form">
+            {missingFields.includes('first_name') && (
+              <div className="form-group">
+                <label>First Name</label>
+                <input
+                  type="text"
+                  value={profileData.first_name}
+                  onChange={(e) => setProfileData({...profileData, first_name: e.target.value})}
+                  placeholder="Enter your first name"
+                  required
+                />
+              </div>
+            )}
+            
+            {missingFields.includes('last_name') && (
+              <div className="form-group">
+                <label>Last Name</label>
+                <input
+                  type="text"
+                  value={profileData.last_name}
+                  onChange={(e) => setProfileData({...profileData, last_name: e.target.value})}
+                  placeholder="Enter your last name"
+                  required
+                />
+              </div>
+            )}
+            
+            {missingFields.includes('email') && (
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={profileData.email}
+                  onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+            )}
           </div>
-        )}
-        
-        <div className="button-group">
-          <Button onClick={updateProfile} loading={loading}>
-            Update Profile
-          </Button>
+          
+          {error && (
+            <div className="error-message">
+              {error}
+              <button onClick={() => setError(null)} className="dismiss-btn">
+                Dismiss
+              </button>
+            </div>
+          )}
+          
+          <div className="button-group">
+            <Button onClick={updateProfile} loading={loading}>
+              Update Profile
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -285,7 +312,14 @@ const ComplyCubeVerification: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div id="complycube-mount" ref={mountRef}></div>
+        <>
+          <div id="complycube-mount"></div>
+          <div className="exit-verification">
+            <button onClick={exitVerification} className="exit-btn">
+              Exit Verification
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
