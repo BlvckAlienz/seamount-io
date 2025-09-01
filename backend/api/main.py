@@ -24,14 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Import core components, services, and the dependency system
 from api.routes.licensing import router as licensing_router
-from config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion  # Added LicenseTier and PricingRegion
+from config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion
 from services.email_service import EmailService
 from services.notification_service import NotificationService
 from services.wallet_service import WalletService
-from dependencies import (
-    initialize_dependencies, get_current_user, get_supabase_client,
-    get_notification_service, get_wallet_service
-)
+from dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service
 from api.routes import kyc, webhooks, portfolio, investor, consent
 from models import UserProfile, SessionResponse
 
@@ -55,11 +52,9 @@ async def lifespan(app: FastAPI):
         notification_service = NotificationService(email_service)
         wallet_service = WalletService(settings, supabase_client)
 
-        initialize_dependencies(
-            supabase_client=supabase_client,
-            wallet_service=wallet_service,
-            notification_service=notification_service
-        )
+        # Initialize dependencies using the function from dependencies.py
+        initialize_dependencies(supabase_client, wallet_service, notification_service)
+        
         # Access business model features
         license_fee = settings.business_model.calculate_license_fee(
             LicenseTier.BASIC, 

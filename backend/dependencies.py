@@ -132,7 +132,8 @@ async def get_current_user(
         # FIX: Handle cases where response.data might be None
         if not profile_res or not hasattr(profile_res, 'data') or profile_res.data is None:
             logger.warning(f"Profile not found or empty response for user {user_id}. Creating one from auth details.")
-            auth_user_res = supabase.auth.admin.get_user_by_id(user_id)
+            # Corrected method: use get_user instead of get_user_by_id
+            auth_user_res = supabase.auth.admin.get_user(user_id)
             if not auth_user_res.user: raise HTTPException(status_code=404, detail="User not found in auth system.")
             
             new_profile_data = {
