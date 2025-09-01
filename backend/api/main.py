@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Import core components, services, and the dependency system
 from api.routes.licensing import router as licensing_router
-from config import get_settings, BusinessModelConfig
+from config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion  # Added LicenseTier and PricingRegion
 from services.email_service import EmailService
 from services.notification_service import NotificationService
 from services.wallet_service import WalletService
@@ -62,9 +62,10 @@ async def lifespan(app: FastAPI):
         )
         # Access business model features
         license_fee = settings.business_model.calculate_license_fee(
-        LicenseTier.BASIC, 
-        PricingRegion.NIGERIA
+            LicenseTier.BASIC, 
+            PricingRegion.NIGERIA
         )
+        logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
         
         logger.info("All services initialized and injected into the dependency module.")
         yield

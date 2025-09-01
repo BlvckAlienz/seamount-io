@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Set, Any
 from decimal import Decimal
 from pydantic import SecretStr, computed_field, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,13 +25,13 @@ class PricingRegion(str, Enum):
 class BusinessModelConfig:
     """
     Seamount.io Business Model Configuration
-    Handles pricing, fees, and revenue calculations for African SMBs
+    Handles pricing, fees, and revenue calculations for both B2B and B2C models
     """
     
-    # Individual user baseline: 2.6% (2% conversion + 0.6% processing)
-    INDIVIDUAL_BASE_RATE = Decimal("0.026")  # Current Seamount individual rate
+    # B2C Individual user baseline: 2.6% (2% conversion + 0.6% processing)
+    INDIVIDUAL_BASE_RATE = Decimal("0.026")
     
-    # One-time License Fees (in local currency) - Premium positioning
+    # B2B One-time License Fees (in local currency)
     LICENSE_FEES = {
         PricingRegion.NIGERIA: {
             LicenseTier.BASIC: Decimal("800000"),      # ₦800K (~$530)
@@ -50,14 +50,14 @@ class BusinessModelConfig:
         }
     }
     
-    # SMB Transaction Fees (Volume discounts from 2.6% individual rate)
+    # B2B SMB Transaction Fees (Volume discounts from 2.6% individual rate)
     TRANSACTION_FEES = {
         LicenseTier.BASIC: Decimal("0.022"),       # 2.2% (15% discount from individual)
         LicenseTier.PRO: Decimal("0.019"),         # 1.9% (27% discount from individual)
         LicenseTier.ENTERPRISE: Decimal("0.016")   # 1.6% (38% discount from individual)
     }
     
-    # Fee Caps (in USD equivalent) - Premium structure
+    # B2B Fee Caps (in USD equivalent)
     FEE_CAPS = {
         "min_fee_usd": Decimal("2.00"),   # Minimum fee (no hidden costs)
         "max_fee_basic": Decimal("25.00"), # Basic tier cap
@@ -65,11 +65,39 @@ class BusinessModelConfig:
         "max_fee_enterprise": Decimal("100.00")  # Enterprise cap
     }
     
-    # Employee limits per tier
+    # B2B Employee limits per tier
     EMPLOYEE_LIMITS = {
         LicenseTier.BASIC: 50,
         LicenseTier.PRO: 500,
         LicenseTier.ENTERPRISE: float('inf')  # Unlimited
+    }
+
+    # B2C Fee Structure
+    FEE_STRUCTURE = {
+        'conversion': {'base_fee': 0.020}, 
+        'processing': {'tier_1': 0.010, 'tier_2_standard': 0.010, 'tier_2_african': 0.006, 'tier_3': 0.018}, 
+        'network': {'base_fee': 0.00}, 
+        'trading': {'tier_1': 0.002, 'tier_2': 0.0025, 'tier_3': 0.003}, 
+        'swap': {'tier_1': 0.003, 'tier_2': 0.0035, 'tier_3': 0.004}, 
+        'bridge': {'tier_1': 0.0025, 'tier_2': 0.0035, 'tier_3': 0.0045, 'min_fee': 1.50, 'max_fee': 35.00}, 
+        'stability': {'tier_1': 6.5, 'tier_2': 7.5, 'tier_3': 9.0}, 
+        'staking': {'reward_rate': 4.5}
+    }
+
+    # B2C Geographic Tiers
+    GEOGRAPHIC_TIERS = {
+        'tier_1': ['US', 'CA', 'GB', 'DE', 'FR', 'AU', 'JP', 'SG', 'NL', 'CH', 'SE', 'NO', 'DK', 'AT', 'BE', 'FI', 'IE', 'LU', 'NZ', 'ZA'], 
+        'tier_2_standard': ['MX', 'BR', 'IN', 'CN', 'KR', 'TH', 'MY', 'PH', 'ID', 'VN', 'TW', 'HK', 'AE', 'SA', 'CL', 'CO', 'PE', 'AR', 'UY'], 
+        'tier_2_african': ['NG', 'KE', 'EG', 'UG', 'ZW', 'TZ'], 
+        'tier_3': ['BD', 'PK', 'LK', 'MM', 'NP', 'ET', 'RW', 'BF', 'ML', 'SN', 'CI', 'GH', 'VE', 'MA', 'DO']
+    }
+
+    # B2C Volume Discounts
+    VOLUME_DISCOUNTS = {
+        'startup': {'threshold': 0, 'discount': 0.00}, 
+        'growth': {'threshold': 100000, 'discount': 0.10}, 
+        'enterprise': {'threshold': 1000000, 'discount': 0.15}, 
+        'institutional': {'threshold': 10000000, 'discount': 0.20}
     }
 
     @staticmethod
@@ -80,6 +108,17 @@ class BusinessModelConfig:
         discount = (individual_rate - tier_rate) / individual_rate
         return float(discount * 100)
     
+    @staticmethod
+    def calculate_license_fee(tier: LicenseTier, region: PricingRegion) -> Decimal:
+        """Calculate one-time license fee based on tier and region"""
+        try:
+            region_pricing = BusinessModelConfig.LICENSE_FEES.get(region, 
+                                                                BusinessModelConfig.LICENSE_FEES[PricingRegion.DEFAULT])
+            return region_pricing[tier]
+        except KeyError as e:
+            logger.error(f"Invalid tier or region: {e}")
+            raise ValueError(f"Invalid pricing configuration: tier={tier}, region={region}")
+
     @staticmethod
     def calculate_annual_savings(tier: LicenseTier, annual_volume_usd: Decimal) -> Dict:
         """Calculate annual savings vs individual rate"""
@@ -98,35 +137,35 @@ class BusinessModelConfig:
             "discount_percentage": BusinessModelConfig.get_discount_percentage(tier),
             "tier": tier.value
         }
-        """Calculate one-time license fee based on tier and region"""
-        try:
-            region_pricing = BusinessModelConfig.LICENSE_FEES.get(region, 
-                                                                BusinessModelConfig.LICENSE_FEES[PricingRegion.DEFAULT])
-            return region_pricing[tier]
-        except KeyError as e:
-            logger.error(f"Invalid tier or region: {e}")
-            raise ValueError(f"Invalid pricing configuration: tier={tier}, region={region}")
 
     @staticmethod
-    def calculate_transaction_fee(amount_usd: Decimal, tier: LicenseTier) -> Tuple[Decimal, Dict]:
+    def calculate_transaction_fee(amount_usd: Decimal, tier: Optional[LicenseTier] = None) -> Tuple[Decimal, Dict]:
         """
         Calculate transaction fee with caps and minimums
-        Returns: (fee_amount, calculation_details)
+        Supports both B2C (individual) and B2B (licensed) users
         """
         try:
-            base_rate = BusinessModelConfig.TRANSACTION_FEES[tier]
-            calculated_fee = amount_usd * base_rate
-            
-            # Apply minimum fee
-            min_fee = BusinessModelConfig.FEE_CAPS["min_fee_usd"]
-            
-            # Apply maximum fee based on tier
-            if tier == LicenseTier.BASIC:
-                max_fee = BusinessModelConfig.FEE_CAPS["max_fee_basic"]
-            elif tier == LicenseTier.PRO:
-                max_fee = BusinessModelConfig.FEE_CAPS["max_fee_pro"]
-            else:  # ENTERPRISE
-                max_fee = BusinessModelConfig.FEE_CAPS["max_fee_enterprise"]
+            # Use individual rate if no tier provided (B2C)
+            if tier is None:
+                base_rate = BusinessModelConfig.INDIVIDUAL_BASE_RATE
+                calculated_fee = amount_usd * base_rate
+                min_fee = Decimal("0.50")  # Lower minimum for B2C
+                max_fee = Decimal("50.00")  # Standard maximum for B2C
+            else:
+                # Use tiered rate for B2B
+                base_rate = BusinessModelConfig.TRANSACTION_FEES[tier]
+                calculated_fee = amount_usd * base_rate
+                
+                # Apply minimum fee
+                min_fee = BusinessModelConfig.FEE_CAPS["min_fee_usd"]
+                
+                # Apply maximum fee based on tier
+                if tier == LicenseTier.BASIC:
+                    max_fee = BusinessModelConfig.FEE_CAPS["max_fee_basic"]
+                elif tier == LicenseTier.PRO:
+                    max_fee = BusinessModelConfig.FEE_CAPS["max_fee_pro"]
+                else:  # ENTERPRISE
+                    max_fee = BusinessModelConfig.FEE_CAPS["max_fee_enterprise"]
             
             # Final fee calculation with caps
             final_fee = max(min_fee, min(calculated_fee, max_fee))
@@ -138,7 +177,7 @@ class BusinessModelConfig:
                 "min_fee": float(min_fee),
                 "max_fee": float(max_fee),
                 "final_fee": float(final_fee),
-                "tier": tier.value,
+                "tier": tier.value if tier else "individual",
                 "effective_rate": float(final_fee / amount_usd) if amount_usd > 0 else 0
             }
             
@@ -147,6 +186,50 @@ class BusinessModelConfig:
         except Exception as e:
             logger.error(f"Fee calculation error: {e}")
             raise ValueError(f"Transaction fee calculation failed: {e}")
+
+    @staticmethod
+    def calculate_b2c_fee(amount: Decimal, country_code: str, service_type: str) -> Dict[str, Any]:
+        """Calculate B2C fee based on country and service type"""
+        # Determine geographic tier
+        geo_tier = None
+        for tier, countries in BusinessModelConfig.GEOGRAPHIC_TIERS.items():
+            if country_code in countries:
+                geo_tier = tier
+                break
+        
+        if not geo_tier:
+            geo_tier = 'tier_3'  # Default to highest fee tier
+        
+        # Get fee rate based on service and tier
+        if service_type in BusinessModelConfig.FEE_STRUCTURE:
+            service_fees = BusinessModelConfig.FEE_STRUCTURE[service_type]
+            if geo_tier in service_fees:
+                fee_rate = Decimal(str(service_fees[geo_tier]))
+            else:
+                fee_rate = Decimal(str(service_fees.get('base_fee', 0.02)))
+        else:
+            fee_rate = Decimal("0.02")  # Default fallback
+        
+        calculated_fee = amount * fee_rate
+        
+        # Apply min/max fees if specified
+        min_fee = Decimal(str(BusinessModelConfig.FEE_STRUCTURE.get(service_type, {}).get('min_fee', 0)))
+        max_fee = Decimal(str(BusinessModelConfig.FEE_STRUCTURE.get(service_type, {}).get('max_fee', float('inf'))))
+        
+        final_fee = max(min_fee, min(calculated_fee, max_fee))
+        
+        return {
+            "amount": float(amount),
+            "country_code": country_code,
+            "service_type": service_type,
+            "geo_tier": geo_tier,
+            "fee_rate": float(fee_rate),
+            "calculated_fee": float(calculated_fee),
+            "min_fee": float(min_fee),
+            "max_fee": float(max_fee if max_fee != float('inf') else 0),
+            "final_fee": float(final_fee),
+            "effective_rate": float(final_fee / amount) if amount > 0 else 0
+        }
 
     @staticmethod
     def project_monthly_revenue(customers_by_tier: Dict[LicenseTier, int], 
@@ -207,6 +290,7 @@ class BusinessModelConfig:
 class Settings(BaseSettings):
     """
     Enhanced Seamount API settings with integrated business model
+    Supports both B2B and B2C operations
     """
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -215,6 +299,7 @@ class Settings(BaseSettings):
     )
 
     # --- Core & Security ---
+    DATABASE_URL: SecretStr
     ENCRYPTION_KEY: SecretStr
     IPINFO_TOKEN: SecretStr
     
@@ -228,10 +313,27 @@ class Settings(BaseSettings):
     COMPLYCUBE_API_KEY: Optional[SecretStr] = None
     COMPLYCUBE_WEBHOOK_SECRET: Optional[SecretStr] = None
     
+    # --- External APIs ---
+    ALPHA_VANTAGE_KEY: SecretStr
+    FLUTTERWAVE_SECRET_KEY: SecretStr
+    FLUTTERWAVE_PUBLIC_KEY: str
+    COINGECKO_API_KEY: SecretStr
+    
     # --- Algorand Network ---
     ALGORAND_NODE_URL: str
     ALGORAND_INDEXER_URL: str
     ALGORAND_API_KEY: SecretStr
+    ALGORAND_CREATOR_MNEMONIC: SecretStr
+    ALGORAND_NETWORK: str
+    USDS_ASSET_ID: int
+
+    # --- Treasury (Sensitive) ---
+    TREASURY_ADDRESS: str
+    TREASURY_PRIVATE_KEY: SecretStr
+
+    # --- Redis (Upstash) ---
+    UPSTASH_REDIS_REST_URL: str
+    UPSTASH_REDIS_REST_TOKEN: SecretStr
     
     # --- Email Service ---
     MAIL_SERVER: str
@@ -244,6 +346,9 @@ class Settings(BaseSettings):
     
     # --- CORS Configuration ---
     ALLOWED_ORIGINS_STR: str = ""
+    
+    # --- Whitelabel API Service ---
+    WHITELISTED_API_KEYS_STR: str = ""
 
     # --- Operational ---
     ENVIRONMENT: str = "development"
@@ -267,9 +372,18 @@ class Settings(BaseSettings):
                 "http://localhost:3000", 
                 "http://localhost:5173", 
                 "https://seamount.io", 
-                "https://www.seamount.io"
+                "https://www.seamount.io",
+                "https://seamount.vercel.app"
             ]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS_STR.split(',')]
+    
+    @computed_field
+    @property
+    def WHITELISTED_API_KEYS(self) -> Set[str]:
+        """Parse WHITELISTED_API_KEYS_STR into a set"""
+        if not self.WHITELISTED_API_KEYS_STR:
+            return set()
+        return {key.strip() for key in self.WHITELISTED_API_KEYS_STR.split(',')}
     
     @computed_field
     @property
@@ -296,6 +410,10 @@ def get_settings() -> Settings:
             basic_license = bm.calculate_license_fee(LicenseTier.BASIC, _settings_instance.DEFAULT_PRICING_REGION)
             logger.info(f"Basic License Fee: {basic_license} ({_settings_instance.DEFAULT_PRICING_REGION.value})")
             
+            # Test B2C fee calculation
+            b2c_fee = bm.calculate_b2c_fee(Decimal("100"), "NG", "conversion")
+            logger.info(f"B2C Fee Example: ${b2c_fee['final_fee']:.2f} for $100 transaction in Nigeria")
+            
         except Exception as e:
             logger.critical(f"FATAL: Configuration validation failed. Error: {e}", exc_info=True)
             raise
@@ -303,9 +421,9 @@ def get_settings() -> Settings:
 
 # --- Business Model Usage Examples ---
 def demo_revenue_projections():
-    """Demo function showing revenue calculations"""
+    """Demo function showing revenue calculations for both B2B and B2C"""
     
-    # Example: Realistic Nigerian SMB distribution
+    # B2B Example: Realistic Nigerian SMB distribution
     customer_distribution = {
         LicenseTier.BASIC: 70,      # 70 small businesses (10-50 employees)
         LicenseTier.PRO: 25,        # 25 medium businesses (50-500 employees)
@@ -319,7 +437,7 @@ def demo_revenue_projections():
         LicenseTier.ENTERPRISE: Decimal("150000") # $150K monthly (large payroll + complex treasury)
     }
     
-    # Calculate projections with savings analysis
+    # Calculate B2B projections with savings analysis
     bm = BusinessModelConfig()
     projections = bm.project_monthly_revenue(
         customer_distribution, 
@@ -327,8 +445,8 @@ def demo_revenue_projections():
         PricingRegion.NIGERIA
     )
     
-    # Show savings vs individual rates
-    logger.info("=== SMB SAVINGS VS INDIVIDUAL RATES ===")
+    # Show B2B savings vs individual rates
+    logger.info("=== B2B SMB SAVINGS VS INDIVIDUAL RATES ===")
     for tier in LicenseTier:
         if customer_distribution.get(tier, 0) > 0:
             annual_volume = avg_volumes[tier] * 12
@@ -336,7 +454,14 @@ def demo_revenue_projections():
             logger.info(f"{tier.value.title()}: {savings['discount_percentage']:.1f}% discount, "
                        f"${savings['annual_savings']:,.0f} annual savings per customer")
     
-    logger.info(f"Total Revenue Projections: {projections}")
+    # B2C Example: Individual user fees
+    logger.info("=== B2C FEE EXAMPLES ===")
+    test_amounts = [Decimal("50"), Decimal("100"), Decimal("500")]
+    for amount in test_amounts:
+        individual_fee, _ = bm.calculate_transaction_fee(amount)  # No tier = individual rate
+        logger.info(f"Individual ${amount}: Fee = ${individual_fee:.2f} ({individual_fee/amount*100:.2f}%)")
+    
+    logger.info(f"Total B2B Revenue Projections: {projections}")
     return projections
 
 if __name__ == "__main__":
