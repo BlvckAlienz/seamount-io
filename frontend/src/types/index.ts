@@ -1,3 +1,8 @@
+// File Location: frontend/src/types/index.ts
+
+// License Management Types
+export * from './licensing';
+
 export interface User {
   id: string;
   name: string;

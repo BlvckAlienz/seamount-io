@@ -9,6 +9,30 @@ from services.kyc_providers.complycube import complycube_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+@router.post("/skip")
+async def skip_verification(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Allow users to skip KYC verification temporarily"""
+    user_id = current_user.get("id")
+    
+    try:
+        # Update user profile to mark verification as skipped
+        update_data = {
+            "kyc_status": "skipped",
+            "verification_skipped": True
+        }
+        
+        result = supabase.from_("user_profiles").update(update_data).eq("id", user_id).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"status": "success", "message": "Verification skipped"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error skipping verification: {str(e)}")
+
 @router.post("/kyc/start-verification", tags=["KYC"])
 async def start_kyc_verification(
     current_user: Dict[str, Any] = Depends(get_current_user),

@@ -25,6 +25,7 @@ export const API_ENDPOINTS = {
   },
   KYC: {
     START_VERIFICATION: '/api/kyc/start-verification',
+    SKIP: '/api/kyc/skip', // Added skip endpoint
   },
   WALLET: {
     CREATE: '/api/wallet/create',

@@ -15,7 +15,7 @@ from uuid import uuid4
 from datetime import datetime
 import asyncio
 import traceback
-import aiohttp
+import aiohttp 
 
 # Add the project root to the Python path for clean imports
 import sys
@@ -23,7 +23,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Import core components, services, and the dependency system
-from config import get_settings
+from api.routes.licensing import router as licensing_router
+from config import get_settings, BusinessModelConfig
 from services.email_service import EmailService
 from services.notification_service import NotificationService
 from services.wallet_service import WalletService
@@ -59,6 +60,12 @@ async def lifespan(app: FastAPI):
             wallet_service=wallet_service,
             notification_service=notification_service
         )
+        # Access business model features
+        license_fee = settings.business_model.calculate_license_fee(
+        LicenseTier.BASIC, 
+        PricingRegion.NIGERIA
+        )
+        
         logger.info("All services initialized and injected into the dependency module.")
         yield
     except Exception as e:
@@ -88,6 +95,7 @@ app.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
 app.include_router(investor.router, prefix="/api/v1", tags=["Investor"])
 app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
+app.include_router(licensing_router)
 
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])

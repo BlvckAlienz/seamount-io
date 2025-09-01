@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Shield, ArrowRight } from 'lucide-react';
-import Button from './ui/Button';  // This is correct
+import Button from './ui/Button';
 import { useAuth } from '../contexts/AuthContext';
 
 interface VerificationModalProps {
@@ -14,12 +14,21 @@ const VerificationModal: React.FC<VerificationModalProps> = ({
   onClose, 
   actionDescription = "perform this action" 
 }) => {
-  const { user } = useAuth();
+  const { user, skipVerification } = useAuth();
 
   if (!isOpen) return null;
 
   const handleVerifyNow = () => {
     window.location.href = '/onboarding';
+  };
+
+  const handleSkip = async () => {
+    try {
+      await skipVerification();
+      onClose();
+    } catch (error) {
+      console.error('Failed to skip verification:', error);
+    }
   };
 
   return (
@@ -61,7 +70,7 @@ const VerificationModal: React.FC<VerificationModalProps> = ({
             Verify Now
           </Button>
           <Button
-            onClick={onClose}
+            onClick={handleSkip}
             variant="outline"
           >
             Maybe Later

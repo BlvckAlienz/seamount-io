@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Shield, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import Button from '../Button';
+import Button from '../ui/Button';
 import Card from '../Card';
 import { apiClient } from '../../config/api';
+import { supabase } from '../../lib/supabase';
+import './KycVerification.css';
 
 interface KycVerificationProps {
   onComplete?: () => void;
@@ -18,6 +20,17 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const mountRef = useRef<HTMLDivElement>(null);
   const { user, refreshKycStatus } = useAuth();
+
+  // Ensure mount point exists
+  useEffect(() => {
+    if (!document.getElementById('complycube-mount')) {
+      const mountPoint = document.createElement('div');
+      mountPoint.id = 'complycube-mount';
+      mountPoint.style.width = '100%';
+      mountPoint.style.minHeight = '500px';
+      document.body.appendChild(mountPoint);
+    }
+  }, []);
 
   // Load ComplyCube script
   useEffect(() => {
@@ -63,24 +76,22 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
     }
   }, [sdkLoaded, sdkToken]);
 
-  // Initialize SDK when token is available and mount element exists
+  // Initialize SDK when token is available
   useEffect(() => {
     if (sdkToken && mountRef.current) {
-      // Wait for the next tick to ensure DOM is updated
-      setTimeout(() => {
-        const mountElement = document.getElementById('complycube-mount');
-        
-        if (!mountElement) {
-          console.error('Mount element still not found after timeout');
-          setError('Verification UI failed to load. Please try again.');
-          return;
-        }
+      const mountElement = document.getElementById('complycube-mount');
+      
+      if (!mountElement) {
+        console.error('Mount element not found');
+        setError('Verification UI failed to load. Please try again.');
+        return;
+      }
 
-        // Initialize ComplyCube
+      // Initialize ComplyCube with a slight delay to ensure mount point is ready
+      setTimeout(() => {
         try {
-          (window as any).ComplyCube.mount({
+          const session = (window as any).ComplyCube.mount({
             token: sdkToken,
-            containerId: 'complycube-mount',
             onComplete: (data: any) => {
               console.log('Verification completed:', data);
               setVerificationStatus('completed');
@@ -101,19 +112,32 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
               if (onCancel) onCancel();
             }
           });
+          
+          // Mount to the specific element
+          session.mount('#complycube-mount');
         } catch (sdkError) {
           console.error('SDK initialization error:', sdkError);
           setError('Failed to initialize verification. Please refresh and try again.');
         }
-      }, 100); // Small delay to ensure DOM is updated
+      }, 100);
     }
-  }, [sdkToken, mountRef, onComplete, onCancel, refreshKycStatus]);
+  }, [sdkToken, onComplete, onCancel, refreshKycStatus]);
 
-  const skipVerification = () => {
-    // Update user status to indicate they skipped verification
-    // This should call your backend API to update the user's KYC status
-    console.log('User skipped verification');
-    if (onCancel) onCancel();
+  // Add skip verification function
+  const skipVerification = async () => {
+    try {
+      setLoading(true);
+      // Call backend API to mark KYC as skipped
+      await apiClient.post('/api/kyc/skip');
+      // Refresh user status
+      await refreshKycStatus();
+      if (onCancel) onCancel();
+    } catch (error: any) {
+      console.error('Failed to skip verification:', error);
+      setError('Failed to skip verification. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -181,15 +205,35 @@ const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onCancel 
         </p>
       </div>
       
-      {/* Mount point for ComplyCube SDK */}
+      {/* Mount point for ComplyCube SDK - Always rendered but hidden until token is available */}
       <div ref={mountRef} className="complycube-container">
-        {sdkToken && <div id="complycube-mount" style={{ minHeight: '500px', width: '100%' }}></div>}
+        <div 
+          id="complycube-mount" 
+          style={{ 
+            minHeight: '500px', 
+            width: '100%',
+            display: sdkToken ? 'block' : 'none'
+          }}
+        ></div>
+        
+        {!sdkToken && (
+          <div className="text-center py-8">
+            <div className="relative w-16 h-16 mx-auto mb-6">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 animate-spin"></div>
+            </div>
+            <p className="text-gray-300">Preparing verification...</p>
+          </div>
+        )}
       </div>
       
       <div className="mt-4 text-center">
         <Button onClick={skipVerification} variant="outline" size="sm">
           Skip for Now
         </Button>
+        <p className="text-xs text-gray-400 mt-2">
+          You can complete verification later from your settings
+        </p>
       </div>
     </Card>
   );

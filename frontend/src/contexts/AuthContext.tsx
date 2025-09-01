@@ -23,6 +23,7 @@ interface AuthContextType extends AuthState {
   triggerWalletCreation: () => Promise<{ success: boolean; mnemonic: string | null }>;
   fetchUserProfile: () => Promise<UserProfile | null>;
   refreshKycStatus: () => Promise<void>;
+  skipVerification: () => Promise<void>; // Added skip verification function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +71,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Failed to refresh KYC status:', error);
     }
   }, [fetchUserProfile]);
+
+  // Add skip verification function
+  const skipVerification = useCallback(async () => {
+    try {
+      setState(prev => ({ ...prev, loading: true }));
+      await apiClient.post('/api/kyc/skip');
+      await refreshKycStatus();
+      toast.success('Verification skipped. You can complete it later from your profile.');
+    } catch (error: any) {
+      console.error('Failed to skip verification:', error);
+      toast.error(error.response?.data?.detail || 'Failed to skip verification');
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
+  }, [refreshKycStatus]);
 
   useEffect(() => {
     setState(prev => ({ ...prev, loading: true }));
@@ -185,6 +201,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       triggerWalletCreation,
       fetchUserProfile,
       refreshKycStatus,
+      skipVerification, // Add skip verification function
     }}>
       {!state.loading ? children : <div>Loading Seamount...</div>}
     </AuthContext.Provider>
