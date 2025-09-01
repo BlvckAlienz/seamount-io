@@ -1,6 +1,6 @@
 # ==============================================================================
 # Seamount.io API - Main Application Entrypoint
-# Version: 3.1.2 (Corrected lead form recipient)
+# Version: 3.1.3 (Emergency Fix for KYC Status and CORS)
 # ==============================================================================
 
 import logging
@@ -72,14 +72,20 @@ async def lifespan(app: FastAPI):
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Seamount.io API",
-    version="3.1.2",
+    version="3.1.3",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
 
+# URGENT FIX: Hardcoded CORS origins to fix immediate deployment issues
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().ALLOWED_ORIGINS,
+    allow_origins=[
+        "https://www.seamount.io",
+        "https://seamount.io",
+        "http://localhost:3000",
+        "http://localhost:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,7 +102,7 @@ app.include_router(licensing_router)
 # --- Public & Core API Endpoints ---
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
-    return {"status": "healthy", "version": "3.1.2"}
+    return {"status": "healthy", "version": "3.1.3"}
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(
@@ -130,7 +136,16 @@ async def initialize_session(
 
 @app.get("/api/v1/user/profile", response_model=UserProfile, tags=["User"])
 async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
-    return UserProfile(**current_user)
+    # URGENT FIX: Handle KYC status validation errors
+    try:
+        return UserProfile(**current_user)
+    except Exception as e:
+        logger.warning(f"User profile validation error, returning safe version: {e}")
+        # Return a safe version with default values
+        safe_user = current_user.copy()
+        if safe_user.get('kyc_status') not in ['not_started', 'initiated', 'in_progress', 'under_review', 'approved', 'rejected', 'skipped']:
+            safe_user['kyc_status'] = 'not_started'
+        return UserProfile(**safe_user)
 
 @app.post("/api/wallet/create", tags=["Wallet"])
 async def create_wallet(
