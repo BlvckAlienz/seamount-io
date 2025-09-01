@@ -1,7 +1,7 @@
 # File Location: backend/models.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 from enum import Enum
 from decimal import Decimal
@@ -10,23 +10,114 @@ class UserRole(str, Enum):
     TRIBE = "tribe"
     ALIEN = "alien"
 
+class KYCStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    INITIATED = "initiated"
+    IN_PROGRESS = "in_progress"
+    UNDER_REVIEW = "under_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SKIPPED = "skipped"
+
+class AccessLevel(str, Enum):
+    RESTRICTED = "restricted"
+    LIMITED = "limited"
+    VERIFIED = "verified"
+    FULL = "full"
+
 class UserProfile(BaseModel):
     id: uuid.UUID
     email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    phone: Optional[str] = None
     country_code: Optional[str] = None
+    country: Optional[str] = Field(default="USA")
+    address_line1: Optional[str] = None
+    city: Optional[str] = None
+    state_province: Optional[str] = None
+    postal_code: Optional[str] = None
     kyc_level: int = Field(default=0)
-    kyc_status: str = Field(default="none")
+    kyc_status: KYCStatus = Field(default=KYCStatus.NOT_STARTED)
+    access_level: AccessLevel = Field(default=AccessLevel.LIMITED)
+    complycube_applicant_id: Optional[str] = None
+    kyc_initiated_at: Optional[datetime] = None
+    kyc_completed_at: Optional[datetime] = None
+    kyc_rejection_reason: Optional[str] = None
+    is_pep: bool = Field(default=False)
+    sanctions_check_passed: Optional[bool] = None
+    risk_level: str = Field(default="unknown")
     algorand_address: Optional[str] = None
     evm_address: Optional[str] = None
     is_admin: bool = Field(default=False)
     role: UserRole = Field(default=UserRole.ALIEN)
+    verification_skipped: bool = Field(default=False)
+    created_at: datetime
+    updated_at: datetime
+    
+    @validator('first_name', 'last_name')
+    def validate_names(cls, v):
+        if v is not None and len(v.strip()) == 0:
+            return None
+        return v.strip() if v else None
+    
+    @validator('email')
+    def validate_email(cls, v):
+        return v.lower().strip()
+    
+    class Config:
+        from_attributes = True
+
+class KYCVerificationLog(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    applicant_id: Optional[str] = None
+    verification_type: str
+    status: str
+    response_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    date_of_birth: Optional[date] = None
+    phone: Optional[str] = Field(None, max_length=20)
+    country: Optional[str] = Field("USA", max_length=3)
+    address_line1: Optional[str] = Field(None, max_length=255)
+    city: Optional[str] = Field(None, max_length=100)
+    state_province: Optional[str] = Field(None, max_length=100)
+    postal_code: Optional[str] = Field(None, max_length=20)
+    
+    @validator('first_name', 'last_name')
+    def validate_names(cls, v):
+        if not v or len(v.strip()) < 1:
+            raise ValueError('Name must be at least 1 character long')
+        return v.strip()
+
+class ProfileCheckResponse(BaseModel):
+    profile_complete: bool
+    missing_fields: List[str]
+    errors: List[str]
+    can_start_kyc: bool
+    kyc_status: str
+
+class KYCStartResponse(BaseModel):
+    token: str
+    applicantId: str
+    status: str = "success"
+    message: str = "KYC verification initiated successfully"
+
+class KYCSkipResponse(BaseModel):
+    success: bool = True
+    message: str
+    access_level: AccessLevel
+    kyc_status: KYCStatus
 
 class PaymentRequest(BaseModel):
     recipient_email: EmailStr
@@ -88,8 +179,8 @@ class UserSession(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-class Config:
-    from_attributes = True
+    class Config:
+        from_attributes = True
         
 class LicenseTier(str, Enum):
     BASIC = "basic"
@@ -165,3 +256,15 @@ class TransactionFeeCalculation(BaseModel):
     final_fee: Decimal
     effective_rate: float
     savings_vs_individual: Decimal
+
+# Additional validation models for comprehensive error handling
+class ValidationError(BaseModel):
+    field: str
+    message: str
+    code: str
+
+class APIResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Any] = None
+    errors: Optional[List[ValidationError]] = None
