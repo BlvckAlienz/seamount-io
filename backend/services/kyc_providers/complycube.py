@@ -42,17 +42,38 @@ class ComplyCubeService:
     def is_available(self) -> bool:
         return self.client is not None
 
+    def validate_user_data(self, user_data: dict) -> None:
+        """Validate user data before creating applicant"""
+        if not user_data.get('first_name') or not user_data.get('first_name').strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="First name is required for KYC verification"
+            )
+        if not user_data.get('last_name') or not user_data.get('last_name').strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Last name is required for KYC verification"
+            )
+        if not user_data.get('email'):
+            raise HTTPException(
+                status_code=400,
+                detail="Email is required for KYC verification"
+            )
+
     def create_applicant(self, user_data: dict) -> ComplyCubeApplicant:
         if not self.is_available():
             raise HTTPException(status_code=503, detail="KYC service is currently unavailable.")
+
+        # Validate user data first
+        self.validate_user_data(user_data)
 
         try:
             applicant_response = self.client.clients.create(
                 type='person',
                 email=user_data.get('email'),
                 personDetails={
-                    'firstName': user_data.get('first_name', ''),
-                    'lastName': user_data.get('last_name', '')
+                    'firstName': user_data.get('first_name', '').strip(),
+                    'lastName': user_data.get('last_name', '').strip()
                 }
             )
             

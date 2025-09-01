@@ -5,33 +5,90 @@ from typing import Dict, Any
 
 from dependencies import get_supabase_client, get_current_user
 from services.kyc_providers.complycube import complycube_service
+from models import ProfileUpdateRequest, ProfileCheckResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/skip")
-async def skip_verification(
-    current_user: dict = Depends(get_current_user),
+@router.get("/kyc/profile-check", tags=["KYC"])
+async def check_kyc_profile(
+    current_user: Dict[str, Any] = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client)
 ):
-    """Allow users to skip KYC verification temporarily"""
+    """
+    Check if user profile is complete enough for KYC verification
+    """
     user_id = current_user.get("id")
     
     try:
-        # Update user profile to mark verification as skipped
-        update_data = {
-            "kyc_status": "skipped",
-            "verification_skipped": True
-        }
+        # Get user profile
+        response = supabase.table('user_profiles') \
+            .select('*') \
+            .eq('id', user_id) \
+            .execute()
         
-        result = supabase.from_("user_profiles").update(update_data).eq("id", user_id).execute()
+        if not response.data:
+            return ProfileCheckResponse(
+                profile_complete=False,
+                missing_fields=['first_name', 'last_name', 'email'],
+                errors=["User profile not found"],
+                can_start_kyc=False,
+                kyc_status="not_started"
+            )
         
-        if not result.data:
-            raise HTTPException(status_code=404, detail="User not found")
+        profile = response.data[0]
+        missing_fields = []
+        errors = []
         
-        return {"status": "success", "message": "Verification skipped"}
+        # Check required fields
+        if not profile.get('first_name') or not profile.get('first_name').strip():
+            missing_fields.append('first_name')
+        if not profile.get('last_name') or not profile.get('last_name').strip():
+            missing_fields.append('last_name')
+        if not profile.get('email'):
+            missing_fields.append('email')
+        
+        profile_complete = len(missing_fields) == 0
+        can_start_kyc = profile_complete and profile.get('kyc_status') != 'approved'
+        
+        return ProfileCheckResponse(
+            profile_complete=profile_complete,
+            missing_fields=missing_fields,
+            errors=errors,
+            can_start_kyc=can_start_kyc,
+            kyc_status=profile.get('kyc_status', 'not_started')
+        )
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error skipping verification: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error checking profile: {str(e)}")
+
+@router.post("/kyc/update-profile", tags=["KYC"])
+async def update_kyc_profile(
+    profile_data: ProfileUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    Update user profile for KYC verification
+    """
+    user_id = current_user.get("id")
+    
+    try:
+        update_data = profile_data.dict(exclude_unset=True)
+        update_data['updated_at'] = 'now()'
+        
+        response = supabase.table('user_profiles') \
+            .update(update_data) \
+            .eq('id', user_id) \
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        
+        return {"success": True, "message": "Profile updated successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating profile: {str(e)}")
 
 @router.post("/kyc/start-verification", tags=["KYC"])
 async def start_kyc_verification(
@@ -50,6 +107,15 @@ async def start_kyc_verification(
         raise HTTPException(status_code=503, detail="The KYC verification service is temporarily unavailable.")
 
     try:
+        # First check if profile is complete
+        profile_check = await check_kyc_profile(current_user, supabase)
+        if not profile_check.profile_complete:
+            missing_fields = ", ".join(profile_check.missing_fields)
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Profile incomplete. Please complete the following fields: {missing_fields}"
+            )
+
         applicant_id = current_user.get("complycube_applicant_id")
 
         if applicant_id:
@@ -57,10 +123,21 @@ async def start_kyc_verification(
         else:
             logger.info(f"No ComplyCube applicant ID found for user {user_id}. Creating a new applicant.")
             
+            # Get full user profile for KYC
+            response = supabase.table('user_profiles') \
+                .select('*') \
+                .eq('id', user_id) \
+                .execute()
+                
+            if not response.data:
+                raise HTTPException(status_code=404, detail="User profile not found")
+                
+            user_profile = response.data[0]
+            
             user_data_for_kyc = {
-                'email': current_user.get('email'),
-                'first_name': current_user.get('first_name', ''),
-                'last_name': current_user.get('last_name', '')
+                'email': user_profile.get('email'),
+                'first_name': user_profile.get('first_name', ''),
+                'last_name': user_profile.get('last_name', '')
             }
             
             applicant = complycube_service.create_applicant(user_data_for_kyc)
