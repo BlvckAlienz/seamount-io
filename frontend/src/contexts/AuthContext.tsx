@@ -86,20 +86,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const fetchUserProfile = async (userId: string) => {
-    try {
-      const response = await apiClient.get(`/api/users/profile/${userId}`);
-      const profile = response.data;
-      setUserProfile(profile);
-      setKycStatus(profile.kyc_status || 'not_started');
-    } catch (error: any) {
-      console.error('Failed to fetch user profile:', error);
-      
-      // If profile doesn't exist, create it
-      if (error.response?.status === 404 && user) {
-        await createUserProfile(user);
-      }
+  try {
+    // FIX: Changed from /api/users/profile/${userId} to correct endpoint
+    const response = await apiClient.get(API_ENDPOINTS.USER.PROFILE);
+    const profile = response.data;
+    setUserProfile(profile);
+    setKycStatus(profile.kyc_status || 'not_started');
+  } catch (error: any) {
+    console.error('Failed to fetch user profile:', error);
+    
+    // If profile doesn't exist, create it
+    if (error.response?.status === 404 && user) {
+      await createUserProfile(user);
     }
-  };
+  }
+};
 
   const createUserProfile = async (authUser: User) => {
     try {

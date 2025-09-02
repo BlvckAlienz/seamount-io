@@ -9,9 +9,13 @@ import { API_BASE_URL } from './env';
  */
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30-second timeout for requests
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+  },
+  // Add this to prevent infinite retries on certain errors
+  validateStatus: function (status) {
+    return status < 500; // Don't retry on server errors
   },
 });
 

@@ -29,7 +29,16 @@ def initialize_dependencies(supabase_client: Client, wallet_service: WalletServi
     logger.info("Dependencies have been successfully initialized.")
 
 def get_supabase_client() -> Client:
-    if not _supabase_client: raise HTTPException(status_code=503, detail="DB service unavailable.")
+    if not _supabase_client: 
+        # Initialize the client if it doesn't exist
+        try:
+            from config import get_settings
+            settings = get_settings()
+            _supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase client: {e}")
+            raise HTTPException(status_code=503, detail="DB service unavailable.")
     return _supabase_client
 
 def get_wallet_service() -> WalletService:

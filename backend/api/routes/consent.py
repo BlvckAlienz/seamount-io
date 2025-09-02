@@ -27,6 +27,16 @@ async def update_consent_preferences(
     logger.info(f"Received consent update for session_id: {payload.session_id}")
 
     try:
+        # Check if session exists first to avoid unnecessary updates
+        existing_session = supabase.table("user_sessions") \
+            .select("*") \
+            .eq("id", str(payload.session_id)) \
+            .execute()
+            
+        if not existing_session.data:
+            logger.warning(f"Session not found: {payload.session_id}")
+            return {"success": True, "message": "Session not found, but operation completed."}
+
         # Prepare the data for the JSONB column in the user_sessions table
         update_data = {
             "consent_preferences": payload.preferences
@@ -38,23 +48,10 @@ async def update_consent_preferences(
             .eq("id", str(payload.session_id)) \
             .execute()
 
-        # Check if the update was successful. If result.data is empty, no row was found.
-        if not result.data:
-            logger.warning(f"Attempted to update consent for a non-existent session_id: {payload.session_id}")
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session with ID {payload.session_id} not found."
-            )
-
         logger.info(f"Successfully updated consent for session_id: {payload.session_id}")
         return {"success": True, "message": "Consent preferences have been updated."}
 
-    except HTTPException:
-        # Re-raise known HTTP exceptions to be handled by FastAPI
-        raise
     except Exception as e:
         logger.error(f"Error updating consent for session {payload.session_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="A server error occurred while updating consent preferences."
-        )
+        # Don't raise HTTPException here to prevent frontend retry loops
+        return {"success": False, "message": "Failed to update consent preferences."}
