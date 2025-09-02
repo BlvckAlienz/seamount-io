@@ -15,7 +15,7 @@ from supabase import create_client, Client
 from postgrest import APIError
 from fastapi import HTTPException
 
-from ..config import settings
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 

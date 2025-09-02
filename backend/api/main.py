@@ -23,14 +23,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 # Import core components, services, and the dependency system
-from api.routes.licensing import router as licensing_router
-from config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion
-from services.email_service import EmailService
-from services.notification_service import NotificationService
-from services.wallet_service import WalletService
-from dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service
-from api.routes import kyc, webhooks, portfolio, investor, consent
-from models import UserProfile, SessionResponse
+from backend.api.routes.licensing import router as licensing_router
+from backend.config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion
+from backend.services.email_service import EmailService
+from backend.services.notification_service import NotificationService
+from backend.services.wallet_service import WalletService
+from backend.dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service
+from backend.api.routes import kyc, webhooks, portfolio, investor, consent
+from backend.models import UserProfile, SessionResponse
 
 logger = logging.getLogger(__name__)
 
