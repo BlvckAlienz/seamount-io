@@ -54,3 +54,4 @@ httpx
 # Additional dependencies
 pyjwt
 requests
+asyncpg>=0.25.0
