@@ -1,9 +1,13 @@
 // File Location: frontend/src/components/onboarding/ComplyCubeVerification.tsx
+// CRITICAL FIX: Proper exit handling and error recovery
+
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../config/api';
 import { COMPLYCUBE_CONFIG } from '../../config/env';
 import Button from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
 import './ComplyCubeVerification.css';
 
 declare global {
@@ -31,8 +35,9 @@ const ComplyCubeVerification: React.FC = () => {
     last_name: '',
     email: ''
   });
-  const { refreshKycStatus, user } = useAuth();
+  const { refreshKycStatus, user, skipVerification } = useAuth();
   const [complyCubeSession, setComplyCubeSession] = useState<any>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Check profile completeness on component mount
@@ -82,6 +87,7 @@ const ComplyCubeVerification: React.FC = () => {
 
   const checkProfileCompleteness = async () => {
     try {
+      setLoading(true);
       const response = await apiClient.get('/api/kyc/profile-check');
       const data: ProfileCheckResponse = response.data;
       
@@ -94,22 +100,29 @@ const ComplyCubeVerification: React.FC = () => {
       }
       
       if (!data.profile_complete) {
-        setError('Please complete your profile before starting verification');
+        setError(`Please complete your profile first. Missing: ${data.missing_fields.join(', ')}`);
       }
     } catch (error: any) {
       console.error('Failed to check profile completeness:', error);
-      setError('Failed to check profile status');
+      setError('Failed to check profile status. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const updateProfile = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       await apiClient.post('/api/kyc/update-profile', profileData);
       await checkProfileCompleteness();
-      setError(null);
+      
+      toast.success('Profile updated successfully!');
     } catch (error: any) {
-      setError('Failed to update profile: ' + (error.response?.data?.detail || 'Unknown error'));
+      const errorMessage = error.response?.data?.detail || 'Failed to update profile. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -118,6 +131,7 @@ const ComplyCubeVerification: React.FC = () => {
   const startVerification = async () => {
     // Double-check profile completeness before starting
     try {
+      setError(null);
       const profileCheck = await apiClient.get('/api/kyc/profile-check');
       if (!profileCheck.data.profile_complete) {
         setError('Please complete your profile first');
@@ -131,13 +145,12 @@ const ComplyCubeVerification: React.FC = () => {
     }
 
     setLoading(true);
-    setError(null);
     try {
       // Get verification token from backend
       const response = await apiClient.post('/api/kyc/start-verification');
       const { token, applicantId } = response.data;
 
-      // Initialize ComplyCube with a slight delay to ensure mount point is ready
+      // Initialize ComplyCube with enhanced error handling
       setTimeout(() => {
         if (window.ComplyCube) {
           const session = window.ComplyCube.mount({
@@ -145,24 +158,28 @@ const ComplyCubeVerification: React.FC = () => {
             onComplete: (data: any) => {
               console.log('Verification complete', data);
               setVerificationStarted(false);
+              toast.success('Verification completed successfully!');
               refreshKycStatus();
+              // Navigate to dashboard after successful verification
+              setTimeout(() => navigate('/dashboard'), 1000);
             },
             onError: (error: any) => {
               console.error('Verification error', error);
               setVerificationStarted(false);
-              setError('Verification failed. Please try again.');
+              setError('Verification failed. You can skip for now and try again later.');
+              toast.error('Verification failed. Please try again or skip for now.');
             },
             onCancel: () => {
               console.log('Verification cancelled by user');
-              setVerificationStarted(false);
+              handleVerificationExit('User cancelled verification');
             },
             onModalClose: () => {
               console.log('Modal closed by user');
-              setVerificationStarted(false);
+              handleVerificationExit('Verification modal closed');
             },
             onExit: (reason: any) => {
               console.log('User exited verification:', reason);
-              setVerificationStarted(false);
+              handleVerificationExit(`Verification exited: ${reason}`);
             }
           });
           
@@ -179,9 +196,10 @@ const ComplyCubeVerification: React.FC = () => {
       console.error('Failed to start verification', error);
       const errorMsg = error.response?.data?.detail || 'Failed to start verification';
       setError(errorMsg);
+      toast.error(errorMsg);
       
       // Check if it's a profile completeness error
-      if (errorMsg.includes('first name') || errorMsg.includes('last name')) {
+      if (errorMsg.includes('first_name') || errorMsg.includes('last_name') || errorMsg.includes('Missing fields')) {
         // Re-check profile completeness
         await checkProfileCompleteness();
       }
@@ -190,89 +208,115 @@ const ComplyCubeVerification: React.FC = () => {
     }
   };
 
-  const skipVerification = async () => {
+  // ENHANCED: Proper exit handling with user feedback
+  const handleVerificationExit = (reason: string) => {
+    console.log('Handling verification exit:', reason);
+    setVerificationStarted(false);
+    
+    if (complyCubeSession) {
+      try {
+        complyCubeSession.unmount();
+      } catch (error) {
+        console.error('Error unmounting ComplyCube session:', error);
+      }
+      setComplyCubeSession(null);
+    }
+    
+    // Show user-friendly message and options
+    toast.info('Verification paused. You can continue anytime or skip for now.');
+    setError(null); // Clear any existing errors
+  };
+
+  const handleSkipVerification = async () => {
     try {
-      setLoading(true);
-      // Call backend API to mark KYC as skipped
-      await apiClient.post('/api/kyc/skip');
-      // Refresh user status
-      await refreshKycStatus();
+      if (skipVerification) {
+        await skipVerification();
+        toast.success('Verification skipped. You can complete it later in settings.');
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       console.error('Failed to skip verification:', error);
-      setError('Failed to skip verification. Please try again.');
-    } finally {
-      setLoading(false);
+      toast.error('Failed to skip verification. Please try again.');
     }
   };
 
-  const exitVerification = () => {
-    setVerificationStarted(false);
-    if (complyCubeSession) {
-      complyCubeSession.unmount();
-    }
+  const handleGoToDashboard = () => {
+    navigate('/dashboard');
   };
 
-  // Show profile completion form if profile is incomplete
-  if (!profileComplete) {
+  // Profile completion form
+  if (!profileComplete && missingFields.length > 0) {
     return (
-      <div className="profile-completion-overlay">
-        <div className="profile-completion-modal">
+      <div className="complycube-verification-container">
+        <div className="verification-header">
           <h2>Complete Your Profile</h2>
-          <p>Please complete your profile information before starting verification:</p>
-          
-          <div className="profile-form">
-            {missingFields.includes('first_name') && (
-              <div className="form-group">
-                <label>First Name</label>
-                <input
-                  type="text"
-                  value={profileData.first_name}
-                  onChange={(e) => setProfileData({...profileData, first_name: e.target.value})}
-                  placeholder="Enter your first name"
-                  required
-                />
-              </div>
-            )}
-            
-            {missingFields.includes('last_name') && (
-              <div className="form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  value={profileData.last_name}
-                  onChange={(e) => setProfileData({...profileData, last_name: e.target.value})}
-                  placeholder="Enter your last name"
-                  required
-                />
-              </div>
-            )}
-            
-            {missingFields.includes('email') && (
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            )}
-          </div>
-          
+          <p>Please provide the missing information to start verification:</p>
+        </div>
+
+        <div className="profile-form">
+          {missingFields.includes('first_name') && (
+            <div className="form-group">
+              <label htmlFor="first_name">First Name *</label>
+              <input
+                id="first_name"
+                type="text"
+                value={profileData.first_name}
+                onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="Enter your first name"
+                required
+              />
+            </div>
+          )}
+
+          {missingFields.includes('last_name') && (
+            <div className="form-group">
+              <label htmlFor="last_name">Last Name *</label>
+              <input
+                id="last_name"
+                type="text"
+                value={profileData.last_name}
+                onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                placeholder="Enter your last name"
+                required
+              />
+            </div>
+          )}
+
+          {missingFields.includes('email') && (
+            <div className="form-group">
+              <label htmlFor="email">Email *</label>
+              <input
+                id="email"
+                type="email"
+                value={profileData.email}
+                onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+          )}
+
           {error && (
             <div className="error-message">
               {error}
-              <button onClick={() => setError(null)} className="dismiss-btn">
-                Dismiss
-              </button>
             </div>
           )}
-          
-          <div className="button-group">
-            <Button onClick={updateProfile} loading={loading}>
-              Update Profile
+
+          <div className="form-actions">
+            <Button 
+              onClick={updateProfile}
+              disabled={loading}
+              className="primary"
+            >
+              {loading ? 'Updating...' : 'Update Profile'}
+            </Button>
+            
+            <Button 
+              onClick={handleGoToDashboard}
+              variant="outline"
+              className="secondary"
+            >
+              Go to Dashboard
             </Button>
           </div>
         </div>
@@ -281,46 +325,79 @@ const ComplyCubeVerification: React.FC = () => {
   }
 
   return (
-    <div className="verification-container">
-      <h2>Identity Verification</h2>
-      <p>Complete verification to unlock all features including sending and receiving USDS.</p>
-      
+    <div className="complycube-verification-container">
+      <div className="verification-header">
+        <h2>Identity Verification</h2>
+        <p>Complete your identity verification to unlock all platform features.</p>
+      </div>
+
       {error && (
         <div className="error-message">
           {error}
-          <button onClick={() => setError(null)} className="dismiss-btn">
-            Dismiss
-          </button>
+          {error.includes('skip') && (
+            <div className="error-actions">
+              <Button 
+                onClick={handleSkipVerification}
+                variant="outline"
+                className="skip-button"
+              >
+                Skip for Now
+              </Button>
+            </div>
+          )}
         </div>
       )}
-      
+
       {!verificationStarted ? (
-        <div className="button-group">
+        <div className="verification-actions">
           <Button 
-            onClick={startVerification} 
-            loading={loading}
-            disabled={!COMPLYCUBE_CONFIG.API_KEY}
+            onClick={startVerification}
+            disabled={loading || !profileComplete}
+            className="start-verification-btn"
           >
-            {COMPLYCUBE_CONFIG.API_KEY ? 'Start Verification' : 'KYC Not Configured'}
+            {loading ? 'Starting...' : 'Start Verification'}
           </Button>
-          <Button 
-            onClick={skipVerification} 
-            variant="outline"
-            className="skip-btn"
-          >
-            I'll do this later
-          </Button>
+
+          <div className="skip-options">
+            <p>You can also:</p>
+            <Button 
+              onClick={handleSkipVerification}
+              variant="outline"
+              className="skip-button"
+            >
+              Skip for Now
+            </Button>
+            <Button 
+              onClick={handleGoToDashboard}
+              variant="text"
+              className="dashboard-button"
+            >
+              Go to Dashboard
+            </Button>
+          </div>
         </div>
       ) : (
-        <>
+        <div className="verification-in-progress">
+          <p>Verification in progress...</p>
           <div id="complycube-mount"></div>
-          <div className="exit-verification">
-            <button onClick={exitVerification} className="exit-btn">
+          
+          <div className="progress-actions">
+            <Button 
+              onClick={() => handleVerificationExit('User manually exited')}
+              variant="outline"
+              className="exit-button"
+            >
               Exit Verification
-            </button>
+            </Button>
           </div>
-        </>
+        </div>
       )}
+
+      <div className="verification-info">
+        <p>✅ Secure and compliant identity verification</p>
+        <p>🚀 Get access to advanced trading features</p>
+        <p>💰 Increase your transaction limits</p>
+      </div>
     </div>
   );
 };

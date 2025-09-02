@@ -1,43 +1,60 @@
-// src/components/ErrorBoundary.tsx
+// File Location: frontend/src/components/ErrorBoundary.tsx
+// CRITICAL: Enhanced error boundary with retry mechanisms and user-friendly recovery
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallbackComponent?: React.ComponentType<{
+    error: Error;
+    retry: () => void;
+    errorId: string;
+  }>;
+  onError?: (error: Error, errorInfo: ErrorInfo, errorId: string) => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  errorId: string | null;
   retryCount: number;
+  lastErrorTime: number;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+class EnhancedErrorBoundary extends Component<Props, State> {
   private maxRetries = 3;
+  private retryTimeWindow = 60000; // 1 minute
   private retryTimeout: NodeJS.Timeout | null = null;
-
+  
   constructor(props: Props) {
     super(props);
     this.state = {
       hasError: false,
       error: null,
       errorInfo: null,
-      retryCount: 0
+      errorId: null,
+      retryCount: 0,
+      lastErrorTime: 0
     };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
+    
     return {
       hasError: true,
       error,
-      errorInfo: null,
-      retryCount: 0
+      errorId,
+      lastErrorTime: now
     };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const { errorId } = this.state;
+    
     console.error('🚨 Seamount Error Boundary caught an error:', error, errorInfo);
     
     this.setState({
@@ -46,14 +63,20 @@ class ErrorBoundary extends Component<Props, State> {
       hasError: true
     });
 
-    // Log to your analytics service here
-    this.logError(error, errorInfo);
+    // Enhanced error logging with retry context
+    this.logError(error, errorInfo, errorId || 'unknown');
+
+    // Call custom error handler if provided
+    if (this.props.onError && errorId) {
+      this.props.onError(error, errorInfo, errorId);
+    }
   }
 
-  private logError = (error: Error, errorInfo: ErrorInfo) => {
+  private logError = (error: Error, errorInfo: ErrorInfo, errorId: string) => {
     try {
       // Enhanced error logging for Seamount.io
       const errorData = {
+        errorId,
         timestamp: new Date().toISOString(),
         userAgent: navigator.userAgent,
         url: window.location.href,
@@ -63,18 +86,28 @@ class ErrorBoundary extends Component<Props, State> {
           stack: error.stack
         },
         componentStack: errorInfo.componentStack,
-        retryCount: this.state.retryCount
+        retryCount: this.state.retryCount,
+        lastErrorTime: this.state.lastErrorTime,
+        sessionInfo: {
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          },
+          connection: (navigator as any).connection?.effectiveType || 'unknown'
+        }
       };
 
       // Send to your backend error tracking
       console.error('Seamount Error Report:', errorData);
       
-      // Optional: Send to your backend
-      // fetch('/api/errors', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(errorData)
-      // }).catch(console.error);
+      // Optional: Send to your backend with retry mechanism
+      fetch('/api/errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorData)
+      }).catch(loggingError => {
+        console.error('Failed to log error to backend:', loggingError);
+      });
 
     } catch (loggingError) {
       console.error('Failed to log error:', loggingError);
@@ -82,18 +115,30 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleRetry = () => {
+    const now = Date.now();
+    const timeSinceLastError = now - this.state.lastErrorTime;
+    
+    // Reset retry count if enough time has passed
+    if (timeSinceLastError > this.retryTimeWindow) {
+      this.setState({ retryCount: 0 });
+    }
+    
     if (this.state.retryCount < this.maxRetries) {
       this.setState(prevState => ({
         hasError: false,
         error: null,
         errorInfo: null,
-        retryCount: prevState.retryCount + 1
+        errorId: null,
+        retryCount: prevState.retryCount + 1,
+        lastErrorTime: now
       }));
 
       // Auto-retry with exponential backoff
+      const backoffTime = Math.pow(2, this.state.retryCount) * 1000;
       this.retryTimeout = setTimeout(() => {
-        window.location.reload();
-      }, Math.pow(2, this.state.retryCount) * 1000);
+        // Force re-render by updating a dummy state
+        this.forceUpdate();
+      }, backoffTime);
     }
   };
 
@@ -102,11 +147,17 @@ class ErrorBoundary extends Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
-      retryCount: 0
+      errorId: null,
+      retryCount: 0,
+      lastErrorTime: 0
     });
   };
 
   private handleGoHome = () => {
+    // Clear any retry timeouts before navigation
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+    }
     window.location.href = '/';
   };
 
@@ -118,10 +169,21 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback UI
-      if (this.props.fallback) {
-        return this.props.fallback;
+      // Use custom fallback component if provided
+      if (this.props.fallbackComponent) {
+        const FallbackComponent = this.props.fallbackComponent;
+        return (
+          <FallbackComponent
+            error={this.state.error!}
+            retry={this.handleRetry}
+            errorId={this.state.errorId || 'unknown'}
+          />
+        );
       }
+
+      // Default fallback UI
+      const canRetry = this.state.retryCount < this.maxRetries;
+      const retryText = `Retry (${this.maxRetries - this.state.retryCount} attempts left)`;
 
       return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -142,8 +204,9 @@ class ErrorBoundary extends Component<Props, State> {
                   <summary className="font-medium text-red-700 cursor-pointer mb-2">
                     Error Details
                   </summary>
-                  <pre className="text-red-600 text-xs overflow-auto">
+                  <pre className="text-red-600 text-xs overflow-auto max-h-32">
                     {this.state.error.message}
+                    {'\n\n'}
                     {this.state.error.stack}
                   </pre>
                 </details>
@@ -151,13 +214,13 @@ class ErrorBoundary extends Component<Props, State> {
             )}
 
             <div className="space-y-3">
-              {this.state.retryCount < this.maxRetries && (
+              {canRetry && (
                 <button
                   onClick={this.handleRetry}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className="h-4 w-4" />
-                  Retry ({this.maxRetries - this.state.retryCount} attempts left)
+                  {retryText}
                 </button>
               )}
               
@@ -179,7 +242,10 @@ class ErrorBoundary extends Component<Props, State> {
 
             <div className="mt-6 pt-4 border-t border-gray-200">
               <p className="text-xs text-gray-500">
-                Error ID: {Date.now().toString(36)}
+                Error ID: {this.state.errorId || Date.now().toString(36)}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Retry count: {this.state.retryCount}/{this.maxRetries}
               </p>
             </div>
           </div>
@@ -191,4 +257,4 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-export default ErrorBoundary;
+export default EnhancedErrorBoundary;

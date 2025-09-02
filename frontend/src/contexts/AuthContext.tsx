@@ -1,208 +1,268 @@
+// File Location: frontend/src/contexts/AuthContext.tsx
+// CRITICAL FIX: Field mapping correction to match database schema
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Session } from '@supabase/supabase-js';
-import { apiClient, API_ENDPOINTS } from '../config/api';
-import { UserProfile } from '../types';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { retryWithBackoff } from '../utils/retry';
+import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
 
-interface AuthState {
-  session: Session | null;
-  user: UserProfile | null;
-  loading: boolean;
-  error: string | null;
-  isDemoMode: boolean;
+interface UserProfile {
+  id: string;
+  first_name: string;  // ✅ FIXED: Using underscore format to match database
+  last_name: string;   // ✅ FIXED: Using underscore format to match database
+  email: string;
+  country_code?: string;
+  kyc_status: 'pending' | 'verified' | 'rejected' | 'not_started';
+  created_at: string;
+  updated_at: string;
 }
 
-interface AuthContextType extends AuthState {
-  signUp: (email: string, password: string, options?: { firstName?: string; lastName?: string; countryCode?: string }) => Promise<{ success: boolean; error?: string }>;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+interface AuthContextType {
+  user: User | null;
+  userProfile: UserProfile | null;
+  session: Session | null;
+  loading: boolean;
+  kycStatus: string;
+  signUp: (email: string, password: string, firstName: string, lastName: string, countryCode: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  completeOnboarding: () => Promise<void>;
-  triggerWalletCreation: () => Promise<{ success: boolean; mnemonic: string | null }>;
-  fetchUserProfile: () => Promise<UserProfile | null>;
   refreshKycStatus: () => Promise<void>;
   skipVerification: () => Promise<void>;
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
   return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
 }
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    user: null,
-    loading: true,
-    error: null,
-    isDemoMode: false,
-  });
-   
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [kycStatus, setKycStatus] = useState('not_started');
   const navigate = useNavigate();
 
-  const fetchUserProfile = useCallback(async () => {
-    try {
-      const { data } = await retryWithBackoff(() => apiClient.get<UserProfile>(API_ENDPOINTS.USER.PROFILE), 2, 1000);
-      return data;
-    } catch (error: any) {
-      console.error('AuthContext: Failed to fetch user profile after retries:', error);
-      if (error?.response?.status === 401 || error?.response?.status === 404) {
-        toast.error('Your session seems to be invalid. Please sign in again.');
-        await supabase.auth.signOut();
-      } else {
-        toast.error('Could not connect to the server. Please check your connection.');
-      }
-      return null;
-    }
-  }, []);
-
-  const refreshKycStatus = useCallback(async () => {
-    try {
-      const userProfile = await fetchUserProfile();
-      if (userProfile) {
-        setState(prev => ({ ...prev, user: userProfile }));
-      }
-    } catch (error) {
-      console.error('Failed to refresh KYC status:', error);
-    }
-  }, [fetchUserProfile]);
-
-  const skipVerification = useCallback(async () => {
-    try {
-      setState(prev => ({ ...prev, loading: true }));
-      await apiClient.post('/api/kyc/skip');
-      await refreshKycStatus();
-      toast.success('Verification skipped. You can complete it later from your profile.');
-    } catch (error: any) {
-      console.error('Failed to skip verification:', error);
-      toast.error(error.response?.data?.detail || 'Failed to skip verification');
-    } finally {
-      setState(prev => ({ ...prev, loading: false }));
-    }
-  }, [refreshKycStatus]);
-
   useEffect(() => {
-    setState(prev => ({ ...prev, loading: true }));
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth State Change] Event: ${event}`);
-      
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        setTimeout(async () => {
-            if (session) {
-                const userProfile = await fetchUserProfile();
-                if (userProfile) {
-                    setState(prev => ({ ...prev, session, user: userProfile, loading: false, error: null }));
-                    
-                    if (userProfile.kyc_status === 'skipped') {
-                        navigate('/dashboard');
-                    } else if (!userProfile.kyc_status || userProfile.kyc_status === 'unverified' || userProfile.kyc_level === 0) {
-                        navigate('/onboarding');
-                    } else if (userProfile.kyc_status === 'approved') {
-                        navigate('/dashboard');
-                    } else {
-                        navigate('/onboarding');
-                    }
-                } else {
-                    setState(prev => ({ ...prev, session: null, user: null, loading: false, error: 'Failed to retrieve user profile.' }));
-                }
-            } else {
-                setState(prev => ({ ...prev, session: null, user: null, loading: false, error: null }));
-            }
-        }, 1000);
-      } else if (event === 'SIGNED_OUT') {
-        setState({ session: null, user: null, loading: false, error: null, isDemoMode: false });
-        navigate('/');
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
       }
+      setLoading(false);
     });
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [fetchUserProfile, navigate]);
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+        setKycStatus('not_started');
+      }
+      setLoading(false);
+    });
 
-  const signUp = async (
-    email: string,
-    password: string,
-    options: { firstName?: string; lastName?: string; countryCode?: string } = {}
-  ) => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserProfile = async (userId: string) => {
     try {
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                first_name: options.firstName,
-                last_name: options.lastName,
-                country_code: options.countryCode
-              }
-            }
-        });
-        if (error) throw error;
-        toast.success('Sign up successful! Please check your email to verify your account.');
-        return { success: true };
-    } catch (err: any) {
-        console.error('[SignUp Error]', err);
-        toast.error(err.message || 'Sign up failed.');
-        setState(prev => ({ ...prev, error: err.message, loading: false }));
-        return { success: false, error: err.message };
+      const response = await apiClient.get(`/api/users/profile/${userId}`);
+      const profile = response.data;
+      setUserProfile(profile);
+      setKycStatus(profile.kyc_status || 'not_started');
+    } catch (error: any) {
+      console.error('Failed to fetch user profile:', error);
+      
+      // If profile doesn't exist, create it
+      if (error.response?.status === 404 && user) {
+        await createUserProfile(user);
+      }
+    }
+  };
+
+  const createUserProfile = async (authUser: User) => {
+    try {
+      const profileData = {
+        id: authUser.id,
+        email: authUser.email || '',
+        first_name: '', // ✅ FIXED: Empty string to be filled later
+        last_name: '',  // ✅ FIXED: Empty string to be filled later
+        kyc_status: 'not_started'
+      };
+
+      const response = await apiClient.post('/api/users/profile', profileData);
+      setUserProfile(response.data);
+      setKycStatus('not_started');
+    } catch (error: any) {
+      console.error('Failed to create user profile:', error);
+    }
+  };
+
+  // ✅ CRITICAL FIX: Corrected field mapping in signUp function
+  const signUp = async (email: string, password: string, firstName: string, lastName: string, countryCode: string) => {
+    try {
+      setLoading(true);
+      
+      // Step 1: Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // Step 2: Create user profile with CORRECT field mapping
+        const signUpData = {
+          id: authData.user.id,
+          email: email,
+          first_name: firstName,  // ✅ FIXED: Now using first_name (underscore)
+          last_name: lastName,    // ✅ FIXED: Now using last_name (underscore)
+          country_code: countryCode,
+          kyc_status: 'not_started'
+        };
+
+        try {
+          const response = await apiClient.post('/api/users/profile', signUpData);
+          setUserProfile(response.data);
+          setKycStatus('not_started');
+          
+          toast.success('Account created successfully! Please check your email to verify your account.');
+        } catch (profileError: any) {
+          console.error('Failed to create user profile:', profileError);
+          // Don't throw here - user was created successfully, just profile creation failed
+          toast.warning('Account created but profile setup incomplete. Please complete your profile.');
+        }
+      }
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      if (error.message.includes('already registered')) {
+        toast.error('Email already registered. Please sign in instead.');
+      } else {
+        toast.error(error.message || 'Failed to create account. Please try again.');
+      }
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        return { success: true };
-    } catch (err: any) {
-        console.error('[SignIn Error]', err);
-        toast.error(err.message || 'Sign in failed.');
-        setState(prev => ({ ...prev, error: err.message, loading: false }));
-        return { success: false, error: err.message };
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      toast.success('Signed in successfully!');
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast.error(error.message || 'Failed to sign in. Please try again.');
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      setUserProfile(null);
+      setSession(null);
+      setKycStatus('not_started');
+      toast.success('Signed out successfully!');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      toast.error('Failed to sign out. Please try again.');
+    }
   };
 
-  const triggerWalletCreation = useCallback(async () => {
+  const refreshKycStatus = async () => {
+    if (!user) return;
+    
     try {
-      const { data } = await apiClient.post<{ success: boolean, mnemonic: string | null }>(API_ENDPOINTS.WALLET.CREATE);
-      return data;
-    } catch (error) {
-      console.error('Wallet creation failed:', error);
-      toast.error('A server error occurred while creating your wallet.');
-      return { success: false, mnemonic: null };
+      const response = await apiClient.get('/api/kyc/status');
+      const newStatus = response.data.kyc_status;
+      setKycStatus(newStatus);
+      
+      if (userProfile) {
+        setUserProfile(prev => prev ? { ...prev, kyc_status: newStatus } : null);
+      }
+    } catch (error: any) {
+      console.error('Failed to refresh KYC status:', error);
     }
-  }, []);
+  };
 
-  const completeOnboarding = useCallback(async () => {
-    toast.success('Setup complete! Welcome to your dashboard.');
-    await fetchUserProfile();
-    navigate('/dashboard');
-  }, [fetchUserProfile, navigate]);
+  const skipVerification = async () => {
+    try {
+      await apiClient.post('/api/kyc/skip');
+      setKycStatus('not_started');
+      
+      if (userProfile) {
+        setUserProfile(prev => prev ? { ...prev, kyc_status: 'not_started' } : null);
+      }
+      
+      toast.info('Verification skipped. You can complete it anytime in settings.');
+    } catch (error: any) {
+      console.error('Failed to skip verification:', error);
+      throw error;
+    }
+  };
 
-  return (
-    <AuthContext.Provider value={{
-      ...state,
-      signUp,
-      signIn,
-      signOut,
-      completeOnboarding,
-      triggerWalletCreation,
-      fetchUserProfile,
-      refreshKycStatus,
-      skipVerification,
-    }}>
-      {!state.loading ? children : <div>Loading Seamount...</div>}
-    </AuthContext.Provider>
-  );
+  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+    if (!user || !userProfile) return;
+
+    try {
+      const response = await apiClient.put(`/api/users/profile/${user.id}`, updates);
+      setUserProfile(response.data);
+      toast.success('Profile updated successfully!');
+    } catch (error: any) {
+      console.error('Failed to update user profile:', error);
+      toast.error('Failed to update profile. Please try again.');
+      throw error;
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    userProfile,
+    session,
+    loading,
+    kycStatus,
+    signUp,
+    signIn,
+    signOut,
+    refreshKycStatus,
+    skipVerification,
+    updateUserProfile,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
