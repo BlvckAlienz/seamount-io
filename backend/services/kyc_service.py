@@ -7,10 +7,10 @@ from supabase import Client
 from fastapi import HTTPException
 from datetime import datetime
 
-from backend.config import Settings
-from backend.services.audit_service import AuditService, AuditEventType
-from backend.services.database_service import DatabaseService
-from backend.services.kyc_providers.complycube import ComplyCubeVerifier
+from config import Settings
+from .audit_service import AuditService, AuditEventType
+from .database_service import DatabaseService
+from .kyc_providers.complycube import ComplyCubeVerifier
 
 logger = logging.getLogger(__name__)
 

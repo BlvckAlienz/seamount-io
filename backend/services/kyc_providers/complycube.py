@@ -126,3 +126,6 @@ class ComplyCubeService:
             raise HTTPException(status_code=500, detail="Could not generate a secure verification token.")
 
 complycube_service = ComplyCubeService()
+
+# Backward compatibility export - kyc_service expects "ComplyCubeVerifier"
+ComplyCubeVerifier = ComplyCubeService

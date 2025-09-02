@@ -10,7 +10,7 @@ import secrets
 import jwt
 from passlib.context import CryptContext
 
-from ..config import settings
+from config import settings
 from .database_service import DatabaseService
 from .audit_service import AuditService
 from .redis_client import RedisClient
