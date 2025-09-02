@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 import traceback
 
 from dependencies import get_current_user, get_supabase_client
-from services.kyc_service import KycService
+from services.kyc_service import KYCService as KycService
 from models import UserProfile
 
 logger = logging.getLogger(__name__)
