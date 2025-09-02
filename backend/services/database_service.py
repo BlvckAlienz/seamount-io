@@ -859,3 +859,6 @@ class SuperDatabaseService:
 
 # Initialize global database service instance
 database_service = SuperDatabaseService()
+
+# Backward compatibility export - other services expect "DatabaseService"
+DatabaseService = SuperDatabaseService
