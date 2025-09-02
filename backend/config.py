@@ -468,3 +468,15 @@ if __name__ == "__main__":
     # Test the configuration
     settings = get_settings()
     demo_revenue_projections()
+    
+ # Initialize settings instance on module import (Render compatibility)
+try:
+    settings = get_settings()
+    logger.info("Settings instance created and exported for import compatibility")
+except Exception as e:
+    logger.error(f"Failed to initialize settings during module import: {e}")
+    # Create a minimal fallback to prevent import failures
+    settings = None
+
+# Export the function as well for backward compatibility
+__all__ = ['get_settings', 'settings', 'BusinessModelConfig', 'LicenseTier', 'PricingRegion']

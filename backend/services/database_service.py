@@ -15,28 +15,27 @@ from supabase import create_client, Client
 from postgrest import APIError
 from fastapi import HTTPException
 
-from backend.config import settings
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Then update the __init__ method to use the function:
 class SuperDatabaseService:
-    """
-    The ultimate database service combining:
-    - Supabase client for auth integration and convenience
-    - Raw asyncpg pool for high-performance operations
-    - Bulletproof retry logic and connection management
-    - Self-healing mechanisms and circuit breakers
-    """
-    
     def __init__(self):
+        # Get settings using the function call
+        settings = get_settings()
+        
         # Supabase client for auth and convenience operations
         if not settings.VITE_SUPABASE_URL or not settings.SUPABASE_SERVICE_KEY:
             raise ValueError("Supabase URL and Service Key must be configured")
         
         self.supabase: Client = create_client(
             settings.VITE_SUPABASE_URL, 
-            settings.SUPABASE_SERVICE_KEY
+            settings.SUPABASE_SERVICE_KEY.get_secret_value()
         )
+        
+        # Store settings for later use
+        self.settings = settings
         
         # AsyncPG pool for high-performance operations
         self.pool: Optional[asyncpg.Pool] = None
@@ -47,6 +46,22 @@ class SuperDatabaseService:
         
         logger.info("SuperDatabaseService initialized with dual-client architecture")
     
+    def _build_postgres_url(self) -> str:
+        """Build PostgreSQL URL from Supabase settings"""
+        # Extract database details from Supabase URL
+        import re
+        from urllib.parse import urlparse
+        
+        supabase_url = self.settings.VITE_SUPABASE_URL
+        if not supabase_url.startswith('https://'):
+            raise ValueError("Invalid Supabase URL format")
+        
+        # Parse project ID from Supabase URL
+        parsed = urlparse(supabase_url)
+        project_id = parsed.hostname.split('.')[0]
+        
+        return f"postgresql://postgres:{self.settings.SUPABASE_SERVICE_KEY.get_secret_value()}@db.{project_id}.supabase.co:5432/postgres"
+    
     async def initialize_pool(self):
         """Initialize high-performance PostgreSQL connection pool"""
         max_attempts = 5
@@ -55,7 +70,7 @@ class SuperDatabaseService:
         while attempt < max_attempts:
             try:
                 # Extract PostgreSQL URL from Supabase settings
-                db_url = settings.DATABASE_URL or self._build_postgres_url()
+                db_url = self.settings.DATABASE_URL.get_secret_value() if self.settings.DATABASE_URL else self._build_postgres_url()
                 
                 self.pool = await asyncpg.create_pool(
                     db_url,
