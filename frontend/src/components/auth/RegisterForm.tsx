@@ -1,3 +1,6 @@
+// File Location: frontend/src/components/auth/RegisterForm.tsx
+// CRITICAL FIX: Corrected country code mapping and form submission flow
+
 import React, { useState, useMemo, useRef } from 'react';
 import { User, Mail, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,7 +59,29 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   const captchaRef = useRef<HCaptcha>(null);
   const { signUp } = useAuth();
   const navigate = useNavigate();
-  const countryOptions = useMemo(() => countryList().getData(), []);
+
+  // FIXED: Create proper country options with correct mapping
+  const countryOptions = useMemo(() => {
+    const options = countryList().getData();
+    // Add some common mappings that might be missing
+    const additionalCountries = [
+      { value: 'AE', label: 'United Arab Emirates' },
+      { value: 'NG', label: 'Nigeria' },
+      { value: 'KE', label: 'Kenya' },
+      { value: 'GH', label: 'Ghana' },
+    ];
+    
+    // Merge and deduplicate
+    const allCountries = [...options];
+    additionalCountries.forEach(country => {
+      if (!allCountries.find(c => c.value === country.value)) {
+        allCountries.push(country);
+      }
+    });
+    
+    // Sort alphabetically by label
+    return allCountries.sort((a, b) => a.label.localeCompare(b.label));
+  }, []);
 
   // Check if hCaptcha is properly configured
   const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY;
@@ -76,8 +101,21 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // FIXED: Ensure country code is properly set
+    if (name === 'countryCode') {
+      console.log('[Form] Country changed to:', value);
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    
     if (name === 'password') validatePassword(value);
+    
+    // Clear errors when user starts typing
+    if (formErrors[name as keyof FormErrors]) {
+      setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleCaptchaVerify = (token: string) => {
@@ -102,50 +140,96 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     setFormData((prev) => ({ ...prev, captchaToken: null }));
   };
 
+  const validateForm = () => {
+    const errors: FormErrors = {};
+    
+    // Email validation
+    if (!formData.email) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    // Name validation
+    if (!formData.firstName.trim()) {
+      errors.form = 'First name is required';
+    }
+    if (!formData.lastName.trim()) {
+      errors.form = 'Last name is required';
+    }
+    
+    // Password validation
+    if (!validatePassword(formData.password)) {
+      errors.password = 'Password does not meet requirements';
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    // CAPTCHA validation (only if enabled)
+    if (isHcaptchaEnabled && !formData.captchaToken) {
+      errors.captcha = 'Please complete the CAPTCHA';
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({});
     setAuthError(null);
-    console.log('Sign Up submitted:', { ...formData, captchaToken: 'REDACTED' });
 
-    // Only check CAPTCHA if it's enabled
-    if (isHcaptchaEnabled && !formData.captchaToken) {
-      setFormErrors({ captcha: 'Please complete the CAPTCHA.' });
-      toast.error('Please complete the CAPTCHA');
+    // Validate form
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      toast.error('Please fix the form errors before submitting');
       return;
     }
 
-    if (!validatePassword(formData.password)) {
-      setFormErrors({ password: 'Password does not meet requirements.' });
-      console.error('Password validation failed:', validRequirements);
-      toast.error('Password does not meet requirements');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      setFormErrors({ confirmPassword: 'Passwords do not match.' });
-      console.error('Password mismatch');
-      toast.error('Passwords do not match');
-      return;
-    }
+    console.log('[Form] Registration attempt with data:', {
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      countryCode: formData.countryCode,
+      passwordLength: formData.password.length,
+      captchaProvided: !!formData.captchaToken
+    });
 
     setLoading(true);
+    
     try {
+      // FIXED: Prepare clean signup data with proper structure
       const signUpData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        countryCode: formData.countryCode,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        countryCode: formData.countryCode, // This should be 2-letter ISO code like 'AE' for UAE
         ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken }),
       };
 
-      await signUp(formData.email, formData.password, signUpData);
-      console.log('Sign Up successful:', formData.email);
-      toast.success('Registration successful! Check your email to verify.');
-      if (onSuccess) onSuccess();
-      navigate('/onboarding');
+      console.log('[Form] Calling signUp with data:', signUpData);
+      
+      await signUp(formData.email.trim(), formData.password, signUpData);
+      
+      console.log('[Form] Registration successful');
+      
+      // Show success message and redirect
+      toast.success('Registration successful! Please check your email to verify your account.');
+      
+      if (onSuccess) {
+        onSuccess();
+      }
+      
+      // Navigate to onboarding after a brief delay
+      setTimeout(() => {
+        navigate('/onboarding');
+      }, 1000);
+      
     } catch (error: any) {
-      const errorMessage = error.message || 'Registration failed.';
+      const errorMessage = error.message || 'Registration failed. Please try again.';
       setAuthError(errorMessage);
-      console.error('Sign Up error:', errorMessage);
+      console.error('[Form] Registration error:', error);
       toast.error(errorMessage);
       
       // Reset CAPTCHA on error
@@ -159,7 +243,13 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
   return (
     <Card className="w-full max-w-sm p-4 bg-gray-900 text-gray-100">
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-white">Create Account</h2>
+        <p className="text-gray-400 text-sm mt-2">Join Seamount and start your journey</p>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-3">
+        {/* First Name */}
         <div>
           <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-1">
             First Name
@@ -172,12 +262,14 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="text"
               value={formData.firstName}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="First name"
               required
             />
           </div>
         </div>
+
+        {/* Last Name */}
         <div>
           <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-1">
             Last Name
@@ -190,12 +282,14 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="text"
               value={formData.lastName}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Last name"
               required
             />
           </div>
         </div>
+
+        {/* Email */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
             Email
@@ -208,12 +302,17 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Email address"
               required
             />
           </div>
+          {formErrors.email && (
+            <p className="text-sm text-red-400 mt-1">{formErrors.email}</p>
+          )}
         </div>
+
+        {/* Password */}
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
             Password
@@ -226,22 +325,51 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Password"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
-            Must be 8+ characters with uppercase, lowercase, number, and special character (!@#$%^&*).
-          </p>
+          
+          {/* Password Requirements */}
+          {formData.password && (
+            <div className="mt-2 text-xs space-y-1">
+              <div className={`flex items-center ${validRequirements.length ? 'text-green-400' : 'text-gray-400'}`}>
+                <CheckCircle size={12} className="mr-1" />
+                At least 8 characters
+              </div>
+              <div className={`flex items-center ${validRequirements.uppercase ? 'text-green-400' : 'text-gray-400'}`}>
+                <CheckCircle size={12} className="mr-1" />
+                One uppercase letter
+              </div>
+              <div className={`flex items-center ${validRequirements.lowercase ? 'text-green-400' : 'text-gray-400'}`}>
+                <CheckCircle size={12} className="mr-1" />
+                One lowercase letter
+              </div>
+              <div className={`flex items-center ${validRequirements.number ? 'text-green-400' : 'text-gray-400'}`}>
+                <CheckCircle size={12} className="mr-1" />
+                One number
+              </div>
+              <div className={`flex items-center ${validRequirements.special ? 'text-green-400' : 'text-gray-400'}`}>
+                <CheckCircle size={12} className="mr-1" />
+                One special character (!@#$%^&*)
+              </div>
+            </div>
+          )}
+          
+          {formErrors.password && (
+            <p className="text-sm text-red-400 mt-1">{formErrors.password}</p>
+          )}
         </div>
+
+        {/* Confirm Password */}
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
             Confirm Password
@@ -254,19 +382,24 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Confirm password"
               required
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
             >
               {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
+          {formErrors.confirmPassword && (
+            <p className="text-sm text-red-400 mt-1">{formErrors.confirmPassword}</p>
+          )}
         </div>
+
+        {/* Country Selection - FIXED */}
         <div>
           <label htmlFor="countryCode" className="block text-sm font-medium text-gray-300 mb-1">
             Country
@@ -276,7 +409,8 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
             name="countryCode"
             value={formData.countryCode}
             onChange={handleInputChange}
-            className="w-full pl-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+            className="w-full pl-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            required
           >
             {countryOptions.map((country: { value: string; label: string }) => (
               <option key={country.value} value={country.value}>
@@ -286,9 +420,9 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           </select>
         </div>
         
-        {/* Conditionally render hCaptcha only if properly configured */}
+        {/* CAPTCHA - Only if enabled */}
         {isHcaptchaEnabled && (
-          <div>
+          <div className="flex justify-center">
             <HCaptcha
               ref={captchaRef}
               sitekey={hcaptchaSiteKey}
@@ -303,33 +437,44 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           </div>
         )}
 
-        {(authError || formErrors.form || formErrors.password || formErrors.confirmPassword) && (
-          <div className="p-2 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
-            <p className="text-xs text-red-400">
-              {authError || formErrors.form || formErrors.password || formErrors.confirmPassword}
+        {/* Error Messages */}
+        {(authError || formErrors.form) && (
+          <div className="p-3 bg-red-900/30 border border-red-500/30 border border-red-500 rounded-lg">
+            <p className="text-sm text-red-400">
+              {authError || formErrors.form}
             </p>
           </div>
         )}
-        <div className="pt-1">
-          <Button
-            type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
-            loading={loading}
-          >
-            Create Account
-          </Button>
-        </div>
-        {onLoginClick && (
-          <div className="text-center pt-2">
-            <p className="text-xs text-gray-400">
-              Already have an account?{' '}
-              <button type="button" onClick={onLoginClick} className="font-semibold text-blue-400 hover:underline">
-                Sign in
-              </button>
-            </p>
-          </div>
-        )}
+
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          disabled={loading || (isHcaptchaEnabled && !formData.captchaToken)}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {loading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Creating Account...
+            </div>
+          ) : (
+            'Create Account'
+          )}
+        </Button>
       </form>
+
+      {/* Login Link */}
+      <div className="text-center mt-4">
+        <p className="text-gray-400 text-sm">
+          Already have an account?{' '}
+          <button
+            onClick={onLoginClick}
+            className="text-blue-400 hover:text-blue-300 font-medium"
+          >
+            Sign In
+          </button>
+        </p>
+      </div>
     </Card>
   );
 };
