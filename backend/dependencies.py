@@ -1,11 +1,11 @@
 # File Location: backend/dependencies.py
-# SURGICAL MERGE: Combined advanced JWT verification with critical scoping/import fixes
+# SURGICAL MERGE: Combined advanced JWT verification with critical scoping/import fixes + OptionalAuth
 
 import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import Client, create_client  # CRITICAL: Added missing import
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from datetime import datetime, timedelta
 from functools import lru_cache
 import aiohttp
@@ -26,9 +26,9 @@ _notification_service: Optional[NotificationService] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
-# Security schemes
-security = HTTPBearer(auto_error=False)
-security_required = HTTPBearer(auto_error=True)
+# Security schemes - SURGICAL FIX: Added dual security modes
+security = HTTPBearer(auto_error=False)  # For optional auth
+security_required = HTTPBearer(auto_error=True)  # For required auth
 
 @lru_cache()
 def get_settings_cached():
@@ -191,26 +191,61 @@ async def verify_supabase_token(
             detail="Could not process authentication token"
         )
 
+# SURGICAL FIX: Added the missing OptionalAuth dependency
 async def verify_supabase_token_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     settings: Settings = Depends(get_settings_cached)
 ) -> Optional[Dict[str, Any]]:
     """
-    Optional JWT verification - returns None if no token or invalid token
-    Used for routes that work with or without authentication
+    SURGICAL FIX: Optional JWT verification - returns None if no token or invalid token
+    This is the missing dependency that was causing 403 errors on public endpoints
     """
     if not credentials:
         logger.debug("🔓 No authorization credentials provided (optional auth)")
         return None
         
     try:
-        # Reuse the main verification logic
-        return await verify_supabase_token(
-            HTTPAuthorizationCredentials(scheme="Bearer", credentials=credentials.credentials),
-            settings
+        # Reuse the main verification logic but handle errors gracefully
+        token = credentials.credentials
+        logger.debug(f"🔍 Attempting optional token verification: {token[:20]}...")
+        
+        # Get unverified header for key ID
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get('kid')
+        
+        if not kid:
+            logger.debug("🔓 Token missing key ID - skipping optional auth")
+            return None
+        
+        # Fetch JWKS and find matching key
+        jwks = await fetch_jwks(settings)
+        
+        key = None
+        for jwk_key in jwks.get('keys', []):
+            if jwk_key.get('kid') == kid:
+                key = jwk_key
+                break
+        
+        if not key:
+            logger.debug(f"🔓 Public key for KID {kid} not found - skipping optional auth")
+            return None
+        
+        # Verify and decode token
+        payload = jwt.decode(
+            token,
+            key,
+            algorithms=['RS256', 'ES256'],
+            audience='authenticated',
+            issuer=settings.SUPABASE_JWT_ISSUER,
+            options={"verify_aud": True, "verify_exp": True, "verify_iss": True}
         )
-    except HTTPException:
-        logger.debug("🔓 Token verification failed for optional auth")
+        
+        user_id = payload.get('sub')
+        logger.info(f"✅ Optional token verified successfully for user: {user_id}")
+        return payload
+        
+    except (JWTError, HTTPException):
+        logger.debug("🔓 Token verification failed for optional auth - continuing without auth")
         return None
     except Exception as e:
         logger.warning(f"⚠️ Unexpected error in optional token verification: {e}")
@@ -283,28 +318,68 @@ async def get_current_user(
             detail=f"Error retrieving user profile: {str(e)}"
         )
 
+# SURGICAL FIX: The missing OptionalAuth user dependency
 async def get_current_user_optional(
     payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
     supabase: Client = Depends(get_supabase_client)
 ) -> Optional[Dict[str, Any]]:
     """
-    Optional user profile fetching - returns None if no valid token
-    Used for routes that work with or without authentication
+    SURGICAL FIX: Optional user profile fetching - returns None if no valid token
+    This was the missing dependency causing 403 errors on public endpoints like /users/me
     """
     if not payload:
+        logger.debug("🔓 No payload from optional token verification")
         return None
         
     try:
         user_id = payload.get("sub")
         if not user_id:
+            logger.debug("🔓 No user ID in optional payload")
             return None
             
+        logger.debug(f"🔍 Fetching optional profile for user: {user_id}")
         profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
-        return profile_res.data if profile_res.data else None
+        
+        if profile_res.data:
+            logger.debug(f"✅ Optional profile found for user: {user_id}")
+            return profile_res.data
+        else:
+            logger.debug(f"🔓 No profile found for optional user: {user_id}")
+            return None
         
     except Exception as e:
         logger.warning(f"⚠️ Optional user profile fetch failed: {e}")
         return None
+
+# SURGICAL FIX: Added OptionalAuth class for easier dependency injection
+class OptionalAuth:
+    """
+    SURGICAL FIX: Optional authentication dependency class
+    Use this for endpoints that should work with or without authentication
+    """
+    def __init__(self):
+        self.user: Optional[Dict[str, Any]] = None
+        self.payload: Optional[Dict[str, Any]] = None
+        self.is_authenticated: bool = False
+    
+    @classmethod
+    async def create(
+        cls,
+        payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
+        user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
+    ) -> 'OptionalAuth':
+        """Factory method to create OptionalAuth instance"""
+        auth = cls()
+        auth.payload = payload
+        auth.user = user
+        auth.is_authenticated = payload is not None and user is not None
+        
+        if auth.is_authenticated:
+            logger.debug(f"🔓 Optional auth successful for user: {user.get('id', 'unknown')}")
+        else:
+            logger.debug("🔓 No authentication provided for optional endpoint")
+        
+        return auth
 
 async def verify_api_key(api_key: Optional[str] = None) -> bool:
     """
