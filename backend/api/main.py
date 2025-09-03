@@ -105,25 +105,43 @@ async def initialize_session(
 ):
     settings = get_settings()
     ip_address = request.client.host if request.client else "unknown"
-    session_data = { 
-        "id": str(uuid4()), 
-        "ip_address": ip_address, 
-        "user_agent": user_agent 
+    
+    session_data = {
+        "id": str(uuid4()),
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "created_at": datetime.utcnow().isoformat()
     }
 
-    ipinfo_token = settings.IPINFO_TOKEN.get_secret_value()
-    if ipinfo_token:
+    # FIXED: Enhanced IPInfo integration with timeout and better error handling
+    if settings.IPINFO_TOKEN and ip_address != "unknown":
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3.0)) as http_session:
-                async with http_session.get(f"https://ipinfo.io/{ip_address}?token={ipinfo_token}") as response:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2.0)) as http_session:
+                async with http_session.get(
+                    f"https://ipinfo.io/{ip_address}?token={settings.IPINFO_TOKEN.get_secret_value()}"
+                ) as response:
                     if response.status == 200:
                         ip_data = await response.json()
                         session_data.update({
-                            "country": ip_data.get("country"), 
-                            "city": ip_data.get("city")
+                            "country": ip_data.get("country", "US"),
+                            "city": ip_data.get("city", "Unknown"),
+                            "region": ip_data.get("region", "Unknown"),
+                            "org": ip_data.get("org", "Unknown ISP"),
+                            "timezone": ip_data.get("timezone", "UTC"),
+                            "is_vpn": ip_data.get("privacy", {}).get("vpn", False)
                         })
+                        logger.info(f"IPInfo enrichment successful for {ip_address}")
+        except asyncio.TimeoutError:
+            logger.warning(f"IPInfo timeout for IP {ip_address}")
         except Exception as e:
-            logger.warning(f"IPinfo enrichment failed for IP {ip_address}: {e}")
+            logger.warning(f"IPInfo enrichment failed for IP {ip_address}: {e}")
+    
+    try:
+        insert_res = supabase.from_("user_sessions").insert(session_data).execute()
+        return JSONResponse(content={"session_id": session_data["id"]})
+    except Exception as e:
+        logger.error(f"Session initialization database error: {e}")
+        return JSONResponse(content={"session_id": session_data["id"]})
     
     try:
         insert_res = supabase.from_("user_sessions").insert(session_data).execute()

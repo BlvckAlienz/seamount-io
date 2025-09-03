@@ -176,9 +176,19 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormErrors({});
-    setAuthError(null);
+  e.preventDefault();
+  
+  // FIXED: Ensure country code is properly formatted
+  const signUpData = {
+    firstName: formData.firstName.trim(),
+    lastName: formData.lastName.trim(),
+    countryCode: formData.countryCode.toUpperCase(), // Ensure uppercase
+    ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken }),
+  };
+
+  console.log('[Form] Calling signUp with data:', signUpData);
+  await signUp(formData.email.trim(), formData.password, signUpData);
+};
 
     // Validate form
     const validationErrors = validateForm();

@@ -59,36 +59,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
-      }
-      setLoading(false);
-    });
+  // Get initial session
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      fetchUserProfile(session.user.id).then(profile => {
+        // FIXED: Trigger onboarding based on profile status
+        if (profile && profile.kyc_status === 'not_started') {
+          // Navigate to onboarding if profile exists but KYC not started
+          navigate('/onboarding');
+        } else if (!profile) {
+          // Create profile if it doesn't exist
+          createUserProfile(session.user.id, session.user.email);
+        }
+      });
+    }
+    setLoading(false);
+  });
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[Auth] State change:', event, session?.user?.id);
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await fetchUserProfile(session.user.id);
-      } else {
-        setUserProfile(null);
-        setKycStatus('not_started');
+  // Listen for auth changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+    
+    if (session?.user) {
+      const profile = await fetchUserProfile(session.user.id);
+      // FIXED: Trigger onboarding when user signs in and needs to complete KYC
+      if (profile && profile.kyc_status === 'not_started') {
+        navigate('/onboarding');
       }
-      setLoading(false);
-    });
+    } else {
+      setUserProfile(null);
+      setKycStatus('not_started');
+    }
+    setLoading(false);
+  });
 
-    return () => subscription.unsubscribe();
-  }, []);
+  return () => subscription.unsubscribe();
+}, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -120,7 +129,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   try {
     setLoading(true);
     console.log('[SignUp] Starting registration for:', email);
-    console.log('[SignUp] Registration data:', { ...signUpData, captchaToken: 'REDACTED' });
     
     // Step 1: Create auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -153,39 +161,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         kyc_status: 'not_started'
       };
 
-        try {
-          console.log('[SignUp] Creating profile:', profileData);
-          
-          // FIXED: Use correct endpoint with proper data structure
-          const response = await apiClient.post('/api/v1/user/profile', profileData);
-          const createdProfile = response.data;
-          
-          console.log('[SignUp] Profile created successfully:', createdProfile);
-          
-          setUserProfile(createdProfile);
-          setKycStatus('not_started');
-          
-          toast.success('Registration successful! Please check your email to verify your account.');
-          
-        } catch (profileError: any) {
-          console.error('[SignUp] Profile creation failed:', profileError);
-          // Don't fail the signup if profile creation fails - can be created later
-          toast.warning('Account created but profile setup incomplete. Please try logging in.');
-        }
-      } else if (authData.user && authData.user.email_confirmed_at) {
-        // User was immediately confirmed
-        toast.success('Registration successful! Welcome to Seamount.');
-        await fetchUserProfile(authData.user.id);
-      }
+      // FIXED: Use correct endpoint with proper data structure
+      const response = await apiClient.post('/api/v1/user/profile', profileData);
+      const createdProfile = response.data;
       
-    } catch (error: any) {
-      console.error('[SignUp] Registration failed:', error);
-      toast.error(error.message || 'Failed to create account');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.log('[SignUp] Profile created successfully:', createdProfile);
+      
+      setUserProfile(createdProfile);
+      setKycStatus('not_started');
+      
+      if (!authData.user.email_confirmed_at) {
+        toast.success('Registration successful! Please check your email to verify your account.');
+      } else {
+        toast.success('Registration successful! Welcome to Seamount.');
+      }
     }
-  };
+    
+  } catch (error: any) {
+    console.error('[SignUp] Registration failed:', error);
+    toast.error(error.message || 'Failed to create account');
+    throw error;
+  } finally {
+    setLoading(false);
+  }
+};
 
   const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -340,59 +339,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-  // FIXED: Add retry mechanism for profile creation
-      const createProfileWithRetry = async (retries = 3): Promise<void> => {
-        for (let attempt = 1; attempt <= retries; attempt++) {
-          try {
-            console.log(`[SignUp] Creating profile attempt ${attempt}/3:`, profileData);
-            
-            // Ensure we have auth token before making API call
-            const session = await supabase.auth.getSession();
-            if (!session.data.session?.access_token) {
-              throw new Error('No auth token available');
-            }
-            
-            const response = await apiClient.post('/api/v1/user/profile', profileData);
-            const createdProfile = response.data;
-            
-            console.log('[SignUp] Profile created successfully:', createdProfile);
-            setUserProfile(createdProfile);
-            setKycStatus('not_started');
-            return; // Success - exit retry loop
-            
-          } catch (profileError: any) {
-            console.error(`[SignUp] Profile creation attempt ${attempt} failed:`, profileError);
-            
-            if (attempt === retries) {
-              // Final attempt failed
-              console.error('[SignUp] All profile creation attempts failed');
-              // Don't throw - allow signup to continue without profile
-              toast.warning('Account created successfully, but profile setup incomplete. Please try logging in again.');
-              return;
-            }
-            
-            // Wait before retry (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
-          }
-        }
-      };
-
-      await createProfileWithRetry();
-      
-      if (!authData.user.email_confirmed_at) {
-        toast.success('Registration successful! Please check your email to verify your account.');
-      } else {
-        toast.success('Registration successful! Welcome to Seamount.');
-      }
-    }
-    
-  } catch (error: any) {
-    console.error('[SignUp] Registration failed:', error);
-    toast.error(error.message || 'Failed to create account');
-    throw error;
-  } finally {
-    setLoading(false);
-  }
 };

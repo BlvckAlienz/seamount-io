@@ -85,12 +85,12 @@ async def update_user_profile(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Profile update failed: {str(e)}")
 
-@router.post("/profile")
+@router.post("/profile", response_model=UserProfile)
 async def create_user_profile(
     profile_data: Dict[str, Any],
     supabase: Client = Depends(get_supabase_client)
-) -> Dict[str, Any]:
-    """FIXED: Create user profile with proper field mapping"""
+):
+    """Create user profile - matches frontend expectation"""
     try:
         # Convert camelCase to snake_case for database
         db_data = {
@@ -98,13 +98,14 @@ async def create_user_profile(
             "email": profile_data.get("email"),
             "first_name": profile_data.get("firstName", ""),
             "last_name": profile_data.get("lastName", ""),
-            "country_code": profile_data.get("countryCode", "US"),
-            "kyc_status": profile_data.get("kyc_status", "not_started"),
-            "created_at": "now()",
-            "updated_at": "now()"
+            "country_code": profile_data.get("countryCode", "US").upper(),
+            "kyc_status": "not_started",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
         }
         
-        result = supabase.table('user_profiles').insert(db_data).execute()
+        # Insert profile
+        result = supabase.from_("user_profiles").insert(db_data).execute()
         
         if not result.data:
             logger.error(f"Failed to create profile for user {profile_data.get('id')}")
@@ -113,10 +114,23 @@ async def create_user_profile(
         created_profile = result.data[0]
         logger.info(f"Profile created successfully for user: {profile_data.get('id')}")
         
-        return created_profile
+        return UserProfile(**created_profile)
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Profile creation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Profile creation failed: {str(e)}")
+        
+@router.post("/users/profile")
+async def create_user_profile_legacy(
+    profile_data: Dict[str, Any],
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Legacy endpoint support - maps to new endpoint"""
+    return await create_user_profile(profile_data, supabase)
+
+@router.get("/users/profile")
+async def get_user_profile_legacy(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Legacy endpoint support - maps to new endpoint"""
+    return await get_user_profile(current_user)
