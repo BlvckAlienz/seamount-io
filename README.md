@@ -124,4 +124,4 @@ For full integration instructions, see [INTEGRATION_GUIDE.md](./docs/INTEGRATION
 
 ## 🚨 Important Note About Transaction Fees
 
-All transaction fees on the Seamount platform are paid in USDS stablecoin. Users should always maintain a small balance of USDS (minimum 5 USDS recommended) to cover transaction fees, even when working with other assets.
+All transaction fees on the Seamount platform are paid in USDS stablecoin. Users should always maintain a small balance of USDS (minimum 5 USDS recommended) to cover transaction fees, even when working with other assets.# Deployment trigger
