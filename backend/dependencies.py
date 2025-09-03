@@ -351,35 +351,27 @@ async def get_current_user_optional(
         logger.warning(f"⚠️ Optional user profile fetch failed: {e}")
         return None
 
-# SURGICAL FIX: Added OptionalAuth class for easier dependency injection
-class OptionalAuth:
+# SURGICAL FIX: Function-based OptionalAuth dependency (not class-based)
+async def get_optional_auth(
+    payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
+    user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
+) -> Dict[str, Any]:
     """
-    SURGICAL FIX: Optional authentication dependency class
-    Use this for endpoints that should work with or without authentication
+    SURGICAL FIX: Optional authentication dependency function
+    Returns dict with user, payload, and is_authenticated status
     """
-    def __init__(self):
-        self.user: Optional[Dict[str, Any]] = None
-        self.payload: Optional[Dict[str, Any]] = None
-        self.is_authenticated: bool = False
+    is_authenticated = payload is not None and user is not None
     
-    @classmethod
-    async def create(
-        cls,
-        payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
-        user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
-    ) -> 'OptionalAuth':
-        """Factory method to create OptionalAuth instance"""
-        auth = cls()
-        auth.payload = payload
-        auth.user = user
-        auth.is_authenticated = payload is not None and user is not None
-        
-        if auth.is_authenticated:
-            logger.debug(f"🔓 Optional auth successful for user: {user.get('id', 'unknown')}")
-        else:
-            logger.debug("🔓 No authentication provided for optional endpoint")
-        
-        return auth
+    if is_authenticated:
+        logger.debug(f"🔓 Optional auth successful for user: {user.get('id', 'unknown')}")
+    else:
+        logger.debug("🔓 No authentication provided for optional endpoint")
+    
+    return {
+        "user": user,
+        "payload": payload,
+        "is_authenticated": is_authenticated
+    }
 
 async def verify_api_key(api_key: Optional[str] = None) -> bool:
     """

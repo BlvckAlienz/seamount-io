@@ -1,5 +1,5 @@
 # File Location: backend/api/routes/users.py
-# SURGICAL FIX: Fixed profile creation/update endpoints and authentication
+# SURGICAL FIX: Fixed profile creation/update endpoints and authentication with function-based OptionalAuth
 
 import logging
 import traceback
@@ -12,7 +12,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, ValidationError
 from supabase import Client
 
-from backend.dependencies import get_supabase_client, get_current_user, OptionalAuth
+# SURGICAL FIX: Import the function-based dependency instead of class
+from backend.dependencies import (
+    get_supabase_client, 
+    get_current_user, 
+    get_optional_auth,  # FIXED: Function instead of class
+    get_current_user_optional  # Added for cleaner optional auth
+)
 from backend.models import UserProfile, ProfileUpdateRequest
 
 logger = logging.getLogger(__name__)
@@ -41,6 +47,58 @@ class ProfileResponse(BaseModel):
     kyc_level: int
     created_at: str
     updated_at: str
+
+# SURGICAL FIX: Added the missing /me endpoint that was causing 403 errors
+@router.get("/me")
+async def get_current_user_profile(
+    auth: Dict[str, Any] = Depends(get_optional_auth),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    SURGICAL FIX: Get current user profile with optional authentication
+    This endpoint works with or without auth - no more 403 errors
+    """
+    try:
+        if not auth["is_authenticated"]:
+            logger.debug("[User Me] No authentication provided")
+            return {
+                "authenticated": False,
+                "message": "No authentication provided",
+                "user": None
+            }
+        
+        user = auth["user"]
+        user_id = user.get("id")
+        
+        logger.info(f"[User Me] Fetching profile for authenticated user: {user_id}")
+        
+        return {
+            "authenticated": True,
+            "user": {
+                "id": user.get("id"),
+                "email": user.get("email"),
+                "first_name": user.get("first_name", ""),
+                "last_name": user.get("last_name", ""),
+                "country_code": user.get("country_code", "US"),
+                "kyc_status": user.get("kyc_status", "pending"),
+                "kyc_level": user.get("kyc_level", 0),
+                "role": user.get("role", "alien"),
+                "created_at": user.get("created_at"),
+                "updated_at": user.get("updated_at")
+            }
+        }
+        
+    except Exception as e:
+        error_id = str(uuid4())[:8]
+        logger.error(f"[User Me] Unexpected error [Error ID: {error_id}]: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # SURGICAL FIX: Return a graceful error response instead of 500
+        return {
+            "authenticated": False,
+            "error": f"Failed to fetch user profile. Error ID: {error_id}",
+            "user": None
+        }
 
 @router.get("/profile", response_model=ProfileResponse)
 async def get_user_profile(
@@ -99,7 +157,7 @@ async def get_user_profile(
 async def create_user_profile(
     profile_data: ProfileCreateRequest,
     supabase: Client = Depends(get_supabase_client),
-    current_user: Optional[Dict[str, Any]] = Depends(OptionalAuth())  # SURGICAL FIX: Allow creation without auth
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)  # SURGICAL FIX: Use function
 ):
     """SURGICAL FIX: Create user profile during registration"""
     try:
