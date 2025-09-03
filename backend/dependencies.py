@@ -272,7 +272,8 @@ async def get_current_user(
         logger.debug(f"🔍 Fetching profile for user: {user_id}")
         profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
         
-        if profile_res.data:
+        # SURGICAL FIX: Handle Supabase response properly
+        if hasattr(profile_res, 'data') and profile_res.data:
             logger.debug(f"✅ Profile found for user: {user_id}")
             return profile_res.data
         
