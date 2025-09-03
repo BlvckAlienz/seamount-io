@@ -27,15 +27,9 @@ export const API_ENDPOINTS = {
   LEADS: {
     BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
-  KYC: {
-    START_VERIFICATION: '/api/kyc/start-verification',
-    SKIP: '/api/kyc/skip', // Added skip endpoint
-  },
-  WALLET: {
-    CREATE: '/api/wallet/create',
-  },
   USER: {
     PROFILE: '/api/v1/user/profile',
+    CREATE_PROFILE: '/api/v1/user/profile', // Use same endpoint for create/update
   },
   SESSION: {
     INITIALIZE: '/api/v1/session/initialize',
@@ -43,7 +37,12 @@ export const API_ENDPOINTS = {
   CONSENT: {
     UPDATE: '/api/v1/consent/update',
   },
-  HEALTH: '/api/v1/health',
+  WALLET: {
+    CREATE: '/api/wallet/create',
+  },
+  KYC: {
+    START_VERIFICATION: '/api/kyc/start-verification',
+  }
 };
 
 // --- Axios Interceptors ---

@@ -76,9 +76,10 @@ app = FastAPI(
 
 # FIXED: Use settings instead of hardcoded CORS
 settings = get_settings()
+# Replace the CORS middleware configuration with this:
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,  # This uses the computed property
+    allow_origins=["http://localhost:3000", "https://www.seamount.io", "https://seamount.io"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

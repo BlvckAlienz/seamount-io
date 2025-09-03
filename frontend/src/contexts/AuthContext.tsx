@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     console.log('[SignUp] Starting registration for:', email);
     
-    // Step 1: Create auth user with metadata
+    // Step 1: Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -143,39 +143,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     });
 
-    if (authError) {
-      console.error('[SignUp] Auth error:', authError);
-      throw authError;
-    }
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("No user returned from authentication");
 
-    console.log('[SignUp] Auth user created:', authData.user?.id);
+    console.log('[SignUp] Auth user created:', authData.user.id);
 
-    if (authData.user) {
-      // Step 2: Create user profile with retry mechanism
-      const profileData = {
-        id: authData.user.id,
-        email: email,
-        firstName: signUpData.firstName.trim(),
-        lastName: signUpData.lastName.trim(),
-        countryCode: signUpData.countryCode,
-        kyc_status: 'not_started'
-      };
+    // Step 2: Create user profile with simplified data
+    const profileData = {
+      id: authData.user.id,
+      email: email,
+      first_name: signUpData.firstName,
+      last_name: signUpData.lastName,
+      country_code: signUpData.countryCode,
+      kyc_status: 'not_started'
+    };
 
-      // FIXED: Use correct endpoint with proper data structure
-      const response = await apiClient.post('/api/v1/user/profile', profileData);
-      const createdProfile = response.data;
-      
-      console.log('[SignUp] Profile created successfully:', createdProfile);
-      
-      setUserProfile(createdProfile);
-      setKycStatus('not_started');
-      
-      if (!authData.user.email_confirmed_at) {
-        toast.success('Registration successful! Please check your email to verify your account.');
-      } else {
-        toast.success('Registration successful! Welcome to Seamount.');
-      }
-    }
+    // Use PUT instead of POST for idempotent profile creation
+    const response = await apiClient.put('/api/v1/user/profile', profileData);
+    const createdProfile = response.data;
+    
+    console.log('[SignUp] Profile created successfully:', createdProfile);
+    
+    setUserProfile(createdProfile);
+    setKycStatus('not_started');
+    
+    toast.success('Registration successful! Please check your email to verify your account.');
     
   } catch (error: any) {
     console.error('[SignUp] Registration failed:', error);

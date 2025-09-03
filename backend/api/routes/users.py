@@ -1,6 +1,7 @@
 # File Location: backend/api/routes/users.py
 # CRITICAL: Add this new router to fix 404 errors
 
+from datetime import datetime
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
