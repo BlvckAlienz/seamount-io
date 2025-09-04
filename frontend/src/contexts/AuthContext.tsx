@@ -1,5 +1,5 @@
 // File Location: frontend/src/contexts/AuthContext.tsx
-// SURGICAL FIX: Added missing createUserProfile function and fixed schema mapping
+// FIXED: Removed undefined 'state' reference and fixed completeOnboarding
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,7 @@ interface UserProfile {
   country_code?: string;
   kyc_status: 'not_started' | 'pending' | 'verified' | 'rejected';
   kyc_level: number;
+  role: 'tribe' | 'alien';
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +67,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (session?.user) {
         fetchUserProfile(session.user.id).then(profile => {
           if (profile && profile.kyc_status === 'pending') {
-            // FIXED: Change from 'not_started' to 'pending' to match DB default
             navigate('/onboarding');
           } else if (!profile) {
             // Create profile if it doesn't exist
@@ -97,25 +97,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // SURGICAL FIX: Added the missing createUserProfile function
-  const createUserProfile = async (userId: string, email: string) => {
-  try {
-    const profileData = {
-      id: userId,
-      email: email,
-      first_name: '',
-      last_name: '',
-      country_code: 'US',
-      kyc_status: 'pending',
-      kyc_level: 0,
-      role: 'alien'
-    };
+  const createUserProfile = async (userId: string, email: string | undefined) => {
+    try {
+      console.log('[Profile] Creating new profile for user:', userId);
+      
+      if (!email) {
+        throw new Error('Email is required to create profile');
+      }
 
-    await apiClient.post('/api/v1/user/profile', profileData);
-  } catch (error) {
-    console.error('Profile creation failed:', error);
-  }
-};
+      const profileData = {
+        id: userId,
+        email: email,
+        first_name: '',
+        last_name: '',
+        country_code: 'US',
+        kyc_status: 'pending',
+        kyc_level: 0,
+        role: 'alien'
+      };
+
+      console.log('[Profile] Creating profile with data:', profileData);
+      
+      const response = await apiClient.post('/api/v1/user/profile', profileData);
+      const createdProfile = response.data;
+      
+      console.log('[Profile] Profile created successfully:', createdProfile);
+      
+      setUserProfile(createdProfile);
+      setKycStatus(createdProfile.kyc_status || 'pending');
+      
+    } catch (error: any) {
+      console.error('[Profile] Creation failed:', error);
+      throw error;
+    }
+  };
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -177,7 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           first_name: signUpData.firstName.trim(),
           last_name: signUpData.lastName.trim(),
           country_code: signUpData.countryCode.toUpperCase(),
-          kyc_status: 'pending' // Ensure we use correct status
+          kyc_status: 'pending'
         };
 
         const updateResponse = await apiClient.put('/api/v1/user/profile', profileUpdateData);
@@ -192,8 +207,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
       } catch (profileError: any) {
         console.error('[SignUp] Profile creation/update failed:', profileError);
-        // Don't fail the entire signup if profile creation fails
-        // The user can complete their profile later
         toast.warning('Account created but profile setup incomplete. You can complete it after email verification.');
       }
       
@@ -225,7 +238,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data.user) {
         console.log('[SignIn] Login successful for user:', data.user.id);
         
-        // SURGICAL FIX: Ensure profile exists before proceeding
+        // Ensure profile exists before proceeding
         let profile = await fetchUserProfile(data.user.id);
         
         // If no profile exists, create one
@@ -317,42 +330,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-// Fix the completeOnboarding function
-const completeOnboarding = async () => {
-  console.log('Completing onboarding...');
-  try {
-    if (user) {
-      // Create wallet first
-      const walletCreated = await triggerWalletCreation();
+  const completeOnboarding = async () => {
+    try {
+      console.log('[Onboarding] Completing onboarding process');
       
-      if (!walletCreated.success) {
-        toast.error('Failed to create wallet. Please try again.');
-        return;
-      }
-
       // Update user role to tribe after successful KYC
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ 
-          kyc_status: 'approved',
-          kyc_level: 3,
-          role: 'tribe',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-        
-      if (error) throw error;
+      if (user) {
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ 
+            kyc_status: 'approved',
+            kyc_level: 3,
+            role: 'tribe',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+          
+        if (error) throw error;
+      }
       
-      // Fix: Fetch updated profile with correct parameters
-      await fetchUserProfile(user.id);
+      await updateUserProfile({ kyc_status: 'verified' });
+      
+      toast.success('Welcome to Seamount! Onboarding complete.');
       navigate('/dashboard');
-      toast.success('Onboarding completed successfully! Welcome to the Tribe!');
+      
+    } catch (error: any) {
+      console.error('[Onboarding] Complete error:', error);
+      toast.error('Failed to complete onboarding');
     }
-  } catch (err: any) {
-    console.error('Complete onboarding error:', err);
-    toast.error('Failed to complete onboarding');
-  }
-};
+  };
 
   const triggerWalletCreation = async (): Promise<{ success: boolean; mnemonic?: string }> => {
     try {
@@ -375,6 +381,11 @@ const completeOnboarding = async () => {
     }
   };
 
+  // Add role check helper function
+  const checkUserRole = useCallback((requiredRole: 'tribe' | 'alien') => {
+    return userProfile?.role === requiredRole;
+  }, [userProfile]);
+
   const value: AuthContextType = {
     user,
     userProfile,
@@ -393,8 +404,3 @@ const completeOnboarding = async () => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-// Add role check helper function
-const checkUserRole = useCallback((requiredRole: 'tribe' | 'alien') => {
-  return state.user?.role === requiredRole || state.isDemoMode;
-}, [state.user, state.isDemoMode]);
