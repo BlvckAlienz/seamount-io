@@ -29,8 +29,7 @@ from backend.services.email_service import EmailService
 from backend.services.notification_service import NotificationService
 from backend.services.wallet_service import WalletService
 from backend.dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service
-from backend.models import UserProfile, SessionResponse
-
+from backend.models import UserProfile, SessionResponse, ProfileUpdateRequest
 logger = logging.getLogger(__name__)
 
 class BusinessLeadPayload(BaseModel):
