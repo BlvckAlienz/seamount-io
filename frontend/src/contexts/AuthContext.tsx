@@ -98,45 +98,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // SURGICAL FIX: Added the missing createUserProfile function
-  const createUserProfile = async (userId: string, email: string | undefined) => {
-    try {
-      console.log('[Profile] Creating new profile for user:', userId);
-      
-      if (!email) {
-        throw new Error('Email is required to create profile');
-      }
+  const createUserProfile = async (userId: string, email: string) => {
+  try {
+    const profileData = {
+      id: userId,
+      email: email,
+      first_name: '',
+      last_name: '',
+      country_code: 'US',
+      kyc_status: 'pending',
+      kyc_level: 0,
+      role: 'alien'
+    };
 
-      // FIXED: Use correct schema mapping - backend expects these exact fields
-      const profileData = {
-        id: userId,           // Primary key matches auth.users.id
-        user_id: userId,      // Additional field in schema
-        email: email,
-        first_name: '',       // Match schema default
-        last_name: '',        // Match schema default
-        country_code: 'US',   // Match schema default
-        kyc_status: 'pending', // Match schema default (not 'not_started')
-        kyc_level: 0,         // Match schema default
-        role: 'alien'         // Match schema default
-      };
-
-      console.log('[Profile] Creating profile with data:', profileData);
-      
-      const response = await apiClient.post('/api/v1/user/profile', profileData);
-      const createdProfile = response.data;
-      
-      console.log('[Profile] Profile created successfully:', createdProfile);
-      
-      setUserProfile(createdProfile);
-      setKycStatus(createdProfile.kyc_status || 'pending');
-      
-    } catch (error: any) {
-      console.error('[Profile] Creation failed:', error);
-      
-      // Don't toast error here - let the calling function handle it
-      // This prevents double error messages
-      throw error;
-    }
-  };
+    await apiClient.post('/api/v1/user/profile', profileData);
+  } catch (error) {
+    console.error('Profile creation failed:', error);
+  }
+};
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -338,20 +317,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const completeOnboarding = async () => {
-    try {
-      console.log('[Onboarding] Completing onboarding process');
+// Fix the completeOnboarding function
+const completeOnboarding = async () => {
+  console.log('Completing onboarding...');
+  try {
+    if (user) {
+      // Create wallet first
+      const walletCreated = await triggerWalletCreation();
       
-      await updateUserProfile({ kyc_status: 'verified' });
+      if (!walletCreated.success) {
+        toast.error('Failed to create wallet. Please try again.');
+        return;
+      }
+
+      // Update user role to tribe after successful KYC
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ 
+          kyc_status: 'approved',
+          kyc_level: 3,
+          role: 'tribe',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+        
+      if (error) throw error;
       
-      toast.success('Welcome to Seamount! Onboarding complete.');
+      // Fix: Fetch updated profile with correct parameters
+      await fetchUserProfile(user.id);
       navigate('/dashboard');
-      
-    } catch (error: any) {
-      console.error('[Onboarding] Complete error:', error);
-      toast.error('Failed to complete onboarding');
+      toast.success('Onboarding completed successfully! Welcome to the Tribe!');
     }
-  };
+  } catch (err: any) {
+    console.error('Complete onboarding error:', err);
+    toast.error('Failed to complete onboarding');
+  }
+};
 
   const triggerWalletCreation = async (): Promise<{ success: boolean; mnemonic?: string }> => {
     try {
@@ -392,3 +393,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+// Add role check helper function
+const checkUserRole = useCallback((requiredRole: 'tribe' | 'alien') => {
+  return state.user?.role === requiredRole || state.isDemoMode;
+}, [state.user, state.isDemoMode]);

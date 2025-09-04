@@ -1,6 +1,3 @@
-// File Location: frontend/src/components/auth/RegisterForm.tsx
-// CRITICAL FIX: Removed any potential be.warning references
-
 import React, { useState, useMemo, useRef } from 'react';
 import { User, Mail, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +31,43 @@ interface FormErrors {
   form?: string;
 }
 
+// Password validation component with horizontal layout
+const PasswordRequirements: React.FC<{ requirements: Record<string, boolean> }> = ({ requirements }) => {
+  const allMet = Object.values(requirements).every(Boolean);
+  
+  if (allMet) {
+    return null; // Hide when all requirements are met
+  }
+  
+  return (
+    <div className="mt-2">
+      <p className="text-xs font-medium text-gray-500 mb-1">Password must contain:</p>
+      <div className="flex flex-wrap gap-2">
+        <div className={`flex items-center text-xs ${requirements.length ? 'text-green-600' : 'text-gray-500'}`}>
+          <div className={`w-2 h-2 rounded-full mr-1 ${requirements.length ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          8+ chars
+        </div>
+        <div className={`flex items-center text-xs ${requirements.uppercase ? 'text-green-600' : 'text-gray-500'}`}>
+          <div className={`w-2 h-2 rounded-full mr-1 ${requirements.uppercase ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          A-Z
+        </div>
+        <div className={`flex items-center text-xs ${requirements.lowercase ? 'text-green-600' : 'text-gray-500'}`}>
+          <div className={`w-2 h-2 rounded-full mr-1 ${requirements.lowercase ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          a-z
+        </div>
+        <div className={`flex items-center text-xs ${requirements.number ? 'text-green-600' : 'text-gray-500'}`}>
+          <div className={`w-2 h-2 rounded-full mr-1 ${requirements.number ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          0-9
+        </div>
+        <div className={`flex items-center text-xs ${requirements.special ? 'text-green-600' : 'text-gray-500'}`}>
+          <div className={`w-2 h-2 rounded-full mr-1 ${requirements.special ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+          !@#$%^&*
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick }) => {
   const [formData, setFormData] = useState<FormData>({
     email: '',
@@ -60,7 +94,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
-  // FIXED: Create proper country options with correct mapping
+  // Create proper country options with correct mapping
   const countryOptions = useMemo(() => {
     const options = countryList().getData();
     // Add some common mappings that might be missing
@@ -102,7 +136,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     
-    // FIXED: Ensure country code is properly set
+    // Ensure country code is properly set
     if (name === 'countryCode') {
       console.log('[Form] Country changed to:', value);
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -200,7 +234,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     setLoading(true);
     
     try {
-      // FIXED: Prepare clean signup data with proper structure
+      // Prepare clean signup data with proper structure
       const signUpData = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -242,16 +276,16 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   };
 
   return (
-    <Card className="w-full max-w-sm p-4 bg-gray-900 text-gray-100">
+    <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Create Account</h2>
-        <p className="text-gray-400 text-sm mt-2">Join Seamount and start your journey</p>
+        <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
+        <p className="text-gray-600 mt-2">Join Seamount and start your journey</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* First Name */}
         <div>
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
             First Name
           </label>
           <div className="relative">
@@ -262,7 +296,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="text"
               value={formData.firstName}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-10 pr-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="First name"
               required
             />
@@ -271,7 +305,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
         {/* Last Name */}
         <div>
-          <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
             Last Name
           </label>
           <div className="relative">
@@ -282,7 +316,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="text"
               value={formData.lastName}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-10 pr-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Last name"
               required
             />
@@ -291,7 +325,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
             Email
           </label>
           <div className="relative">
@@ -302,19 +336,19 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full pl-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-10 pr-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Email address"
               required
             />
           </div>
           {formErrors.email && (
-            <p className="text-sm text-red-400 mt-1">{formErrors.email}</p>
+            <p className="text-sm text-red-600 mt-1">{formErrors.email}</p>
           )}
         </div>
 
         {/* Password */}
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Password
           </label>
           <div className="relative">
@@ -325,14 +359,14 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-10 pr-10 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Password"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
@@ -340,38 +374,17 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           
           {/* Password Requirements */}
           {formData.password && (
-            <div className="mt-2 text-xs space-y-1">
-              <div className={`flex items-center ${validRequirements.length ? 'text-green-400' : 'text-gray-400'}`}>
-                <CheckCircle size={12} className="mr-1" />
-                At least 8 characters
-              </div>
-              <div className={`flex items-center ${validRequirements.uppercase ? 'text-green-400' : 'text-gray-400'}`}>
-                <CheckCircle size={12} className="mr-1" />
-                One uppercase letter
-              </div>
-              <div className={`flex items-center ${validRequirements.lowercase ? 'text-green-400' : 'text-gray-400'}`}>
-                <CheckCircle size={12} className="mr-1" />
-                One lowercase letter
-              </div>
-              <div className={`flex items-center ${validRequirements.number ? 'text-green-400' : 'text-gray-400'}`}>
-                <CheckCircle size={12} className="mr-1" />
-                One number
-              </div>
-              <div className={`flex items-center ${validRequirements.special ? 'text-green-400' : 'text-gray-400'}`}>
-                <CheckCircle size={12} className="mr-1" />
-                One special character (!@#$%^&*)
-              </div>
-            </div>
+            <PasswordRequirements requirements={validRequirements} />
           )}
           
           {formErrors.password && (
-            <p className="text-sm text-red-400 mt-1">{formErrors.password}</p>
+            <p className="text-sm text-red-600 mt-1">{formErrors.password}</p>
           )}
         </div>
 
         {/* Confirm Password */}
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
             Confirm Password
           </label>
           <div className="relative">
@@ -382,34 +395,34 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={handleInputChange}
-              className="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full pl-10 pr-10 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Confirm password"
               required
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
           {formErrors.confirmPassword && (
-            <p className="text-sm text-red-400 mt-1">{formErrors.confirmPassword}</p>
+            <p className="text-sm text-red-600 mt-1">{formErrors.confirmPassword}</p>
           )}
         </div>
 
-        {/* Country Selection - FIXED */}
+        {/* Country Selection */}
         <div>
-          <label htmlFor="countryCode" className="block text-sm font-medium text-gray-300 mb-1">
+          <label htmlFor="countryCode" className="block text-sm font-medium text-gray-700 mb-1">
             Country
           </label>
           <select
             id="countryCode"
             name="countryCode"
-            value={formData.countCode}
+            value={formData.countryCode}
             onChange={handleInputChange}
-            className="w-full pl-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full pl-3 pr-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           >
             {countryOptions.map((country: { value: string; label: string }) => (
@@ -429,18 +442,17 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
               onVerify={handleCaptchaVerify}
               onError={handleCaptchaError}
               onExpire={handleCaptchaExpire}
-              theme="dark"
             />
             {formErrors.captcha && (
-              <p className="text-sm text-red-400 mt-1">{formErrors.captcha}</p>
+              <p className="text-sm text-red-600 mt-1">{formErrors.captcha}</p>
             )}
           </div>
         )}
 
         {/* Error Messages */}
         {(authError || formErrors.form) && (
-          <div className="p-3 bg-red-900/30 border border-red-500/30 border border-red-500 rounded-lg">
-            <p className="text-sm text-red-400">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-600">
               {authError || formErrors.form}
             </p>
           </div>
@@ -450,7 +462,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
         <Button
           type="submit"
           disabled={loading || (isHcaptchaEnabled && !formData.captchaToken)}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? (
             <div className="flex items-center justify-center">
@@ -465,17 +477,17 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
       {/* Login Link */}
       <div className="text-center mt-4">
-        <p className="text-gray-400 text-sm">
+        <p className="text-gray-600 text-sm">
           Already have an account?{' '}
           <button
             onClick={onLoginClick}
-            className="text-blue-400 hover:text-blue-300 font-medium"
+            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
           >
             Sign In
           </button>
         </p>
       </div>
-    </Card>
+    </div>
   );
 };
 

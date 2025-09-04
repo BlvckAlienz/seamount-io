@@ -90,15 +90,15 @@ class WalletService:
             # Store encrypted private key in metadata JSONB field
             db_record = {
                 "user_id": user_id,
-                "wallet_address": wallet_data["address"],  # Match column name in DB
-                "algo_balance": 0,  # Initialize with 0 balance
-                "usds_balance": 0,  # Initialize with 0 balance
+                "wallet_address": wallet_data["address"],
+                "algo_balance": 0,
+                "usds_balance": 0,
                 "last_updated": datetime.utcnow().isoformat(),
                 "metadata": {
-                    "encrypted_private_key": encrypted_pk,
-                    "is_demo": wallet_data.get("is_demo", False),
-                    "created_at": datetime.utcnow().isoformat()
-                }
+                "encrypted_private_key": encrypted_pk,
+                "is_demo": wallet_data.get("is_demo", False),
+                "created_at": datetime.utcnow().isoformat()
+               }
             }
             
             # Step 3: Insert into the 'wallet_balances' table.

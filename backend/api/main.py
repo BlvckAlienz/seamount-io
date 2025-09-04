@@ -97,6 +97,22 @@ app.include_router(licensing_router)
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
     return {"status": "healthy", "version": "3.1.4"}
+    
+# Add these endpoints to main.py
+@app.get("/api/v1/user/profile", response_model=UserProfile)
+async def get_user_profile(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    return current_user
+
+@app.put("/api/v1/user/profile")
+async def update_user_profile(
+    update_data: ProfileUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    # Update logic here
+    pass
 
 @app.post("/api/v1/session/initialize", response_model=SessionResponse, tags=["Session"])
 async def initialize_session(

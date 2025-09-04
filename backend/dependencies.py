@@ -346,7 +346,7 @@ async def get_current_user(
             "first_name": user_metadata.get("first_name", ""),
             "last_name": user_metadata.get("last_name", ""),
             "country_code": user_metadata.get("country_code", "US"),
-            "kyc_status": "not_started",
+            "kyc_status": "pending",  # Changed from 'not_started'
             "access_level": "limited",
             "role": UserRole.ALIEN.value,
             "created_at": datetime.utcnow().isoformat(),
