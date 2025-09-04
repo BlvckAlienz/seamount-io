@@ -1,5 +1,5 @@
 // File Location: frontend/src/components/auth/RegisterForm.tsx
-// CRITICAL FIX: Corrected country code mapping and form submission flow
+// CRITICAL FIX: Removed any potential be.warning references
 
 import React, { useState, useMemo, useRef } from 'react';
 import { User, Mail, Lock, CheckCircle, Eye, EyeOff } from 'lucide-react';
@@ -204,7 +204,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
       const signUpData = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        countryCode: formData.countryCode.toUpperCase(), // This should be 2-letter ISO code like 'AE' for UAE
+        countryCode: formData.countryCode.toUpperCase(),
         ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken }),
       };
 
@@ -407,7 +407,7 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           <select
             id="countryCode"
             name="countryCode"
-            value={formData.countryCode}
+            value={formData.countCode}
             onChange={handleInputChange}
             className="w-full pl-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             required

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiClient, API_ENDPOINTS } from '../config/api';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Copy, ArrowLeft } from 'lucide-react';
-import Button from '../components/ui/Button'; // Assuming you have a Button component
+import Button from '../components/ui/Button';
 
 // Make sure ComplyCube is declared on the window object
 declare global {
@@ -72,7 +72,7 @@ const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
   
   const handleSkip = async () => {
     toast('You can complete verification later from your settings.');
-    await completeOnboarding(); // This updates user state and redirects to dashboard
+    await completeOnboarding();
   };
 
   return (
@@ -151,7 +151,6 @@ const WalletBackupStep: React.FC<StepProps & { mnemonic: string }> = ({ onNext, 
     );
 };
 
-
 // --- Main Onboarding Component ---
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState<'identity' | 'walletBackup'>('identity');
@@ -188,7 +187,7 @@ const OnboardingPage: React.FC = () => {
         setStep('walletBackup');
     } else {
         toast.error('Could not create your wallet. You can try again later from your settings.', { id: toastId });
-        await completeOnboarding(); // Redirect to dashboard even if wallet fails
+        await completeOnboarding();
     }
   };
 

@@ -9,8 +9,7 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
-from backend.dependencies import get_supabase_client, OptionalAuth
-from backend.models import UserProfile
+from backend.dependencies import get_supabase_client, get_optional_auth, OptionalAuth
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,7 +18,7 @@ router = APIRouter()
 async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client),
-    current_user: Optional[Dict] = Depends(OptionalAuth)
+    auth: OptionalAuth = Depends(get_optional_auth)
 ):
     """Create or update user profile with FIXED query chaining"""
     
@@ -27,10 +26,10 @@ async def create_user_profile(
         data = await request.json()
         logger.info(f"[Profile Create] Raw request data: {data}")
         
-        # Extract user ID from current user or data
+        # Extract user ID from auth or data
         user_id = None
-        if current_user:
-            user_id = current_user.get('sub')
+        if auth and auth.payload:
+            user_id = auth.payload.get('sub')
         
         if not user_id and 'id' in data:
             user_id = data['id']
@@ -47,8 +46,8 @@ async def create_user_profile(
             "id": user_id,
             "user_id": user_id,
             "email": data.get('email', ''),
-            "first_name": data.get('firstName', '') or data.get('first_name', ''),  # Handle both formats
-            "last_name": data.get('lastName', '') or data.get('last_name', ''),    # Handle both formats
+            "first_name": data.get('firstName', '') or data.get('first_name', ''),
+            "last_name": data.get('lastName', '') or data.get('last_name', ''),
             "country_code": data.get('countryCode', 'US') or data.get('country_code', 'US'),
             "kyc_status": "pending",
             "kyc_level": 0,

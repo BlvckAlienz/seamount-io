@@ -1,10 +1,10 @@
 # File Location: backend/dependencies.py
-# SURGICAL MERGE: Combined advanced JWT verification with critical scoping/import fixes + OptionalAuth
+# CRITICAL FIX: Proper OptionalAuth implementation and import fixes
 
 import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from supabase import Client, create_client  # CRITICAL: Added missing import
+from supabase import Client, create_client
 from typing import Dict, Any, Optional, Union
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -26,7 +26,7 @@ _notification_service: Optional[NotificationService] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
-# Security schemes - SURGICAL FIX: Added dual security modes
+# Security schemes
 security = HTTPBearer(auto_error=False)  # For optional auth
 security_required = HTTPBearer(auto_error=True)  # For required auth
 
@@ -46,16 +46,14 @@ def initialize_dependencies(supabase_client: Client, wallet_service: WalletServi
 def get_supabase_client() -> Client:
     """
     CRITICAL FIX: Proper singleton Supabase client with correct config attributes
-    This was the root cause of the UnboundLocalError
     """
-    global _supabase_client  # CRITICAL: Must declare global before use
+    global _supabase_client
     
     if _supabase_client is None:
         try:
             settings = get_settings_cached()
-            # CRITICAL FIX: Use correct attribute names from your config.py
-            supabase_url = settings.VITE_SUPABASE_URL  # Not SUPABASE_URL
-            supabase_key = settings.SUPABASE_SERVICE_KEY.get_secret_value()  # Not SUPABASE_KEY
+            supabase_url = settings.VITE_SUPABASE_URL
+            supabase_key = settings.SUPABASE_SERVICE_KEY.get_secret_value()
             
             _supabase_client = create_client(supabase_url, supabase_key)
             logger.info("✅ Supabase client initialized successfully")
@@ -79,6 +77,65 @@ def get_notification_service() -> NotificationService:
         logger.error("❌ Notification service not initialized")
         raise HTTPException(status_code=503, detail="Notification service unavailable")
     return _notification_service
+
+# CRITICAL FIX: Add OptionalAuth class at the top level
+class OptionalAuth:
+    """Optional authentication container"""
+    def __init__(self, user: Optional[dict] = None, payload: Optional[dict] = None):
+        self.user = user
+        self.payload = payload
+        self.is_authenticated = user is not None and payload is not None
+
+async def get_optional_auth(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    settings: Settings = Depends(get_settings_cached)
+) -> OptionalAuth:
+    """
+    Optional authentication dependency that returns OptionalAuth object
+    """
+    if not credentials:
+        return OptionalAuth()
+    
+    try:
+        # Verify token using existing logic
+        token = credentials.credentials
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get('kid')
+        
+        if not kid:
+            return OptionalAuth()
+        
+        jwks = await fetch_jwks(settings)
+        key = None
+        for jwk_key in jwks.get('keys', []):
+            if jwk_key.get('kid') == kid:
+                key = jwk_key
+                break
+        
+        if not key:
+            return OptionalAuth()
+        
+        payload = jwt.decode(
+            token,
+            key,
+            algorithms=['RS256', 'ES256'],
+            audience='authenticated',
+            issuer=settings.SUPABASE_JWT_ISSUER,
+            options={"verify_aud": True, "verify_exp": True, "verify_iss": True}
+        )
+        
+        # Get user profile
+        supabase = get_supabase_client()
+        user_id = payload.get('sub')
+        if user_id:
+            profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+            user_profile = profile_res.data if profile_res.data else None
+            return OptionalAuth(user=user_profile, payload=payload)
+        
+        return OptionalAuth(payload=payload)
+        
+    except Exception:
+        return OptionalAuth()
 
 async def fetch_jwks(settings: Settings = Depends(get_settings_cached)) -> Dict[str, Any]:
     """

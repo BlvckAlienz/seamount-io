@@ -1,9 +1,10 @@
-# File Location: frontend/src/hooks/useUserProfile.ts
-# CRITICAL FIX: Enhanced profile management with robust error handling
+// File Location: frontend/src/hooks/useUserProfile.ts
+// CRITICAL FIX: Enhanced profile management with robust error handling
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface UserProfile {
   id: string;
@@ -68,6 +69,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         }
 
         setProfile(data);
+        setLoading(false);
         return;
 
       } catch (err) {
@@ -77,14 +79,13 @@ export const useUserProfile = (): UseUserProfileReturn => {
         if (attempt === maxRetries) {
           console.error(`Profile fetch failed after ${maxRetries} attempts:`, err);
           setError(errorMessage);
+          setLoading(false);
         } else {
           console.warn(`Profile fetch attempt ${attempt} failed, retrying...`);
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
       }
     }
-
-    setLoading(false);
   }, [user]);
 
   // CRITICAL: Check profile completeness with enhanced validation
@@ -108,15 +109,15 @@ export const useUserProfile = (): UseUserProfileReturn => {
 
       const data: ProfileCheck = await response.json();
       setProfileCheck(data);
+      setLoading(false);
       return data;
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Profile check failed';
       console.error('Profile completeness check error:', err);
       setError(errorMessage);
-      return null;
-    } finally {
       setLoading(false);
+      return null;
     }
   }, [user]);
 
@@ -163,6 +164,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         // Refresh profile check after successful update
         await checkProfileCompleteness();
         
+        setLoading(false);
         return true;
       } else {
         throw new Error(result.message || 'Profile update failed');
@@ -172,9 +174,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
       const errorMessage = err instanceof Error ? err.message : 'Profile update failed';
       console.error('Profile update error:', err);
       setError(errorMessage);
-      return false;
-    } finally {
       setLoading(false);
+      return false;
     }
   }, [user, checkProfileCompleteness]);
 
@@ -213,6 +214,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
         setProfile(prev => prev ? { ...prev, kyc_status: 'in_progress' } : null);
         setProfileCheck(prev => prev ? { ...prev, kyc_status: 'in_progress' } : null);
         
+        setLoading(false);
         return true;
       } else {
         throw new Error(result.message || 'Failed to start KYC verification');
@@ -222,9 +224,8 @@ export const useUserProfile = (): UseUserProfileReturn => {
       const errorMessage = err instanceof Error ? err.message : 'KYC initialization failed';
       console.error('KYC start error:', err);
       setError(errorMessage);
-      return false;
-    } finally {
       setLoading(false);
+      return false;
     }
   }, [user, checkProfileCompleteness]);
 
