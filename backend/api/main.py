@@ -73,9 +73,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# FIXED: Use settings instead of hardcoded CORS
-settings = get_settings()
-# Replace the CORS middleware configuration with this:
+# FIXED: Update CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://www.seamount.io", "https://seamount.io"],
@@ -84,14 +82,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# FIXED: Include the missing users router
-app.include_router(users_router)  # This provides /api/v1/user/profile
-app.include_router(kyc.router, prefix="/api", tags=["KYC"])
+# FIXED: Update router inclusion with proper prefix
+app.include_router(users_router, prefix="/api/v1/user", tags=["User"])
+app.include_router(kyc.router, prefix="/api/v1", tags=["KYC"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
 app.include_router(investor.router, prefix="/api/v1", tags=["Investor"])
 app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
-app.include_router(licensing_router)
+app.include_router(licensing_router, prefix="/api/v1", tags=["Licensing"])
+
+# REMOVED: Duplicate endpoints that were causing conflicts
+# @app.get("/api/v1/user/profile", response_model=UserProfile)
+# @app.put("/api/v1/user/profile")
 
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():

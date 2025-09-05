@@ -28,31 +28,32 @@ const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
   const { completeOnboarding } = useAuth();
 
   const startVerification = async () => {
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post<{ token: string }>(
-        API_ENDPOINTS.KYC.START_VERIFICATION
-      );
-      
-      if (window.ComplyCube) {
-        const session = window.ComplyCube.mount({
-          token: data.token,
-          onComplete: () => {
-            toast.success('Verification completed!');
-            onNext();
-          },
-          onError: (error) => {
-            toast.error('Verification failed: ' + error.message);
-          }
-        });
-        session.mount('#complycube-mount');
-        setSdkInitialized(true);
-      }
-    } catch (error) {
-      toast.error('Failed to start verification');
-      setLoading(false);
+  setLoading(true);
+  try {
+    // FIXED: Use the correct API endpoint
+    const { data } = await apiClient.post<{ token: string }>(
+      "/api/v1/kyc/start-verification"  // Changed from API_ENDPOINTS.KYC.START_VERIFICATION
+    );
+    
+    if (window.ComplyCube) {
+      const session = window.ComplyCube.mount({
+        token: data.token,
+        onComplete: () => {
+          toast.success('Verification completed!');
+          onNext();
+        },
+        onError: (error) => {
+          toast.error('Verification failed: ' + error.message);
+        }
+      });
+      session.mount('#complycube-mount');
+      setSdkInitialized(true);
     }
-  };
+  } catch (error) {
+    toast.error('Failed to start verification');
+    setLoading(false);
+  }
+};
   
   const handleSkip = async () => {
     toast('You can complete verification later from your settings.');

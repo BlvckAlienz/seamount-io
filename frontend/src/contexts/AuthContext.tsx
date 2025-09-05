@@ -60,42 +60,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id).then(profile => {
-          if (profile && profile.kyc_status === 'pending') {
-            navigate('/onboarding');
-          } else if (!profile) {
-            // Create profile if it doesn't exist
-            createUserProfile(session.user.id, session.user.email);
-          }
-        });
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
+  // Get initial session
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      fetchUserProfile(session.user.id).then(profile => {
         if (profile && profile.kyc_status === 'pending') {
           navigate('/onboarding');
+        } else if (profile && profile.kyc_status === 'verified') {
+          // FIXED: Redirect to dashboard if already verified
+          navigate('/dashboard');
+        } else if (!profile) {
+          // Create profile if it doesn't exist
+          createUserProfile(session.user.id, session.user.email);
         }
-      } else {
-        setUserProfile(null);
-        setKycStatus('not_started');
-      }
-      setLoading(false);
-    });
+      });
+    }
+    setLoading(false);
+  });
 
-    return () => subscription.unsubscribe();
-  }, []);
+  // Listen for auth changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    setSession(session);
+    setUser(session?.user ?? null);
+    
+    if (session?.user) {
+      const profile = await fetchUserProfile(session.user.id);
+      if (profile && profile.kyc_status === 'pending') {
+        navigate('/onboarding');
+      } else if (profile && profile.kyc_status === 'verified') {
+        // FIXED: Redirect to dashboard if already verified
+        navigate('/dashboard');
+      }
+    } else {
+      setUserProfile(null);
+      setKycStatus('not_started');
+    }
+    setLoading(false);
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
   const createUserProfile = async (userId: string, email: string | undefined) => {
     try {

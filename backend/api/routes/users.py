@@ -14,7 +14,7 @@ from backend.dependencies import get_supabase_client, get_optional_auth, Optiona
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/profile")
+@router.post("")  # Changed from "/profile" to match prefix
 async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client),
@@ -52,6 +52,7 @@ async def create_user_profile(
         insert_data = {
             "id": user_id,
             "user_id": user_id,
+            "user_id": user_id,  # Added this line to populate user_id column
             "email": data.get('email', ''),
             "first_name": data.get('firstName', '') or data.get('first_name', ''),
             "last_name": data.get('lastName', '') or data.get('last_name', ''),
@@ -112,7 +113,7 @@ async def create_user_profile(
             detail=f"Failed to create profile. Error ID: {error_id}"
         )
 
-@router.get("/profile")
+@router.get("")  # Changed from "/profile" to match prefix
 async def get_user_profile(
     supabase=Depends(get_supabase_client),
     current_user: Optional[Dict] = Depends(OptionalAuth)
@@ -154,7 +155,7 @@ async def get_user_profile(
             detail=f"Failed to fetch profile. Error ID: {error_id}"
         )
 
-@router.put("/profile")
+@router.put("")  # Changed from "/profile" to match prefix
 async def update_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client),

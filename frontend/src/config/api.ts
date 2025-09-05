@@ -28,8 +28,8 @@ export const API_ENDPOINTS = {
     BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
   USER: {
-    PROFILE: '/api/v1/user/profile',
-    CREATE_PROFILE: '/api/v1/user/profile', // Use same endpoint for create/update
+    PROFILE: '/api/v1/user',  // Changed from '/api/v1/user/profile'
+    CREATE_PROFILE: '/api/v1/user',  // Changed from '/api/v1/user/profile'
   },
   SESSION: {
     INITIALIZE: '/api/v1/session/initialize',
@@ -41,7 +41,7 @@ export const API_ENDPOINTS = {
     CREATE: '/api/wallet/create',
   },
   KYC: {
-    START_VERIFICATION: '/api/kyc/start-verification',
+    START_VERIFICATION: '/api/v1/kyc/start-verification',  // Fixed endpoint
   }
 };
 
