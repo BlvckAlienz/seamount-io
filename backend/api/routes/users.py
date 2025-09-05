@@ -42,13 +42,20 @@ async def create_user_profile(
         # Build insert data with defaults
         now = datetime.now(timezone.utc).isoformat()
         
+        # Handle country code - ensure uppercase
+        country_code = data.get('countryCode', 'US') or data.get('country_code', 'US')
+        if country_code:
+            country_code = country_code.upper()
+        else:
+            country_code = 'US'
+        
         insert_data = {
             "id": user_id,
             "user_id": user_id,
             "email": data.get('email', ''),
             "first_name": data.get('firstName', '') or data.get('first_name', ''),
             "last_name": data.get('lastName', '') or data.get('last_name', ''),
-            "country_code": data.get('countryCode', 'US') or data.get('country_code', 'US'),
+            "country_code": country_code,
             "kyc_status": "pending",
             "kyc_level": 0,
             "role": "alien",
@@ -183,7 +190,8 @@ async def update_user_profile(
         if 'lastName' in data:
             update_data['last_name'] = data['lastName']
         if 'countryCode' in data:
-            update_data['country_code'] = data['countryCode']
+            # Ensure country code is uppercase
+            update_data['country_code'] = data['countryCode'].upper()
             
         logger.info(f"[Profile Update] Update data: {update_data}")
         
