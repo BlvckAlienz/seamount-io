@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from backend.api.routes.licensing import router as licensing_router
 from backend.api.routes import kyc, webhooks, portfolio, investor, consent
 from backend.api.routes.users import router as users_router
-from backend.config import get_settings, BusinessModelConfig, LicenseTier, PricingRegion
+from backend.config import Settings, get_settings, BusinessModelConfig, LicenseTier, PricingRegion
 from backend.services.email_service import EmailService
 from backend.services.notification_service import NotificationService
 from backend.services.wallet_service import WalletService
@@ -36,6 +36,7 @@ from backend.services.kyc_service import KYCService
 from backend.services.database_service import DatabaseService
 from backend.services.audit_service import AuditService
 from backend.dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service, get_audit_service
+from backend.models import UserRole
 
 logger = logging.getLogger(__name__)
 
