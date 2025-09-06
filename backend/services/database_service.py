@@ -526,5 +526,8 @@ class DatabaseService:
 # Global database service instance for backward compatibility
 database_service = DatabaseService()
 
+# CRITICAL FIX: Add SuperDatabaseService alias for import compatibility
+SuperDatabaseService = DatabaseService  # Alias for backward compatibility
+
 # Export both for flexibility
-__all__ = ["DatabaseService", "database_service"]
+__all__ = ["DatabaseService", "SuperDatabaseService", "database_service"]
