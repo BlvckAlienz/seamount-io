@@ -2,9 +2,9 @@
 # CRITICAL FIX: Complete audit service for compliance and security logging
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List  # ← Added List import here
 from supabase import Client
-from datetime import datetime
+from datetime import datetime, timedelta  # ← Added timedelta import
 from enum import Enum
 import uuid
 import json
@@ -58,7 +58,7 @@ class AuditService:
     
     def __init__(self, supabase_client: Client):
         self.supabase = supabase_client
-        logger.info("âœ… AuditService initialized successfully")
+        logger.info("✅ AuditService initialized successfully")
 
     async def log_event(
         self,
