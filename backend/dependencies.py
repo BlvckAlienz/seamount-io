@@ -1,5 +1,5 @@
 # File Location: backend/dependencies.py
-# CRITICAL FIX: Proper OptionalAuth implementation and import fixes
+# CRITICAL FIX: Complete implementation with proper KYC service dependency injection
 
 import logging
 from fastapi import Depends, HTTPException, status
@@ -19,10 +19,11 @@ from models import UserRole
 
 logger = logging.getLogger(__name__)
 
-# CRITICAL FIX: Proper global declarations
+# CRITICAL FIX: Proper global declarations with KYC service
 _supabase_client: Optional[Client] = None
 _wallet_service: Optional[WalletService] = None
 _notification_service: Optional[NotificationService] = None
+_kyc_service = None  # Will be initialized with proper KYC service
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
@@ -35,12 +36,13 @@ def get_settings_cached():
     """Cached settings instance for performance"""
     return get_settings()
 
-def initialize_dependencies(supabase_client: Client, wallet_service: WalletService, notification_service: NotificationService):
+def initialize_dependencies(supabase_client: Client, wallet_service: WalletService, notification_service: NotificationService, kyc_service=None):
     """Initialize dependency services - used in main.py startup"""
-    global _supabase_client, _wallet_service, _notification_service
+    global _supabase_client, _wallet_service, _notification_service, _kyc_service
     _supabase_client = supabase_client
     _wallet_service = wallet_service
     _notification_service = notification_service
+    _kyc_service = kyc_service
     logger.info("✅ Dependencies initialized successfully")
 
 def get_supabase_client() -> Client:
@@ -77,6 +79,13 @@ def get_notification_service() -> NotificationService:
         logger.error("❌ Notification service not initialized")
         raise HTTPException(status_code=503, detail="Notification service unavailable")
     return _notification_service
+
+def get_kyc_service():
+    """Get KYC service instance"""
+    if _kyc_service is None:
+        logger.error("❌ KYC service not initialized")
+        raise HTTPException(status_code=503, detail="KYC service unavailable")
+    return _kyc_service
 
 # CRITICAL FIX: Add OptionalAuth class at the top level
 class OptionalAuth:
@@ -192,7 +201,7 @@ async def verify_supabase_token(
     
     try:
         token = credentials.credentials
-        logger.debug(f"🔍 Verifying JWT token: {token[:20]}...")
+        logger.debug(f"🔐 Verifying JWT token: {token[:20]}...")
         
         # Get unverified header for key ID
         unverified_header = jwt.get_unverified_header(token)
@@ -248,66 +257,6 @@ async def verify_supabase_token(
             detail="Could not process authentication token"
         )
 
-# SURGICAL FIX: Added the missing OptionalAuth dependency
-async def verify_supabase_token_optional(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    settings: Settings = Depends(get_settings_cached)
-) -> Optional[Dict[str, Any]]:
-    """
-    SURGICAL FIX: Optional JWT verification - returns None if no token or invalid token
-    This is the missing dependency that was causing 403 errors on public endpoints
-    """
-    if not credentials:
-        logger.debug("🔓 No authorization credentials provided (optional auth)")
-        return None
-        
-    try:
-        # Reuse the main verification logic but handle errors gracefully
-        token = credentials.credentials
-        logger.debug(f"🔍 Attempting optional token verification: {token[:20]}...")
-        
-        # Get unverified header for key ID
-        unverified_header = jwt.get_unverified_header(token)
-        kid = unverified_header.get('kid')
-        
-        if not kid:
-            logger.debug("🔓 Token missing key ID - skipping optional auth")
-            return None
-        
-        # Fetch JWKS and find matching key
-        jwks = await fetch_jwks(settings)
-        
-        key = None
-        for jwk_key in jwks.get('keys', []):
-            if jwk_key.get('kid') == kid:
-                key = jwk_key
-                break
-        
-        if not key:
-            logger.debug(f"🔓 Public key for KID {kid} not found - skipping optional auth")
-            return None
-        
-        # Verify and decode token
-        payload = jwt.decode(
-            token,
-            key,
-            algorithms=['RS256', 'ES256'],
-            audience='authenticated',
-            issuer=settings.SUPABASE_JWT_ISSUER,
-            options={"verify_aud": True, "verify_exp": True, "verify_iss": True}
-        )
-        
-        user_id = payload.get('sub')
-        logger.info(f"✅ Optional token verified successfully for user: {user_id}")
-        return payload
-        
-    except (JWTError, HTTPException):
-        logger.debug("🔓 Token verification failed for optional auth - continuing without auth")
-        return None
-    except Exception as e:
-        logger.warning(f"⚠️ Unexpected error in optional token verification: {e}")
-        return None
-
 async def get_current_user(
     payload: Dict[str, Any] = Depends(verify_supabase_token),
     supabase: Client = Depends(get_supabase_client)
@@ -320,198 +269,201 @@ async def get_current_user(
     if not user_id:
         logger.error("❌ Invalid token payload: user ID missing")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid token payload: user ID missing"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload - user ID missing"
         )
     
-    try:
-        # Fetch user profile from database
-        logger.debug(f"🔍 Fetching profile for user: {user_id}")
-        profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+    logger.debug(f"🔍 Fetching user profile for ID: {user_id}")
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # CRITICAL FIX: Query user_profiles table properly
+            profile_response = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+            
+            if profile_response.data:
+                logger.info(f"✅ User profile found for: {user_id}")
+                return profile_response.data
+            
+            # SELF-HEALING: Profile doesn't exist, create it from token data
+            logger.warning(f"⚠️ Profile not found for user {user_id}. Attempting self-healing profile creation...")
+            
+            # Extract email from token (if available)
+            email = payload.get('email')
+            if not email:
+                logger.error(f"❌ Cannot create profile: no email in token for user {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User profile not found and cannot be auto-created without email"
+                )
+            
+            # Create minimal profile from token data
+            now = datetime.utcnow().isoformat()
+            profile_data = {
+                "id": user_id,
+                "user_id": user_id,  # CRITICAL: Ensure user_id column is populated
+                "email": email,
+                "first_name": payload.get('user_metadata', {}).get('first_name', ''),
+                "last_name": payload.get('user_metadata', {}).get('last_name', ''),
+                "country_code": payload.get('user_metadata', {}).get('country_code', 'US'),
+                "kyc_status": "pending",
+                "kyc_level": 0,
+                "role": "alien",
+                "access_level": "limited",
+                "created_at": now,
+                "updated_at": now
+            }
+            
+            logger.info(f"🔧 Self-healing: Creating profile for user {user_id}")
+            
+            # Create profile with upsert to handle race conditions
+            create_response = supabase.from_("user_profiles").upsert(
+                profile_data, 
+                on_conflict="id"
+            ).execute()
+            
+            if not create_response.data:
+                raise Exception("Profile creation returned no data")
+            
+            # Fetch the created profile
+            fetch_response = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
+            
+            if not fetch_response.data:
+                raise Exception("Could not fetch newly created profile")
+            
+            logger.info(f"✅ Self-healing successful: Profile created for user {user_id}")
+            return fetch_response.data
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
+        except Exception as db_error:
+            logger.warning(f"⚠️ Database operation failed (attempt {attempt + 1}): {str(db_error)}")
+            
+            if attempt == max_retries - 1:
+                logger.error(f"❌ All profile fetch attempts failed for user {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Could not retrieve or create user profile"
+                )
+            
+            # Exponential backoff for retries
+            import asyncio
+            await asyncio.sleep(2 ** attempt)
+    
+    # This should never be reached, but added for completeness
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Unexpected error in user profile retrieval"
+    )
+
+def require_role(required_role: Union[UserRole, str]):
+    """
+    Dependency factory for role-based access control
+    Usage: @app.get("/admin", dependencies=[Depends(require_role("tribe"))])
+    """
+    async def role_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        user_role = current_user.get("role", "alien")
         
-        # SURGICAL FIX: Handle Supabase response properly
-        if hasattr(profile_res, 'data') and profile_res.data:
-            logger.debug(f"✅ Profile found for user: {user_id}")
-            return profile_res.data
+        if isinstance(required_role, str):
+            required_role_str = required_role
+        else:
+            required_role_str = required_role.value
         
-        # SELF-HEALING: Create profile if it doesn't exist
-        logger.warning(f"⚠️ Profile not found for user {user_id}. Auto-creating from JWT data...")
-        
-        user_metadata = payload.get('user_metadata', {})
-        app_metadata = payload.get('app_metadata', {})
-        
-        new_profile_data = {
-            "id": user_id,
-            "email": payload.get('email', ''),
-            "first_name": user_metadata.get("first_name", ""),
-            "last_name": user_metadata.get("last_name", ""),
-            "country_code": user_metadata.get("country_code", "US"),
-            "kyc_status": "pending",  # Changed from 'not_started'
-            "access_level": "limited",
-            "role": UserRole.ALIEN.value,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Insert new profile
-        insert_res = supabase.from_("user_profiles").insert(new_profile_data).execute()
-        
-        if not insert_res.data or len(insert_res.data) == 0:
-            logger.error(f"❌ Failed to create profile for user {user_id}")
+        if user_role != required_role_str:
+            logger.warning(f"⚠️ Access denied: User {current_user.get('id')} has role '{user_role}', required: '{required_role_str}'")
             raise HTTPException(
-                status_code=500, 
-                detail="Could not create user profile"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Role '{required_role_str}' required"
             )
         
-        logger.info(f"✅ Successfully auto-created profile for user: {user_id}")
-        return insert_res.data[0]
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-    except Exception as e:
-        logger.error(f"❌ Profile fetch/creation error for user {user_id}: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error retrieving user profile: {str(e)}"
-        )
+        return current_user
+    
+    return role_checker
 
-# SURGICAL FIX: The missing OptionalAuth user dependency
-async def get_current_user_optional(
-    payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
-    supabase: Client = Depends(get_supabase_client)
-) -> Optional[Dict[str, Any]]:
+def require_kyc_level(min_level: int):
     """
-    SURGICAL FIX: Optional user profile fetching - returns None if no valid token
-    This was the missing dependency causing 403 errors on public endpoints like /users/me
+    Dependency factory for KYC level-based access control
+    Usage: @app.get("/premium", dependencies=[Depends(require_kyc_level(2))])
     """
-    if not payload:
-        logger.debug("🔓 No payload from optional token verification")
-        return None
+    async def kyc_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        user_kyc_level = current_user.get("kyc_level", 0)
         
-    try:
-        user_id = payload.get("sub")
-        if not user_id:
-            logger.debug("🔓 No user ID in optional payload")
-            return None
-            
-        logger.debug(f"🔍 Fetching optional profile for user: {user_id}")
-        profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+        if user_kyc_level < min_level:
+            logger.warning(f"⚠️ KYC level insufficient: User {current_user.get('id')} has level {user_kyc_level}, required: {min_level}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"KYC verification level {min_level} required"
+            )
         
-        if profile_res.data:
-            logger.debug(f"✅ Optional profile found for user: {user_id}")
-            return profile_res.data
-        else:
-            logger.debug(f"🔓 No profile found for optional user: {user_id}")
-            return None
-        
-    except Exception as e:
-        logger.warning(f"⚠️ Optional user profile fetch failed: {e}")
-        return None
+        return current_user
+    
+    return kyc_checker
 
-# SURGICAL FIX: Function-based OptionalAuth dependency (not class-based)
-async def get_optional_auth(
-    payload: Optional[Dict[str, Any]] = Depends(verify_supabase_token_optional),
-    user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
+# Enhanced security dependencies for high-value operations
+async def require_fresh_auth(
+    credentials: HTTPAuthorizationCredentials = Depends(security_required),
+    settings: Settings = Depends(get_settings_cached)
 ) -> Dict[str, Any]:
     """
-    SURGICAL FIX: Optional authentication dependency function
-    Returns dict with user, payload, and is_authenticated status
+    Requires a token issued within the last 10 minutes for sensitive operations
     """
-    is_authenticated = payload is not None and user is not None
+    payload = await verify_supabase_token(credentials, settings)
     
-    if is_authenticated:
-        logger.debug(f"🔓 Optional auth successful for user: {user.get('id', 'unknown')}")
-    else:
-        logger.debug("🔓 No authentication provided for optional endpoint")
+    # Check token age
+    issued_at = payload.get('iat')
+    if issued_at:
+        token_age = datetime.utcnow().timestamp() - issued_at
+        max_age = 600  # 10 minutes
+        
+        if token_age > max_age:
+            logger.warning(f"⚠️ Token too old for sensitive operation: {token_age}s (max: {max_age}s)")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Fresh authentication required for this operation"
+            )
     
-    return {
-        "user": user,
-        "payload": payload,
-        "is_authenticated": is_authenticated
-    }
+    return payload
 
-async def verify_api_key(api_key: Optional[str] = None) -> bool:
-    """
-    Verify whitelisted API key for service-to-service communication
-    Used for webhook endpoints and internal service calls
-    """
-    if not api_key:
-        return False
-        
-    try:
-        settings = get_settings_cached()
-        is_valid = api_key in settings.WHITELISTED_API_KEYS
-        
-        if is_valid:
-            logger.info(f"✅ Valid API key used: {api_key[:8]}...")
-        else:
-            logger.warning(f"❌ Invalid API key attempted: {api_key[:8]}...")
-            
-        return is_valid
-        
-    except Exception as e:
-        logger.error(f"❌ API key verification error: {e}")
-        return False
+# Rate limiting dependencies (simplified - would use Redis in production)
+_rate_limit_cache: Dict[str, Dict] = {}
 
-# DIAGNOSTIC FUNCTIONS FOR DEBUGGING
-
-async def get_token_info(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> Dict[str, Any]:
+def rate_limit(requests_per_minute: int = 60):
     """
-    Debug function to inspect token without full verification
-    Remove in production - useful for troubleshooting auth issues
+    Basic rate limiting dependency
+    In production, this would use Redis for distributed rate limiting
     """
-    if not credentials:
-        return {"error": "No token provided"}
+    async def rate_limiter(request, current_user: Dict[str, Any] = Depends(get_current_user)):
+        user_id = current_user.get("id")
+        now = datetime.utcnow()
         
-    try:
-        token = credentials.credentials
-        unverified_header = jwt.get_unverified_header(token)
-        unverified_payload = jwt.get_unverified_claims(token)
+        if user_id not in _rate_limit_cache:
+            _rate_limit_cache[user_id] = {"requests": [], "blocked_until": None}
         
-        return {
-            "header": unverified_header,
-            "payload": {
-                "sub": unverified_payload.get("sub"),
-                "email": unverified_payload.get("email"),
-                "exp": unverified_payload.get("exp"),
-                "iat": unverified_payload.get("iat"),
-                "aud": unverified_payload.get("aud"),
-                "iss": unverified_payload.get("iss")
-            },
-            "token_length": len(token)
-        }
-    except Exception as e:
-        return {"error": f"Token inspection failed: {str(e)}"}
-
-# Health check dependency
-async def check_dependencies_health() -> Dict[str, str]:
-    """Health check for all critical dependencies"""
-    health_status = {}
+        user_limits = _rate_limit_cache[user_id]
+        
+        # Check if user is temporarily blocked
+        if user_limits["blocked_until"] and now < user_limits["blocked_until"]:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded. Please try again later."
+            )
+        
+        # Clean old requests (older than 1 minute)
+        minute_ago = now - timedelta(minutes=1)
+        user_limits["requests"] = [req_time for req_time in user_limits["requests"] if req_time > minute_ago]
+        
+        # Check current rate
+        if len(user_limits["requests"]) >= requests_per_minute:
+            user_limits["blocked_until"] = now + timedelta(minutes=1)
+            logger.warning(f"⚠️ Rate limit exceeded for user {user_id}: {len(user_limits['requests'])} requests/minute")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded: {requests_per_minute} requests per minute maximum"
+            )
+        
+        # Record this request
+        user_limits["requests"].append(now)
+        return current_user
     
-    # Check Supabase client
-    try:
-        supabase = get_supabase_client()
-        health_status["supabase"] = "healthy"
-    except Exception as e:
-        health_status["supabase"] = f"unhealthy: {str(e)}"
-    
-    # Check services
-    try:
-        get_wallet_service()
-        health_status["wallet_service"] = "healthy"
-    except Exception:
-        health_status["wallet_service"] = "not initialized"
-    
-    try:
-        get_notification_service()
-        health_status["notification_service"] = "healthy"
-    except Exception:
-        health_status["notification_service"] = "not initialized"
-    
-    # Check JWKS cache
-    health_status["jwks_cache"] = "cached" if jwks_cache else "empty"
-    
-    return health_status
+    return rate_limiter
