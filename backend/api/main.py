@@ -123,11 +123,12 @@ async def lifespan(app: FastAPI):
         audit_service = AuditService(supabase_client)
         kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
 
-        # Initialize dependencies with all services
+        # FIXED: Initialize dependencies with audit service included
         initialize_dependencies(
             supabase_client, 
             wallet_service, 
             notification_service, 
+            audit_service,  # <- Added this line
             kyc_service
         )
         
@@ -232,6 +233,7 @@ async def create_wallet(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
     wallet_service: WalletService = Depends(get_wallet_service),
+    audit_service: AuditService = Depends(get_audit_service),  # FIXED: Use dependency injection
     supabase: Client = Depends(get_supabase_client)
 ):
     """Enhanced wallet creation with security monitoring"""
@@ -259,17 +261,12 @@ async def create_wallet(
         new_wallet_material = wallet_service.create_algorand_wallet()
         await wallet_service.store_encrypted_wallet(user_id, new_wallet_material)
         
-        # SECURITY: Audit wallet creation
-        audit_service = get_audit_service()
-        if audit_service:
-            await audit_service.log_event(
-                "wallet_created",
-                user_id=user_id,
-                details={
-                    "wallet_address": new_wallet_material["address"],
-                    "ip_address": request.client.host
-                }
-            )
+        # SECURITY: Audit wallet creation with proper dependency injection
+        await audit_service.log_wallet_operation(
+            user_id=user_id,
+            operation="wallet_created",
+            wallet_address=new_wallet_material["address"]
+        )
         
         return {
             "success": True,
