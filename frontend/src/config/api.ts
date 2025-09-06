@@ -1,5 +1,5 @@
 // File Location: frontend/src/config/api.ts
-// CRITICAL FIX: Corrected API endpoints to match backend routes
+// CRITICAL FIX: Removed duplicate exports
 
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
@@ -9,7 +9,7 @@ import { API_BASE_URL } from './env';
  * CRITICAL FIX: Centralized API client with correct endpoint mappings
  * Fixes 405/403 errors by aligning frontend calls with backend routes
  */
-export const apiClient = axios.create({
+const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -24,7 +24,7 @@ export const apiClient = axios.create({
  * CRITICAL FIX: Corrected API endpoints that match the actual backend routes
  * This fixes the 405 Method Not Allowed and 403 Forbidden errors
  */
-export const API_ENDPOINTS = {
+const API_ENDPOINTS = {
   // Lead generation endpoints
   LEADS: {
     BUSINESS_CONTACT: '/api/v1/leads/business-contact',
@@ -158,7 +158,7 @@ apiClient.interceptors.response.use(
  */
 
 // User profile operations
-export const userAPI = {
+const userAPI = {
   // Get user profile
   getProfile: async () => {
     const response = await apiClient.get(API_ENDPOINTS.USER.PROFILE);
@@ -179,7 +179,7 @@ export const userAPI = {
 };
 
 // KYC operations
-export const kycAPI = {
+const kycAPI = {
   // Start KYC verification
   startVerification: async (verificationData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION, verificationData);
@@ -194,7 +194,7 @@ export const kycAPI = {
 };
 
 // Lead generation operations
-export const leadAPI = {
+const leadAPI = {
   // Submit business contact form
   submitBusinessContact: async (contactData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.LEADS.BUSINESS_CONTACT, contactData);
@@ -203,7 +203,7 @@ export const leadAPI = {
 };
 
 // Session management operations
-export const sessionAPI = {
+const sessionAPI = {
   // Initialize user session
   initialize: async (sessionData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE, sessionData);
@@ -212,7 +212,7 @@ export const sessionAPI = {
 };
 
 // Consent management operations
-export const consentAPI = {
+const consentAPI = {
   // Update user consent preferences
   update: async (consentData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.CONSENT.UPDATE, consentData);
@@ -221,7 +221,7 @@ export const consentAPI = {
 };
 
 // Wallet operations
-export const walletAPI = {
+const walletAPI = {
   // Create new wallet
   create: async (walletData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.WALLET.CREATE, walletData);
@@ -236,7 +236,7 @@ export const walletAPI = {
 };
 
 // Payment operations
-export const paymentAPI = {
+const paymentAPI = {
   // Create new payment
   create: async (paymentData: any) => {
     const response = await apiClient.post(API_ENDPOINTS.PAYMENTS.CREATE, paymentData);
@@ -257,7 +257,7 @@ export const paymentAPI = {
 };
 
 // Portfolio operations
-export const portfolioAPI = {
+const portfolioAPI = {
   // Get portfolio overview
   getOverview: async (userId: string) => {
     const response = await apiClient.get(`${API_ENDPOINTS.PORTFOLIO.OVERVIEW}/${userId}`);
@@ -274,8 +274,7 @@ export const portfolioAPI = {
 /**
  * CRITICAL FIX: Enhanced error handling utilities
  */
-
-export const handleApiError = (error: any) => {
+const handleApiError = (error: any) => {
   const status = error.response?.status;
   const detail = error.response?.data?.detail || error.message;
   
@@ -318,7 +317,7 @@ export const handleApiError = (error: any) => {
 /**
  * CRITICAL FIX: Request retry mechanism with exponential backoff
  */
-export const retryRequest = async <T>(
+const retryRequest = async <T>(
   requestFn: () => Promise<T>,
   maxRetries: number = 3,
   baseDelay: number = 1000
@@ -356,12 +355,12 @@ export const retryRequest = async <T>(
 /**
  * CRITICAL FIX: Enhanced API client with automatic retry for specific operations
  */
-export const createRetryableRequest = <T>(requestFn: () => Promise<T>) => {
+const createRetryableRequest = <T>(requestFn: () => Promise<T>) => {
   return () => retryRequest(requestFn, 3, 1000);
 };
 
-// Export enhanced user operations with retry logic
-export const enhancedUserAPI = {
+// Enhanced user operations with retry logic
+const enhancedUserAPI = {
   getProfile: createRetryableRequest(() => userAPI.getProfile()),
   createProfile: createRetryableRequest((data: any) => userAPI.createProfile(data)),
   updateProfile: createRetryableRequest((data: any) => userAPI.updateProfile(data))
@@ -370,7 +369,7 @@ export const enhancedUserAPI = {
 /**
  * CRITICAL FIX: Debug utilities for troubleshooting API issues
  */
-export const debugAPI = {
+const debugAPI = {
   logEndpoints: () => {
     console.log('[API Debug] Available endpoints:', API_ENDPOINTS);
   },
@@ -401,7 +400,7 @@ export const debugAPI = {
 /**
  * CRITICAL FIX: Batch operations for improved performance
  */
-export const batchAPI = {
+const batchAPI = {
   // Batch multiple API calls with proper error handling
   execute: async (requests: Array<() => Promise<any>>) => {
     const results = await Promise.allSettled(requests.map(req => req()));
@@ -422,7 +421,7 @@ export const batchAPI = {
   }
 };
 
-// Export everything for easy access
+// FIXED: Single export block - no duplicates
 export {
   apiClient,
   API_ENDPOINTS,
@@ -434,7 +433,12 @@ export {
   walletAPI,
   paymentAPI,
   portfolioAPI,
-  enhancedUserAPI
+  enhancedUserAPI,
+  handleApiError,
+  retryRequest,
+  createRetryableRequest,
+  debugAPI,
+  batchAPI
 };
 
 export default apiClient;
