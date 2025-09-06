@@ -1,5 +1,5 @@
 # File Location: backend/dependencies.py
-# CRITICAL FIX: Complete implementation with proper KYC service dependency injection
+# CRITICAL FIX: Complete implementation with proper KYC and Audit service dependency injection
 
 import logging
 from fastapi import Depends, HTTPException, status
@@ -15,14 +15,16 @@ import json
 from config import Settings, get_settings
 from services.wallet_service import WalletService
 from services.notification_service import NotificationService
+from services.audit_service import AuditService
 from models import UserRole
 
 logger = logging.getLogger(__name__)
 
-# CRITICAL FIX: Proper global declarations with KYC service
+# CRITICAL FIX: Proper global declarations with KYC and Audit services
 _supabase_client: Optional[Client] = None
 _wallet_service: Optional[WalletService] = None
 _notification_service: Optional[NotificationService] = None
+_audit_service: Optional[AuditService] = None
 _kyc_service = None  # Will be initialized with proper KYC service
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
@@ -36,12 +38,13 @@ def get_settings_cached():
     """Cached settings instance for performance"""
     return get_settings()
 
-def initialize_dependencies(supabase_client: Client, wallet_service: WalletService, notification_service: NotificationService, kyc_service=None):
+def initialize_dependencies(supabase_client: Client, wallet_service: WalletService, notification_service: NotificationService, audit_service: AuditService = None, kyc_service=None):
     """Initialize dependency services - used in main.py startup"""
-    global _supabase_client, _wallet_service, _notification_service, _kyc_service
+    global _supabase_client, _wallet_service, _notification_service, _audit_service, _kyc_service
     _supabase_client = supabase_client
     _wallet_service = wallet_service
     _notification_service = notification_service
+    _audit_service = audit_service
     _kyc_service = kyc_service
     logger.info("✅ Dependencies initialized successfully")
 
@@ -79,6 +82,13 @@ def get_notification_service() -> NotificationService:
         logger.error("❌ Notification service not initialized")
         raise HTTPException(status_code=503, detail="Notification service unavailable")
     return _notification_service
+
+def get_audit_service() -> AuditService:
+    """Get audit service instance"""
+    if _audit_service is None: 
+        logger.error("❌ Audit service not initialized")
+        raise HTTPException(status_code=503, detail="Audit service unavailable")
+    return _audit_service
 
 def get_kyc_service():
     """Get KYC service instance"""
@@ -155,7 +165,7 @@ async def fetch_jwks(settings: Settings = Depends(get_settings_cached)) -> Dict[
     
     # Return cached JWKS if still valid
     if jwks_cache and jwks_cache_expiry and datetime.utcnow() < jwks_cache_expiry: 
-        logger.debug("🔄 Using cached JWKS")
+        logger.debug("📄 Using cached JWKS")
         return jwks_cache
     
     max_retries = 3
@@ -201,7 +211,7 @@ async def verify_supabase_token(
     
     try:
         token = credentials.credentials
-        logger.debug(f"🔐 Verifying JWT token: {token[:20]}...")
+        logger.debug(f"🔍 Verifying JWT token: {token[:20]}...")
         
         # Get unverified header for key ID
         unverified_header = jwt.get_unverified_header(token)
