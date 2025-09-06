@@ -309,9 +309,10 @@ async def get_current_user(
             
             # Create minimal profile from token data
             now = datetime.utcnow().isoformat()
+            # FIXED: Remove the 'access_level' field that doesn't exist in database
             profile_data = {
                 "id": user_id,
-                "user_id": user_id,  # CRITICAL: Ensure user_id column is populated
+                "user_id": user_id,
                 "email": email,
                 "first_name": payload.get('user_metadata', {}).get('first_name', ''),
                 "last_name": payload.get('user_metadata', {}).get('last_name', ''),
@@ -319,7 +320,6 @@ async def get_current_user(
                 "kyc_status": "pending",
                 "kyc_level": 0,
                 "role": "alien",
-                "access_level": "limited",
                 "created_at": now,
                 "updated_at": now
             }

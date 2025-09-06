@@ -12,7 +12,7 @@ from backend.dependencies import get_supabase_client, get_current_user, get_opti
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/profile")  # This creates /api/v1/user/profile endpoint
+@router.post("/profile")
 async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client)
@@ -40,9 +40,10 @@ async def create_user_profile(
         else:
             country_code = 'US'
         
+        # FIXED: Remove the 'access_level' field that doesn't exist in database
         insert_data = {
             "id": user_id,
-            "user_id": user_id,  # CRITICAL FIX: Ensure user_id column is populated
+            "user_id": user_id,
             "email": data.get('email', ''),
             "first_name": data.get('firstName', '') or data.get('first_name', ''),
             "last_name": data.get('lastName', '') or data.get('last_name', ''),
@@ -50,7 +51,6 @@ async def create_user_profile(
             "kyc_status": "pending",
             "kyc_level": 0,
             "role": "alien",
-            "access_level": "limited",
             "created_at": now,
             "updated_at": now
         }
