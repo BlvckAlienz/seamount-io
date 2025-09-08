@@ -1,5 +1,5 @@
 # File Location: backend/dependencies.py
-# CRITICAL FIX: Complete implementation with proper KYC and Audit service dependency injection
+# CRITICAL FIX: Complete implementation with proper service dependency handling
 
 import logging
 from fastapi import Depends, HTTPException, status
@@ -16,16 +16,19 @@ from config import Settings, get_settings
 from services.wallet_service import WalletService
 from services.notification_service import NotificationService
 from services.audit_service import AuditService
+from services.kyc_service import KYCService
+from services.database_service import DatabaseService
 from models import UserRole
 
 logger = logging.getLogger(__name__)
 
-# CRITICAL FIX: Proper global declarations with KYC and Audit services
+# Global service instances
 _supabase_client: Optional[Client] = None
 _wallet_service: Optional[WalletService] = None
 _notification_service: Optional[NotificationService] = None
 _audit_service: Optional[AuditService] = None
-_kyc_service = None  # Will be initialized with proper KYC service
+_kyc_service: Optional[KYCService] = None
+_database_service: Optional[DatabaseService] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
@@ -38,14 +41,25 @@ def get_settings_cached():
     """Cached settings instance for performance"""
     return get_settings()
 
-def initialize_dependencies(supabase_client: Client, wallet_service: WalletService, notification_service: NotificationService, audit_service: AuditService = None, kyc_service=None):
+def initialize_dependencies(
+    supabase_client: Client, 
+    wallet_service: WalletService, 
+    notification_service: NotificationService, 
+    audit_service: Optional[AuditService] = None,
+    kyc_service: Optional[KYCService] = None,
+    database_service: Optional[DatabaseService] = None
+):
     """Initialize dependency services - used in main.py startup"""
-    global _supabase_client, _wallet_service, _notification_service, _audit_service, _kyc_service
+    global _supabase_client, _wallet_service, _notification_service
+    global _audit_service, _kyc_service, _database_service
+    
     _supabase_client = supabase_client
     _wallet_service = wallet_service
     _notification_service = notification_service
     _audit_service = audit_service
     _kyc_service = kyc_service
+    _database_service = database_service
+    
     logger.info("✅ Dependencies initialized successfully")
 
 def get_supabase_client() -> Client:
@@ -83,19 +97,17 @@ def get_notification_service() -> NotificationService:
         raise HTTPException(status_code=503, detail="Notification service unavailable")
     return _notification_service
 
-def get_audit_service() -> AuditService:
-    """Get audit service instance"""
-    if _audit_service is None: 
-        logger.error("❌ Audit service not initialized")
-        raise HTTPException(status_code=503, detail="Audit service unavailable")
+def get_audit_service() -> Optional[AuditService]:
+    """Get audit service instance (optional)"""
     return _audit_service
 
-def get_kyc_service():
-    """Get KYC service instance"""
-    if _kyc_service is None:
-        logger.error("❌ KYC service not initialized")
-        raise HTTPException(status_code=503, detail="KYC service unavailable")
+def get_kyc_service() -> Optional[KYCService]:
+    """Get KYC service instance (optional)"""
     return _kyc_service
+
+def get_database_service() -> Optional[DatabaseService]:
+    """Get database service instance (optional)"""
+    return _database_service
 
 # CRITICAL FIX: Add OptionalAuth class at the top level
 class OptionalAuth:
@@ -309,14 +321,13 @@ async def get_current_user(
             
             # Create minimal profile from token data
             now = datetime.utcnow().isoformat()
-            # FIXED: Remove the 'access_level' field that doesn't exist in database
             profile_data = {
                 "id": user_id,
                 "user_id": user_id,
                 "email": email,
                 "first_name": payload.get('user_metadata', {}).get('first_name', ''),
                 "last_name": payload.get('user_metadata', {}).get('last_name', ''),
-                "country_code": payload.get('user_metadata', {}).get('country_code', 'US'),
+                "country_code": payload.get('user_metadata', {}).get('country_code', 'US').upper(),
                 "kyc_status": "pending",
                 "kyc_level": 0,
                 "role": "alien",
@@ -333,17 +344,19 @@ async def get_current_user(
             ).execute()
             
             if not create_response.data:
-                raise Exception("Profile creation returned no data")
-            
+                logger.error("❌ Profile creation returned no data")
+                continue  # Retry
+                
             # Fetch the created profile
             fetch_response = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
             
-            if not fetch_response.data:
-                raise Exception("Could not fetch newly created profile")
-            
-            logger.info(f"✅ Self-healing successful: Profile created for user {user_id}")
-            return fetch_response.data
-            
+            if fetch_response.data:
+                logger.info(f"✅ Self-healing successful: Profile created for user {user_id}")
+                return fetch_response.data
+            else:
+                logger.error("❌ Could not fetch newly created profile")
+                continue  # Retry
+                
         except HTTPException:
             # Re-raise HTTP exceptions as-is
             raise

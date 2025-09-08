@@ -20,57 +20,21 @@ const apiClient = axios.create({
   },
 });
 
-/**
- * CRITICAL FIX: Corrected API endpoints that match the actual backend routes
- * This fixes the 405 Method Not Allowed and 403 Forbidden errors
- */
+// CRITICAL FIX: Corrected API endpoints that match the actual backend routes
 const API_ENDPOINTS = {
-  // Lead generation endpoints
-  LEADS: {
-    BUSINESS_CONTACT: '/api/v1/leads/business-contact',
-  },
-  
   // FIXED: User endpoints matching backend routes exactly
   USER: {
-    PROFILE: '/api/v1/user',           // GET /api/v1/user (not /profile)
-    CREATE_PROFILE: '/api/v1/user',    // POST /api/v1/user (not /profile) 
-    UPDATE_PROFILE: '/api/v1/user',    // PUT /api/v1/user (not /profile)
-    DELETE_PROFILE: '/api/v1/user',    // DELETE /api/v1/user
-  },
-  
-  // Session management
-  SESSION: {
-    INITIALIZE: '/api/v1/session/initialize',
-  },
-  
-  // Consent management
-  CONSENT: {
-    UPDATE: '/api/v1/consent/update',
-  },
-  
-  // Wallet operations
-  WALLET: {
-    CREATE: '/api/v1/wallet/create',     // FIXED: Added v1 prefix
-    BALANCE: '/api/v1/wallet/balance',   // FIXED: Added balance endpoint
+    PROFILE: '/api/v1/user/profile',           // GET/PUT/POST /api/v1/user/profile
   },
   
   // FIXED: KYC endpoints matching backend
   KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
-    WEBHOOK: '/api/v1/kyc/webhook',
-    STATUS: '/api/v1/kyc/status',
   },
   
-  // FIXED: Added missing endpoints that backend provides
-  PAYMENTS: {
-    CREATE: '/api/v1/payments/create',
-    STATUS: '/api/v1/payments/status',
-    HISTORY: '/api/v1/payments/history',
-  },
-  
-  PORTFOLIO: {
-    OVERVIEW: '/api/v1/portfolio/overview',
-    HOLDINGS: '/api/v1/portfolio/holdings',
+  // FIXED: Wallet endpoint correction
+  WALLET: {
+    CREATE: '/api/wallet/create',     // Matches backend route
   }
 };
 

@@ -27,35 +27,18 @@ async def create_user_profile(
         user_id = data.get('id')
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID is required")
+        
+        # CRITICAL FIX: Verify user exists in auth.users before creating profile
+        try:
+            # Check if user exists in auth system first
+            auth_user = supabase.auth.admin.get_user(user_id)
+            if not auth_user.user:
+                raise HTTPException(status_code=404, detail="User not found in authentication system")
+        except Exception as auth_error:
+            logger.error(f"[Profile Create] Auth user check failed: {auth_error}")
+            raise HTTPException(status_code=400, detail="User must be authenticated before creating profile")
             
         logger.info(f"[Profile Create] Creating profile for user: {user_id}")
-        
-        # Build insert data with defaults
-        now = datetime.now(timezone.utc).isoformat()
-        
-        # Handle country code - ensure uppercase
-        country_code = data.get('countryCode', 'US') or data.get('country_code', 'US')
-        if country_code:
-            country_code = country_code.upper()
-        else:
-            country_code = 'US'
-        
-        # FIXED: Remove the 'access_level' field that doesn't exist in database
-        insert_data = {
-            "id": user_id,
-            "user_id": user_id,
-            "email": data.get('email', ''),
-            "first_name": data.get('firstName', '') or data.get('first_name', ''),
-            "last_name": data.get('lastName', '') or data.get('last_name', ''),
-            "country_code": country_code,
-            "kyc_status": "pending",
-            "kyc_level": 0,
-            "role": "alien",
-            "created_at": now,
-            "updated_at": now
-        }
-        
-        logger.info(f"[Profile Create] Insert data: {insert_data}")
         
         # FIXED: Separate upsert and select operations
         try:

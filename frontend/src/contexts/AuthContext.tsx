@@ -66,11 +66,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(session?.user ?? null);
     if (session?.user) {
       fetchUserProfile(session.user.id).then(profile => {
-        if (profile && profile.kyc_status === 'pending') {
-          navigate('/onboarding');
-        } else if (profile && profile.kyc_status === 'verified') {
-          // FIXED: Redirect to dashboard if already verified
-          navigate('/dashboard');
+        if (profile) {
+          // FIXED: Proper KYC status-based routing
+          if (profile.kyc_status === 'pending') {
+            navigate('/onboarding');
+          } else if (profile.kyc_status === 'verified') {
+            navigate('/dashboard');
+          }
+          // If kyc_status is 'not_started' or other, stay on current page
         } else if (!profile) {
           // Create profile if it doesn't exist
           createUserProfile(session.user.id, session.user.email);
@@ -87,11 +90,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     if (session?.user) {
       const profile = await fetchUserProfile(session.user.id);
-      if (profile && profile.kyc_status === 'pending') {
-        navigate('/onboarding');
-      } else if (profile && profile.kyc_status === 'verified') {
-        // FIXED: Redirect to dashboard if already verified
-        navigate('/dashboard');
+      if (profile) {
+        // FIXED: Consistent KYC status handling
+        if (profile.kyc_status === 'pending') {
+          navigate('/onboarding');
+        } else if (profile.kyc_status === 'verified') {
+          navigate('/dashboard');
+        }
       }
     } else {
       setUserProfile(null);

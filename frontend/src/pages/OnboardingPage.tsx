@@ -27,12 +27,12 @@ const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
   const [sdkInitialized, setSdkInitialized] = useState(false);
   const { completeOnboarding } = useAuth();
 
-  const startVerification = async () => {
+ const startVerification = async () => {
   setLoading(true);
   try {
-    // FIXED: Use the correct API endpoint
+    // FIXED: Use the correct API endpoint that matches backend routing
     const { data } = await apiClient.post<{ token: string }>(
-      "/api/v1/kyc/start-verification"  // Changed from API_ENDPOINTS.KYC.START_VERIFICATION
+      "/api/v1/kyc/start-verification"  // Matches backend router prefix
     );
     
     if (window.ComplyCube) {
