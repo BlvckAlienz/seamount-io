@@ -1,11 +1,11 @@
 // File Location: frontend/src/contexts/AuthContext.tsx
-// FIXED: Removed undefined 'state' reference and fixed completeOnboarding
+// COMPLETE FIX: Authentication flow with proper KYC triggering
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { apiClient, API_ENDPOINTS } from '../config/api';
+import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
 
 interface UserProfile {
@@ -27,7 +27,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   kycStatus: string;
-  signUp: (email: string, password: string, signUpData: any) => Promise<void>;
+  signUp: (email: string, password: string, signUpData: any) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshKycStatus: () => Promise<void>;
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Calculate user role based on profile
   const userRole = userProfile?.kyc_status === 'verified' || userProfile?.role === 'tribe' ? 'tribe' : 'alien';
 
-  const requireTribeAccess = (action: string) => {
+  const requireTribeAccess = (action: string): boolean => {
     if (userRole !== 'tribe') {
       toast.error(`Please complete verification to ${action}`);
       navigate('/onboarding?message=verify_to_access');
@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return true;
   };
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
       console.log('[Profile] Fetching for user:', userId);
       
@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('[Profile] Fetched successfully:', profile);
       
       setUserProfile(profile);
-      setKycStatus(profile.kyc_status || 'pending');
+      setKycStatus(profile.kyc_status || 'not_started');
       
       return profile;
     } catch (error: any) {
@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const createUserProfile = async (userId: string, email: string | undefined) => {
+  const createUserProfile = async (userId: string, email: string | undefined): Promise<UserProfile> => {
     try {
       console.log('[Profile] Creating new profile for user:', userId);
       
@@ -115,7 +115,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         first_name: '',
         last_name: '',
         country_code: 'US',
-        kyc_status: 'not_started',
+        kyc_status: 'pending', // This ensures KYC onboarding will trigger
         kyc_level: 0,
         role: 'alien'
       };
@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('[Profile] Profile created successfully:', createdProfile);
       
       setUserProfile(createdProfile);
-      setKycStatus(createdProfile.kyc_status || 'not_started');
+      setKycStatus(createdProfile.kyc_status || 'pending');
       
       return createdProfile;
     } catch (error: any) {
@@ -137,61 +137,86 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Enhanced auth state change handler with proper KYC triggering
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserProfile(session.user.id).then(profile => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const profile = await fetchUserProfile(session.user.id);
+          
           if (profile) {
-            // FIXED: Proper KYC status-based routing
-            if (profile.kyc_status === 'pending') {
+            // Redirect based on KYC status
+            if (profile.kyc_status === 'pending' || profile.kyc_status === 'not_started') {
               navigate('/onboarding');
             } else if (profile.kyc_status === 'verified') {
               navigate('/dashboard');
             }
-            // If kyc_status is 'not_started' or other, stay on current page
-          } else if (!profile) {
+          } else {
             // Create profile if it doesn't exist
-            createUserProfile(session.user.id, session.user.email);
+            await createUserProfile(session.user.id, session.user.email);
+            navigate('/onboarding');
           }
-        });
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    // Listen for auth changes
+    initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(true);
       
       if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
-        if (profile) {
-          // FIXED: Consistent KYC status handling
-          if (profile.kyc_status === 'pending') {
+        try {
+          const profile = await fetchUserProfile(session.user.id);
+          
+          if (profile) {
+            // Redirect based on KYC status
+            if (profile.kyc_status === 'pending' || profile.kyc_status === 'not_started') {
+              navigate('/onboarding');
+            } else if (profile.kyc_status === 'verified') {
+              navigate('/dashboard');
+            }
+          } else {
+            // Create profile if it doesn't exist
+            await createUserProfile(session.user.id, session.user.email);
             navigate('/onboarding');
-          } else if (profile.kyc_status === 'verified') {
-            navigate('/dashboard');
           }
+        } catch (error) {
+          console.error('Error handling auth state change:', error);
         }
       } else {
         setUserProfile(null);
         setKycStatus('not_started');
       }
+      
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
-  const signUp = async (email: string, password: string, signUpData: any) => {
+  const signUp = async (
+    email: string, 
+    password: string, 
+    signUpData: any
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       console.log('[SignUp] Starting registration for:', email);
       
-      // Step 1: Create auth user
+      // Step 1: Create auth user only
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -204,42 +229,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("No user returned from authentication");
+      if (authError) {
+        console.error('[SignUp] Auth error:', authError);
+        throw authError;
+      }
+
+      if (!authData.user) {
+        throw new Error("No user returned from authentication");
+      }
 
       console.log('[SignUp] Auth user created:', authData.user.id);
-
-      // Step 2: Create user profile using the fixed function
-      try {
-        await createUserProfile(authData.user.id, email);
-        
-        // Step 3: Update profile with registration data
-        const profileUpdateData = {
-          first_name: signUpData.firstName.trim(),
-          last_name: signUpData.lastName.trim(),
-          country_code: signUpData.countryCode.toUpperCase(),
-          kyc_status: 'pending'
-        };
-
-        const updateResponse = await apiClient.put('/api/v1/user/profile', profileUpdateData);
-        const updatedProfile = updateResponse.data;
-        
-        console.log('[SignUp] Profile updated successfully:', updatedProfile);
-        
-        setUserProfile(updatedProfile);
-        setKycStatus('pending');
-        
-        toast.success('Registration successful! Please check your email to verify your account.');
-        
-      } catch (profileError: any) {
-        console.error('[SignUp] Profile creation/update failed:', profileError);
-        toast.warning('Account created but profile setup incomplete. You can complete it after email verification.');
-      }
+      
+      // Don't create profile here - it will be created when user confirms email
+      toast.success('Registration successful! Please check your email to verify your account.');
+      
+      return { success: true };
       
     } catch (error: any) {
       console.error('[SignUp] Registration failed:', error);
-      toast.error(error.message || 'Failed to create account');
-      throw error;
+      const errorMessage = error.message || 'Failed to create account';
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -264,20 +274,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data.user) {
         console.log('[SignIn] Login successful for user:', data.user.id);
         
-        // Ensure profile exists before proceeding
-        let profile = await fetchUserProfile(data.user.id);
-        
-        // If no profile exists, create one
-        if (!profile) {
-          console.log('[SignIn] No profile found, creating...');
-          try {
-            await createUserProfile(data.user.id, data.user.email);
-            profile = await fetchUserProfile(data.user.id);
-          } catch (createError) {
-            console.error('[SignIn] Profile creation failed:', createError);
-          }
-        }
-        
+        // Profile will be fetched by the auth state change listener
         toast.success('Successfully signed in!');
         return { success: true };
       }
@@ -293,7 +290,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<void> => {
     try {
       setLoading(true);
       await supabase.auth.signOut();
@@ -311,20 +308,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const refreshKycStatus = useCallback(async () => {
+  const refreshKycStatus = useCallback(async (): Promise<void> => {
     if (!user) return;
     
     try {
       const response = await apiClient.get('/api/v1/user/profile');
       const profile = response.data;
       setUserProfile(profile);
-      setKycStatus(profile.kyc_status || 'pending');
+      setKycStatus(profile.kyc_status || 'not_started');
     } catch (error: any) {
       console.error('[KYC] Failed to refresh status:', error);
     }
   }, [user]);
 
-  const skipVerification = async () => {
+  const skipVerification = async (): Promise<void> => {
     try {
       setKycStatus('verified');
       toast.success('Verification skipped for demo purposes');
@@ -334,7 +331,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const updateUserProfile = async (updates: Partial<UserProfile>) => {
+  const updateUserProfile = async (updates: Partial<UserProfile>): Promise<void> => {
     try {
       setLoading(true);
       
@@ -356,7 +353,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const completeOnboarding = async () => {
+  const completeOnboarding = async (): Promise<void> => {
     try {
       console.log('[Onboarding] Completing onboarding process');
       

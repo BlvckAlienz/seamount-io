@@ -21,49 +21,44 @@ const apiClient = axios.create({
 });
 
 // CRITICAL FIX: Corrected API endpoints that match the actual backend routes
-const API_ENDPOINTS = {
-  // FIXED: User endpoints matching backend routes exactly
-  USER: {
-    PROFILE: '/api/v1/user/profile',           // GET/PUT/POST /api/v1/user/profile
+export const API_ENDPOINTS = {
+  SESSION: {
+    INITIALIZE: '/api/v1/session/initialize',
   },
-  
-  // FIXED: KYC endpoints matching backend
+  USER: {
+    PROFILE: '/api/v1/user/profile',
+    UPDATE: '/api/v1/user/profile' // Added for clarity
+  },
   KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
+    STATUS: '/api/v1/kyc/status'
   },
-  
-  // FIXED: Wallet endpoint correction
   WALLET: {
-    CREATE: '/api/wallet/create',     // Matches backend route
+    CREATE: '/api/wallet/create'
   }
 };
 
-// CRITICAL FIX: Enhanced request interceptor with better error handling
-apiClient.interceptors.request.use(
-  async (config) => {
-    const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
-    console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
-    
-    try {
-      // Get fresh session token for every request
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log(`[API Auth] Token attached for authenticated request`);
-      } else {
-        console.log(`[API Auth] No session token - proceeding with unauthenticated request`);
-      }
-    } catch (error) {
-      console.error('[API Auth Error] Failed to get session token:', error);
-      // Continue without auth token for public endpoints
-    }
-    
-    return config;
-  },
+export const initializeSession = async (): Promise<string> => {
+  try {
+    const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
+    return response.data.session_id;
+  } catch (error) {
+    console.error('Session initialization failed, continuing without cookie banner');
+    return 'anonymous-session-fallback';
+  }
+};
+
+// Enhanced API client with role-based error handling
+apiClient.interceptors.response.use(
+  (response) => response,
   (error) => {
-    console.error('[API Request Error] Request configuration failed:', error);
+    if (error.response?.status === 403) {
+      // Handle Alien user trying to access Tribe-only features
+      if (error.response.data?.detail?.includes('KYC verification')) {
+        // Redirect to onboarding or show verification prompt
+        window.location.href = '/onboarding?message=verify_to_access';
+      }
+    }
     return Promise.reject(error);
   }
 );
