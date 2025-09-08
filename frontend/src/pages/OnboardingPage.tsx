@@ -42,15 +42,16 @@ const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
           toast.success('Verification completed!');
           onNext();
         },
-        onError: (error) => {
+        onError: (error: any) => {
           toast.error('Verification failed: ' + error.message);
+          setLoading(false);
         }
       });
       session.mount('#complycube-mount');
       setSdkInitialized(true);
     }
-  } catch (error) {
-    toast.error('Failed to start verification');
+  } catch (error: any) {
+    toast.error('Failed to start verification: ' + error.message);
     setLoading(false);
   }
 };
@@ -189,7 +190,7 @@ const WalletBackupStep: React.FC<StepProps & { mnemonic: string }> = ({ onNext, 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState<'identity' | 'walletBackup'>('identity');
   const [mnemonic, setMnemonic] = useState<string | null>(null);
-  const { completeOnboarding, triggerWalletCreation } = useAuth();
+  const { completeOnboarding, triggerWalletCreation, userProfile } = useAuth();
   const navigate = useNavigate();
 
   // Load ComplyCube SDK when the component mounts
@@ -210,6 +211,21 @@ const OnboardingPage: React.FC = () => {
       if (sdkScript) document.body.removeChild(sdkScript);
     };
   }, []);
+  
+  // Add this useEffect for smart redirects
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const message = urlParams.get('message');
+    
+    if (message === 'verify_to_access') {
+      toast('Please complete verification to access this feature');
+    }
+    
+    // Check if user is already verified
+    if (userProfile?.kyc_status === 'verified') {
+      navigate('/dashboard');
+    }
+  }, [userProfile, navigate]);
 
   const handleIdentityComplete = async () => {
     const toastId = toast.loading('Creating your secure wallet...');

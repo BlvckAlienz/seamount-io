@@ -35,6 +35,8 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   triggerWalletCreation: () => Promise<{ success: boolean; mnemonic?: string }>;
+  userRole: 'tribe' | 'alien';
+  requireTribeAccess: (action: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,88 +61,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [kycStatus, setKycStatus] = useState('not_started');
   const navigate = useNavigate();
 
-  useEffect(() => {
-  // Get initial session
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setSession(session);
-    setUser(session?.user ?? null);
-    if (session?.user) {
-      fetchUserProfile(session.user.id).then(profile => {
-        if (profile) {
-          // FIXED: Proper KYC status-based routing
-          if (profile.kyc_status === 'pending') {
-            navigate('/onboarding');
-          } else if (profile.kyc_status === 'verified') {
-            navigate('/dashboard');
-          }
-          // If kyc_status is 'not_started' or other, stay on current page
-        } else if (!profile) {
-          // Create profile if it doesn't exist
-          createUserProfile(session.user.id, session.user.email);
-        }
-      });
+  // Calculate user role based on profile
+  const userRole = userProfile?.kyc_status === 'verified' || userProfile?.role === 'tribe' ? 'tribe' : 'alien';
+
+  const requireTribeAccess = (action: string) => {
+    if (userRole !== 'tribe') {
+      toast.error(`Please complete verification to ${action}`);
+      navigate('/onboarding?message=verify_to_access');
+      return false;
     }
-    setLoading(false);
-  });
-
-  // Listen for auth changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    setSession(session);
-    setUser(session?.user ?? null);
-    
-    if (session?.user) {
-      const profile = await fetchUserProfile(session.user.id);
-      if (profile) {
-        // FIXED: Consistent KYC status handling
-        if (profile.kyc_status === 'pending') {
-          navigate('/onboarding');
-        } else if (profile.kyc_status === 'verified') {
-          navigate('/dashboard');
-        }
-      }
-    } else {
-      setUserProfile(null);
-      setKycStatus('not_started');
-    }
-    setLoading(false);
-  });
-
-  return () => subscription.unsubscribe();
-}, []);
-
-  const createUserProfile = async (userId: string, email: string | undefined) => {
-    try {
-      console.log('[Profile] Creating new profile for user:', userId);
-      
-      if (!email) {
-        throw new Error('Email is required to create profile');
-      }
-
-      const profileData = {
-        id: userId,
-        email: email,
-        first_name: '',
-        last_name: '',
-        country_code: 'US',
-        kyc_status: 'pending',
-        kyc_level: 0,
-        role: 'alien'
-      };
-
-      console.log('[Profile] Creating profile with data:', profileData);
-      
-      const response = await apiClient.post('/api/v1/user/profile', profileData);
-      const createdProfile = response.data;
-      
-      console.log('[Profile] Profile created successfully:', createdProfile);
-      
-      setUserProfile(createdProfile);
-      setKycStatus(createdProfile.kyc_status || 'pending');
-      
-    } catch (error: any) {
-      console.error('[Profile] Creation failed:', error);
-      throw error;
-    }
+    return true;
   };
 
   const fetchUserProfile = async (userId: string) => {
@@ -170,6 +100,91 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     }
   };
+
+  const createUserProfile = async (userId: string, email: string | undefined) => {
+    try {
+      console.log('[Profile] Creating new profile for user:', userId);
+      
+      if (!email) {
+        throw new Error('Email is required to create profile');
+      }
+
+      const profileData = {
+        id: userId,
+        email: email,
+        first_name: '',
+        last_name: '',
+        country_code: 'US',
+        kyc_status: 'not_started',
+        kyc_level: 0,
+        role: 'alien'
+      };
+
+      console.log('[Profile] Creating profile with data:', profileData);
+      
+      const response = await apiClient.post('/api/v1/user/profile', profileData);
+      const createdProfile = response.data;
+      
+      console.log('[Profile] Profile created successfully:', createdProfile);
+      
+      setUserProfile(createdProfile);
+      setKycStatus(createdProfile.kyc_status || 'not_started');
+      
+      return createdProfile;
+    } catch (error: any) {
+      console.error('[Profile] Creation failed:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user.id).then(profile => {
+          if (profile) {
+            // FIXED: Proper KYC status-based routing
+            if (profile.kyc_status === 'pending') {
+              navigate('/onboarding');
+            } else if (profile.kyc_status === 'verified') {
+              navigate('/dashboard');
+            }
+            // If kyc_status is 'not_started' or other, stay on current page
+          } else if (!profile) {
+            // Create profile if it doesn't exist
+            createUserProfile(session.user.id, session.user.email);
+          }
+        });
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
+        if (profile) {
+          // FIXED: Consistent KYC status handling
+          if (profile.kyc_status === 'pending') {
+            navigate('/onboarding');
+          } else if (profile.kyc_status === 'verified') {
+            navigate('/dashboard');
+          }
+        }
+      } else {
+        setUserProfile(null);
+        setKycStatus('not_started');
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signUp = async (email: string, password: string, signUpData: any) => {
     try {
@@ -350,7 +365,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { error } = await supabase
           .from('user_profiles')
           .update({ 
-            kyc_status: 'approved',
+            kyc_status: 'verified',
             kyc_level: 3,
             role: 'tribe',
             updated_at: new Date().toISOString()
@@ -392,11 +407,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Add role check helper function
-  const checkUserRole = useCallback((requiredRole: 'tribe' | 'alien') => {
-    return userProfile?.role === requiredRole;
-  }, [userProfile]);
-
   const value: AuthContextType = {
     user,
     userProfile,
@@ -411,6 +421,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateUserProfile,
     completeOnboarding,
     triggerWalletCreation,
+    userRole,
+    requireTribeAccess,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

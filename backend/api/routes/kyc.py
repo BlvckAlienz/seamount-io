@@ -8,9 +8,10 @@ from typing import Dict, Any, Optional
 import traceback
 import uuid
 
-from backend.dependencies import get_current_user, get_supabase_client, get_kyc_service
+from backend.dependencies import get_current_user, get_supabase_client, get_kyc_service, get_wallet_service
 from backend.models import UserProfile
 from backend.services.kyc_service import KYCService
+from backend.services.wallet_service import WalletService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -80,88 +81,51 @@ async def check_profile_completeness(
 @router.post("/start-verification")
 async def start_kyc_verification(
     current_user: dict = Depends(get_current_user),
+    kyc_service: KYCService = Depends(get_kyc_service),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """
-    CRITICAL FIX: Start KYC verification with enhanced prerequisite checking
-    """
+    """Start real KYC verification with ComplyCube"""
     try:
         user_id = current_user.get('id')
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
-        logger.info(f"[KYC Start] User: {user_id}")
+        # Create ComplyCube client
+        client_id = await kyc_service.complycube.create_client(
+            user_id, 
+            current_user.get('email'), 
+            current_user.get('country_code', 'US')
+        )
         
-        # CRITICAL: Double-check profile completeness before starting
-        profile_check = await check_profile_completeness(current_user, supabase)
+        # Create verification session
+        session_data = await kyc_service.complycube.create_verification_session(client_id)
         
-        if not profile_check["profile_complete"]:
-            logger.warning(f"[KYC Start] Blocked - incomplete profile for user: {user_id}")
-            raise HTTPException(
-                status_code=400, 
-                detail={
-                    "error": "Profile incomplete",
-                    "missing_fields": profile_check["missing_fields"],
-                    "message": "Please complete your profile before starting KYC verification"
-                }
-            )
+        # Update user profile with ComplyCube client ID
+        update_result = supabase.table('user_profiles').update({
+            'complycube_client_id': client_id,
+            'kyc_status': 'in_progress',
+            'updated_at': 'now()'
+        }).eq('id', user_id).execute()
         
-        # Check if KYC already in progress or completed
-        current_kyc_status = profile_check.get("kyc_status", "not_started")
-        if current_kyc_status in ["in_progress", "completed", "verified", "approved"]:
-            logger.info(f"[KYC Start] Already {current_kyc_status} for user: {user_id}")
-            return {
-                "success": False,
-                "message": f"KYC verification already {current_kyc_status}",
-                "kyc_status": current_kyc_status
-            }
-        
-        # CRITICAL FIX: For now, return a mock token for ComplyCube integration
-        # In production, this would integrate with the actual KYC service
-        mock_token = f"cc_test_token_{user_id}_{uuid.uuid4().hex[:8]}"
-        
-        try:
-            # Update KYC status in database
-            update_result = supabase.table('user_profiles').update({
-                'kyc_status': 'in_progress',
-                'updated_at': 'now()'
-            }).eq('id', user_id).execute()
-            
-            if not update_result.data:
-                logger.warning(f"[KYC Start] Status update may have failed for user: {user_id}")
-            
-            logger.info(f"[KYC Start] Verification started successfully for user: {user_id}")
-            
-            return {
-                "token": mock_token,
-                "applicantId": f"applicant_{user_id}",
-                "status": "success",
-                "message": "KYC verification initiated successfully"
-            }
-            
-        except Exception as db_error:
-            logger.error(f"[KYC Start] Database error for {user_id}: {str(db_error)}")
-            # Continue with KYC even if status update fails
-            return {
-                "token": mock_token,
-                "applicantId": f"applicant_{user_id}",
-                "status": "success",
-                "message": "KYC verification initiated (status update pending)",
-                "warning": "Status update may be delayed"
-            }
+        return {
+            "token": session_data["token"],
+            "applicantId": client_id,
+            "status": "success",
+            "message": "KYC verification initiated successfully"
+        }
         
     except HTTPException:
         raise
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
-        logger.error(f"[KYC Start] Error for user {current_user.get('id', 'unknown')} [Error ID: {error_id}]: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"[KYC Start] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"KYC initialization failed. Error ID: {error_id}")
 
 @router.post("/webhook")
 async def kyc_webhook_handler(
     request: Request,
-    supabase: Client = Depends(get_supabase_client)
+    supabase: Client = Depends(get_supabase_client),
+    wallet_service: WalletService = Depends(get_wallet_service)
 ) -> Dict[str, Any]:
     """
     CRITICAL FIX: Handle KYC provider webhooks with robust error handling
@@ -222,7 +186,17 @@ async def kyc_webhook_handler(
             # Add completion timestamp if verified
             if internal_status == 'verified':
                 update_data['kyc_completed_at'] = 'now()'
-                update_data['kyc_level'] = 2  # Level 2 verification complete
+                update_data['kyc_level'] = 3  # Level 3 verification complete
+                update_data['role'] = 'tribe'  # Grant Tribe status
+                
+                # Create USDS wallet automatically
+                try:
+                    wallet_data = wallet_service.create_algorand_wallet()
+                    await wallet_service.store_encrypted_wallet(user_id, wallet_data)
+                    
+                    logger.info(f"Automatically created wallet for verified user: {user_id}")
+                except Exception as wallet_error:
+                    logger.error(f"Failed to create wallet for verified user {user_id}: {wallet_error}")
             
             # Add rejection reason if applicable
             if internal_status == 'rejected':
