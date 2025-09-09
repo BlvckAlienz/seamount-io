@@ -1,67 +1,114 @@
 // File: frontend/src/config/api.ts
-// FIXED: Removed duplicate API_ENDPOINTS export
+// FIXED: Removed duplicate exports and organized properly
 
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
+import { API_BASE_URL } from './env';
 
-// Define the base URL for the API
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-api.onrender.com';
-
-// Create an axios instance with default config
-export const apiClient = axios.create({
+/**
+ * A centralized Axios client for all API communications with the Seamount backend.
+ * It includes interceptors to automatically handle authentication tokens and provide
+ * robust, consistent logging for both successful and failed requests.
+ */
+const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add this to prevent infinite retries on certain errors
+  validateStatus: function (status) {
+    return status < 500; // Don't retry on server errors
+  },
 });
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('supabase.auth.token');
-    if (token) {
-      const parsedToken = JSON.parse(token);
-      config.headers.Authorization = `Bearer ${parsedToken.access_token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('supabase.auth.token');
-      window.location.href = '/';
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Define the API endpoints - SINGLE DEFINITION
-export const API_ENDPOINTS = {
-  SESSION: {
-    INITIALIZE: '/api/v1/session/initialize',
+/**
+ * A typed object of all API endpoints.
+ * Using this ensures type safety and prevents typos in API route strings.
+ */
+const API_ENDPOINTS = {
+  LEADS: {
+    BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
   USER: {
     PROFILE: '/api/v1/user/profile',
-    UPDATE: '/api/v1/user/profile'
+    CREATE_PROFILE: '/api/v1/user/profile', // Use same endpoint for create/update
   },
-  KYC: {
-    START_VERIFICATION: '/api/v1/kyc/start-verification',
-    STATUS: '/api/v1/kyc/status'
+  SESSION: {
+    INITIALIZE: '/api/v1/session/initialize',
+  },
+  CONSENT: {
+    UPDATE: '/api/v1/consent/update',
   },
   WALLET: {
-    CREATE: '/api/wallet/create'
+    CREATE: '/api/wallet/create',
+  },
+  KYC: {
+    START_VERIFICATION: '/api/kyc/start-verification',
   }
 };
 
+// --- Axios Interceptors ---
+
+// 1. Request Interceptor: Automatically injects the Supabase JWT into every outgoing request.
+// This is the most reliable pattern as it guarantees the freshest token is used.
+apiClient.interceptors.request.use(
+  async (config) => {
+    const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
+    console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log(`[API Auth] Token attached for authenticated request`);
+      } else {
+        // This is normal for public routes (e.g., session initialize, contact form).
+        console.log(`[API Auth] No session token - proceeding with unauthenticated request`);
+      }
+    } catch (error) {
+      console.error('[API Auth Error] Failed to get session for auth token:', error);
+      // Proceed with the request without auth if getting the session fails.
+    }
+    
+    return config;
+  },
+  (error) => {
+    console.error('[API Request Error] Error creating request:', error);
+    return Promise.reject(error);
+  }
+);
+
+// 2. Response Interceptor: Centralizes logging and error handling for all API responses.
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log(`[API Response] <-- ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+    
+    // Log success for important operations
+    if (response.status >= 200 && response.status < 300) {
+      console.log(`[API Success] ${response.config.url?.split('/').pop() || 'Unknown'} operation completed`);
+    }
+    
+    return response;
+  },
+  (error) => {
+    const config = error.config;
+    const response = error.response;
+    const url = config?.url || 'unknown endpoint';
+    const status = response?.status || 'Network Error';
+    const detail = response?.data?.detail || error.message;
+
+    console.error(`[API Error] <-- ${status} ${config?.method?.toUpperCase()} ${url}`);
+    console.error(`[API Error] Detail: ${detail}`);
+    
+    return Promise.reject(error);
+  }
+);
+
 // Function to initialize session
-export const initializeSession = async (): Promise<string> => {
+const initializeSession = async (): Promise<string> => {
   try {
     const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
     return response.data.session_id;
@@ -72,28 +119,31 @@ export const initializeSession = async (): Promise<string> => {
 };
 
 // User API functions
-export const userAPI = {
+const userAPI = {
   getProfile: () => apiClient.get(API_ENDPOINTS.USER.PROFILE),
   updateProfile: (data: any) => apiClient.put(API_ENDPOINTS.USER.UPDATE, data),
 };
 
 // KYC API functions
-export const kycAPI = {
+const kycAPI = {
   startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
-  getStatus: () => apiClient.get(API_ENDPOINTS.KYC.STATUS),
+  getStatus: () => apiClient.get('/api/v1/kyc/status'), // Fixed endpoint to match backend
 };
 
 // Wallet API functions
-export const walletAPI = {
+const walletAPI = {
   create: () => apiClient.post(API_ENDPOINTS.WALLET.CREATE),
 };
 
-// Export everything in a single statement to avoid duplicates
+// Export everything at once to avoid duplicates
 export {
   apiClient,
-  // API_ENDPOINTS is already exported above, don't re-export it here
+  API_ENDPOINTS,
   userAPI,
   kycAPI,
   walletAPI,
   initializeSession,
 };
+
+// Default export for convenience
+export default apiClient;
