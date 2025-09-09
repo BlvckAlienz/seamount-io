@@ -25,20 +25,22 @@ interface StepProps {
 const IdentityStep: React.FC<StepProps> = ({ onNext }) => {
   const [loading, setLoading] = useState(false);
   const [sdkInitialized, setSdkInitialized] = useState(false);
-  const { completeOnboarding } = useAuth();
+  const { completeOnboarding, refreshKycStatus } = useAuth();
 
  const startVerification = async () => {
   setLoading(true);
   try {
     // FIXED: Use the correct API endpoint that matches backend routing
     const { data } = await apiClient.post<{ token: string }>(
-      "/api/v1/kyc/start-verification"  // Matches backend router prefix
+      "/api/kyc/start-verification"  // Matches backend router prefix
     );
     
     if (window.ComplyCube) {
       const session = window.ComplyCube.mount({
         token: data.token,
-        onComplete: () => {
+        onComplete: async () => {
+          // FIXED: Refresh KYC status before proceeding
+          await refreshKycStatus();
           toast.success('Verification completed!');
           onNext();
         },

@@ -490,3 +490,18 @@ def rate_limit(requests_per_minute: int = 60):
         return current_user
     
     return rate_limiter
+    
+ def require_tribe_member(current_user: dict = Depends(get_current_user)):
+    """Require user to be a Tribe member (verified)"""
+    if current_user.get('kyc_status') != 'verified' and not current_user.get('is_demo', False):
+        raise HTTPException(
+            status_code=403, 
+            detail="Complete KYC verification to access this feature"
+        )
+    return current_user
+
+def get_user_role(current_user: dict = Depends(get_current_user)):
+    """Get user role (Tribe or Alien)"""
+    if current_user.get('kyc_status') == 'verified' or current_user.get('is_demo', False):
+        return "tribe"
+    return "alien"
