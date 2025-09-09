@@ -490,8 +490,9 @@ def rate_limit(requests_per_minute: int = 60):
         return current_user
     
     return rate_limiter
-    
- def require_tribe_member(current_user: dict = Depends(get_current_user)):
+
+# FIXED: Proper indentation for these functions
+def require_tribe_member(current_user: dict = Depends(get_current_user)):
     """Require user to be a Tribe member (verified)"""
     if current_user.get('kyc_status') != 'verified' and not current_user.get('is_demo', False):
         raise HTTPException(
