@@ -1,5 +1,5 @@
 # File Location: backend/api/main.py
-# CRITICAL FIX: Proper CORS, Security, and corrected routes without duplicates
+# PRODUCTION-READY: Complete API with security hardening and KYC fixes
 
 import logging
 from contextlib import asynccontextmanager
@@ -157,6 +157,19 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# SECURITY: Add security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Add security headers
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 # CORS middleware configuration
 app.add_middleware(

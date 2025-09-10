@@ -328,9 +328,10 @@ async def get_current_user(
                 "first_name": payload.get('user_metadata', {}).get('first_name', ''),
                 "last_name": payload.get('user_metadata', {}).get('last_name', ''),
                 "country_code": payload.get('user_metadata', {}).get('country_code', 'US').upper(),
-                "kyc_status": "pending",
-                "kyc_level": 0,
+                "kyc_status": "pending",  # Default KYC status
+                "kyc_level": 0,           # Default KYC level
                 "role": "alien",
+                "is_admin": False,
                 "created_at": now,
                 "updated_at": now
             }
