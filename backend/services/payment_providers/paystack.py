@@ -10,7 +10,7 @@ from config import Settings
 
 logger = logging.getLogger(__name__)
 
-class PaystackProcessor:
+class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
     """
     Paystack integration for local Nigerian NGN payments.
     Targets 1.2% fees vs Flutterwave's 2.15%.
@@ -35,7 +35,7 @@ class PaystackProcessor:
         if "test" in self.secret_key.lower():
             logger.warning("⚠️ Paystack using TEST keys")
         
-        logger.info("✅ PaystackProcessor initialized")
+        logger.info("✅ PaystackProvider initialized")  # Updated log message
     
     async def _request_with_retry(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
         """HTTP request with exponential backoff retry"""

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from dependencies import get_current_user  # Changed import
+from backend.dependencies import get_current_user  # Changed import
 import logging
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from uuid import UUID
 from supabase import Client
 
 # Correctly import dependencies from the central module
-from dependencies import get_supabase_client
+from backend.dependencies import get_supabase_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

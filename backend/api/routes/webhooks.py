@@ -6,7 +6,7 @@ import os
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from supabase import Client
 import logging
-from dependencies import get_supabase_client
+from backend.dependencies import get_supabase_client
 from config import get_settings, Settings
 from services.wallet_service import WalletService
 

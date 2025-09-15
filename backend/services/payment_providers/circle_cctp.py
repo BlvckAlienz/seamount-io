@@ -9,7 +9,7 @@ from config import Settings
 
 logger = logging.getLogger(__name__)
 
-class CircleCCTPProcessor:
+class CircleCCTPProvider:
     """
     Circle Cross-Chain Transfer Protocol (CCTP) for international USDC transfers.
     Supports Ethereum, Polygon, Avalanche, Arbitrum, and Optimism.

@@ -10,7 +10,7 @@ from config import Settings
 
 logger = logging.getLogger(__name__)
 
-class FlutterwaveProcessor:
+class FlutterwaveProvider:
     """
     A modern, dependency-injected, and fully asynchronous service for all
     Flutterwave payment interactions, preserving all original logic.

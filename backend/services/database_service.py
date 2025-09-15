@@ -522,12 +522,3 @@ class DatabaseService:
                 logger.info("[DB] Database connections closed successfully")
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
-
-# Global database service instance for backward compatibility
-database_service = DatabaseService()
-
-# CRITICAL FIX: Add SuperDatabaseService alias for import compatibility
-SuperDatabaseService = DatabaseService  # Alias for backward compatibility
-
-# Export both for flexibility
-__all__ = ["DatabaseService", "SuperDatabaseService", "database_service"]

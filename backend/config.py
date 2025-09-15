@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List, Optional, Dict, Tuple, Set, Any
 from decimal import Decimal
 from pydantic import SecretStr, computed_field, Field
@@ -293,54 +294,55 @@ class Settings(BaseSettings):
     Supports both B2B and B2C operations
     """
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.path.join(os.path.dirname(__file__), '..', '.env'),
         env_file_encoding='utf-8',
+        extra="allow",
         case_sensitive=False
     )
 
     # --- Core & Security ---
-    DATABASE_URL: SecretStr
-    ENCRYPTION_KEY: SecretStr
-    IPINFO_TOKEN: SecretStr
+    DATABASE_URL: SecretStr = Field(default="postgresql://user:password@localhost:5432/seamount")
+    ENCRYPTION_KEY: SecretStr = Field(default="default-encryption-key-change-in-production")
+    IPINFO_TOKEN: Optional[SecretStr] = None
     
     # --- Supabase ---
-    VITE_SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: SecretStr
-    SUPABASE_JWKS_URI: str
-    SUPABASE_JWT_ISSUER: str
+    VITE_SUPABASE_URL: str = Field(default="https://your-supabase-url.supabase.co")
+    SUPABASE_SERVICE_KEY: SecretStr = Field(default="your-supabase-service-key")
+    SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
+    SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
 
     # --- KYC Provider (ComplyCube) ---
     COMPLYCUBE_API_KEY: Optional[SecretStr] = None
     COMPLYCUBE_WEBHOOK_SECRET: Optional[SecretStr] = None
     
     # --- External APIs ---
-    ALPHA_VANTAGE_KEY: SecretStr
-    FLUTTERWAVE_SECRET_KEY: SecretStr
-    FLUTTERWAVE_PUBLIC_KEY: str
-    COINGECKO_API_KEY: SecretStr
+    ALPHA_VANTAGE_KEY: Optional[SecretStr] = None
+    FLUTTERWAVE_SECRET_KEY: Optional[SecretStr] = None
+    FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
+    COINGECKO_API_KEY: Optional[SecretStr] = None
     
     # --- Algorand Network ---
-    ALGORAND_NODE_URL: str
-    ALGORAND_INDEXER_URL: str
-    ALGORAND_API_KEY: SecretStr
-    ALGORAND_CREATOR_MNEMONIC: SecretStr
-    ALGORAND_NETWORK: str
-    USDS_ASSET_ID: int
+    ALGORAND_NODE_URL: str = Field(default="https://mainnet-api.algonode.cloud")
+    ALGORAND_INDEXER_URL: str = Field(default="https://mainnet-idx.algonode.cloud")
+    ALGORAND_API_KEY: Optional[SecretStr] = None
+    ALGORAND_CREATOR_MNEMONIC: Optional[SecretStr] = None
+    ALGORAND_NETWORK: str = Field(default="mainnet")
+    USDS_ASSET_ID: int = Field(default=0)
 
     # --- Treasury (Sensitive) ---
-    TREASURY_ADDRESS: str
-    TREASURY_PRIVATE_KEY: SecretStr
+    TREASURY_ADDRESS: Optional[str] = None
+    TREASURY_PRIVATE_KEY: Optional[SecretStr] = None
 
     # --- Redis (Upstash) ---
-    UPSTASH_REDIS_REST_URL: str
-    UPSTASH_REDIS_REST_TOKEN: SecretStr
+    UPSTASH_REDIS_REST_URL: Optional[str] = None
+    UPSTASH_REDIS_REST_TOKEN: Optional[SecretStr] = None
     
     # --- Email Service ---
-    MAIL_SERVER: str
+    MAIL_SERVER: Optional[str] = None
     MAIL_PORT: int = 587
-    MAIL_USERNAME: str
-    MAIL_PASSWORD: SecretStr
-    MAIL_FROM: str
+    MAIL_USERNAME: Optional[str] = None
+    MAIL_PASSWORD: Optional[SecretStr] = None
+    MAIL_FROM: Optional[str] = None
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
     
@@ -362,6 +364,15 @@ class Settings(BaseSettings):
     # --- Revenue Tracking ---
     TRACK_REVENUE_METRICS: bool = True
     REVENUE_REPORTING_CURRENCY: str = "USD"
+    
+    # --- Payment Providers ---
+    PAYSTACK_PUBLIC_KEY: Optional[SecretStr] = None
+    PAYSTACK_SECRET_KEY: Optional[SecretStr] = None
+    PAYSTACK_WEBHOOK_SECRET: Optional[SecretStr] = None
+    
+    # --- API URLs ---
+    API_BASE_URL: str = Field(default="http://localhost:8000")
+    FRONTEND_URL: str = Field(default="http://localhost:3000")
 
     @computed_field
     @property
@@ -391,92 +402,17 @@ class Settings(BaseSettings):
         """Access to business model configuration"""
         return BusinessModelConfig()
 
-# --- Singleton Pattern for Settings ---
-_settings_instance: Optional[Settings] = None
-
-def get_settings() -> Settings:
-    """Returns cached instance of application settings"""
-    global _settings_instance
-    if _settings_instance is None:
-        try:
-            _settings_instance = Settings()
-            logger.info("Configuration loaded and validated successfully.")
-            logger.info(f"Environment: {_settings_instance.ENVIRONMENT}")
-            logger.info(f"Pricing Region: {_settings_instance.DEFAULT_PRICING_REGION.value}")
-            logger.info(f"ComplyCube API: {'Configured' if _settings_instance.COMPLYCUBE_API_KEY else 'NOT CONFIGURED'}")
-            
-            # Log business model validation
-            bm = _settings_instance.business_model
-            basic_license = bm.calculate_license_fee(LicenseTier.BASIC, _settings_instance.DEFAULT_PRICING_REGION)
-            logger.info(f"Basic License Fee: {basic_license} ({_settings_instance.DEFAULT_PRICING_REGION.value})")
-            
-            # Test B2C fee calculation
-            b2c_fee = bm.calculate_b2c_fee(Decimal("100"), "NG", "conversion")
-            logger.info(f"B2C Fee Example: ${b2c_fee['final_fee']:.2f} for $100 transaction in Nigeria")
-            
-        except Exception as e:
-            logger.critical(f"FATAL: Configuration validation failed. Error: {e}", exc_info=True)
-            raise
-    return _settings_instance
-
-# --- Business Model Usage Examples ---
-def demo_revenue_projections():
-    """Demo function showing revenue calculations for both B2B and B2C"""
-    
-    # B2B Example: Realistic Nigerian SMB distribution
-    customer_distribution = {
-        LicenseTier.BASIC: 70,      # 70 small businesses (10-50 employees)
-        LicenseTier.PRO: 25,        # 25 medium businesses (50-500 employees)
-        LicenseTier.ENTERPRISE: 5   # 5 large businesses (500+ employees)
-    }
-    
-    # Realistic monthly transaction volumes based on SMB payroll + treasury
-    avg_volumes = {
-        LicenseTier.BASIC: Decimal("8000"),      # $8K monthly (small payroll + some treasury)
-        LicenseTier.PRO: Decimal("35000"),       # $35K monthly (medium payroll + active treasury)
-        LicenseTier.ENTERPRISE: Decimal("150000") # $150K monthly (large payroll + complex treasury)
-    }
-    
-    # Calculate B2B projections with savings analysis
-    bm = BusinessModelConfig()
-    projections = bm.project_monthly_revenue(
-        customer_distribution, 
-        avg_volumes, 
-        PricingRegion.NIGERIA
-    )
-    
-    # Show B2B savings vs individual rates
-    logger.info("=== B2B SMB SAVINGS VS INDIVIDUAL RATES ===")
-    for tier in LicenseTier:
-        if customer_distribution.get(tier, 0) > 0:
-            annual_volume = avg_volumes[tier] * 12
-            savings = bm.calculate_annual_savings(tier, annual_volume)
-            logger.info(f"{tier.value.title()}: {savings['discount_percentage']:.1f}% discount, "
-                       f"${savings['annual_savings']:,.0f} annual savings per customer")
-    
-    # B2C Example: Individual user fees
-    logger.info("=== B2C FEE EXAMPLES ===")
-    test_amounts = [Decimal("50"), Decimal("100"), Decimal("500")]
-    for amount in test_amounts:
-        individual_fee, _ = bm.calculate_transaction_fee(amount)  # No tier = individual rate
-        logger.info(f"Individual ${amount}: Fee = ${individual_fee:.2f} ({individual_fee/amount*100:.2f}%)")
-    
-    logger.info(f"Total B2B Revenue Projections: {projections}")
-    return projections
-
-if __name__ == "__main__":
-    # Test the configuration
-    settings = get_settings()
-    demo_revenue_projections()
-    
- # Initialize settings instance on module import (Render compatibility)
+# Create a single settings instance
 try:
-    settings = get_settings()
-    logger.info("Settings instance created and exported for import compatibility")
+    settings = Settings()
+    logger.info("Settings loaded successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize settings during module import: {e}")
-    # Create a minimal fallback to prevent import failures
-    settings = None
+    logger.error(f"Failed to load settings: {e}")
+    # Create a minimal settings object with defaults
+    settings = Settings(_env_file=None)
 
 # Export the function as well for backward compatibility
+def get_settings() -> Settings:
+    return settings
+
 __all__ = ['get_settings', 'settings', 'BusinessModelConfig', 'LicenseTier', 'PricingRegion']

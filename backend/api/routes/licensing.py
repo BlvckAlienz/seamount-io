@@ -8,16 +8,18 @@ from fastapi.responses import JSONResponse
 
 # Core dependencies
 from supabase import Client
-from dependencies import get_current_user, get_supabase_client
+from backend.dependencies import get_current_user, get_supabase_client
 from models import (
     LicensePurchaseRequest, LicensePurchaseResponse, LicenseInfo,
     TierUpgradeRequest, LicenseUsageStats, TransactionFeeCalculation,
     LicenseTier
 )
-from services.licensing_service import LicensingService
-from services.audit_service import AuditService
-from services.notification_service import NotificationService
-from config import get_settings
+from backend.services.licensing_service import LicensingService
+from backend.services.audit_service import AuditService
+from backend.services.notification_service import NotificationService
+from backend.services.payment_service import PaymentService
+from backend.services.email_service import EmailService
+from config import get_settings, BusinessModelConfig, PricingRegion
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/licensing", tags=["SMB Licensing"])
@@ -26,13 +28,7 @@ def get_licensing_service(
     supabase: Client = Depends(get_supabase_client)
 ) -> LicensingService:
     """Dependency to get licensing service instance"""
-    settings = get_settings()
-    
-    # Initialize required services (in production, these would be injected)
-    from services.audit_service import AuditService
-    from services.notification_service import NotificationService
-    from services.email_service import EmailService
-    
+    settings = get_settings() 
     email_service = EmailService(settings)
     notification_service = NotificationService(email_service)
     audit_service = AuditService(supabase)
@@ -41,10 +37,8 @@ def get_licensing_service(
 
 @router.get("/tiers", summary="Get available license tiers and pricing")
 async def get_license_tiers(region: str = "nigeria"):
-    """Get all available license tiers with pricing for specified region"""
-    try:
-        from config import BusinessModelConfig, PricingRegion
-        
+    """Get all available license tiers with pricing for specified region""" 
+    try:  # Fixed indentation
         # Convert string to enum safely
         try:
             pricing_region = PricingRegion(region.lower())
@@ -175,7 +169,6 @@ async def savings_calculator(
     
     for tier in LicenseTier:
         # Get license fee (assume Nigeria for demo)
-        from config import PricingRegion
         license_fee = business_model.calculate_license_fee(tier, PricingRegion.NIGERIA)
         
         # Calculate tier transaction costs
