@@ -522,3 +522,6 @@ class DatabaseService:
                 logger.info("[DB] Database connections closed successfully")
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
+
+# This alias ensures existing imports continue to work
+SuperDatabaseService = DatabaseService
