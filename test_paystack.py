@@ -7,9 +7,9 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-# Load environment variables from backend/.env
+# Load environment variables from the correct .env location
 from dotenv import load_dotenv
-env_path = project_root / 'backend' / '.env'
+env_path = project_root / '.env'  # .env is in the project root, not in backend
 load_dotenv(dotenv_path=env_path)
 
 from backend.config import get_settings
