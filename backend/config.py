@@ -9,11 +9,6 @@ from enum import Enum
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# DEBUG: Verify environment file loading
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-logger.debug(f"Looking for .env at: {env_path}")
-logger.debug(f"File exists: {os.path.exists(env_path)}")
-
 class LicenseTier(str, Enum):
     """License tiers for Seamount platform"""
     BASIC = "basic"
