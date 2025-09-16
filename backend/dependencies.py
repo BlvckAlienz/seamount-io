@@ -75,7 +75,7 @@ def get_supabase_client() -> Client:
     if _supabase_client is None:
         try:
             settings = get_settings_cached()
-            supabase_url = settings.VITE_SUPABASE_URL
+            supabase_url = settings.SUPABASE_URL
             supabase_key = settings.SUPABASE_SERVICE_KEY.get_secret_value()
             
             _supabase_client = create_client(supabase_url, supabase_key)

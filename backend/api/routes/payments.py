@@ -146,6 +146,7 @@ async def initialize_deposit(
 @limiter.limit("30/minute")
 async def get_transaction_status(
     transaction_id: str,
+    request: Request,
     supabase: Client = Depends(get_supabase_client)
 ):
     """Get payment transaction status"""
@@ -163,3 +164,4 @@ async def get_transaction_status(
     except Exception as e:
         logger.error(f"Failed to fetch transaction {transaction_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch transaction status")
+        

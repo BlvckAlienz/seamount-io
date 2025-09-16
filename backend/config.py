@@ -9,6 +9,11 @@ from enum import Enum
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# DEBUG: Verify environment file loading
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+logger.debug(f"Looking for .env at: {env_path}")
+logger.debug(f"File exists: {os.path.exists(env_path)}")
+
 class LicenseTier(str, Enum):
     """License tiers for Seamount platform"""
     BASIC = "basic"
@@ -35,9 +40,9 @@ class BusinessModelConfig:
     # B2B One-time License Fees (in local currency)
     LICENSE_FEES = {
         PricingRegion.NIGERIA: {
-            LicenseTier.BASIC: Decimal("800000"),      # ₦800K (~$530)
-            LicenseTier.PRO: Decimal("1600000"),       # ₦1.6M (~$1,060)
-            LicenseTier.ENTERPRISE: Decimal("3200000") # ₦3.2M (~$2,120)
+            LicenseTier.BASIC: Decimal("800000"),      # 800K (~$530)
+            LicenseTier.PRO: Decimal("1600000"),       # 1.6M (~$1,060)
+            LicenseTier.ENTERPRISE: Decimal("3200000") # 3.2M (~$2,120)
         },
         PricingRegion.KENYA: {
             LicenseTier.BASIC: Decimal("80000"),       # KSh80K (~$530)
@@ -294,7 +299,7 @@ class Settings(BaseSettings):
     Supports both B2B and B2C operations
     """
     model_config = SettingsConfigDict(
-        env_file=os.path.join(os.path.dirname(__file__), '..', '.env'),
+        env_file=os.path.join(os.path.dirname(__file__), '.env'),
         env_file_encoding='utf-8',
         extra="allow",
         case_sensitive=False
@@ -306,7 +311,7 @@ class Settings(BaseSettings):
     IPINFO_TOKEN: Optional[SecretStr] = None
     
     # --- Supabase ---
-    VITE_SUPABASE_URL: str = Field(default="https://your-supabase-url.supabase.co")
+    SUPABASE_URL: str = Field(default="https://your-supabase-url.supabase.co")
     SUPABASE_SERVICE_KEY: SecretStr = Field(default="your-supabase-service-key")
     SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
     SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
@@ -401,13 +406,36 @@ class Settings(BaseSettings):
     def business_model(self) -> BusinessModelConfig:
         """Access to business model configuration"""
         return BusinessModelConfig()
+        
+    def validate_supabase_credentials(self):
+        """Validate Supabase credentials format"""
+        if not self.SUPABASE_URL or self.SUPABASE_URL == "https://your-supabase-url.supabase.co":
+            logger.warning("Supabase URL not configured - using default")
+            return False
+        
+        if not self.SUPABASE_SERVICE_KEY or self.SUPABASE_SERVICE_KEY.get_secret_value() == "your-supabase-service-key":
+            logger.warning("Supabase Service Key not configured - using default")
+            return False
+        
+        # Check if key looks like a JWT (should start with eyJ)
+        key_value = self.SUPABASE_SERVICE_KEY.get_secret_value()
+        if not key_value.startswith("eyJ"):
+            logger.warning("Supabase Service Key appears malformed - should be a JWT starting with 'eyJ'")
+            return False
+        
+        logger.info("Supabase credentials validated successfully")
+        return True
 
 # Create a single settings instance
 try:
     settings = Settings()
     logger.info("Settings loaded successfully")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info(f"Supabase URL configured: {'Yes' if settings.SUPABASE_URL != 'https://your-supabase-url.supabase.co' else 'No'}")
 except Exception as e:
     logger.error(f"Failed to load settings: {e}")
+    logger.error(f"Working directory: {os.getcwd()}")
+    logger.error(f"Config file location: {__file__}")
     # Create a minimal settings object with defaults
     settings = Settings(_env_file=None)
 

@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 # Add the project root to the Python path for clean imports
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Import core dependencies first
 try:
@@ -79,7 +79,19 @@ try:
     from backend.api.routes import kyc, webhooks, portfolio, investor, consent
     from backend.api.routes.users import router as users_router
     from backend.api.routes.session import router as session_router
-    from backend.api.routes import payments as payments_router
+    
+    # Import payments router with specific error handling
+    try:
+        from backend.api.routes.payments import router as payments_router
+        logging.info("Payments router imported successfully")
+    except ImportError as payment_e:
+        logging.error(f"Payments router import error: {payment_e}")
+        from fastapi import APIRouter
+        payments_router = APIRouter()
+        @payments_router.get("/health")
+        async def payments_health():
+            return {"status": "payments module not available", "error": str(payment_e)}
+        
 except ImportError as e:
     logging.error(f"Router import error: {e}")
     # Create minimal stubs for missing dependencies
@@ -168,39 +180,69 @@ async def lifespan(app: FastAPI):
         # Check if we can get settings
         try:
             settings = get_settings()
-            supabase_client = create_client(
-                settings.VITE_SUPABASE_URL, 
-                settings.SUPABASE_SERVICE_KEY.get_secret_value()
-            )
-            
+    
+            # Validate Supabase credentials before creating client
+            if settings.validate_supabase_credentials():
+                try:
+                    supabase_client = create_client(
+                        settings.SUPABASE_URL, 
+                        settings.SUPABASE_SERVICE_KEY.get_secret_value()
+                    )
+                    logger.info("Supabase client created successfully")
+                except Exception as e:
+                    logger.error(f"Failed to create Supabase client: {e}")
+                    supabase_client = None
+            else:
+                logger.warning("Supabase credentials validation failed - operating without database")
+                supabase_client = None
+                
             # Initialize all services if available
             email_service = EmailService(settings)
             notification_service = NotificationService(email_service)
-            wallet_service = WalletService(settings, supabase_client)
-            database_service = DatabaseService(supabase_client)
-            audit_service = AuditService(supabase_client)
-            kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
+            
+            # Only initialize services that require Supabase if client is available
+            if supabase_client:
+                wallet_service = WalletService(settings, supabase_client)
+                database_service = DatabaseService(supabase_client)
+                audit_service = AuditService(supabase_client)
+                kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
 
-            # Initialize dependencies
-            initialize_dependencies(
-                supabase_client, 
-                wallet_service, 
-                notification_service, 
-                audit_service,
-                kyc_service
-            )
+                # Initialize dependencies
+                initialize_dependencies(
+                    supabase_client, 
+                    wallet_service, 
+                    notification_service, 
+                    audit_service,
+                    kyc_service
+                )
+            else:
+                logger.warning("Supabase client not available, skipping database-dependent services")
+                # Initialize with minimal dependencies
+                initialize_dependencies(
+                    None, 
+                    None, 
+                    notification_service, 
+                    None,
+                    None
+                )
             
-            license_fee = settings.business_model.calculate_license_fee(
-                LicenseTier.BASIC, 
-                PricingRegion.NIGERIA
-            )
-            logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
+            # This part can proceed without Supabase
+            try:
+                license_fee = settings.business_model.calculate_license_fee(
+                    LicenseTier.BASIC, 
+                    PricingRegion.NIGERIA
+                )
+                logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
+            except:
+                logger.warning("Business model calculation failed")
             
-            logger.info("All services initialized successfully.")
+            logger.info("Services initialized successfully.")
         except NameError:
             logger.warning("Some services not available due to import errors")
         except Exception as e:
             logger.error(f"Service initialization error: {e}")
+            # Don't raise the error, continue with partial initialization
+            logger.warning("Continuing with partial service initialization")
         
         yield
     except Exception as e:
@@ -259,8 +301,8 @@ if licensing_router:
     app.include_router(licensing_router, prefix="/api/v1", tags=["Licensing"])
 if session_router:
     app.include_router(session_router, prefix="/api/v1/session", tags=["Session"])
-if payments_router and hasattr(payments_router, 'router'):
-    app.include_router(payments_router.router, prefix="/api/payments", tags=["Payments"])
+if payments_router:
+    app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 

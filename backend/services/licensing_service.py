@@ -15,7 +15,7 @@ from models import (
     LicenseStatus, PaymentStatus, TierUpgradeRequest, LicenseUsageStats,
     TransactionFeeCalculation
 )
-from .payment_providers.flutterwave import FlutterwaveProcessor
+from .payment_providers.paystack import PaystackProvider
 from .audit_service import AuditService, AuditEventType
 from .notification_service import NotificationService
 
@@ -41,7 +41,7 @@ class LicensingService:
         self.supabase = supabase_client
         self.audit = audit_service
         self.notifications = notification_service
-        self.fiat_processor = FlutterwaveProcessor(settings)
+        self.fiat_processor = PaystackProvider(settings)
         self.business_model = BusinessModelConfig()
         
         logger.info("LicensingService initialized with business model integration")
@@ -152,7 +152,7 @@ class LicensingService:
             
             self.supabase.table("license_payments").insert(payment_data).execute()
 
-            # Initialize payment with Flutterwave
+            # Initialize payment with Paystack
             payment_result = await self.fiat_processor.initialize_payment(
                 amount=float(license_amount),
                 currency=currency,
@@ -401,7 +401,7 @@ class LicensingService:
                 
                 <p>Start using your new license benefits immediately in your Seamount dashboard.</p>
                 
-                <p>Questions? Contact your dedicated success manager at success@seamount.io</p>
+                <p>Questions? Contact your dedicated success manager at support@seamount.io</p>
                 
                 <p>Best regards,<br>The Seamount Team</p>
                 """

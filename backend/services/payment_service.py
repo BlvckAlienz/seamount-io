@@ -94,9 +94,9 @@ class PaymentService:
         
         try:
             if hasattr(settings, 'PAYSTACK_SECRET_KEY') and settings.PAYSTACK_SECRET_KEY:
-                self.paystack = PaystackProcessor(settings)
+                self.paystack = PaystackProvider(settings)  # Changed to PaystackProvider
             if hasattr(settings, 'FLUTTERWAVE_SECRET_KEY') and settings.FLUTTERWAVE_SECRET_KEY:
-                self.flutterwave = FlutterwaveProcessor(settings)
+                self.flutterwave = FlutterwaveProvider(settings)  # Changed to FlutterwaveProvider
         except Exception as e:
             logger.error(f"Failed to initialize payment processors: {e}")
         

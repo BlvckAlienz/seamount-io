@@ -3,13 +3,12 @@ import os
 import sys
 from pathlib import Path
 
-# Add the project root to the path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
+# Add the current directory to the path
+sys.path.insert(0, str(Path.cwd()))
 
-# Load environment variables from the correct .env location
+# Load environment variables from the .env file in the backend directory
 from dotenv import load_dotenv
-env_path = project_root / '.env'  # .env is in the project root, not in backend
+env_path = Path.cwd() / 'backend' / '.env'
 load_dotenv(dotenv_path=env_path)
 
 from backend.config import get_settings
@@ -24,10 +23,14 @@ def test_paystack():
         print(f"Current working directory: {os.getcwd()}")
         print(f"Env file path: {env_path}")
         print(f"Env file exists: {env_path.exists()}")
+        
         if env_path.exists():
             print("Env file content:")
             with open(env_path, 'r') as f:
                 print(f.read())
+        else:
+            print("No .env file found at the specified path")
+            
         return False
     
     try:

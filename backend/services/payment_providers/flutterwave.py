@@ -4,9 +4,10 @@ import aiohttp
 from decimal import Decimal
 from datetime import datetime
 from typing import Dict, Any
+from fastapi import HTTPException
 
 # --- Core Dependencies ---
-from config import Settings
+from backend.config import Settings  # Fixed import path
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class FlutterwaveProvider:
         if "test" in self.public_key.lower():
             logger.warning("Flutterwave is using a TEST public key.")
         
-        logger.info("✅ FlutterwaveProcessor config validated.")
+        logger.info("✅ FlutterwaveProvider config validated.")  # Fixed log message
     
     async def initialize_payment(self, amount: float, currency: str, email: str, tx_ref: str, phone: str = None, name: str = "Seamount User") -> Dict[str, Any]:
         """Initializes a Flutterwave payment link asynchronously."""
