@@ -207,6 +207,17 @@ async def lifespan(app: FastAPI):
                 audit_service = AuditService(supabase_client)
                 kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
 
+                # Test KYC service initialization with health check
+                try:
+                    kyc_health = await kyc_service.health_check()
+                    logger.info(f"KYC Service health: {kyc_health}")
+                    
+                    if kyc_health.get('provider') != 'healthy':
+                        logger.warning("KYC provider not healthy - KYC features may be limited")
+                except Exception as e:
+                    logger.error(f"KYC Service health check failed: {e}")
+                    # Continue anyway but log the error
+
                 # Initialize dependencies
                 initialize_dependencies(
                     supabase_client, 
