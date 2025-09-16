@@ -90,6 +90,23 @@ async def start_kyc_verification(
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
+        # Check if user already has active verification session
+        current_kyc_status = current_user.get('kyc_status')
+        if current_kyc_status == "in_progress":
+            # Check if there's an active session in the database
+            try:
+                session_response = supabase.from_("kyc_sessions").select("session_id").eq("user_id", user_id).eq("status", "pending").maybe_single().execute()
+                if session_response.data:
+                    logger.warning(f"User {user_id} already has active KYC session")
+                    return {
+                        "success": False,
+                        "error": "KYC verification session already active",
+                        "kyc_status": current_user.get("kyc_status")
+                    }
+            except Exception as session_error:
+                logger.warning(f"Could not check session status for user {user_id}: {session_error}")
+                # Continue with new session creation if we can't verify existing session
+        
         # FIX: Use the KYC service's public method instead of accessing complycube directly
         result = await kyc_service.start_verification_session(
             user_id,
@@ -156,19 +173,19 @@ async def kyc_webhook_handler(
         # Find and update user by reference
         try:
             # Try direct user ID lookup first
-            user_response = supabase.table('user_profiles').select('id').eq('id', user_reference).maybe_single().execute()
+            user_response = supabase.table('user_profiles').select('id').eq('id', user_reference).execute()
             
-            if not user_response.data:
+            if not user_response.data or len(user_response.data) == 0:
                 # Try looking for user by applicant ID pattern
                 if user_reference.startswith('applicant_'):
                     actual_user_id = user_reference.replace('applicant_', '')
-                    user_response = supabase.table('user_profiles').select('id').eq('id', actual_user_id).maybe_single().execute()
+                    user_response = supabase.table('user_profiles').select('id').eq('id', actual_user_id).execute()
             
-            if not user_response.data:
+            if not user_response.data or len(user_response.data) == 0:
                 logger.error(f"[KYC Webhook] User not found for reference: {user_reference}")
                 return {"success": False, "error": "User not found"}
             
-            user_id = user_response.data['id']
+            user_id = user_response.data[0]['id']
             
             # Update the user's KYC status
             update_data = {
@@ -239,12 +256,12 @@ async def get_kyc_status(
         
         profile_response = supabase.table('user_profiles').select(
             'kyc_status, kyc_level, kyc_completed_at, kyc_rejection_reason'
-        ).eq('id', user_id).maybe_single().execute()
+        ).eq('id', user_id).execute()
         
-        if not profile_response.data:
+        if not profile_response.data or len(profile_response.data) == 0:
             raise HTTPException(status_code=404, detail="User not found")
         
-        profile = profile_response.data
+        profile = profile_response.data[0]
         
         return {
             "user_id": user_id,

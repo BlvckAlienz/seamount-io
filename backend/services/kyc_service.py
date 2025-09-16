@@ -42,13 +42,13 @@ class KYCService:
         if complycube_key:
             try:
                 self.provider = ComplyCubeVerifier(api_key=complycube_key.get_secret_value() if hasattr(complycube_key, 'get_secret_value') else complycube_key)
-                logger.info("âœ… KYC Service initialized with ComplyCube provider")
+                logger.info("✅ KYC Service initialized with ComplyCube provider")
             except Exception as e:
                 logger.error(f"Failed to initialize ComplyCube provider: {e}")
                 self.provider = None
         else:
             self.provider = None
-            logger.warning("âš ï¸  COMPLYCUBE_API_KEY not set. KYC service will operate in simulated mode")
+            logger.warning("⚠️  COMPLYCUBE_API_KEY not set. KYC service will operate in simulated mode")
 
     async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
         """
@@ -56,7 +56,7 @@ class KYCService:
         This is the main entry point for user identity verification
         """
         try:
-            logger.info(f"ðŸ”„ Starting KYC verification for user {user_id}")
+            logger.info(f"🔄 Starting KYC verification for user {user_id}")
             
             # Validate user profile exists
             user_profile = await self.db_service.get_user_profile_by_id(user_id)
@@ -64,9 +64,9 @@ class KYCService:
                 logger.error(f"User profile not found for user {user_id}")
                 raise HTTPException(status_code=404, detail="User profile not found")
             
-            # Check if user already has pending verification
-            if user_profile.get("kyc_status") in ["pending", "in_progress"]:
-                logger.warning(f"User {user_id} already has pending KYC verification")
+            # Check if user already has active verification session (FIXED: only check in_progress, not pending)
+            if user_profile.get("kyc_status") == "in_progress":
+                logger.warning(f"User {user_id} already has active KYC verification")
                 return {
                     "success": False,
                     "error": "KYC verification already in progress",
@@ -75,7 +75,7 @@ class KYCService:
             
             # Handle simulated mode for testing
             if not self.provider:
-                logger.warning(f"ðŸ§ª SIMULATING KYC session for user {user_id} - No provider configured")
+                logger.warning(f"🧪 SIMULATING KYC session for user {user_id} - No provider configured")
                 
                 # Update user to pending status for simulation
                 await self.db_service.update_user_kyc_status(user_id, "pending", 1)
@@ -91,7 +91,7 @@ class KYCService:
             # Create ComplyCube client
             try:
                 client_id = await self.provider.create_client(user_id, email, country_code)
-                logger.info(f"ðŸ“‹ Created ComplyCube client {client_id} for user {user_id}")
+                logger.info(f"📋 Created ComplyCube client {client_id} for user {user_id}")
             except Exception as e:
                 logger.error(f"Failed to create ComplyCube client for user {user_id}: {e}")
                 await self.audit.log_event(
@@ -111,7 +111,7 @@ class KYCService:
                 if not session_id or not flow_url:
                     raise ValueError("Invalid session data received from provider")
                     
-                logger.info(f"ðŸ”— Created verification session {session_id} for user {user_id}")
+                logger.info(f"🔗 Created verification session {session_id} for user {user_id}")
             except Exception as e:
                 logger.error(f"Failed to create verification session for user {user_id}: {e}")
                 await self.audit.log_event(

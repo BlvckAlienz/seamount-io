@@ -183,9 +183,10 @@ async def get_optional_auth(
         supabase = get_supabase_client()
         user_id = payload.get('sub')
         if user_id:
-            profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
-            user_profile = profile_res.data if profile_res.data else None
-            return OptionalAuth(user=user_profile, payload=payload)
+            profile_res = supabase.from_("user_profiles").select("*").eq("id", user_id).limit(1).execute()
+            if profile_res.data and len(profile_res.data) > 0:
+                user_profile = profile_res.data[0]
+                return OptionalAuth(user=user_profile, payload=payload)
         
         return OptionalAuth(payload=payload)
         
@@ -201,7 +202,7 @@ async def fetch_jwks(settings: Any = Depends(get_settings_cached)) -> Dict[str, 
     
     # Return cached JWKS if still valid
     if jwks_cache and jwks_cache_expiry and datetime.utcnow() < jwks_cache_expiry: 
-        logger.debug("📄 Using cached JWKS")
+        logger.debug("📊 Using cached JWKS")
         return jwks_cache
     
     max_retries = 3
@@ -324,12 +325,12 @@ async def get_current_user(
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # CRITICAL FIX: Query user_profiles table properly
-            profile_response = supabase.from_("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+            # CRITICAL FIX: Query user_profiles table properly - FIXED RLS RECURSION
+            profile_response = supabase.from_("user_profiles").select("*").eq("id", user_id).limit(1).execute()
             
-            if profile_response.data:
+            if profile_response.data and len(profile_response.data) > 0:
                 logger.info(f"✅ User profile found for: {user_id}")
-                return profile_response.data
+                return profile_response.data[0]
             
             # SELF-HEALING: Profile doesn't exist, create it from token data
             logger.warning(f"⚠️ Profile not found for user {user_id}. Attempting self-healing profile creation...")
@@ -360,7 +361,7 @@ async def get_current_user(
                 "updated_at": now
             }
             
-            logger.info(f"🔧 Self-healing: Creating profile for user {user_id}")
+            logger.info(f"🛠️ Self-healing: Creating profile for user {user_id}")
             
             # Create profile with upsert to handle race conditions
             create_response = supabase.from_("user_profiles").upsert(
@@ -372,12 +373,12 @@ async def get_current_user(
                 logger.error("❌ Profile creation returned no data")
                 continue  # Retry
                 
-            # Fetch the created profile
-            fetch_response = supabase.from_("user_profiles").select("*").eq("id", user_id).single().execute()
+            # Fetch the created profile - FIXED RLS RECURSION
+            fetch_response = supabase.from_("user_profiles").select("*").eq("id", user_id).limit(1).execute()
             
-            if fetch_response.data:
+            if fetch_response.data and len(fetch_response.data) > 0:
                 logger.info(f"✅ Self-healing successful: Profile created for user {user_id}")
-                return fetch_response.data
+                return fetch_response.data[0]
             else:
                 logger.error("❌ Could not fetch newly created profile")
                 continue  # Retry
