@@ -52,32 +52,33 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
    
   const navigate = useNavigate();
 
-  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
-    try {
-      const { data } = await retryWithBackoff(
-        () => apiClient.get<UserProfile>('/api/v1/user/profile'),
-        maxRetries,
-        delayMs
-      );
-      setState((prev) => ({ ...prev, user: data, error: null }));
-      return data;
-    } catch (error: any) {
-      console.error('AuthContext: Failed to fetch user profile after retries:', error);
-      
-      if (error?.response?.status === 401) {
-        toast.error('Your session has expired. Please sign in again.');
-        await supabase.auth.signOut();
-      } else if (error?.response?.status === 404) {
-        toast.error('Failed to load user profile. Please try again later.');
-        setState((prev) => ({ ...prev, error: 'Profile not found.' }));
-      } else {
-        toast.error('Could not connect to the server. Some features may be unavailable.');
-        setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
-      }
-      
-      return null;
-    }
-  }, []);
+	const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
+	  try {
+		const { data } = await retryWithBackoff(
+		  () => apiClient.get<{ success: boolean; profile: UserProfile }>('/api/v1/user/profile'),
+		  maxRetries,
+		  delayMs
+		);
+		// FIX: Extract profile from response data
+		setState((prev) => ({ ...prev, user: data.profile, error: null }));
+		return data.profile;
+	  } catch (error: any) {
+		console.error('AuthContext: Failed to fetch user profile after retries:', error);
+		
+		if (error?.response?.status === 401) {
+		  toast.error('Your session has expired. Please sign in again.');
+		  await supabase.auth.signOut();
+		} else if (error?.response?.status === 404) {
+		  toast.error('Failed to load user profile. Please try again later.');
+		  setState((prev) => ({ ...prev, error: 'Profile not found.' }));
+		} else {
+		  toast.error('Could not connect to the server. Some features may be unavailable.');
+		  setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
+		}
+		
+		return null;
+	  }
+	}, []);
 
   // FIXED: Correct KYC routing logic after successful authentication
 useEffect(() => {

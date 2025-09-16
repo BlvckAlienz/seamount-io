@@ -20,7 +20,7 @@ export interface UserProfile {
   last_name: string;
   country_code: string;
   kyc_level: number;
-  kyc_status?: 'not_started' | 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected' | 'verified'; // Made optional and added all possible values
+  kyc_status: 'not_started' | 'pending' | 'in_progress' | 'under_review' | 'approved' | 'rejected' | 'skipped' | 'verified';
   is_admin: boolean;
   phone?: string;
   date_of_birth?: string;
@@ -31,6 +31,28 @@ export interface UserProfile {
   avatar_url?: string;
   created_at: string;
   updated_at?: string;
+  // Add these fields to match backend response
+  wallet_address?: string | null;
+  phone_number?: string | null;
+  occupation?: string | null;
+  source_of_funds?: string | null;
+  risk_tolerance?: string;
+  notification_preferences?: {
+    sms: boolean;
+    push: boolean;
+    email: boolean;
+  };
+  settings?: Record<string, any>;
+  metadata?: Record<string, any>;
+  complycube_applicant_id?: string | null;
+  role: string;
+  user_id?: string | null;
+  kyc_session_id?: string | null;
+  kyc_provider?: string;
+  security_flags?: Record<string, any>;
+  last_login_at?: string | null;
+  failed_login_attempts?: number;
+  account_locked_until?: string | null;
 }
 
 export interface Portfolio {
