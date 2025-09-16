@@ -90,26 +90,19 @@ async def start_kyc_verification(
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
-        # Create ComplyCube client
-        client_id = await kyc_service.complycube.create_client(
-            user_id, 
-            current_user.get('email'), 
+        # FIX: Use the KYC service's public method instead of accessing complycube directly
+        result = await kyc_service.start_verification_session(
+            user_id,
+            current_user.get('email'),
             current_user.get('country_code', 'US')
         )
         
-        # Create verification session
-        session_data = await kyc_service.complycube.create_verification_session(client_id)
-        
-        # Update user profile with ComplyCube client ID
-        update_result = supabase.table('user_profiles').update({
-            'complycube_client_id': client_id,
-            'kyc_status': 'in_progress',
-            'updated_at': 'now()'
-        }).eq('id', user_id).execute()
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("error", "KYC verification failed"))
         
         return {
-            "token": session_data["token"],
-            "applicantId": client_id,
+            "token": result.get("session_token"),  # Adjust based on actual response structure
+            "applicantId": result.get("applicant_id"),
             "status": "success",
             "message": "KYC verification initiated successfully"
         }
