@@ -544,45 +544,45 @@ class KYCService:
             logger.error(f"Error during KYC session cleanup: {e}")
             return 0
 
-async def health_check(self) -> Dict[str, Any]:
-    """
-    Health check for KYC service
-    Returns service status and provider connectivity
-    """
-    try:
-        status = {
-            "service": "healthy",
-            "provider": "not_configured",
-            "database": "unknown"
-        }
-        
-        # Check provider connectivity
-        if self.provider:
-            try:
-                # Check if provider has health_check method
-                if hasattr(self.provider, 'health_check'):
-                    provider_status = await self.provider.health_check()
-                    status["provider"] = "healthy" if provider_status else "unhealthy"
-                else:
-                    # Fallback for providers without health_check
-                    status["provider"] = "healthy (no health check method)"
-            except Exception as e:
-                status["provider"] = f"error: {str(e)}"
-        
-        # Check database connectivity
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Health check for KYC service
+        Returns service status and provider connectivity
+        """
         try:
-            # Check if db_service has test_connection method
-            if hasattr(self.db_service, 'test_connection'):
-                await self.db_service.test_connection()
-                status["database"] = "healthy"
-            else:
-                # Fallback for db services without test_connection
-                status["database"] = "healthy (no test connection method)"
+            status = {
+                "service": "healthy",
+                "provider": "not_configured",
+                "database": "unknown"
+            }
+            
+            # Check provider connectivity
+            if self.provider:
+                try:
+                    # Check if provider has health_check method
+                    if hasattr(self.provider, 'health_check'):
+                        provider_status = await self.provider.health_check()
+                        status["provider"] = "healthy" if provider_status else "unhealthy"
+                    else:
+                        # Fallback for providers without health_check
+                        status["provider"] = "healthy (no health check method)"
+                except Exception as e:
+                    status["provider"] = f"error: {str(e)}"
+            
+            # Check database connectivity
+            try:
+                # Check if db_service has test_connection method
+                if hasattr(self.db_service, 'test_connection'):
+                    await self.db_service.test_connection()
+                    status["database"] = "healthy"
+                else:
+                    # Fallback for db services without test_connection
+                    status["database"] = "healthy (no test connection method)"
+            except Exception as e:
+                status["database"] = f"error: {str(e)}"
+            
+            return status
+            
         except Exception as e:
-            status["database"] = f"error: {str(e)}"
-        
-        return status
-        
-    except Exception as e:
-        logger.error(f"Error during KYC service health check: {e}")
-        return {"service": "unhealthy", "error": str(e)}
+            logger.error(f"Error during KYC service health check: {e}")
+            return {"service": "unhealthy", "error": str(e)}
