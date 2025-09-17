@@ -1,20 +1,25 @@
 # File Location: backend/api/routes/kyc.py
-# CRITICAL FIX: Corrected import paths and proper KYC service integration
+# CRITICAL FIX: Complete implementation with proper KYC service integration and webhook verification
 
 import logging
+import hmac
+import hashlib
 from fastapi import APIRouter, Depends, HTTPException, Request
 from supabase import Client
 from typing import Dict, Any, Optional
 import traceback
 import uuid
+from datetime import datetime
 
 from backend.dependencies import get_current_user, get_supabase_client, get_kyc_service, get_wallet_service
 from backend.models import UserProfile
 from backend.services.kyc_service import KYCService
 from backend.services.wallet_service import WalletService
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 @router.get("/profile-check")
 async def check_profile_completeness(
@@ -118,10 +123,12 @@ async def start_kyc_verification(
             raise HTTPException(status_code=500, detail=result.get("error", "KYC verification failed"))
         
         return {
-            "token": result.get("session_token"),  # Adjust based on actual response structure
-            "applicantId": result.get("applicant_id"),
+            "success": True,
+            "token": result.get("session_token"),  # Now matches frontend expectation
+            "applicantId": result.get("applicant_id"),  # Now matches frontend expectation
             "status": "success",
-            "message": "KYC verification initiated successfully"
+            "message": "KYC verification initiated successfully",
+            "flow_url": result.get("flow_url", "")  # Added for compatibility
         }
         
     except HTTPException:
@@ -138,35 +145,98 @@ async def kyc_webhook_handler(
     wallet_service: WalletService = Depends(get_wallet_service)
 ) -> Dict[str, Any]:
     """
-    CRITICAL FIX: Handle KYC provider webhooks with robust error handling
+    CRITICAL FIX: Handle KYC provider webhooks with robust error handling and signature verification
     """
     try:
+        # Verify webhook signature if secret is configured
+        webhook_secret = settings.COMPLYCUBE_WEBHOOK_SECRET
+        if webhook_secret:
+            signature_header = request.headers.get('ComplyCube-Signature')
+            if not signature_header:
+                logger.error("Missing webhook signature header")
+                raise HTTPException(status_code=401, detail="Missing signature header")
+            
+            # Get the raw request body for signature verification
+            body = await request.body()
+            
+            # ComplyCube signs the payload using HMAC-SHA256
+            # The signature header format is: t=<timestamp>,v1=<signature>
+            try:
+                # Parse the signature header
+                signature_data = {}
+                for part in signature_header.split(','):
+                    key, value = part.split('=', 1)
+                    signature_data[key] = value
+                
+                timestamp = signature_data.get('t')
+                signature = signature_data.get('v1')
+                
+                if not timestamp or not signature:
+                    logger.error("Invalid signature header format")
+                    raise HTTPException(status_code=401, detail="Invalid signature format")
+                
+                # Verify the timestamp is recent (prevent replay attacks)
+                current_time = int(datetime.utcnow().timestamp())
+                if current_time - int(timestamp) > 300:  # 5 minutes tolerance
+                    logger.error("Webhook timestamp too old")
+                    raise HTTPException(status_code=401, detail="Timestamp too old")
+                
+                # Create the signed payload
+                signed_payload = f"{timestamp}.{body.decode('utf-8')}"
+                
+                # Compute the expected signature
+                expected_signature = hmac.new(
+                    webhook_secret.get_secret_value().encode('utf-8'),
+                    signed_payload.encode('utf-8'),
+                    hashlib.sha256
+                ).hexdigest()
+                
+                # Compare signatures using constant-time comparison
+                if not hmac.compare_digest(signature, expected_signature):
+                    logger.error("Invalid webhook signature")
+                    raise HTTPException(status_code=401, detail="Invalid signature")
+                    
+                logger.info("Webhook signature verified successfully")
+                
+            except (ValueError, AttributeError) as e:
+                logger.error(f"Error parsing signature header: {str(e)}")
+                raise HTTPException(status_code=401, detail="Invalid signature format")
+        
         webhook_data = await request.json()
         logger.info(f"[KYC Webhook] Received: {webhook_data}")
         
         # Extract essential data with fallbacks
         user_reference = webhook_data.get('user_reference') or webhook_data.get('reference') or webhook_data.get('clientId')
         status = webhook_data.get('status', 'unknown').lower()
+        event_type = webhook_data.get('type', '').lower()
         
         if not user_reference:
             logger.error(f"[KYC Webhook] Missing user reference: {webhook_data}")
             raise HTTPException(status_code=400, detail="Missing user reference")
         
-        # Map provider status to our internal status
+        # Map provider status to our internal status - UPDATED FOR COMPLYCUBE WEBHOOKS
         status_mapping = {
             'approved': 'verified',
-            'completed': 'verified', 
+            'completed': 'verified',  # ComplyCube uses 'completed' for successful verification
             'verified': 'verified',
             'passed': 'verified',
-            'clear': 'verified',
+            'clear': 'verified',      # ComplyCube specific status
             'rejected': 'rejected',
             'failed': 'rejected',
             'declined': 'rejected',
-            'consider': 'under_review',
+            'consider': 'under_review',  # ComplyCube specific - needs manual review
             'pending': 'in_progress',
             'in_progress': 'in_progress',
-            'processing': 'in_progress'
+            'processing': 'in_progress',
+            'check.completed': 'verified',    # ComplyCube webhook event type
+            'check.clear': 'verified',        # ComplyCube webhook event type  
+            'check.consider': 'under_review', # ComplyCube webhook event type
+            'check.unrecognised': 'rejected'  # ComplyCube webhook event type
         }
+        
+        # Prefer event type for ComplyCube webhooks
+        if event_type and event_type.startswith('check.'):
+            status = event_type
         
         internal_status = status_mapping.get(status, 'in_progress')
         
@@ -207,6 +277,7 @@ async def kyc_webhook_handler(
                     logger.info(f"Automatically created wallet for verified user: {user_id}")
                 except Exception as wallet_error:
                     logger.error(f"Failed to create wallet for verified user {user_id}: {wallet_error}")
+                    # Don't fail the whole process if wallet creation fails
             
             # Add rejection reason if applicable
             if internal_status == 'rejected':

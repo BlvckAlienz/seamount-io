@@ -89,14 +89,16 @@ useEffect(() => {
     // Handle undefined/null kyc_status as not_started
     const kycStatus = state.user.kyc_status || 'not_started';
     
-    // Only verified/approved users go to dashboard, everyone else goes to onboarding
-    if (kycStatus !== 'verified' && kycStatus !== 'approved') {
-      console.log('KYC not verified, redirecting to onboarding');
-      navigate('/onboarding');
-    } else {
+    // Only verified/approved users go to dashboard
+    // Users with 'pending' or 'in_progress' should stay on verification page
+    if (kycStatus === 'verified' || kycStatus === 'approved') {
       console.log('KYC verified, redirecting to dashboard');
       navigate('/dashboard');
+    } else if (kycStatus === 'not_started') {
+      console.log('KYC not started, redirecting to onboarding');
+      navigate('/onboarding');
     }
+    // Users with 'pending' or 'in_progress' remain on current page
   }
 }, [state.session, state.user, state.loading, navigate]);
 

@@ -118,33 +118,41 @@ class ComplyCubeVerifier:
         raise HTTPException(status_code=500, detail="Maximum retries exceeded")
     
     # CRITICAL FIX: Add the missing health_check method
-    async def health_check(self) -> bool:
-        """
-        FIXED: Skip API health check - just verify initialization status
-        ComplyCube doesn't have a reliable health endpoint without creating resources
-        """
-        try:
-            self.last_health_check = datetime.utcnow().isoformat()
-        
-            if self.simulation_mode:
-                self.health_status = "simulation_mode"
-                logger.debug("ComplyCube health check: simulation mode active")
-                return True
-        
-            if not self.api_key:
-                self.health_status = "api_key_missing"
-                logger.error("ComplyCube health check failed: API key missing")
-                return False
-        
-            # FIXED: Just verify we have proper configuration - no API calls
-            self.health_status = "healthy"
-            logger.info("ComplyCube health check passed (configuration verified)")
+    # REPLACE LINES 85-100 with this improved health check:
+async def health_check(self) -> bool:
+    """
+    FIXED: Proper health check that validates configuration without making API calls
+    """
+    try:
+        self.last_health_check = datetime.utcnow().isoformat()
+    
+        if self.simulation_mode:
+            self.health_status = "simulation_mode"
+            logger.debug("ComplyCube health check: simulation mode active")
             return True
+    
+        # CRITICAL: Validate API key format instead of making API calls
+        api_key_value = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
         
-        except Exception as e:
-            self.health_status = "health_check_error"
-            logger.error(f"ComplyCube health check error: {str(e)}")
+        if not api_key_value or not isinstance(api_key_value, str):
+            self.health_status = "api_key_invalid"
+            logger.error("ComplyCube health check failed: API key missing or invalid")
             return False
+        
+        if not api_key_value.startswith('live_') and not api_key_value.startswith('test_'):
+            self.health_status = "api_key_format_invalid"
+            logger.error(f"ComplyCube API key format invalid: should start with 'live_' or 'test_'")
+            return False
+        
+        # Configuration is valid (we'll let actual operations test connectivity)
+        self.health_status = "configured"
+        logger.info("ComplyCube health check passed: configuration validated")
+        return True
+    
+    except Exception as e:
+        self.health_status = "health_check_error"
+        logger.error(f"ComplyCube health check error: {str(e)}")
+        return False
     
     def get_health_status(self) -> Dict[str, Any]:
         """
