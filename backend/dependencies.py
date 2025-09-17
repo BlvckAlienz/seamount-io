@@ -16,14 +16,27 @@ import json
 from backend.config import get_settings
 from backend.models import UserRole
 
-# Use TYPE_CHECKING to avoid circular imports
 if TYPE_CHECKING:
     from backend.services.wallet_service import WalletService
     from backend.services.notification_service import NotificationService
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
-    from backend.services.kyc_providers.complycube import complycube_service
+else:
+    # Runtime imports for actual service instantiation
+    try:
+        from backend.services.wallet_service import WalletService
+        from backend.services.notification_service import NotificationService
+        from backend.services.audit_service import AuditService
+        from backend.services.kyc_service import KYCService
+        from backend.services.database_service import DatabaseService
+    except ImportError as e:
+        logger.warning(f"Service import failed: {e}")
+        WalletService = None
+        NotificationService = None
+        AuditService = None
+        KYCService = None
+        DatabaseService = None
        
 logger = logging.getLogger(__name__)
 
@@ -101,14 +114,6 @@ def get_kyc_service() -> "KYCService":
     except Exception as e:
         logger.error(f"Failed to initialize KYC service: {e}")
         raise HTTPException(status_code=500, detail="KYC service initialization failed")
-
-def get_wallet_service() -> WalletService:
-    """Get Wallet service instance"""
-    try:
-        return WalletService()
-    except Exception as e:
-        logger.error(f"Failed to initialize Wallet service: {e}")
-        raise HTTPException(status_code=500, detail="Wallet service initialization failed")
     
 # Add this function to handle missing payment providers gracefully
 def get_payment_service():
