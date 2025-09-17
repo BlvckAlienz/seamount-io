@@ -23,7 +23,8 @@ if TYPE_CHECKING:
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
-
+    from backend.services.kyc_providers.complycube import complycube_service
+       
 logger = logging.getLogger(__name__)
 
 # Global service instances
@@ -88,7 +89,25 @@ def get_supabase_client() -> Client:
             logger.warning("Using mock Supabase client - some features may not work")
     
     return _supabase_client
+    
+def get_kyc_service() -> KYCService:
+    """Get KYC service instance"""
+    try:
+        # Initialize with ComplyCube provider
+        kyc_service = KYCService(provider=complycube_service)
+        return kyc_service
+    except Exception as e:
+        logger.error(f"Failed to initialize KYC service: {e}")
+        raise HTTPException(status_code=500, detail="KYC service initialization failed")
 
+def get_wallet_service() -> WalletService:
+    """Get Wallet service instance"""
+    try:
+        return WalletService()
+    except Exception as e:
+        logger.error(f"Failed to initialize Wallet service: {e}")
+        raise HTTPException(status_code=500, detail="Wallet service initialization failed")
+    
 # Add this function to handle missing payment providers gracefully
 def get_payment_service():
     """Get payment service instance with graceful fallback"""

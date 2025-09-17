@@ -44,8 +44,10 @@ const API_ENDPOINTS = {
     CREATE: '/api/wallet/create',
   },
   KYC: {
-    START_VERIFICATION: '/api/kyc/start-verification',
-  }
+  START_VERIFICATION: '/api/v1/kyc/start-verification',
+  CHECK_PROFILE: '/api/v1/kyc/profile-check',
+  GET_STATUS: '/api/v1/kyc/status',
+  },
 };
 
 // --- Axios Interceptors ---
@@ -126,8 +128,9 @@ const userAPI = {
 
 // KYC API functions
 const kycAPI = {
+  checkProfile: () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
   startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
-  getStatus: () => apiClient.get('/api/v1/kyc/status'), // Fixed endpoint to match backend
+  getStatus: () => apiClient.get(API_ENDPOINTS.KYC.GET_STATUS),
 };
 
 // Wallet API functions

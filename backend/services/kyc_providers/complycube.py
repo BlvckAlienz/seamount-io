@@ -121,17 +121,17 @@ class ComplyCubeVerifier:
     # REPLACE LINES 85-100 with this improved health check:
 async def health_check(self) -> bool:
     """
-    FIXED: Proper health check that validates configuration without making API calls
+    FIXED: Configuration validation without API calls (ComplyCube has no health endpoint)
     """
     try:
         self.last_health_check = datetime.utcnow().isoformat()
-    
+        
         if self.simulation_mode:
             self.health_status = "simulation_mode"
             logger.debug("ComplyCube health check: simulation mode active")
             return True
-    
-        # CRITICAL: Validate API key format instead of making API calls
+        
+        # Validate API key format without making API calls
         api_key_value = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
         
         if not api_key_value or not isinstance(api_key_value, str):
@@ -144,11 +144,11 @@ async def health_check(self) -> bool:
             logger.error(f"ComplyCube API key format invalid: should start with 'live_' or 'test_'")
             return False
         
-        # Configuration is valid (we'll let actual operations test connectivity)
+        # Configuration is valid
         self.health_status = "configured"
         logger.info("ComplyCube health check passed: configuration validated")
         return True
-    
+        
     except Exception as e:
         self.health_status = "health_check_error"
         logger.error(f"ComplyCube health check error: {str(e)}")
