@@ -215,38 +215,37 @@ class KYCService:
             logger.error(f"Failed to handle simulation mode for user {user_id}: {e}")
             raise HTTPException(status_code=500, detail="KYC service initialization failed")
 
-
     async def _check_provider_health(self) -> bool:
-    """
-    FIXED: Check provider health with proper error handling and logging
-    """
-    try:
-        # Cache health checks for 30 minutes
-        if (self.last_provider_check and 
-            datetime.utcnow() - datetime.fromisoformat(self.last_provider_check.replace('Z', '+00:00')) < timedelta(minutes=30)):
-            return self.provider_healthy
-    
-        if self.provider and hasattr(self.provider, 'health_check'):
-            self.provider_healthy = await self.provider.health_check()
-            self.last_provider_check = datetime.utcnow().isoformat()
+        """
+        FIXED: Check provider health with proper error handling and logging
+        """
+        try:
+            # Cache health checks for 30 minutes
+            if (self.last_provider_check and 
+                datetime.utcnow() - datetime.fromisoformat(self.last_provider_check.replace('Z', '+00:00')) < timedelta(minutes=30)):
+                return self.provider_healthy
         
-            if self.provider_healthy:
-                logger.info("KYC provider health check passed")
-            else:
-                logger.error("KYC provider health check failed - will use simulation mode")
+            if self.provider and hasattr(self.provider, 'health_check'):
+                self.provider_healthy = await self.provider.health_check()
+                self.last_provider_check = datetime.utcnow().isoformat()
             
-            return self.provider_healthy
-        else:
-            logger.warning("KYC provider does not support health checks")
-            # Assume healthy if we can't check
-            self.provider_healthy = True
-            return True
-        
-    except Exception as e:
-        logger.error(f"Error during provider health check: {e}")
-        # On error, assume unhealthy to trigger simulation mode
-        self.provider_healthy = False
-        return False
+                if self.provider_healthy:
+                    logger.info("KYC provider health check passed")
+                else:
+                    logger.error("KYC provider health check failed - will use simulation mode")
+                
+                return self.provider_healthy
+            else:
+                logger.warning("KYC provider does not support health checks")
+                # Assume healthy if we can't check
+                self.provider_healthy = True
+                return True
+            
+        except Exception as e:
+            logger.error(f"Error during provider health check: {e}")
+            # On error, assume unhealthy to trigger simulation mode
+            self.provider_healthy = False
+            return False
 
     # CRITICAL FIX: Updated health_check method with proper provider integration
     async def health_check(self) -> Dict[str, Any]:
