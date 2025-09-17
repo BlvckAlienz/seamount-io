@@ -90,9 +90,11 @@ def get_supabase_client() -> Client:
     
     return _supabase_client
     
-def get_kyc_service() -> KYCService:
+def get_kyc_service() -> "KYCService":
     """Get KYC service instance"""
     try:
+        from backend.services.kyc_service import KYCService
+        from backend.services.kyc_providers.complycube import complycube_service
         # Initialize with ComplyCube provider
         kyc_service = KYCService(provider=complycube_service)
         return kyc_service
@@ -143,10 +145,6 @@ def get_notification_service() -> "NotificationService":
 def get_audit_service() -> Optional["AuditService"]:
     """Get audit service instance (optional)"""
     return _audit_service
-
-def get_kyc_service() -> Optional["KYCService"]:
-    """Get KYC service instance (optional)"""
-    return _kyc_service
 
 def get_database_service() -> Optional["DatabaseService"]:
     """Get database service instance (optional)"""
