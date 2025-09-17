@@ -99,6 +99,7 @@ async def get_user_profile(
         
         # Profile is already fetched by get_current_user dependency
         logger.info(f"[Profile Get] Profile retrieved successfully for user: {user_id}")
+        logger.info(f"Profile API returning: {current_user}")
         
         return {
             "success": True,

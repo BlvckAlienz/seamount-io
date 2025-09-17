@@ -23,6 +23,9 @@ class AuditEventType(str, Enum):
     KYC_COMPLETED = "kyc_completed" 
     KYC_FAILED = "kyc_failed"
     KYC_SKIPPED = "kyc_skipped"
+    KYC_MANUAL_REVIEW = "kyc_manual_review"
+    KYC_REJECTED = "kyc_rejected"
+    KYC_APPROVED = "kyc_approved"
     
     WALLET_CREATED = "wallet_created"
     WALLET_ACCESSED = "wallet_accessed"

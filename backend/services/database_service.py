@@ -365,7 +365,53 @@ class DatabaseService:
             logger.error(f"[DB] Error fetching KYC history for user {user_id}: {str(e)}")
             logger.error(traceback.format_exc())
             raise
+    
+    async def get_kyc_session_by_applicant_id(self, applicant_id: str) -> Optional[Dict[str, Any]]:
+        """Get KYC session by ComplyCube applicant ID"""
+        try:
+            result = await self.supabase.table("kyc_sessions")\
+                .select("*")\
+                .eq("applicant_id", applicant_id)\
+                .single()\
+                .execute()
+            
+            return result.data if result.data else None
+            
+        except Exception as e:
+            logger.error(f"Error fetching KYC session by applicant_id {applicant_id}: {e}")
+            return None
 
+    async def update_kyc_session_status(self, applicant_id: str, status: str, response_data: Dict[str, Any]) -> bool:
+        """Update KYC session status and response data"""
+        try:
+            result = await self.supabase.table("kyc_sessions")\
+                .update({
+                    "status": status,
+                    "response_data": response_data,
+                    "updated_at": datetime.utcnow().isoformat()
+                })\
+                .eq("applicant_id", applicant_id)\
+                .execute()
+            
+            return bool(result.data)
+            
+        except Exception as e:
+            logger.error(f"Error updating KYC session status for applicant {applicant_id}: {e}")
+            return False
+
+    async def store_kyc_session(self, kyc_data: Dict[str, Any]) -> bool:
+        """Store KYC session data"""
+        try:
+            result = await self.supabase.table("kyc_sessions")\
+                .insert(kyc_data)\
+                .execute()
+            
+            return bool(result.data)
+            
+        except Exception as e:
+            logger.error(f"Error storing KYC session: {e}")
+            return False
+    
     # =============================================================================
     # Wallet Management Operations - Critical for Platform
     # =============================================================================
