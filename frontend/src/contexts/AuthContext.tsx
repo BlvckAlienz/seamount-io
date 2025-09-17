@@ -80,7 +80,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 	  }
 	}, []);
 
-  // FIXED: Correct KYC routing logic after successful authentication
+// FIXED: Correct KYC routing logic after successful authentication
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     console.log('Auth successful, checking KYC status for routing...');
@@ -90,15 +90,14 @@ useEffect(() => {
     const kycStatus = state.user.kyc_status || 'not_started';
     
     // Only verified/approved users go to dashboard
-    // Users with 'pending' or 'in_progress' should stay on verification page
     if (kycStatus === 'verified' || kycStatus === 'approved') {
       console.log('KYC verified, redirecting to dashboard');
       navigate('/dashboard');
-    } else if (kycStatus === 'not_started') {
-      console.log('KYC not started, redirecting to onboarding');
+    } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
+      console.log('KYC not started or pending, redirecting to onboarding');
       navigate('/onboarding');
     }
-    // Users with 'pending' or 'in_progress' remain on current page
+    // Users with 'in_progress' remain on current page (already in verification flow)
   }
 }, [state.session, state.user, state.loading, navigate]);
 
