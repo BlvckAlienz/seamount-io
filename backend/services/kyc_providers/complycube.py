@@ -57,7 +57,7 @@ class ComplyCubeVerifier:
         if self.simulation_mode:
             return self._simulate_response(endpoint, data)
         
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        url = f"{self.base_url}/{endpoint}" if not endpoint.startswith('/') else f"{self.base_url}{endpoint}"
         headers = self._get_headers()
         
         retry_count = 0
@@ -91,10 +91,11 @@ class ComplyCubeVerifier:
                             continue
                         else:
                             self.health_status = "api_error"
-                            logger.error(f"ComplyCube API error: {response.status} - {response_data}")
+                            error_msg = response_data.get('message', 'Unknown error') if isinstance(response_data, dict) else str(response_data)
+                            logger.error(f"ComplyCube API error: {response.status} - {error_msg}")
                             raise HTTPException(
-                                status_code=response.status,
-                                detail=f"ComplyCube API error: {response_data.get('message', 'Unknown error')}"
+                                status_code=500,  # Always return 500 to client for external API errors
+                                detail=f"ComplyCube API error: {error_msg}"
                             )
                             
             except asyncio.TimeoutError:
@@ -138,7 +139,7 @@ class ComplyCubeVerifier:
             # Simple API endpoint test - get account info
             try:
                 # Use a lightweight endpoint that doesn't create resources
-                response = await self._make_request("GET", "/account")
+                response = await self._make_request("GET", "account")
                 
                 if response:
                     self.health_status = "healthy"

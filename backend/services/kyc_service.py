@@ -272,7 +272,7 @@ class KYCService:
             if self.db_service:
                 try:
                     # Simple DB health check - try to count users
-                    test_query = await self.db_service.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
+                    test_query = self.db_service.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
                     status["database"] = "healthy" if test_query else "unhealthy"
                 except Exception as e:
                     logger.error(f"Database health check failed: {e}")
