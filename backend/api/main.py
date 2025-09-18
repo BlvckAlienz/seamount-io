@@ -347,9 +347,9 @@ app.add_middleware(
 # FIXED: Include routers with proper error handling and consistent prefixes
 if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
-    logger.info("✅ Users router registered")
+    logger.info("âœ… Users router registered")
 
-# FIX: Correct KYC router registration
+# FIXED: Correct KYC router registration
 if routers_available.get('kyc'):
     from backend.api.routes.kyc import router as kyc_router
     app.include_router(kyc_router, prefix="/api/v1/kyc", tags=["KYC"])
@@ -357,31 +357,31 @@ if routers_available.get('kyc'):
 
 if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
     app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
-    logger.info("✅ Webhooks router registered")
+    logger.info("âœ… Webhooks router registered")
 
 if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
     app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["Portfolio"])
-    logger.info("✅ Portfolio router registered")
+    logger.info("âœ… Portfolio router registered")
 
 if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
     app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])
-    logger.info("✅ Investor router registered")
+    logger.info("âœ… Investor router registered")
 
 if routers_available.get('consent') and hasattr(routers_available['consent'], 'router'):
     app.include_router(routers_available['consent'].router, prefix="/api/v1", tags=["Consent"])
-    logger.info("✅ Consent router registered")
+    logger.info("âœ… Consent router registered")
 
 if routers_available.get('licensing'):
     app.include_router(routers_available['licensing'], prefix="/api/v1", tags=["Licensing"])
-    logger.info("✅ Licensing router registered")
+    logger.info("âœ… Licensing router registered")
 
 if routers_available.get('session'):
     app.include_router(routers_available['session'], prefix="/api/v1/session", tags=["Session"])
-    logger.info("✅ Session router registered")
+    logger.info("âœ… Session router registered")
 
 if routers_available.get('payments'):
     app.include_router(routers_available['payments'], prefix="/api/payments", tags=["Payments"])
-    logger.info("✅ Payments router registered")
+    logger.info("âœ… Payments router registered")
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 

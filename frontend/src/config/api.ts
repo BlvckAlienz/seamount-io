@@ -43,7 +43,7 @@ const API_ENDPOINTS = {
   WALLET: {
     CREATE: '/api/wallet/create',
   },
- KYC: {
+   KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
     CHECK_PROFILE: '/api/v1/kyc/profile-check',
     GET_STATUS: '/api/v1/kyc/status',
