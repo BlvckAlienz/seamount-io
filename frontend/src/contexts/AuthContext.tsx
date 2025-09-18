@@ -80,26 +80,28 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 	  }
 	}, []);
 
-// FIXED: Correct KYC routing logic after successful authentication
+// FIXED: Proper KYC status-based routing with role assignment
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     console.log('Auth successful, checking KYC status for routing...');
     console.log('User KYC Status:', state.user.kyc_status);
+    console.log('User Role:', state.user.role);
     
-    // Handle undefined/null kyc_status as not_started
     const kycStatus = state.user.kyc_status || 'not_started';
     
-    // Only verified/approved users go to dashboard
+    // Update role based on KYC status
     if (kycStatus === 'verified' || kycStatus === 'approved') {
-      console.log('KYC verified, redirecting to dashboard');
+      updateUserRole('tribe');
       navigate('/dashboard');
-    } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
-      console.log('KYC not started or pending, redirecting to onboarding');
+    } else if (kycStatus === 'skipped') {
+      updateUserRole('alien'); // Limited access for skipped verification
+      navigate('/dashboard');
+    } else if (kycStatus === 'not_started') {
       navigate('/onboarding');
     }
-    // Users with 'in_progress' remain on current page (already in verification flow)
+    // For 'in_progress' or 'pending', stay on current page
   }
-}, [state.session, state.user, state.loading, navigate]);
+}, [state.session, state.user, state.loading, navigate, updateUserRole]);
 
   useEffect(() => {
     const initializeAuth = async () => {

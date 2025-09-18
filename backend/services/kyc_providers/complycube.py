@@ -121,7 +121,7 @@ class ComplyCubeVerifier:
     # REPLACE LINES 85-100 with this improved health check:
 async def health_check(self) -> bool:
     """
-    FIXED: Configuration validation without API calls (ComplyCube has no health endpoint)
+    Configuration validation without API calls (ComplyCube has no health endpoint)
     """
     try:
         self.last_health_check = datetime.utcnow().isoformat()

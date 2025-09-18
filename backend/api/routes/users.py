@@ -41,6 +41,22 @@ async def create_user_profile(
         logger.info(f"[Profile Create] Creating profile for user: {user_id}")
         
         # FIXED: Separate upsert and select operations
+        insert_data = {
+            "id": user_id,
+            "email": data.get('email', ''),
+            "first_name": data.get('firstName') or data.get('first_name', ''),
+            "last_name": data.get('lastName') or data.get('last_name', ''),
+            "country_code": (data.get('countryCode') or data.get('country_code', 'US')).upper(),
+            "phone": data.get('phone', ''),
+            "kyc_status": data.get('kyc_status', 'not_started'),
+            "kyc_level": data.get('kyc_level', 0),
+            "role": data.get('role', 'alien'),
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # FIXED: Separate upsert and select operations
         try:
             # Step 1: Upsert the data
             upsert_result = supabase.from_("user_profiles").upsert(

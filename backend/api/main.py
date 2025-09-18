@@ -26,9 +26,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Import core dependencies first
 try:
-    from backend.dependencies import initialize_dependencies, get_supabase_client, get_current_user, get_wallet_service, get_notification_service, get_audit_service
+    from backend.dependencies import (
+        initialize_dependencies, 
+        get_supabase_client, 
+        get_current_user, 
+        get_wallet_service, 
+        get_notification_service, 
+        get_audit_service,
+        get_kyc_service  # FIXED: Add missing KYC service dependency
+    )
+    dependencies_available = True
 except ImportError as e:
     logging.error(f"Critical dependency import error: {e}")
+    dependencies_available = False
+    
     # Create mock functions for critical dependencies
     def get_supabase_client():
         raise HTTPException(status_code=503, detail="Supabase client not available")
@@ -45,6 +56,9 @@ except ImportError as e:
     def get_audit_service():
         raise HTTPException(status_code=503, detail="Audit service not available")
     
+    def get_kyc_service():
+        raise HTTPException(status_code=503, detail="KYC service not available")
+    
     def initialize_dependencies(*args, **kwargs):
         logging.warning("Dependencies initialization skipped due to import errors")
 
@@ -55,13 +69,16 @@ class WalletService:
 class AuditService:
     pass
 
+class KYCService:
+    pass
+
 # Then try to import other dependencies
 try:
     from backend.config import Settings, get_settings, BusinessModelConfig, LicenseTier, PricingRegion
     from backend.services.email_service import EmailService
     from backend.services.notification_service import NotificationService
     from backend.services.wallet_service import WalletService as ActualWalletService
-    from backend.services.kyc_service import KYCService
+    from backend.services.kyc_service import KYCService as ActualKYCService
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService as ActualAuditService
     from backend.models import UserRole
@@ -69,42 +86,71 @@ try:
     # Override the placeholder classes with the actual ones
     WalletService = ActualWalletService
     AuditService = ActualAuditService
+    KYCService = ActualKYCService
+    services_available = True
 except ImportError as e:
     logging.error(f"Core service import error: {e}")
-    # Keep the placeholder classes
+    services_available = False
 
-# Try to import routers
+# Try to import routers with better error handling
+routers_available = {}
+
 try:
     from backend.api.routes.licensing import router as licensing_router
-    from backend.api.routes import kyc, webhooks, portfolio, investor, consent
-    from backend.api.routes.users import router as users_router
-    from backend.api.routes.session import router as session_router
-    
-    # Import payments router with specific error handling
-    try:
-        from backend.api.routes.payments import router as payments_router
-        logging.info("Payments router imported successfully")
-    except ImportError as payment_e:
-        logging.error(f"Payments router import error: {payment_e}")
-        from fastapi import APIRouter
-        payments_router = APIRouter()
-        @payments_router.get("/health")
-        async def payments_health():
-            return {"status": "payments module not available", "error": str(payment_e)}
-        
+    routers_available['licensing'] = licensing_router
 except ImportError as e:
-    logging.error(f"Router import error: {e}")
-    # Create minimal stubs for missing dependencies
-    licensing_router = None
-    users_router = None
-    session_router = None
-    payments_router = None
-    # Add these to handle the NameError
-    kyc = None
-    webhooks = None
-    portfolio = None
-    investor = None
-    consent = None
+    logging.error(f"Licensing router import error: {e}")
+    routers_available['licensing'] = None
+
+try:
+    from backend.api.routes import kyc
+    routers_available['kyc'] = kyc
+except ImportError as e:
+    logging.error(f"KYC router import error: {e}")
+    routers_available['kyc'] = None
+
+try:
+    from backend.api.routes import webhooks, portfolio, investor, consent
+    routers_available['webhooks'] = webhooks
+    routers_available['portfolio'] = portfolio
+    routers_available['investor'] = investor
+    routers_available['consent'] = consent
+except ImportError as e:
+    logging.error(f"Additional routers import error: {e}")
+    routers_available.update({
+        'webhooks': None,
+        'portfolio': None,
+        'investor': None,
+        'consent': None
+    })
+
+try:
+    from backend.api.routes.users import router as users_router
+    routers_available['users'] = users_router
+except ImportError as e:
+    logging.error(f"Users router import error: {e}")
+    routers_available['users'] = None
+
+try:
+    from backend.api.routes.session import router as session_router
+    routers_available['session'] = session_router
+except ImportError as e:
+    logging.error(f"Session router import error: {e}")
+    routers_available['session'] = None
+
+# Import payments router with specific error handling
+try:
+    from backend.api.routes.payments import router as payments_router
+    routers_available['payments'] = payments_router
+    logging.info("Payments router imported successfully")
+except ImportError as payment_e:
+    logging.error(f"Payments router import error: {payment_e}")
+    from fastapi import APIRouter
+    payments_router = APIRouter()
+    @payments_router.get("/health")
+    async def payments_health():
+        return {"status": "payments module not available", "error": str(payment_e)}
+    routers_available['payments'] = payments_router
 
 logger = logging.getLogger(__name__)
 
@@ -178,82 +224,85 @@ async def lifespan(app: FastAPI):
     logger.info("--- Seamount API Starting Up ---")
     try:
         # Check if we can get settings
-        try:
-            settings = get_settings()
-    
-            # Validate Supabase credentials before creating client
-            if settings.validate_supabase_credentials():
-                try:
-                    supabase_client = create_client(
-                        settings.SUPABASE_URL, 
-                        settings.SUPABASE_SERVICE_KEY.get_secret_value()
-                    )
-                    logger.info("Supabase client created successfully")
-                except Exception as e:
-                    logger.error(f"Failed to create Supabase client: {e}")
-                    supabase_client = None
-            else:
-                logger.warning("Supabase credentials validation failed - operating without database")
-                supabase_client = None
-                
-            # Initialize all services if available
-            email_service = EmailService(settings)
-            notification_service = NotificationService(email_service)
-            
-            # Only initialize services that require Supabase if client is available
-            if supabase_client:
-                wallet_service = WalletService(settings, supabase_client)
-                database_service = DatabaseService(supabase_client)
-                audit_service = AuditService(supabase_client)
-                kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
-
-                # Test KYC service initialization with health check
-                try:
-                    kyc_health = await kyc_service.health_check()
-                    logger.info(f"KYC Service health: {kyc_health}")
-                    
-                    if kyc_health.get('provider') != 'healthy':
-                        logger.warning("KYC provider not healthy - KYC features may be limited")
-                except Exception as e:
-                    logger.error(f"KYC Service health check failed: {e}")
-                    # Continue anyway but log the error
-
-                # Initialize dependencies
-                initialize_dependencies(
-                    supabase_client, 
-                    wallet_service, 
-                    notification_service, 
-                    audit_service,
-                    kyc_service
-                )
-            else:
-                logger.warning("Supabase client not available, skipping database-dependent services")
-                # Initialize with minimal dependencies
-                initialize_dependencies(
-                    None, 
-                    None, 
-                    notification_service, 
-                    None,
-                    None
-                )
-            
-            # This part can proceed without Supabase
+        if services_available:
             try:
-                license_fee = settings.business_model.calculate_license_fee(
-                    LicenseTier.BASIC, 
-                    PricingRegion.NIGERIA
-                )
-                logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
-            except:
-                logger.warning("Business model calculation failed")
-            
-            logger.info("Services initialized successfully.")
-        except NameError:
-            logger.warning("Some services not available due to import errors")
-        except Exception as e:
-            logger.error(f"Service initialization error: {e}")
-            # Don't raise the error, continue with partial initialization
-            logger.warning("Continuing with partial service initialization")
+                settings = get_settings()
+        
+                # Validate Supabase credentials before creating client
+                if settings.validate_supabase_credentials():
+                    try:
+                        supabase_client = create_client(
+                            settings.SUPABASE_URL, 
+                            settings.SUPABASE_SERVICE_KEY.get_secret_value()
+                        )
+                        logger.info("Supabase client created successfully")
+                    except Exception as e:
+                        logger.error(f"Failed to create Supabase client: {e}")
+                        supabase_client = None
+                else:
+                    logger.warning("Supabase credentials validation failed - operating without database")
+                    supabase_client = None
+                    
+                # Initialize all services if available
+                email_service = EmailService(settings)
+                notification_service = NotificationService(email_service)
+                
+                # Only initialize services that require Supabase if client is available
+                if supabase_client:
+                    wallet_service = WalletService(settings, supabase_client)
+                    database_service = DatabaseService(supabase_client)
+                    audit_service = AuditService(supabase_client)
+                    kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
+
+                    # Test KYC service initialization with health check
+                    try:
+                        kyc_health = await kyc_service.health_check()
+                        logger.info(f"KYC Service health: {kyc_health}")
+                        
+                        if kyc_health.get('provider') != 'healthy':
+                            logger.warning("KYC provider not healthy - KYC features may be limited")
+                    except Exception as e:
+                        logger.error(f"KYC Service health check failed: {e}")
+                        # Continue anyway but log the error
+
+                    # Initialize dependencies
+                    if dependencies_available:
+                        initialize_dependencies(
+                            supabase_client, 
+                            wallet_service, 
+                            notification_service, 
+                            audit_service,
+                            kyc_service
+                        )
+                else:
+                    logger.warning("Supabase client not available, skipping database-dependent services")
+                    # Initialize with minimal dependencies
+                    if dependencies_available:
+                        initialize_dependencies(
+                            None, 
+                            None, 
+                            notification_service, 
+                            None,
+                            None
+                        )
+                
+                # This part can proceed without Supabase
+                try:
+                    license_fee = settings.business_model.calculate_license_fee(
+                        LicenseTier.BASIC, 
+                        PricingRegion.NIGERIA
+                    )
+                    logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
+                except:
+                    logger.warning("Business model calculation failed")
+                
+                logger.info("Services initialized successfully.")
+            except Exception as e:
+                logger.error(f"Service initialization error: {e}")
+                # Don't raise the error, continue with partial initialization
+                logger.warning("Continuing with partial service initialization")
+        else:
+            logger.warning("Core services not available due to import errors")
         
         yield
     except Exception as e:
@@ -295,25 +344,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-if users_router:
-    app.include_router(users_router, prefix="/api/v1/user", tags=["User"])
-if kyc and hasattr(kyc, 'router'):
-    app.include_router(kyc.router, prefix="/api/kyc", tags=["KYC"])
-if webhooks and hasattr(webhooks, 'router'):
-    app.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
-if portfolio and hasattr(portfolio, 'router'):
-    app.include_router(portfolio.router, prefix="/api/v1", tags=["Portfolio"])
-if investor and hasattr(investor, 'router'):
-    app.include_router(investor.router, prefix="/api/v1", tags=["Investor"])
-if consent and hasattr(consent, 'router'):
-    app.include_router(consent.router, prefix="/api/v1", tags=["Consent"])
-if licensing_router:
-    app.include_router(licensing_router, prefix="/api/v1", tags=["Licensing"])
-if session_router:
-    app.include_router(session_router, prefix="/api/v1/session", tags=["Session"])
-if payments_router:
-    app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
+# FIXED: Include routers with proper error handling and consistent prefixes
+if routers_available.get('users'):
+    app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
+    logger.info("✅ Users router registered")
+
+# FIXED: Correct KYC router registration
+if routers_available.get('kyc'):
+    from backend.api.routes.kyc import router as kyc_router
+    app.include_router(kyc_router, prefix="/api/v1/kyc", tags=["KYC"])
+    logger.info("✅ KYC router registered at /api/v1/kyc")
+
+if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
+    app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
+    logger.info("✅ Webhooks router registered")
+
+if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
+    app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["Portfolio"])
+    logger.info("✅ Portfolio router registered")
+
+if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
+    app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])
+    logger.info("✅ Investor router registered")
+
+if routers_available.get('consent') and hasattr(routers_available['consent'], 'router'):
+    app.include_router(routers_available['consent'].router, prefix="/api/v1", tags=["Consent"])
+    logger.info("✅ Consent router registered")
+
+if routers_available.get('licensing'):
+    app.include_router(routers_available['licensing'], prefix="/api/v1", tags=["Licensing"])
+    logger.info("✅ Licensing router registered")
+
+if routers_available.get('session'):
+    app.include_router(routers_available['session'], prefix="/api/v1/session", tags=["Session"])
+    logger.info("✅ Session router registered")
+
+if routers_available.get('payments'):
+    app.include_router(routers_available['payments'], prefix="/api/payments", tags=["Payments"])
+    logger.info("✅ Payments router registered")
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 
@@ -329,6 +397,9 @@ async def initialize_session(
     user_agent: Optional[str] = Header(None, alias="User-Agent"),
     supabase: Client = Depends(get_supabase_client)
 ):
+    if not services_available:
+        raise HTTPException(status_code=503, detail="Settings service not available")
+    
     try:
         settings = get_settings()
     except NameError:

@@ -44,9 +44,11 @@ const API_ENDPOINTS = {
     CREATE: '/api/wallet/create',
   },
   KYC: {
-  START_VERIFICATION: '/api/v1/kyc/start-verification',
-  CHECK_PROFILE: '/api/v1/kyc/profile-check',
-  GET_STATUS: '/api/v1/kyc/status',
+    START_VERIFICATION: '/api/v1/kyc/start-verification',
+    CHECK_PROFILE: '/api/v1/kyc/profile-check',
+    GET_STATUS: '/api/v1/kyc/status',
+    SKIP_VERIFICATION: '/api/v1/kyc/skip-verification',
+    REQUIREMENTS: '/api/v1/kyc/requirements',
   },
 };
 
@@ -130,7 +132,9 @@ const userAPI = {
 const kycAPI = {
   checkProfile: () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
   startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
-  getStatus: () => apiClient.get(API_ENDPOINTS.KYC.GET_STATUS),
+  skipVerification: () => apiClient.post(API_ENDPOINTS.KYC.SKIP_VERIFICATION),
+  getStatus: (userId?: string) => apiClient.get(`${API_ENDPOINTS.KYC.GET_STATUS}${userId ? `/${userId}` : ''}`),
+  getRequirements: () => apiClient.get(API_ENDPOINTS.KYC.REQUIREMENTS),
 };
 
 // Wallet API functions
