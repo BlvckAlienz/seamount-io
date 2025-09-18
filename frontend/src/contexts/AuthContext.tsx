@@ -296,7 +296,7 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
 }, []);
 
-// FIX: Move this useEffect after updateUserRole definition
+// Replace the problematic useEffect with this corrected version
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     console.log('Auth successful, checking KYC status for routing...');
@@ -310,12 +310,13 @@ useEffect(() => {
       updateUserRole('tribe');
       navigate('/dashboard');
     } else if (kycStatus === 'skipped') {
-      updateUserRole('alien'); // Limited access for skipped verification
+      updateUserRole('alien');
       navigate('/dashboard');
-    } else if (kycStatus === 'not_started') {
+    } else if (kycStatus === 'not_started' || kycStatus === 'pending' || kycStatus === 'in_progress') {
+      // CRITICAL FIX: Redirect ALL non-verified states to onboarding
       navigate('/onboarding');
     }
-    // For 'in_progress' or 'pending', stay on current page
+    // For other statuses, stay on current page
   }
 }, [state.session, state.user, state.loading, navigate, updateUserRole]);
 

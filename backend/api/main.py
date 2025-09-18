@@ -466,6 +466,7 @@ async def create_wallet(
     
     logger.info(f"[Wallet Create] Initiated for user: {user_id}")
     try:
+        # Check if wallet already exists
         wallet_res = supabase.from_("user_wallets").select("algorand_address, is_demo").eq("user_id", user_id).maybe_single().execute()
         
         if wallet_res.data:
@@ -476,23 +477,28 @@ async def create_wallet(
                 "mnemonic": None 
             }
 
-        new_wallet_material = wallet_service.create_algorand_wallet()
-        await wallet_service.store_encrypted_wallet(user_id, new_wallet_material)
+        # Use the new method that returns the mnemonic
+        result = await wallet_service.create_wallet_for_user(user_id)
         
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=result.get("error", "Wallet creation failed"))
+
         # SECURITY: Audit wallet creation with proper dependency injection
         if audit_service:
             await audit_service.log_wallet_operation(
                 user_id=user_id,
                 operation="wallet_created",
-                wallet_address=new_wallet_material["address"]
+                wallet_address=result["address"]
             )
         
         return {
             "success": True,
-            "address": new_wallet_material["address"],
-            "mnemonic": new_wallet_material["mnemonic"],
+            "address": result["address"],
+            "mnemonic": result["mnemonic"],
             "message": "Wallet created successfully. Secure your mnemonic phrase immediately."
         }
+    except HTTPException:
+        raise
     except Exception as e:
         error_id = str(uuid4())[:8]
         logger.critical(f"[Wallet Create] FAILED for user {user_id} [Error ID: {error_id}]: {e}", exc_info=True)
