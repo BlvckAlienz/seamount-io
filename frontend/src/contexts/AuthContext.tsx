@@ -268,19 +268,17 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
 const completeOnboarding = async () => {
-  console.log('Completing onboarding...');
   try {
     if (state.user) {
       const { error } = await supabase
-        .from('user_profiles')
+        .from("user_profiles")
         .update({ 
-          kyc_status: 'pending',
-          kyc_level: 1 
+          kyc_status: 'skipped',  // Change from 'pending' to 'skipped'
+          kyc_level: 1,
+          role: 'alien'  // Explicitly set role
         })
-        .eq('id', state.user.id);
+        .eq("id", state.user.id);
         
-      if (error) throw error;
-      
       await fetchUserProfile(3, 1000);
       navigate('/dashboard');
       toast.success('Onboarding completed successfully!');

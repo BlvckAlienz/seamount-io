@@ -1,5 +1,5 @@
 # File Location: backend/services/kyc_providers/complycube.py
-# CRITICAL FIX: Add missing health_check method and fix initialization issues
+# COMPLETE FIX: Production-ready ComplyCube integration with CORS and token fixes
 
 import logging
 import aiohttp
@@ -21,7 +21,7 @@ class ComplyCubeApplicant(BaseModel):
 
 class ComplyCubeVerifier:
     """
-    CRITICAL FIX: Production-ready ComplyCube integration with proper health monitoring
+    Production-ready ComplyCube integration with proper CORS and token handling
     """
     
     def __init__(self, api_key: str = None):
@@ -32,7 +32,7 @@ class ComplyCubeVerifier:
         self.last_health_check = None
         self.health_status = "unknown"
         
-        # CRITICAL FIX: Better initialization status tracking
+        # Better initialization status tracking
         if not self.api_key:
             logger.warning("ComplyCube API key not configured - operating in simulation mode")
             self.simulation_mode = True
@@ -52,7 +52,7 @@ class ComplyCubeVerifier:
     
     async def _make_request(self, method: str, endpoint: str, data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        CRITICAL: Make authenticated API request with comprehensive error handling
+        Make authenticated API request with comprehensive error handling
         """
         if self.simulation_mode:
             return self._simulate_response(endpoint, data)
@@ -94,7 +94,7 @@ class ComplyCubeVerifier:
                             error_msg = response_data.get('message', 'Unknown error') if isinstance(response_data, dict) else str(response_data)
                             logger.error(f"ComplyCube API error: {response.status} - {error_msg}")
                             raise HTTPException(
-                                status_code=500,  # Always return 500 to client for external API errors
+                                status_code=500,
                                 detail=f"ComplyCube API error: {error_msg}"
                             )
                             
@@ -117,28 +117,26 @@ class ComplyCubeVerifier:
         self.health_status = "max_retries_exceeded"
         raise HTTPException(status_code=500, detail="Maximum retries exceeded")
     
-    # CRITICAL FIX: Add the missing health_check method
-    # REPLACE LINES 85-100 with this improved health check:
-async def health_check(self) -> Dict[str, Any]:
-    """Configuration validation without API calls"""
-    try:
-        self.last_health_check = datetime.utcnow().isoformat()
-        
-        if self.simulation_mode:
-            self.health_status = "simulation_mode"
-            return {"status": "healthy", "mode": "simulation"}
-        
-        # Validate API key format
-        api_key = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
-        if not api_key or not api_key.startswith(('live_', 'test_')):
-            self.health_status = "invalid_api_key"
-            return {"status": "unhealthy", "error": "Invalid API key format"}
-        
-        self.health_status = "healthy"
-        return {"status": "healthy", "provider": "complycube"}
-    except Exception as e:
-        self.health_status = "error"
-        return {"status": "unhealthy", "error": str(e)}
+    async def health_check(self) -> Dict[str, Any]:
+        """Configuration validation without API calls"""
+        try:
+            self.last_health_check = datetime.utcnow().isoformat()
+            
+            if self.simulation_mode:
+                self.health_status = "simulation_mode"
+                return {"status": "healthy", "mode": "simulation"}
+            
+            # Validate API key format
+            api_key = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
+            if not api_key or not api_key.startswith(('live_', 'test_')):
+                self.health_status = "invalid_api_key"
+                return {"status": "unhealthy", "error": "Invalid API key format"}
+            
+            self.health_status = "healthy"
+            return {"status": "healthy", "provider": "complycube"}
+        except Exception as e:
+            self.health_status = "error"
+            return {"status": "unhealthy", "error": str(e)}
     
     def get_health_status(self) -> Dict[str, Any]:
         """
@@ -175,7 +173,7 @@ async def health_check(self) -> Dict[str, Any]:
         elif "tokens" in endpoint:
             return {
                 "token": f"cc_token_{uuid.uuid4().hex[:16]}",
-                "expiresAt": datetime.utcnow().isoformat()
+                "expiresAt": (datetime.utcnow() + timedelta(hours=1)).isoformat()
             }
         elif "checks" in endpoint:
             return {
@@ -189,7 +187,7 @@ async def health_check(self) -> Dict[str, Any]:
     
     async def create_client(self, user_id: str, email: str, country_code: str = "US") -> str:
         """
-        CRITICAL: Create ComplyCube client for user with enhanced error handling
+        Create ComplyCube client for user with enhanced error handling
         """
         try:
             client_data = {
@@ -204,7 +202,7 @@ async def health_check(self) -> Dict[str, Any]:
             if country_code:
                 client_data["personDetails"]["nationality"] = country_code.upper()
             
-            response = await self._make_request("POST", "/clients", client_data)
+            response = await self._make_request("POST", "clients", client_data)
             client_id = response.get("id")
             
             if not client_id:
@@ -219,14 +217,14 @@ async def health_check(self) -> Dict[str, Any]:
             logger.error(f"Failed to create ComplyCube client for user {user_id}: {str(e)}")
             raise HTTPException(status_code=500, detail="Could not create KYC profile")
     
-    async def create_verification_session(self, client_id: str) -> Dict[str, Any]:
+    async def create_verification_session(self, client_id: str, referrer: str = "https://seamount.io/*") -> Dict[str, Any]:
         """
-        CRITICAL: Create hosted verification session with proper token handling
+        Create hosted verification session with proper token handling and CORS configuration
         """
         try:
-            token_response = await self._make_request("POST", "/tokens", {
+            token_response = await self._make_request("POST", "tokens", {
                 "clientId": client_id,
-                "referrer": "*://*/*"
+                "referrer": referrer  # This fixes the CORS issue
             })
             
             token = token_response.get("token")
@@ -240,7 +238,8 @@ async def health_check(self) -> Dict[str, Any]:
                 "id": f"session_{client_id}",
                 "url": session_url,
                 "token": token,
-                "client_id": client_id
+                "client_id": client_id,
+                "expires_at": token_response.get("expiresAt")
             }
             
         except HTTPException:

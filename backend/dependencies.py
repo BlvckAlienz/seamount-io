@@ -31,7 +31,7 @@ else:
         from backend.services.kyc_service import KYCService
         from backend.services.database_service import DatabaseService
     except ImportError as e:
-        logger.warning(f"Service import failed: {e}")
+        logging.warning(f"Service import failed: {e}")
         WalletService = None
         NotificationService = None
         AuditService = None
@@ -105,15 +105,27 @@ def get_supabase_client() -> Client:
     
 def get_kyc_service() -> "KYCService":
     """Get KYC service instance"""
-    try:
-        from backend.services.kyc_service import KYCService
-        from backend.services.kyc_providers.complycube import complycube_service
-        # Initialize with ComplyCube provider
-        kyc_service = KYCService(provider=complycube_service)
-        return kyc_service
-    except Exception as e:
-        logger.error(f"Failed to initialize KYC service: {e}")
-        raise HTTPException(status_code=500, detail="KYC service initialization failed")
+    global _kyc_service
+    
+    if _kyc_service is None:
+        try:
+            # Try to initialize KYC service if not already initialized
+            from backend.services.kyc_service import KYCService
+            from backend.services.kyc_providers.complycube import complycube_service
+            
+            # Initialize with ComplyCube provider
+            _kyc_service = KYCService(
+                get_settings_cached(), 
+                get_supabase_client(), 
+                None,  # database_service is optional
+                None   # audit_service is optional
+            )
+            logger.info("✅ KYC service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize KYC service: {e}")
+            raise HTTPException(status_code=500, detail="KYC service initialization failed")
+    
+    return _kyc_service
     
 # Add this function to handle missing payment providers gracefully
 def get_payment_service():
@@ -486,14 +498,12 @@ async def require_fresh_auth(
     if issued_at:
         token_age = datetime.utcnow().timestamp() - issued_at
         max_age = 600  # 10 minutes
-        
         if token_age > max_age:
             logger.warning(f"⚠️ Token too old for sensitive operation: {token_age}s (max: {max_age}s)")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Fresh authentication required for this operation"
             )
-    
     return payload
 
 # Rate limiting dependencies (simplified - would use Redis in production)

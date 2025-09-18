@@ -1,5 +1,6 @@
 import os
 import logging
+import traceback
 from supabase import Client
 from cryptography.fernet import Fernet, InvalidToken
 from algosdk import account, mnemonic
@@ -7,7 +8,7 @@ from fastapi import HTTPException
 from uuid import uuid4
 from datetime import datetime
 
-from config import Settings
+from backend.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +96,10 @@ class WalletService:
                 "usds_balance": 0,
                 "last_updated": datetime.utcnow().isoformat(),
                 "metadata": {
-                "encrypted_private_key": encrypted_pk,
-                "is_demo": wallet_data.get("is_demo", False),
-                "created_at": datetime.utcnow().isoformat()
-               }
+                    "encrypted_private_key": encrypted_pk,
+                    "is_demo": wallet_data.get("is_demo", False),
+                    "created_at": datetime.utcnow().isoformat()
+                }
             }
             
             # Step 3: Insert into the 'wallet_balances' table.
@@ -156,11 +157,16 @@ class WalletService:
         Create a wallet for a user and return the mnemonic for backup
         """
         try:
+            logger.info(f"🚀 Attempting to create wallet for user: {user_id}")
+            logger.info(f"📊 Using table: wallet_balances for storage")
+            
             # Generate the wallet
             algo_wallet = self.create_algorand_wallet()
+            logger.info(f"✅ Algorand wallet generated for user: {user_id}")
             
             # Store encrypted version using the same method as store_encrypted_wallet
             encrypted_pk = self._encrypt(algo_wallet["private_key"])
+            logger.info(f"🔒 Private key encrypted successfully")
             
             # Prepare data for wallet_balances table
             db_record = {
@@ -176,13 +182,17 @@ class WalletService:
                 }
             }
             
+            logger.info(f"💾 Attempting to insert wallet record into wallet_balances table")
+            
             # Store in database
             result = self.supabase.from_("wallet_balances").insert(db_record).execute()
             
             if not result.data:
+                logger.error(f"❌ Failed to create wallet record in database for user: {user_id}")
                 raise Exception("Failed to create wallet record")
                 
-            logger.info(f"Successfully created wallet for user: {user_id}")
+            logger.info(f"✅ Successfully created wallet for user: {user_id}")
+            logger.info(f"📝 Wallet address: {algo_wallet['address']}")
             
             # Return success with mnemonic for user backup
             return {
@@ -192,7 +202,8 @@ class WalletService:
             }
             
         except Exception as e:
-            logger.error(f"Wallet creation failed for user {user_id}: {e}")
+            logger.error(f"💥 Wallet creation failed for user {user_id}: {str(e)}")
+            logger.error(f"📝 Stack trace: {traceback.format_exc()}")
             return {
                 "success": False,
                 "error": str(e)
