@@ -119,40 +119,26 @@ class ComplyCubeVerifier:
     
     # CRITICAL FIX: Add the missing health_check method
     # REPLACE LINES 85-100 with this improved health check:
-async def health_check(self) -> bool:
-    """
-    Configuration validation without API calls (ComplyCube has no health endpoint)
-    """
+async def health_check(self) -> Dict[str, Any]:
+    """Configuration validation without API calls"""
     try:
         self.last_health_check = datetime.utcnow().isoformat()
         
         if self.simulation_mode:
             self.health_status = "simulation_mode"
-            logger.debug("ComplyCube health check: simulation mode active")
-            return True
+            return {"status": "healthy", "mode": "simulation"}
         
-        # Validate API key format without making API calls
-        api_key_value = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
+        # Validate API key format
+        api_key = self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key
+        if not api_key or not api_key.startswith(('live_', 'test_')):
+            self.health_status = "invalid_api_key"
+            return {"status": "unhealthy", "error": "Invalid API key format"}
         
-        if not api_key_value or not isinstance(api_key_value, str):
-            self.health_status = "api_key_invalid"
-            logger.error("ComplyCube health check failed: API key missing or invalid")
-            return False
-        
-        if not api_key_value.startswith('live_') and not api_key_value.startswith('test_'):
-            self.health_status = "api_key_format_invalid"
-            logger.error(f"ComplyCube API key format invalid: should start with 'live_' or 'test_'")
-            return False
-        
-        # Configuration is valid
-        self.health_status = "configured"
-        logger.info("ComplyCube health check passed: configuration validated")
-        return True
-        
+        self.health_status = "healthy"
+        return {"status": "healthy", "provider": "complycube"}
     except Exception as e:
-        self.health_status = "health_check_error"
-        logger.error(f"ComplyCube health check error: {str(e)}")
-        return False
+        self.health_status = "error"
+        return {"status": "unhealthy", "error": str(e)}
     
     def get_health_status(self) -> Dict[str, Any]:
         """

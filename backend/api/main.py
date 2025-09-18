@@ -349,7 +349,7 @@ if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
     logger.info("✅ Users router registered")
 
-# FIXED: Correct KYC router registration
+# FIX: Correct KYC router registration
 if routers_available.get('kyc'):
     from backend.api.routes.kyc import router as kyc_router
     app.include_router(kyc_router, prefix="/api/v1/kyc", tags=["KYC"])

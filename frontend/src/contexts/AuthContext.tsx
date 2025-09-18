@@ -80,29 +80,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 	  }
 	}, []);
 
-// FIXED: Proper KYC status-based routing with role assignment
-useEffect(() => {
-  if (state.session && state.user && !state.loading) {
-    console.log('Auth successful, checking KYC status for routing...');
-    console.log('User KYC Status:', state.user.kyc_status);
-    console.log('User Role:', state.user.role);
-    
-    const kycStatus = state.user.kyc_status || 'not_started';
-    
-    // Update role based on KYC status
-    if (kycStatus === 'verified' || kycStatus === 'approved') {
-      updateUserRole('tribe');
-      navigate('/dashboard');
-    } else if (kycStatus === 'skipped') {
-      updateUserRole('alien'); // Limited access for skipped verification
-      navigate('/dashboard');
-    } else if (kycStatus === 'not_started') {
-      navigate('/onboarding');
-    }
-    // For 'in_progress' or 'pending', stay on current page
-  }
-}, [state.session, state.user, state.loading, navigate, updateUserRole]);
-
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -318,6 +295,29 @@ const completeOnboarding = async () => {
 const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
 }, []);
+
+// FIX: Move this useEffect after updateUserRole definition
+useEffect(() => {
+  if (state.session && state.user && !state.loading) {
+    console.log('Auth successful, checking KYC status for routing...');
+    console.log('User KYC Status:', state.user.kyc_status);
+    console.log('User Role:', state.user.role);
+    
+    const kycStatus = state.user.kyc_status || 'not_started';
+    
+    // Update role based on KYC status
+    if (kycStatus === 'verified' || kycStatus === 'approved') {
+      updateUserRole('tribe');
+      navigate('/dashboard');
+    } else if (kycStatus === 'skipped') {
+      updateUserRole('alien'); // Limited access for skipped verification
+      navigate('/dashboard');
+    } else if (kycStatus === 'not_started') {
+      navigate('/onboarding');
+    }
+    // For 'in_progress' or 'pending', stay on current page
+  }
+}, [state.session, state.user, state.loading, navigate, updateUserRole]);
 
 const triggerWalletCreation = useCallback(async () => {
   try {

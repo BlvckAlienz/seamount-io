@@ -40,7 +40,7 @@ async def create_user_profile(
             
         logger.info(f"[Profile Create] Creating profile for user: {user_id}")
         
-        # FIXED: Separate upsert and select operations
+        # FIXED: Define insert_data before use
         insert_data = {
             "id": user_id,
             "email": data.get('email', ''),
