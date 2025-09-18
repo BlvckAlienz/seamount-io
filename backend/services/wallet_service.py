@@ -150,44 +150,50 @@ class WalletService:
         except Exception as e:
             logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not retrieve secure wallet data.")
+
+    async def create_wallet_for_user(self, user_id: str):
+        """
+        Create a wallet for a user and return the mnemonic for backup
+        """
+        try:
+            # Generate the wallet
+            algo_wallet = self.create_algorand_wallet()
             
-        async def create_wallet_for_user(self, user_id: str):
-    """
-    Create a wallet for a user and return the mnemonic for backup
-    """
-    try:
-        # Generate the wallet
-        algo_wallet = self.create_algorand_wallet()
-        
-        # Store encrypted version
-        encrypted_pk = self._encrypt(algo_wallet["private_key"])
-        
-        wallet_data = {
-            "user_id": user_id,
-            "algorand_address": algo_wallet["address"],
-            "algorand_private_key": encrypted_pk,
-            "is_demo": algo_wallet.get("is_demo", False),
-            "created_at": datetime.utcnow().isoformat()
-        }
-        
-        # Store in database
-        result = self.supabase.from_("user_wallets").insert(wallet_data).execute()
-        
-        if not result.data:
-            raise Exception("Failed to create wallet record")
+            # Store encrypted version using the same method as store_encrypted_wallet
+            encrypted_pk = self._encrypt(algo_wallet["private_key"])
             
-        logger.info(f"Successfully created wallet for user: {user_id}")
-        
-        # Return success with mnemonic for user backup
-        return {
-            "success": True,
-            "address": algo_wallet["address"],
-            "mnemonic": algo_wallet["mnemonic"]
-        }
-        
-    except Exception as e:
-        logger.error(f"Wallet creation failed for user {user_id}: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+            # Prepare data for wallet_balances table
+            db_record = {
+                "user_id": user_id,
+                "wallet_address": algo_wallet["address"],
+                "algo_balance": 0,
+                "usds_balance": 0,
+                "last_updated": datetime.utcnow().isoformat(),
+                "metadata": {
+                    "encrypted_private_key": encrypted_pk,
+                    "is_demo": False,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+            }
+            
+            # Store in database
+            result = self.supabase.from_("wallet_balances").insert(db_record).execute()
+            
+            if not result.data:
+                raise Exception("Failed to create wallet record")
+                
+            logger.info(f"Successfully created wallet for user: {user_id}")
+            
+            # Return success with mnemonic for user backup
+            return {
+                "success": True,
+                "address": algo_wallet["address"],
+                "mnemonic": algo_wallet["mnemonic"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Wallet creation failed for user {user_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
