@@ -33,7 +33,8 @@ try:
         get_wallet_service, 
         get_notification_service, 
         get_audit_service,
-        get_kyc_service
+        get_kyc_service,
+        get_db_service  # Changed from get_database_service
     )
     dependencies_available = True
 except ImportError as e:
@@ -252,7 +253,12 @@ async def lifespan(app: FastAPI):
                     wallet_service = WalletService(settings, supabase_client)
                     database_service = DatabaseService(supabase_client)
                     audit_service = AuditService(supabase_client)
-                    kyc_service = KYCService(settings, supabase_client, database_service, audit_service)
+                    kyc_service = KYCService(
+                        settings, 
+                        supabase_client, 
+                        get_db_service(),  # Use the correct function
+                        get_audit_service()
+                    )
 
                     # Test KYC service initialization with health check
                     try:
@@ -289,26 +295,17 @@ async def lifespan(app: FastAPI):
                 # This part can proceed without Supabase
                 try:
                     license_fee = settings.business_model.calculate_license_fee(
-                        LicenseTier.BASIC, 
+                        LicenseTier.STARTER,  # Changed from BASIC to STARTER
                         PricingRegion.NIGERIA
                     )
-                    logger.info(f"Business model initialized. Basic license fee in Nigeria: {license_fee}")
-                except:
-                    logger.warning("Business model calculation failed")
-                
-                logger.info("Services initialized successfully.")
-            except Exception as e:
-                logger.error(f"Service initialization error: {e}")
-                # Don't raise the error, continue with partial initialization
-                logger.warning("Continuing with partial service initialization")
-        else:
-            logger.warning("Core services not available due to import errors")
-        
-        yield
-    except Exception as e:
-        logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-        raise
-    logger.info("--- Seamount API Shutting Down ---")
+                    logger.info(f"Business model initialized. Starter license fee in Nigeria: {license_fee}")
+                except Exception as e:
+                    logger.warning(f"Business model calculation failed: {e}")
+            yield
+        except Exception as e:
+            logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+            raise
+        logger.info("--- Seamount API Shutting Down ---")
 
 app = FastAPI(
     title="Seamount.io API",

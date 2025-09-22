@@ -225,7 +225,23 @@ class DatabaseService:
     async def get_user_profile_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Alias for get_user_profile for KYC service compatibility"""
         return await self.get_user_profile(user_id)
-
+    
+    async def get_user_by_kyc_client_id(self, client_id: str) -> Optional[Dict[str, Any]]:
+    """Get user by KYC client ID with proper error handling"""
+    try:
+        response = self.supabase.table("kyc_sessions") \
+            .select("user_id") \
+            .eq("client_id", client_id) \
+            .maybe_single() \
+            .execute()
+        
+        if response.data:
+            return await self.get_user_profile(response.data["user_id"])
+        return None
+    except Exception as e:
+        logger.error(f"Error getting user by KYC client ID: {e}")
+        return None
+    
     async def log_kyc_session(self, user_id: str, session_id: str, client_id: str) -> bool:
         """Log KYC verification session initiation with proper error handling"""
         try:

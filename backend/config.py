@@ -160,7 +160,25 @@ class BusinessModelConfig:
     def calculate_api_subscription_fee(tier: LicenseTier) -> Decimal:
         """Calculate monthly API subscription fee based on tier"""
         return BusinessModelConfig.API_SUBSCRIPTION_FEES[tier]
-
+    
+        @staticmethod
+    def calculate_license_fee(tier: LicenseTier, region: PricingRegion) -> Decimal:
+        """Calculate license fee based on tier and region"""
+        base_fee = BusinessModelConfig.API_SUBSCRIPTION_FEES[tier]
+        
+        # Apply regional pricing adjustments if enabled
+        if region != PricingRegion.DEFAULT:
+            # Add regional pricing logic here
+            regional_multipliers = {
+                PricingRegion.NIGERIA: Decimal("1.0"),
+                PricingRegion.KENYA: Decimal("1.0"),
+                PricingRegion.GHANA: Decimal("1.0"),
+                PricingRegion.SOUTH_AFRICA: Decimal("1.1"),  # 10% premium for South Africa
+            }
+            base_fee = base_fee * regional_multipliers.get(region, Decimal("1.0"))
+        
+        return base_fee
+    
     @staticmethod
     def calculate_annual_revenue_projection(customers_by_tier: Dict[LicenseTier, int],
                                           avg_monthly_volume: Dict[LicenseTier, Decimal]) -> Dict:

@@ -564,3 +564,7 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
     if current_user.get('kyc_status') == 'verified' or current_user.get('is_demo', False):
         return "tribe"
     return "alien"
+    
+def get_db_service() -> Optional["DatabaseService"]:
+    """Get database service instance (alias for get_database_service)"""
+    return get_database_service()
