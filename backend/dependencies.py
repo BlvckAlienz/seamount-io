@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
+    from backend.services.algorand_service import AlgorandService
 else:
     # Runtime imports for actual service instantiation
     try:
@@ -30,6 +31,7 @@ else:
         from backend.services.audit_service import AuditService
         from backend.services.kyc_service import KYCService
         from backend.services.database_service import DatabaseService
+        from backend.services.algorand_service import AlgorandService
     except ImportError as e:
         logging.warning(f"Service import failed: {e}")
         WalletService = None
@@ -37,6 +39,7 @@ else:
         AuditService = None
         KYCService = None
         DatabaseService = None
+        AlgorandService = None
        
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ _notification_service: Optional["NotificationService"] = None
 _audit_service: Optional["AuditService"] = None
 _kyc_service: Optional["KYCService"] = None
 _database_service: Optional["DatabaseService"] = None
+_algorand_service: Optional["AlgorandService"] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
@@ -65,11 +69,12 @@ def initialize_dependencies(
     notification_service: "NotificationService", 
     audit_service: Optional["AuditService"] = None,
     kyc_service: Optional["KYCService"] = None,
-    database_service: Optional["DatabaseService"] = None
+    database_service: Optional["DatabaseService"] = None,
+    algorand_service: Optional["AlgorandService"] = None
 ):
     """Initialize dependency services - used in main.py startup"""
     global _supabase_client, _wallet_service, _notification_service
-    global _audit_service, _kyc_service, _database_service
+    global _audit_service, _kyc_service, _database_service, _algorand_service
     
     _supabase_client = supabase_client
     _wallet_service = wallet_service
@@ -77,6 +82,7 @@ def initialize_dependencies(
     _audit_service = audit_service
     _kyc_service = kyc_service
     _database_service = database_service
+    _algorand_service = algorand_service
     
     logger.info("✅ Dependencies initialized successfully")
 
@@ -111,14 +117,13 @@ def get_kyc_service() -> "KYCService":
         try:
             # Try to initialize KYC service if not already initialized
             from backend.services.kyc_service import KYCService
-            from backend.services.kyc_providers.complycube import complycube_service
             
-            # Initialize with ComplyCube provider
+            # Initialize with default provider
             _kyc_service = KYCService(
                 get_settings_cached(), 
                 get_supabase_client(), 
-                None,  # database_service is optional
-                None   # audit_service is optional
+                get_database_service(),
+                get_audit_service()
             )
             logger.info("✅ KYC service initialized successfully")
         except Exception as e:
@@ -126,6 +131,24 @@ def get_kyc_service() -> "KYCService":
             raise HTTPException(status_code=500, detail="KYC service initialization failed")
     
     return _kyc_service
+
+def get_algorand_service() -> "AlgorandService":
+    """Get Algorand service instance"""
+    global _algorand_service
+    
+    if _algorand_service is None:
+        try:
+            # Try to initialize Algorand service if not already initialized
+            from backend.services.algorand_service import AlgorandService
+            
+            # Initialize with settings
+            _algorand_service = AlgorandService(get_settings_cached())
+            logger.info("✅ Algorand service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Algorand service: {e}")
+            raise HTTPException(status_code=500, detail="Algorand service initialization failed")
+    
+    return _algorand_service
     
 # Add this function to handle missing payment providers gracefully
 def get_payment_service():
