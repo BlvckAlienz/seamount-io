@@ -34,7 +34,8 @@ try:
         get_notification_service, 
         get_audit_service,
         get_kyc_service,
-        get_db_service  # Changed from get_database_service
+        get_db_service,
+        get_oracle_service  # ADD THIS LINE
     )
     dependencies_available = True
 except ImportError as e:
@@ -62,6 +63,10 @@ except ImportError as e:
     
     def get_db_service():
         raise HTTPException(status_code=503, detail="Database service not available")
+    
+    # ADD THE MOCK FOR get_oracle_service
+    def get_oracle_service():
+        raise HTTPException(status_code=503, detail="Oracle service not available")
     
     def initialize_dependencies(*args, **kwargs):
         logging.warning("Dependencies initialization skipped due to import errors")
@@ -91,6 +96,7 @@ try:
 except ImportError as e:
     logging.error(f"Oracle service import error: {e}")
     oracle_service_available = False
+    OracleService = None  # Define as None if import fails
     
     # Override the placeholder classes with the actual ones
     WalletService = ActualWalletService
@@ -522,29 +528,47 @@ async def debug_kyc_test(
         }
 
 # DEBUG: Oracle service test endpoint
-@app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
-async def debug_oracle_test(
-    asset_name: str,
-    oracle_service: OracleService = Depends(get_oracle_service)
-):
-    """Test Oracle service functionality"""
-    try:
-        # Get asset price from Oracle service
-        price, metadata = await oracle_service.get_asset_price(asset_name)
-        
-        return {
-            "success": True,
-            "asset": asset_name,
-            "price": str(price),
-            "metadata": metadata,
-            "message": "Oracle service test completed successfully"
-        }
-    except Exception as e:
-        logger.error(f"Oracle test failed for asset {asset_name}: {e}")
+# Replace the debug oracle endpoint in main.py with this conditional version
+# More robust version of the debug endpoint
+if dependencies_available and oracle_service_available:
+    @app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
+    async def debug_oracle_test(
+        asset_name: str,
+        oracle_service: OracleService = Depends(get_oracle_service)
+    ):
+        """Test Oracle service functionality"""
+        try:
+            if oracle_service is None:
+                return {
+                    "success": False,
+                    "error": "Oracle service not initialized",
+                    "message": "Oracle service is None"
+                }
+            
+            # Get asset price from Oracle service
+            price, metadata = await oracle_service.get_asset_price(asset_name)
+            
+            return {
+                "success": True,
+                "asset": asset_name,
+                "price": str(price),
+                "metadata": metadata,
+                "message": "Oracle service test completed successfully"
+            }
+        except Exception as e:
+            logger.error(f"Oracle test failed for asset {asset_name}: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Oracle service test failed"
+            }
+else:
+    @app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
+    async def debug_oracle_test(asset_name: str):
         return {
             "success": False,
-            "error": str(e),
-            "message": "Oracle service test failed"
+            "error": "Service not available",
+            "message": "Oracle service debug endpoint disabled - dependencies or Oracle service not available"
         }
 
 @app.get("/api/v1/health", tags=["System"])
