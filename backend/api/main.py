@@ -24,11 +24,17 @@ from pathlib import Path
 # Add the project root to the Python path for clean imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# ===== CRITICAL FIX: Define all variables at module level first =====
+# ===== CRITICAL FIX: Set up logging FIRST =====
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# ===== Define all variables at module level first =====
 services_available = False
 dependencies_available = False
 oracle_service_available = False
 routers_available = {}
+
+logger.info("Starting Seamount API initialization...")
 
 # Import core dependencies first
 try:
@@ -46,7 +52,7 @@ try:
     dependencies_available = True
     logger.info("✅ Dependencies imported successfully")
 except ImportError as e:
-    logging.error(f"Critical dependency import error: {e}")
+    logger.error(f"Critical dependency import error: {e}")
     dependencies_available = False
     
     # Create mock functions for critical dependencies
@@ -75,7 +81,7 @@ except ImportError as e:
         raise HTTPException(status_code=503, detail="Oracle service not available")
     
     def initialize_dependencies(*args, **kwargs):
-        logging.warning("Dependencies initialization skipped due to import errors")
+        logger.warning("Dependencies initialization skipped due to import errors")
 
 # Define placeholder classes for type annotations
 class WalletService:
@@ -108,7 +114,7 @@ try:
     services_available = True
     logger.info("✅ Core services imported successfully")
 except ImportError as e:
-    logging.error(f"Core service import error: {e}")
+    logger.error(f"Core service import error: {e}")
     services_available = False
 
 # Try to import Oracle service separately
@@ -118,7 +124,7 @@ try:
     oracle_service_available = True
     logger.info("✅ Oracle service imported successfully")
 except ImportError as e:
-    logging.error(f"Oracle service import error: {e}")
+    logger.error(f"Oracle service import error: {e}")
     oracle_service_available = False
 
 # Try to import routers with better error handling
@@ -126,14 +132,14 @@ try:
     from backend.api.routes.licensing import router as licensing_router
     routers_available['licensing'] = licensing_router
 except ImportError as e:
-    logging.error(f"Licensing router import error: {e}")
+    logger.error(f"Licensing router import error: {e}")
     routers_available['licensing'] = None
 
 try:
     from backend.api.routes import kyc
     routers_available['kyc'] = kyc
 except ImportError as e:
-    logging.error(f"KYC router import error: {e}")
+    logger.error(f"KYC router import error: {e}")
     routers_available['kyc'] = None
 
 try:
@@ -143,7 +149,7 @@ try:
     routers_available['investor'] = investor
     routers_available['consent'] = consent
 except ImportError as e:
-    logging.error(f"Additional routers import error: {e}")
+    logger.error(f"Additional routers import error: {e}")
     routers_available.update({
         'webhooks': None,
         'portfolio': None,
@@ -155,31 +161,29 @@ try:
     from backend.api.routes.users import router as users_router
     routers_available['users'] = users_router
 except ImportError as e:
-    logging.error(f"Users router import error: {e}")
+    logger.error(f"Users router import error: {e}")
     routers_available['users'] = None
 
 try:
     from backend.api.routes.session import router as session_router
     routers_available['session'] = session_router
 except ImportError as e:
-    logging.error(f"Session router import error: {e}")
+    logger.error(f"Session router import error: {e}")
     routers_available['session'] = None
 
 # Import payments router with specific error handling
 try:
     from backend.api.routes.payments import router as payments_router
     routers_available['payments'] = payments_router
-    logging.info("✅ Payments router imported successfully")
+    logger.info("✅ Payments router imported successfully")
 except ImportError as payment_e:
-    logging.error(f"Payments router import error: {payment_e}")
+    logger.error(f"Payments router import error: {payment_e}")
     from fastapi import APIRouter
     payments_router = APIRouter()
     @payments_router.get("/health")
     async def payments_health():
         return {"status": "payments module not available", "error": str(payment_e)}
     routers_available['payments'] = payments_router
-
-logger = logging.getLogger(__name__)
 
 # SECURITY: Rate limiter with Redis backend for production
 limiter = Limiter(key_func=get_remote_address)
