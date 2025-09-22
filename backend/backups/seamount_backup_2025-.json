@@ -1,0 +1,175 @@
+{
+  "timestamp": "2025-",
+  "database": "seamount_production",
+  "tables": {
+    "users": {
+      "data": [],
+      "count": 0
+    },
+    "profiles": {
+      "error": "relation \"public.profiles\" does not exist",
+      "count": 0
+    },
+    "transactions": {
+      "data": [],
+      "count": 0
+    },
+    "wallets": {
+      "error": "relation \"public.wallets\" does not exist",
+      "count": 0
+    },
+    "payments": {
+      "error": "relation \"public.payments\" does not exist",
+      "count": 0
+    },
+    "user_profiles": {
+      "data": [
+        {
+          "id": "bf2bb35b-3053-4cfd-ae2b-9ec1bbd82cad",
+          "email": "frontwatergroup@gmail.com",
+          "first_name": "Frontwater",
+          "last_name": "Group",
+          "country_code": "TR",
+          "kyc_level": 1,
+          "kyc_status": "skipped",
+          "is_admin": false,
+          "wallet_address": null,
+          "phone_number": null,
+          "date_of_birth": null,
+          "occupation": null,
+          "source_of_funds": null,
+          "risk_tolerance": "medium",
+          "notification_preferences": {
+            "sms": false,
+            "push": true,
+            "email": true
+          },
+          "settings": {},
+          "metadata": {},
+          "created_at": "2025-09-18T11:00:54.339757+00:00",
+          "updated_at": "2025-09-20T11:52:34.718948+00:00",
+          "complycube_applicant_id": null,
+          "role": "alien",
+          "user_id": null,
+          "kyc_session_id": null,
+          "kyc_provider": "complycube",
+          "security_flags": {},
+          "last_login_at": null,
+          "failed_login_attempts": 0,
+          "account_locked_until": null
+        },
+        {
+          "id": "eb1ed114-4e5f-4d27-9df6-4db42680fb9d",
+          "email": "ryne.paul526@gmail.com",
+          "first_name": "IRENE",
+          "last_name": "PAUL",
+          "country_code": "KE",
+          "kyc_level": 2,
+          "kyc_status": "not_started",
+          "is_admin": false,
+          "wallet_address": null,
+          "phone_number": null,
+          "date_of_birth": null,
+          "occupation": null,
+          "source_of_funds": null,
+          "risk_tolerance": "medium",
+          "notification_preferences": {
+            "sms": false,
+            "push": true,
+            "email": true
+          },
+          "settings": {},
+          "metadata": {},
+          "created_at": "2025-08-23T19:49:55.906158+00:00",
+          "updated_at": "2025-09-01T15:05:52.556909+00:00",
+          "complycube_applicant_id": null,
+          "role": "alien",
+          "user_id": "eb1ed114-4e5f-4d27-9df6-4db42680fb9d",
+          "kyc_session_id": null,
+          "kyc_provider": "complycube",
+          "security_flags": {},
+          "last_login_at": null,
+          "failed_login_attempts": 0,
+          "account_locked_until": null
+        },
+        {
+          "id": "7dc1688c-0c77-4ec3-ad25-393304e9f60c",
+          "email": "lapelene573@gmail.com",
+          "first_name": "Fall",
+          "last_name": "Leplenne ",
+          "country_code": "US",
+          "kyc_level": 0,
+          "kyc_status": "not_started",
+          "is_admin": false,
+          "wallet_address": null,
+          "phone_number": null,
+          "date_of_birth": null,
+          "occupation": null,
+          "source_of_funds": null,
+          "risk_tolerance": "medium",
+          "notification_preferences": {
+            "sms": false,
+            "push": true,
+            "email": true
+          },
+          "settings": {},
+          "metadata": {},
+          "created_at": "2025-08-28T18:56:37.812444+00:00",
+          "updated_at": "2025-09-01T15:05:52.556909+00:00",
+          "complycube_applicant_id": null,
+          "role": "alien",
+          "user_id": "7dc1688c-0c77-4ec3-ad25-393304e9f60c",
+          "kyc_session_id": null,
+          "kyc_provider": "complycube",
+          "security_flags": {},
+          "last_login_at": null,
+          "failed_login_attempts": 0,
+          "account_locked_until": null
+        },
+        {
+          "id": "f7eaba2d-883c-4040-89a5-b57fdd82fbd1",
+          "email": "armstyyy@yahoo.com",
+          "first_name": "Armstrong",
+          "last_name": "Ighodalo",
+          "country_code": "NG",
+          "kyc_level": 2,
+          "kyc_status": "not_started",
+          "is_admin": false,
+          "wallet_address": null,
+          "phone_number": null,
+          "date_of_birth": null,
+          "occupation": null,
+          "source_of_funds": null,
+          "risk_tolerance": "medium",
+          "notification_preferences": {
+            "sms": false,
+            "push": true,
+            "email": true
+          },
+          "settings": {},
+          "metadata": {},
+          "created_at": "2025-08-20T14:03:05.67781+00:00",
+          "updated_at": "2025-09-01T15:05:52.556909+00:00",
+          "complycube_applicant_id": null,
+          "role": "alien",
+          "user_id": "f7eaba2d-883c-4040-89a5-b57fdd82fbd1",
+          "kyc_session_id": null,
+          "kyc_provider": "complycube",
+          "security_flags": {},
+          "last_login_at": null,
+          "failed_login_attempts": 0,
+          "account_locked_until": null
+        }
+      ],
+      "count": 4
+    },
+    "accounts": {
+      "error": "relation \"public.accounts\" does not exist",
+      "count": 0
+    },
+    "balances": {
+      "error": "relation \"public.balances\" does not exist",
+      "count": 0
+    }
+  }
+}

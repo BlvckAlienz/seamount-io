@@ -21,18 +21,14 @@ class AlgorandService:
     The single source of truth for all interactions with the Algorand blockchain.
     This service handles raw on-chain operations like transfers, minting, and balance checks.
     """
-    def __init__(self, settings: Settings):
-        """
-        Initializes the service with a pre-configured settings object,
-        following a clean dependency injection pattern.
-        """
+     def __init__(self, settings: Settings):
         self.settings = settings
         self.algod_client = algod.AlgodClient(
-            settings.ALGORAND_API_KEY.get_secret_value(), 
+            settings.ALGORAND_API_KEY.get_secret_value() if settings.ALGORAND_API_KEY else "",
             settings.ALGORAND_NODE_URL
         )
-        self.usds_asset_id = settings.USDS_ASSET_ID
-        self.decimals = 6
+        # REMOVE: self.usds_asset_id = settings.USDS_ASSET_ID
+        # REMOVE: self.decimals = 6
 
         if not settings.ALGORAND_CREATOR_MNEMONIC:
             raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
@@ -46,11 +42,101 @@ class AlgorandService:
             logger.critical(f"Failed to derive treasury account from mnemonic: {e}", exc_info=True)
             raise
 
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(Exception)
-    )
+    # NEW GENERIC METHOD: Get balance for any asset
+    async def get_asset_balance(self, address: str, asset_id: int) -> Decimal:
+        """
+        Gets the balance for a given Algorand asset for a specific address.
+        Returns the balance in standard units (not micro-units).
+        """
+        try:
+            asset_config = self._get_asset_config(asset_id)
+            decimals = asset_config['decimals']
+
+            account_info = self.algod_client.account_info(address)
+            for asset in account_info.get("assets", []):
+                if asset["asset-id"] == asset_id:
+                    amount = Decimal(asset["amount"]) / Decimal(10**decimals)
+                    return amount.quantize(Decimal('0.' + '0'*decimals))
+            return Decimal("0.0")
+        except AlgodHTTPError as e:
+            if "account not found" in str(e):
+                logger.warning(f"Account {address} not found on-chain. Returning zero balance.")
+                return Decimal("0.0")
+            logger.error(f"Failed to get balance for asset {asset_id} on {address}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while getting balance: {e}")
+            raise
+
+    # NEW GENERIC METHOD: Transfer any asset
+    async def transfer_asset(
+        self,
+        sender_private_key: str,
+        receiver_address: str,
+        asset_id: int,
+        amount: Decimal,
+        memo: str = ""
+    ) -> str:
+        """
+        Transfers an asset from a user's account to another. Requires the user's private key.
+        """
+        try:
+            asset_config = self._get_asset_config(asset_id)
+            decimals = asset_config['decimals']
+
+            sender_address = account.address_from_private_key(sender_private_key)
+            params = self.algod_client.suggested_params()
+            amount_base_units = int(amount * (10**decimals))
+
+            txn = AssetTransferTxn(
+                sender=sender_address,
+                sp=params,
+                receiver=receiver_address,
+                amt=amount_base_units,
+                index=asset_id,
+                note=memo.encode()
+            )
+            signed_txn = txn.sign(sender_private_key)
+            tx_id = self.algod_client.send_transaction(signed_txn)
+            await self.wait_for_confirmation(tx_id)
+            logger.info(f"Successfully sent {amount} of asset {asset_id} from {sender_address} to {receiver_address}. TxID: {tx_id}")
+            return tx_id
+        except Exception as e:
+            logger.error(f"Failed to transfer asset {asset_id}: {e}", exc_info=True)
+            raise
+
+    # NEW METHOD: Prepare opt-in for any asset (crucial for goBTC/goETH)
+    async def prepare_asset_opt_in(self, user_address: str, asset_id: int) -> Dict[str, Any]:
+        """
+        Prepares an asset opt-in transaction for the user to sign.
+        """
+        try:
+            if not account.is_valid_address(user_address):
+                raise ValueError("Invalid Algorand address provided for opt-in.")
+            
+            params = self.algod_client.suggested_params()
+            txn = AssetOptInTxn(sender=user_address, sp=params, index=asset_id)
+            
+            unsigned_txn_b64 = encoding.msgpack_encode(txn)
+            
+            return {
+                "success": True,
+                "unsigned_txn_b64": unsigned_txn_b64,
+                "tx_id": txn.get_txid(),
+                "asset_id": asset_id
+            }
+        except Exception as e:
+            logger.error(f"Failed to prepare opt-in transaction for asset {asset_id}: {e}", exc_info=True)
+            raise
+
+    # HELPER METHOD: Get configuration for an asset
+    def _get_asset_config(self, asset_id: int) -> Dict:
+        """Finds the asset configuration from SUPPORTED_ASSETS by asset_id."""
+        for asset_key, config in self.settings.SUPPORTED_ASSETS.items():
+            if config['asset_id'] == asset_id:
+                return config
+        raise ValueError(f"Asset ID {asset_id} is not configured in SUPPORTED_ASSETS.")
+    
     async def wait_for_confirmation(self, tx_id: str) -> Dict[str, Any]:
         """
         Waits for a transaction to be confirmed on the Algorand network with exponential backoff.
@@ -72,115 +158,6 @@ class AlgorandService:
                     # In a production system with an indexer, you would query it here as a fallback.
                     pass 
         raise TimeoutError(f"Transaction {tx_id} was not confirmed after multiple rounds.")
-
-    async def get_usds_balance(self, address: str) -> Decimal:
-        """
-        Gets the USDS balance for a given Algorand address.
-        """
-        try:
-            account_info = self.algod_client.account_info(address)
-            for asset in account_info.get("assets", []):
-                if asset["asset-id"] == self.usds_asset_id:
-                    amount = Decimal(asset["amount"]) / Decimal(10**self.decimals)
-                    return amount.quantize(Decimal('0.000001'))
-            return Decimal("0.0")
-        except AlgodHTTPError as e:
-            if "account not found" in str(e):
-                logger.warning(f"Account {address} not found on-chain. Returning zero balance.")
-                return Decimal("0.0")
-            logger.error(f"Failed to get balance for {address}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while getting balance for {address}: {e}")
-            raise
-
-    async def send_usds(self, sender_private_key: str, receiver_address: str, amount: Decimal, memo: str) -> str:
-        """
-        Transfers USDS from a user's account to another. Requires the user's private key.
-        This is a highly sensitive operation.
-        """
-        try:
-            sender_address = account.address_from_private_key(sender_private_key)
-            params = self.algod_client.suggested_params()
-            amount_base_units = int(amount * (10**self.decimals))
-
-            txn = AssetTransferTxn(
-                sender=sender_address, sp=params, receiver=receiver_address,
-                amt=amount_base_units, index=self.usds_asset_id, note=memo.encode()
-            )
-            signed_txn = txn.sign(sender_private_key)
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            await self.wait_for_confirmation(tx_id)
-            logger.info(f"Successfully sent {amount} USDS from {sender_address} to {receiver_address}. TxID: {tx_id}")
-            return tx_id
-        except Exception as e:
-            logger.error(f"Failed to send USDS: {e}", exc_info=True)
-            raise
-
-    async def mint_usds(self, recipient_address: str, amount: Decimal, fiat_reference: str) -> str:
-        """
-        Mints new USDS from the treasury account to a recipient.
-        """
-        try:
-            params = self.algod_client.suggested_params()
-            amount_base_units = int(amount * (10**self.decimals))
-
-            txn = AssetTransferTxn(
-                sender=self.treasury_address, sp=params, receiver=recipient_address,
-                amt=amount_base_units, index=self.usds_asset_id, note=f"USDS Mint. Ref: {fiat_reference}".encode()
-            )
-            signed_txn = txn.sign(self.treasury_private_key)
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            await self.wait_for_confirmation(tx_id)
-            logger.info(f"Successfully minted {amount} USDS to {recipient_address}. TxID: {tx_id}")
-            return tx_id
-        except Exception as e:
-            logger.error(f"Failed to mint USDS: {e}", exc_info=True)
-            raise
-
-    async def burn_usds(self, user_private_key: str, amount: Decimal, fiat_reference: str) -> str:
-        """
-        Burns USDS by transferring it from a user's account back to the treasury.
-        """
-        try:
-            user_address = account.address_from_private_key(user_private_key)
-            params = self.algod_client.suggested_params()
-            amount_base_units = int(amount * (10**self.decimals))
-
-            txn = AssetTransferTxn(
-                sender=user_address, sp=params, receiver=self.treasury_address,
-                amt=amount_base_units, index=self.usds_asset_id, note=f"USDS Burn. Ref: {fiat_reference}".encode()
-            )
-            signed_txn = txn.sign(user_private_key)
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            await self.wait_for_confirmation(tx_id)
-            logger.info(f"Successfully burned {amount} USDS from {user_address}. TxID: {tx_id}")
-            return tx_id
-        except Exception as e:
-            logger.error(f"Failed to burn USDS: {e}", exc_info=True)
-            raise
-
-    async def prepare_opt_in_transaction(self, user_address: str) -> Dict[str, Any]:
-        """
-        Prepares a USDS opt-in transaction for the user to sign on the frontend.
-        """
-        try:
-            if not account.is_valid_address(user_address):
-                raise ValueError("Invalid Algorand address provided for opt-in.")
-            
-            params = self.algod_client.suggested_params()
-            txn = AssetOptInTxn(sender=user_address, sp=params, index=self.usds_asset_id)
-            
-            unsigned_txn_b64 = encoding.msgpack_encode(txn)
-            
-            return {
-                "success": True,
-                "unsigned_txn_b64": unsigned_txn_b64,
-                "tx_id": txn.get_txid()
-            }
-        except Exception as e:
-            logger.error(f"Failed to prepare opt-in transaction for {user_address}: {e}", exc_info=True)
-            raise
 
     async def fund_account_for_opt_in(self, user_address: str) -> Optional[str]:
         """

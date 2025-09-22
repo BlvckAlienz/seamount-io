@@ -7,19 +7,21 @@ from algosdk import account, mnemonic
 from fastapi import HTTPException
 from uuid import uuid4
 from datetime import datetime
+from decimal import Decimal
 
-from backend.config import Settings
+from backend.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
 class WalletService:
     """
     Handles the secure creation, encryption, and storage of user wallets
-    in the 'wallet_balances' table. Updated to match actual database schema.
+    Updated for Phase 1: Multi-Asset Support (USDT, USDCa, goBTC, goETH)
     """
+
     def __init__(self, settings: Settings, supabase_client: Client):
         """
-        Initializes the WalletService.
+        Initializes the WalletService with multi-asset support.
         """
         if not settings.ENCRYPTION_KEY:
             logger.critical("FATAL: ENCRYPTION_KEY is not configured. Wallet service cannot operate securely.")
@@ -32,8 +34,9 @@ class WalletService:
             logger.critical(f"Invalid ENCRYPTION_KEY provided. Cannot initialize cipher. Error: {e}")
             raise ValueError("Invalid ENCRYPTION_KEY.")
 
+        self.settings = settings
         self.supabase = supabase_client
-        logger.info("WalletService initialized successfully in secure mode.")
+        logger.info("WalletService initialized successfully with multi-asset support.")
 
     def _encrypt(self, data: str) -> str:
         """Encrypts sensitive data using the configured key."""
@@ -73,10 +76,10 @@ class WalletService:
     async def store_encrypted_wallet(self, user_id: str, wallet_data: dict) -> dict:
         """
         Encrypts the private key from the generated wallet data and stores the
-        non-sensitive parts in the 'wallet_balances' table.
+        non-sensitive parts in the 'wallet_balances' table with multi-asset support.
 
         **CRITICAL:** This function does NOT handle or store the mnemonic phrase.
-        Updated to match the actual wallet_balances table schema.
+        Updated to match the actual wallet_balances table schema with Phase 1 assets.
         """
         logger.info(f"Preparing to store encrypted wallet for user_id: {user_id}")
         
@@ -87,13 +90,16 @@ class WalletService:
             # Step 1: Encrypt the private key for secure storage.
             encrypted_pk = self._encrypt(wallet_data["private_key"])
             
-            # Step 2: Prepare data matching the ACTUAL 'wallet_balances' schema.
-            # Store encrypted private key in metadata JSONB field
+            # Step 2: Prepare data matching the ACTUAL 'wallet_balances' schema with Phase 1 assets.
             db_record = {
                 "user_id": user_id,
                 "wallet_address": wallet_data["address"],
                 "algo_balance": 0,
                 "usds_balance": 0,
+                "usdt_balance": 0,  # NEW: Phase 1 asset
+                "usdc_balance": 0,  # NEW: Phase 1 asset
+                "gobtc_balance": 0, # NEW: Phase 1 asset
+                "goeth_balance": 0, # NEW: Phase 1 asset
                 "last_updated": datetime.utcnow().isoformat(),
                 "metadata": {
                     "encrypted_private_key": encrypted_pk,
@@ -152,6 +158,72 @@ class WalletService:
             logger.critical(f"Catastrophic failure retrieving private key for user {user_id}: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Could not retrieve secure wallet data.")
 
+    async def get_wallet_balances(self, user_id: str) -> dict:
+        """
+        Retrieves all wallet balances for a user, including Phase 1 assets.
+        """
+        try:
+            response = self.supabase.from_("wallet_balances") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .single() \
+                .execute()
+
+            if not response.data:
+                logger.error(f"No wallet found for user {user_id}")
+                raise HTTPException(status_code=404, detail="Wallet not found for user.")
+
+            wallet_data = response.data
+            
+            # Format balances with proper decimal places
+            balances = {
+                "algo": Decimal(str(wallet_data.get("algo_balance", 0))),
+                "usds": Decimal(str(wallet_data.get("usds_balance", 0))),
+                "usdt": Decimal(str(wallet_data.get("usdt_balance", 0))),
+                "usdc": Decimal(str(wallet_data.get("usdc_balance", 0))),
+                "gobtc": Decimal(str(wallet_data.get("gobtc_balance", 0))),
+                "goeth": Decimal(str(wallet_data.get("goeth_balance", 0))),
+                "wallet_address": wallet_data.get("wallet_address"),
+                "last_updated": wallet_data.get("last_updated")
+            }
+            
+            return balances
+            
+        except Exception as e:
+            logger.error(f"Failed to get wallet balances for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail="Could not retrieve wallet balances.")
+
+    async def update_asset_balance(self, user_id: str, asset: str, amount: Decimal) -> bool:
+        """
+        Updates a specific asset balance for a user.
+        Supports: algo, usds, usdt, usdc, gobtc, goeth
+        """
+        try:
+            # Validate asset type
+            valid_assets = ["algo", "usds", "usdt", "usdc", "gobtc", "goeth"]
+            if asset not in valid_assets:
+                raise ValueError(f"Invalid asset type: {asset}. Must be one of {valid_assets}")
+            
+            # Convert to database column name
+            column_name = f"{asset}_balance"
+            
+            # Update the balance
+            response = self.supabase.from_("wallet_balances") \
+                .update({column_name: float(amount)}) \
+                .eq("user_id", user_id) \
+                .execute()
+            
+            if not response.data:
+                logger.error(f"Failed to update {asset} balance for user {user_id}")
+                return False
+                
+            logger.info(f"Successfully updated {asset} balance for user {user_id}: {amount}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating {asset} balance for user {user_id}: {e}")
+            return False
+
     async def create_wallet_for_user(self, user_id: str):
         """
         Create a wallet for a user and return the mnemonic for backup
@@ -168,12 +240,16 @@ class WalletService:
             encrypted_pk = self._encrypt(algo_wallet["private_key"])
             logger.info(f"🔒 Private key encrypted successfully")
             
-            # Prepare data for wallet_balances table
+            # Prepare data for wallet_balances table with Phase 1 assets
             db_record = {
                 "user_id": user_id,
                 "wallet_address": algo_wallet["address"],
                 "algo_balance": 0,
                 "usds_balance": 0,
+                "usdt_balance": 0,  # NEW: Phase 1 asset
+                "usdc_balance": 0,  # NEW: Phase 1 asset
+                "gobtc_balance": 0, # NEW: Phase 1 asset
+                "goeth_balance": 0, # NEW: Phase 1 asset
                 "last_updated": datetime.utcnow().isoformat(),
                 "metadata": {
                     "encrypted_private_key": encrypted_pk,

@@ -6,9 +6,12 @@ import os
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from supabase import Client
 import logging
+from decimal import Decimal
+from datetime import datetime
+
 from backend.dependencies import get_supabase_client
-from config import get_settings, Settings
-from services.wallet_service import WalletService
+from backend.config import get_settings, Settings
+from backend.services.wallet_service import WalletService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -78,42 +81,58 @@ async def paystack_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 async def handle_paystack_charge_success(event_data):
-    """Handle successful payment with automatic USDS minting"""
+    """Handle successful payment with asset-specific credit"""
     try:
         data = event_data.get("data", {})
         reference = data.get("reference")
         amount = float(data.get("amount", 0)) / 100  # Convert from kobo to naira
         
-        from services.database_service import DatabaseService
-        db = DatabaseService()
+        # Get transaction details to determine which asset was purchased
+        supabase = get_supabase_client()
+        transaction_result = supabase.table("payment_transactions").select("*").eq("reference", reference).single().execute()
         
+        if not transaction_result.data:
+            logger.error(f"Transaction not found for reference: {reference}")
+            return
+            
+        transaction = transaction_result.data
+        user_id = transaction["user_id"]
+        
+        # Determine which asset to credit based on transaction metadata
+        asset = transaction.get("asset", "usdt")  # Default to USDT if not specified
+        wallet_service = WalletService(get_settings(), supabase)
+        
+        # Get current balance
+        balances = await wallet_service.get_wallet_balances(user_id)
+        current_balance = balances.get(asset, Decimal("0"))
+        
+        # Calculate new balance
+        new_balance = current_balance + Decimal(str(amount))
+        
+        # Update the specific asset balance
+        success = await wallet_service.update_asset_balance(user_id, asset, new_balance)
+        
+        if not success:
+            logger.error(f"Failed to update {asset} balance for user {user_id}")
+            return
+            
         # Update payment record
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "completed",
-                "provider_tx_id": data.get("id"),
-                "completed_at": "NOW()",
-                "routing_metadata": json.dumps({
-                    "paystack_gateway_response": data.get("gateway_response"),
-                    "paystack_channel": data.get("channel"),
-                    "customer_email": data.get("customer", {}).get("email")
-                })
-            }
-        )
+        update_data = {
+            "status": "completed",
+            "provider_tx_id": data.get("id"),
+            "completed_at": datetime.utcnow().isoformat(),
+            "routing_metadata": json.dumps({
+                "paystack_gateway_response": data.get("gateway_response"),
+                "paystack_channel": data.get("channel"),
+                "customer_email": data.get("customer", {}).get("email"),
+                "asset_credited": asset,
+                "amount_credited": float(amount)
+            })
+        }
         
-        # Trigger USDS minting process
-        from services.payment_service import EnhancedPaymentService
-        payment_service = EnhancedPaymentService()  # Dependency injection needed
-        await payment_service._handle_successful_payment(
-            transaction_id=reference,
-            provider_tx_id=data.get("id"),
-            amount=amount,
-            metadata={}
-        )
+        supabase.table("payment_transactions").update(update_data).eq("reference", reference).execute()
         
-        logger.info(f"✅ Payment completed: {reference} - NGN {amount}")
+        logger.info(f"✅ Payment completed: {reference} - {amount} {asset.upper()} credited to user {user_id}")
         
     except Exception as e:
         logger.error(f"Failed to handle charge success: {str(e)}")
@@ -124,145 +143,21 @@ async def handle_paystack_charge_failed(event_data):
         data = event_data.get("data", {})
         reference = data.get("reference")
         
-        from services.database_service import DatabaseService
-        db = DatabaseService()
+        supabase = get_supabase_client()
         
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "failed",
-                "provider_tx_id": data.get("id"),
-                "routing_metadata": json.dumps({
-                    "failure_reason": data.get("gateway_response"),
-                    "paystack_channel": data.get("channel")
-                })
-            }
-        )
+        supabase.table("payment_transactions").update({
+            "status": "failed",
+            "provider_tx_id": data.get("id"),
+            "routing_metadata": json.dumps({
+                "failure_reason": data.get("gateway_response"),
+                "paystack_channel": data.get("channel")
+            })
+        }).eq("reference", reference).execute()
         
         logger.warning(f"❌ Payment failed: {reference}")
         
     except Exception as e:
         logger.error(f"Failed to handle charge failure: {str(e)}")
-
-async def handle_paystack_transfer_success(event_data):
-    """Handle successful payout/transfer"""
-    try:
-        data = event_data.get("data", {})
-        reference = data.get("reference")
-        amount = float(data.get("amount", 0)) / 100
-        
-        from services.database_service import DatabaseService
-        db = DatabaseService()
-        
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "completed",
-                "provider_tx_id": data.get("transfer_code"),
-                "completed_at": "NOW()"
-            }
-        )
-        
-        logger.info(f"✅ Transfer completed: {reference} - NGN {amount}")
-        
-    except Exception as e:
-        logger.error(f"Failed to handle transfer success: {str(e)}")
-
-async def handle_paystack_transfer_failed(event_data):
-    """Handle failed payout/transfer"""
-    try:
-        data = event_data.get("data", {})
-        reference = data.get("reference")
-        
-        from services.database_service import DatabaseService
-        db = DatabaseService()
-        
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "failed",
-                "routing_metadata": json.dumps({
-                    "failure_reason": data.get("failure_reason")
-                })
-            }
-        )
-        
-        logger.warning(f"❌ Transfer failed: {reference}")
-        
-    except Exception as e:
-        logger.error(f"Failed to handle transfer failure: {str(e)}")
-
-async def handle_paystack_transfer_reversed(event_data):
-    """Handle reversed transfer"""
-    try:
-        data = event_data.get("data", {})
-        reference = data.get("reference")
-        
-        from services.database_service import DatabaseService
-        db = DatabaseService()
-        
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "reversed",
-                "routing_metadata": json.dumps({
-                    "reversal_reason": "Transfer reversed by provider"
-                })
-            }
-        )
-        
-        logger.warning(f"🔄 Transfer reversed: {reference}")
-        
-    except Exception as e:
-        logger.error(f"Failed to handle transfer reversal: {str(e)}")
-
-# =============================================================================
-# COMPLYCUBE WEBHOOK HANDLER (EXISTING KYC LOGIC PRESERVED)
-# =============================================================================
-
-@router.post("/complycube")
-async def handle_complycube_webhook(
-    request: Request,
-    supabase: Client = Depends(get_supabase_client),
-    settings: Settings = Depends(get_settings)
-):
-    """Handle ComplyCube KYC webhook events"""
-    # Verify webhook signature
-    signature = request.headers.get("X-ComplyCube-Signature")
-    body = await request.body()
-    
-    if not verify_signature(body, signature, settings.COMPLYCUBE_WEBHOOK_SECRET.get_secret_value()):
-        raise HTTPException(status_code=401, detail="Invalid signature")
-    
-    event = await request.json()
-    
-    if event["type"] == "check.completed" and event["data"]["status"] == "complete":
-        applicant_id = event["data"]["applicantId"]
-        
-        # Find user with this applicant ID
-        user_res = supabase.from_("user_profiles").select("*").eq("complycube_applicant_id", applicant_id).execute()
-        
-        if user_res.data:
-            user_id = user_res.data[0]["id"]
-            
-            # Update user role to 'tribe'
-            supabase.from_("user_profiles").update({
-                "role": "tribe",
-                "kyc_status": "approved",
-                "kyc_level": 3
-            }).eq("id", user_id).execute()
-            
-            # Create wallet for user
-            wallet_service = WalletService(settings, supabase)
-            await wallet_service.provision_user_wallet(user_id)
-            
-            logger.info(f"User {user_id} KYC completed and wallet created")
-    
-    return {"status": "success"}
 
 # =============================================================================
 # FLUTTERWAVE WEBHOOK HANDLER (FALLBACK PROVIDER)
@@ -296,29 +191,54 @@ async def flutterwave_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 async def handle_flutterwave_success(data):
-    """Handle successful Flutterwave payment"""
+    """Handle successful Flutterwave payment with asset-specific credit"""
     try:
         reference = data.get("tx_ref")
         amount = float(data.get("amount", 0))
         
-        from services.database_service import DatabaseService
-        db = DatabaseService()
+        # Get transaction details to determine which asset was purchased
+        supabase = get_supabase_client()
+        transaction_result = supabase.table("payment_transactions").select("*").eq("reference", reference).single().execute()
         
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "completed",
-                "provider_tx_id": data.get("id"),
-                "completed_at": "NOW()",
-                "routing_metadata": json.dumps({
-                    "flutterwave_processor": data.get("processor_response"),
-                    "flutterwave_narration": data.get("narration")
-                })
-            }
-        )
+        if not transaction_result.data:
+            logger.error(f"Transaction not found for reference: {reference}")
+            return
+            
+        transaction = transaction_result.data
+        user_id = transaction["user_id"]
         
-        logger.info(f"✅ Flutterwave payment completed: {reference}")
+        # Determine which asset to credit based on transaction metadata
+        asset = transaction.get("asset", "usdt")  # Default to USDT if not specified
+        wallet_service = WalletService(get_settings(), supabase)
+        
+        # Get current balance
+        balances = await wallet_service.get_wallet_balances(user_id)
+        current_balance = balances.get(asset, Decimal("0"))
+        
+        # Calculate new balance
+        new_balance = current_balance + Decimal(str(amount))
+        
+        # Update the specific asset balance
+        success = await wallet_service.update_asset_balance(user_id, asset, new_balance)
+        
+        if not success:
+            logger.error(f"Failed to update {asset} balance for user {user_id}")
+            return
+        
+        # Update transaction record
+        supabase.table("payment_transactions").update({
+            "status": "completed",
+            "provider_tx_id": data.get("id"),
+            "completed_at": datetime.utcnow().isoformat(),
+            "routing_metadata": json.dumps({
+                "flutterwave_processor": data.get("processor_response"),
+                "flutterwave_narration": data.get("narration"),
+                "asset_credited": asset,
+                "amount_credited": float(amount)
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.info(f"✅ Flutterwave payment completed: {reference} - {amount} {asset.upper()} credited")
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave success: {str(e)}")
@@ -328,41 +248,16 @@ async def handle_flutterwave_failure(data):
     try:
         reference = data.get("tx_ref")
         
-        from services.database_service import DatabaseService
-        db = DatabaseService()
+        supabase = get_supabase_client()
         
-        await db.update(
-            "payment_transactions",
-            {"reference": reference},
-            {
-                "status": "failed",
-                "routing_metadata": json.dumps({
-                    "failure_reason": data.get("processor_response")
-                })
-            }
-        )
+        supabase.table("payment_transactions").update({
+            "status": "failed",
+            "routing_metadata": json.dumps({
+                "failure_reason": data.get("processor_response")
+            })
+        }).eq("reference", reference).execute()
         
         logger.warning(f"❌ Flutterwave payment failed: {reference}")
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave failure: {str(e)}")
-
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
-    """Verify webhook signature for security"""
-    if not signature or not secret:
-        return False
-        
-    try:
-        expected_signature = hmac.new(
-            secret.encode(), 
-            payload, 
-            hashlib.sha256
-        ).hexdigest()
-        
-        return hmac.compare_digest(expected_signature, signature)
-    except Exception:
-        return False

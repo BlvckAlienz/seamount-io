@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "seamount-fullstack",
   "version": "1.0.0",
   "description": "Seamount.io fullstack application",
@@ -14,5 +15,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "dotenv": "^17.2.2"
   }
 }

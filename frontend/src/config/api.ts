@@ -10,6 +10,9 @@ import { API_BASE_URL } from './env';
  * It includes interceptors to automatically handle authentication tokens and provide
  * robust, consistent logging for both successful and failed requests.
  */
+ 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+ 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -42,6 +45,7 @@ const API_ENDPOINTS = {
   },
   WALLET: {
     CREATE: '/api/wallet/create',
+    PROVISION: '/api/wallet/provision' // Add this endpoint
   },
    KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
@@ -150,6 +154,18 @@ export {
   kycAPI,
   walletAPI,
   initializeSession,
+};
+
+// ADD helper function for the missing provision endpoint
+const provisionWallets = async () => {
+  try {
+    const response = await apiClient.post('/api/wallet/provision');
+    return response.data;
+  } catch (error) {
+    console.error('Wallet provision failed:', error);
+    // Fallback to regular wallet creation
+    return walletAPI.create();
+  }
 };
 
 // Default export for convenience
