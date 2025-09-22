@@ -227,7 +227,7 @@ class DatabaseService:
         return await self.get_user_profile(user_id)
     
     async def get_user_by_kyc_client_id(self, client_id: str) -> Optional[Dict[str, Any]]:
-    """Get user by KYC client ID with proper error handling"""
+        """Get user by KYC client ID with proper error handling"""
         try:
             response = self.supabase.table("kyc_sessions") \
                 .select("user_id") \
@@ -237,7 +237,7 @@ class DatabaseService:
         
             if response.data:
                 return await self.get_user_profile(response.data["user_id"])
-            return None
+                return None
         except Exception as e:
             logger.error(f"Error getting user by KYC client ID: {e}")
             return None
