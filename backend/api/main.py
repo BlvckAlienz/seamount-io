@@ -24,6 +24,12 @@ from pathlib import Path
 # Add the project root to the Python path for clean imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# ===== CRITICAL FIX: Define all variables at module level first =====
+services_available = False
+dependencies_available = False
+oracle_service_available = False
+routers_available = {}
+
 # Import core dependencies first
 try:
     from backend.dependencies import (
@@ -35,9 +41,10 @@ try:
         get_audit_service,
         get_kyc_service,
         get_db_service,
-        get_oracle_service  # ADD THIS LINE
+        get_oracle_service
     )
     dependencies_available = True
+    logger.info("✅ Dependencies imported successfully")
 except ImportError as e:
     logging.error(f"Critical dependency import error: {e}")
     dependencies_available = False
@@ -64,7 +71,6 @@ except ImportError as e:
     def get_db_service():
         raise HTTPException(status_code=503, detail="Database service not available")
     
-    # ADD THE MOCK FOR get_oracle_service
     def get_oracle_service():
         raise HTTPException(status_code=503, detail="Oracle service not available")
     
@@ -81,6 +87,9 @@ class AuditService:
 class KYCService:
     pass
 
+class OracleService:
+    pass
+
 # Then try to import other dependencies
 try:
     from backend.config import Settings, get_settings, BusinessModelConfig, LicenseTier, PricingRegion
@@ -91,25 +100,28 @@ try:
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService as ActualAuditService
     from backend.models import UserRole
-    from backend.services.oracle_service import OracleService
-    oracle_service_available = True
-except ImportError as e:
-    logging.error(f"Oracle service import error: {e}")
-    oracle_service_available = False
-    OracleService = None  # Define as None if import fails
     
     # Override the placeholder classes with the actual ones
     WalletService = ActualWalletService
     AuditService = ActualAuditService
     KYCService = ActualKYCService
     services_available = True
+    logger.info("✅ Core services imported successfully")
 except ImportError as e:
     logging.error(f"Core service import error: {e}")
     services_available = False
 
-# Try to import routers with better error handling
-routers_available = {}
+# Try to import Oracle service separately
+try:
+    from backend.services.oracle_service import OracleService as ActualOracleService
+    OracleService = ActualOracleService
+    oracle_service_available = True
+    logger.info("✅ Oracle service imported successfully")
+except ImportError as e:
+    logging.error(f"Oracle service import error: {e}")
+    oracle_service_available = False
 
+# Try to import routers with better error handling
 try:
     from backend.api.routes.licensing import router as licensing_router
     routers_available['licensing'] = licensing_router
@@ -157,7 +169,7 @@ except ImportError as e:
 try:
     from backend.api.routes.payments import router as payments_router
     routers_available['payments'] = payments_router
-    logging.info("Payments router imported successfully")
+    logging.info("✅ Payments router imported successfully")
 except ImportError as payment_e:
     logging.error(f"Payments router import error: {payment_e}")
     from fastapi import APIRouter
@@ -237,25 +249,27 @@ class BusinessLeadPayload(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("--- Seamount API Starting Up ---")
+    
     try:
-        # Check if we can get settings
+        # Check if we can get settings using the GLOBAL variables
         if services_available:
+            logger.info("✅ Core services available - proceeding with initialization")
             try:
                 settings = get_settings()
         
                 # Validate Supabase credentials before creating client
-                if settings.validate_supabase_credentials():
+                if hasattr(settings, 'validate_supabase_credentials') and settings.validate_supabase_credentials():
                     try:
                         supabase_client = create_client(
                             settings.SUPABASE_URL, 
                             settings.SUPABASE_SERVICE_KEY.get_secret_value()
                         )
-                        logger.info("Supabase client created successfully")
+                        logger.info("✅ Supabase client created successfully")
                     except Exception as e:
-                        logger.error(f"Failed to create Supabase client: {e}")
+                        logger.error(f"❌ Failed to create Supabase client: {e}")
                         supabase_client = None
                 else:
-                    logger.warning("Supabase credentials validation failed - operating without database")
+                    logger.warning("❌ Supabase credentials validation failed - operating without database")
                     supabase_client = None
                     
                 # Initialize all services if available
@@ -281,19 +295,15 @@ async def lifespan(app: FastAPI):
                             oracle_service = OracleService(settings, database_service)
                             logger.info("✅ Oracle service initialized successfully")
                         except Exception as e:
-                            logger.error(f"Failed to initialize Oracle service: {e}")
+                            logger.error(f"❌ Failed to initialize Oracle service: {e}")
                             oracle_service = None
 
                     # Test KYC service initialization with health check
                     try:
                         kyc_health = await kyc_service.health_check()
-                        logger.info(f"KYC Service health: {kyc_health}")
-                        
-                        if kyc_health.get('provider') != 'healthy':
-                            logger.warning("KYC provider not healthy - KYC features may be limited")
+                        logger.info(f"✅ KYC Service health: {kyc_health}")
                     except Exception as e:
-                        logger.error(f"KYC Service health check failed: {e}")
-                        # Continue anyway but log the error
+                        logger.error(f"❌ KYC Service health check failed: {e}")
 
                     # Initialize dependencies
                     if dependencies_available:
@@ -303,12 +313,13 @@ async def lifespan(app: FastAPI):
                             notification_service, 
                             audit_service,
                             kyc_service,
-                            database_service,  # Add database_service
-                            None,  # algorand_service (optional)
-                            oracle_service  # Add oracle_service
+                            database_service,
+                            None,  # algorand_service
+                            oracle_service
                         )
+                        logger.info("✅ All dependencies initialized successfully")
                 else:
-                    logger.warning("Supabase client not available, skipping database-dependent services")
+                    logger.warning("❌ Supabase client not available, skipping database-dependent services")
                     # Initialize with minimal dependencies
                     if dependencies_available:
                         initialize_dependencies(
@@ -319,22 +330,25 @@ async def lifespan(app: FastAPI):
                             None
                         )
                 
-                # This part can proceed without Supabase
+                # Business model calculation
                 try:
                     license_fee = settings.business_model.calculate_license_fee(
-                        LicenseTier.STARTER,  # Changed from BASIC to STARTER
+                        LicenseTier.STARTER,
                         PricingRegion.NIGERIA
                     )
-                    logger.info(f"Business model initialized. Starter license fee in Nigeria: {license_fee}")
+                    logger.info(f"💰 Business model initialized. Starter license fee in Nigeria: {license_fee}")
                 except Exception as e:
-                    logger.warning(f"Business model calculation failed: {e}")
+                    logger.warning(f"⚠️ Business model calculation failed: {e}")
+                    
             except Exception as e:
-                logger.error(f"Service initialization error: {e}")
-                # Don't raise the error, continue with partial initialization
-                logger.warning("Continuing with partial service initialization")
+                logger.error(f"❌ Service initialization error: {e}")
+        else:
+            logger.warning("❌ Core services not available - operating in limited mode")
+            
     except Exception as e:
-        logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-        raise
+        logger.critical(f"💥 FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+        # Don't raise the error to allow the app to start in degraded mode
+        logger.info("🔄 Continuing with degraded functionality")
     
     yield
     
@@ -437,17 +451,11 @@ async def kyc_webhook(request: Request, background_tasks: BackgroundTasks):
 async def process_kyc_webhook(payload: Dict[str, Any]):
     """Background task to process KYC webhook events"""
     try:
-        # Implement your webhook processing logic here
         event_type = payload.get("type")
         applicant_id = payload.get("resource", {}).get("id")
         
         logger.info(f"Processing KYC webhook: {event_type} for applicant {applicant_id}")
         
-        # Update user KYC status based on event
-        if event_type == "check.completed":
-            # Handle completed KYC check
-            pass
-            
     except Exception as e:
         logger.error(f"Error in background KYC webhook processing: {e}")
 
@@ -456,7 +464,6 @@ async def process_kyc_webhook(payload: Dict[str, Any]):
 async def debug_db_test(supabase: Client = Depends(get_supabase_client)):
     """Test database connectivity"""
     try:
-        # Test basic query
         result = supabase.from_("user_profiles").select("count", count="exact").execute()
         return {
             "success": True, 
@@ -479,7 +486,6 @@ async def debug_wallet_test(
 ):
     """Test wallet service functionality"""
     try:
-        # Check if wallet exists
         wallet = await wallet_service.get_wallet_for_user(user_id)
         
         if wallet:
@@ -511,7 +517,6 @@ async def debug_kyc_test(
 ):
     """Test KYC service functionality"""
     try:
-        # Check KYC service health
         health = await kyc_service.health_check()
         
         return {
@@ -527,54 +532,53 @@ async def debug_kyc_test(
             "message": "KYC service test failed"
         }
 
-# DEBUG: Oracle service test endpoint
-# Replace the debug oracle endpoint in main.py with this conditional version
-# More robust version of the debug endpoint
-if dependencies_available and oracle_service_available:
-    @app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
-    async def debug_oracle_test(
-        asset_name: str,
-        oracle_service: OracleService = Depends(get_oracle_service)
-    ):
-        """Test Oracle service functionality"""
-        try:
-            if oracle_service is None:
-                return {
-                    "success": False,
-                    "error": "Oracle service not initialized",
-                    "message": "Oracle service is None"
-                }
-            
-            # Get asset price from Oracle service
-            price, metadata = await oracle_service.get_asset_price(asset_name)
-            
-            return {
-                "success": True,
-                "asset": asset_name,
-                "price": str(price),
-                "metadata": metadata,
-                "message": "Oracle service test completed successfully"
-            }
-        except Exception as e:
-            logger.error(f"Oracle test failed for asset {asset_name}: {e}")
+# DEBUG: Oracle service test endpoint (safe version)
+@app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
+async def debug_oracle_test(asset_name: str):
+    """Test Oracle service functionality"""
+    try:
+        if not oracle_service_available or not dependencies_available:
             return {
                 "success": False,
-                "error": str(e),
-                "message": "Oracle service test failed"
+                "error": "Service not available",
+                "message": "Oracle service debug endpoint disabled"
             }
-else:
-    @app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
-    async def debug_oracle_test(asset_name: str):
+        
+        oracle_service = get_oracle_service()
+        if oracle_service is None:
+            return {
+                "success": False,
+                "error": "Oracle service not initialized",
+                "message": "Oracle service is None"
+            }
+        
+        price, metadata = await oracle_service.get_asset_price(asset_name)
+        
+        return {
+            "success": True,
+            "asset": asset_name,
+            "price": str(price),
+            "metadata": metadata,
+            "message": "Oracle service test completed successfully"
+        }
+    except Exception as e:
+        logger.error(f"Oracle test failed for asset {asset_name}: {e}")
         return {
             "success": False,
-            "error": "Service not available",
-            "message": "Oracle service debug endpoint disabled - dependencies or Oracle service not available"
+            "error": str(e),
+            "message": "Oracle service test failed"
         }
 
 @app.get("/api/v1/health", tags=["System"])
 @limiter.limit("10/minute")
 async def health_check(request: Request):
-    return {"status": "healthy", "version": "3.1.5"}
+    return {
+        "status": "healthy", 
+        "version": "3.1.5",
+        "services_available": services_available,
+        "oracle_service_available": oracle_service_available,
+        "dependencies_available": dependencies_available
+    }
 
 @app.post("/api/v1/session/initialize", tags=["Session"])
 @limiter.limit("20/minute")
@@ -600,7 +604,7 @@ async def initialize_session(
         "created_at": datetime.utcnow().isoformat()
     }
 
-    # Enhanced IPInfo integration with timeout and better error handling
+    # Enhanced IPInfo integration
     if hasattr(settings, 'IPINFO_TOKEN') and settings.IPINFO_TOKEN and ip_address != "unknown":
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2.0)) as http_session:
@@ -617,9 +621,6 @@ async def initialize_session(
                             "timezone": ip_data.get("timezone", "UTC"),
                             "is_vpn": ip_data.get("privacy", {}).get("vpn", False)
                         })
-                        logger.info(f"IPInfo enrichment successful for {ip_address}")
-        except asyncio.TimeoutError:
-            logger.warning(f"IPInfo timeout for IP {ip_address}")
         except Exception as e:
             logger.warning(f"IPInfo enrichment failed for IP {ip_address}: {e}")
     
@@ -631,7 +632,7 @@ async def initialize_session(
         return JSONResponse(content={"session_id": session_data["id"]})
 
 @app.post("/api/wallet/create", tags=["Wallet"])
-@limiter.limit("5/minute")  # SECURITY: Strict rate limit for wallet operations
+@limiter.limit("5/minute")
 async def create_wallet(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -640,8 +641,6 @@ async def create_wallet(
     """Create a wallet for the user with proper error handling"""
     try:
         logger.info(f"Creating wallet for user: {current_user['id']}")
-        
-        # Use the new method that returns mnemonic
         result = await wallet_service.create_wallet_for_user(current_user["id"])
         
         if result["success"]:
@@ -691,7 +690,7 @@ async def get_security_status(request: Request):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-# MOVED: Payment and trading endpoints to dedicated handlers (no missing router dependency)
+# Payment and trading endpoints
 @app.post("/api/v1/payments/send", dependencies=[Depends(require_role("tribe"))], tags=["Payments"])
 @limiter.limit("10/minute")
 async def send_payment(
