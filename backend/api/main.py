@@ -86,6 +86,11 @@ try:
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService as ActualAuditService
     from backend.models import UserRole
+    from backend.services.oracle_service import OracleService
+    oracle_service_available = True
+except ImportError as e:
+    logging.error(f"Oracle service import error: {e}")
+    oracle_service_available = False
     
     # Override the placeholder classes with the actual ones
     WalletService = ActualWalletService
@@ -262,6 +267,16 @@ async def lifespan(app: FastAPI):
                         database_service,
                         audit_service
                     )
+                    
+                    # Initialize Oracle service if available
+                    oracle_service = None
+                    if oracle_service_available:
+                        try:
+                            oracle_service = OracleService(settings, database_service)
+                            logger.info("✅ Oracle service initialized successfully")
+                        except Exception as e:
+                            logger.error(f"Failed to initialize Oracle service: {e}")
+                            oracle_service = None
 
                     # Test KYC service initialization with health check
                     try:
@@ -281,7 +296,10 @@ async def lifespan(app: FastAPI):
                             wallet_service, 
                             notification_service, 
                             audit_service,
-                            kyc_service
+                            kyc_service,
+                            database_service,  # Add database_service
+                            None,  # algorand_service (optional)
+                            oracle_service  # Add oracle_service
                         )
                 else:
                     logger.warning("Supabase client not available, skipping database-dependent services")
@@ -501,6 +519,32 @@ async def debug_kyc_test(
             "success": False,
             "error": str(e),
             "message": "KYC service test failed"
+        }
+
+# DEBUG: Oracle service test endpoint
+@app.get("/api/debug/oracle-test/{asset_name}", tags=["Debug"])
+async def debug_oracle_test(
+    asset_name: str,
+    oracle_service: OracleService = Depends(get_oracle_service)
+):
+    """Test Oracle service functionality"""
+    try:
+        # Get asset price from Oracle service
+        price, metadata = await oracle_service.get_asset_price(asset_name)
+        
+        return {
+            "success": True,
+            "asset": asset_name,
+            "price": str(price),
+            "metadata": metadata,
+            "message": "Oracle service test completed successfully"
+        }
+    except Exception as e:
+        logger.error(f"Oracle test failed for asset {asset_name}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Oracle service test failed"
         }
 
 @app.get("/api/v1/health", tags=["System"])

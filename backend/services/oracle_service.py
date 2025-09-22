@@ -15,12 +15,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PriceData:
-    currency_pair: str; rate: Decimal; source: str
-    timestamp: datetime; confidence: float; volume_24h: Optional[Decimal] = None
+    currency_pair: str
+    rate: Decimal
+    source: str
+    timestamp: datetime
+    confidence: float
+    volume_24h: Optional[Decimal] = None
+    
     def to_dict(self):
-        data = asdict(self); data['rate'] = str(self.rate)
+        data = asdict(self)
+        data['rate'] = str(self.rate)
         data['timestamp'] = self.timestamp.isoformat()
-        if self.volume_24h: data['volume_24h'] = str(self.volume_24h)
+        if self.volume_24h:
+            data['volume_24h'] = str(self.volume_24h)
         return data
 
 class OracleService:

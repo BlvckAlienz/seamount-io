@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
     from backend.services.algorand_service import AlgorandService
+    from backend.services.oracle_service import OracleService
 else:
     # Runtime imports for actual service instantiation
     try:
@@ -32,6 +33,7 @@ else:
         from backend.services.kyc_service import KYCService
         from backend.services.database_service import DatabaseService
         from backend.services.algorand_service import AlgorandService
+        from backend.services.oracle_service import OracleService
     except ImportError as e:
         logging.warning(f"Service import failed: {e}")
         WalletService = None
@@ -40,6 +42,7 @@ else:
         KYCService = None
         DatabaseService = None
         AlgorandService = None
+        OracleService = None
        
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ _audit_service: Optional["AuditService"] = None
 _kyc_service: Optional["KYCService"] = None
 _database_service: Optional["DatabaseService"] = None
 _algorand_service: Optional["AlgorandService"] = None
+_oracle_service: Optional["OracleService"] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
 
@@ -70,11 +74,12 @@ def initialize_dependencies(
     audit_service: Optional["AuditService"] = None,
     kyc_service: Optional["KYCService"] = None,
     database_service: Optional["DatabaseService"] = None,
-    algorand_service: Optional["AlgorandService"] = None
+    algorand_service: Optional["AlgorandService"] = None,
+    oracle_service: Optional["OracleService"] = None  # Add this parameter
 ):
     """Initialize dependency services - used in main.py startup"""
     global _supabase_client, _wallet_service, _notification_service
-    global _audit_service, _kyc_service, _database_service, _algorand_service
+    global _audit_service, _kyc_service, _database_service, _algorand_service, _oracle_service
     
     _supabase_client = supabase_client
     _wallet_service = wallet_service
@@ -83,6 +88,7 @@ def initialize_dependencies(
     _kyc_service = kyc_service
     _database_service = database_service
     _algorand_service = algorand_service
+    _oracle_service = oracle_service  # Set the oracle service
     
     logger.info("✅ Dependencies initialized successfully")
 
@@ -149,6 +155,36 @@ def get_algorand_service() -> "AlgorandService":
             raise HTTPException(status_code=500, detail="Algorand service initialization failed")
     
     return _algorand_service
+
+def get_oracle_service() -> "OracleService":
+    """Get Oracle service instance - CRITICAL for real-time conversion rates"""
+    global _oracle_service
+    
+    if _oracle_service is None:
+        try:
+            from backend.services.oracle_service import OracleService
+            
+            # Get the database service instance first
+            db_service = get_database_service()
+            if db_service is None:
+                logger.error("Database service not available for Oracle service")
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Database service not available - required for Oracle service"
+                )
+            
+            # Initialize with both settings and database service
+            _oracle_service = OracleService(get_settings_cached(), db_service)
+            logger.info("✅ Oracle service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Oracle service: {e}")
+            # For production, we can't run without Oracle service
+            raise HTTPException(
+                status_code=500, 
+                detail="Oracle service initialization failed - critical for conversion rates"
+            )
+    
+    return _oracle_service
     
 # Add this function to handle missing payment providers gracefully
 def get_payment_service():
