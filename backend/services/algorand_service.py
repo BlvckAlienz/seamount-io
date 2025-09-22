@@ -21,26 +21,26 @@ class AlgorandService:
     The single source of truth for all interactions with the Algorand blockchain.
     This service handles raw on-chain operations like transfers, minting, and balance checks.
     """
-     def __init__(self, settings: Settings):
-        self.settings = settings
-        self.algod_client = algod.AlgodClient(
-            settings.ALGORAND_API_KEY.get_secret_value() if settings.ALGORAND_API_KEY else "",
-            settings.ALGORAND_NODE_URL
-        )
-        # REMOVE: self.usds_asset_id = settings.USDS_ASSET_ID
-        # REMOVE: self.decimals = 6
+    def __init__(self, settings: Settings):
+       self.settings = settings
+       self.algod_client = algod.AlgodClient(
+           settings.ALGORAND_API_KEY.get_secret_value() if settings.ALGORAND_API_KEY else "",
+           settings.ALGORAND_NODE_URL
+       )
+       # REMOVE: self.usds_asset_id = settings.USDS_ASSET_ID
+       # REMOVE: self.decimals = 6
 
-        if not settings.ALGORAND_CREATOR_MNEMONIC:
-            raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
+       if not settings.ALGORAND_CREATOR_MNEMONIC:
+           raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
         
-        try:
-            mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
-            self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
-            self.treasury_address = account.address_from_private_key(self.treasury_private_key)
-            logger.info(f"AlgorandService initialized. Treasury Address: {self.treasury_address}")
-        except Exception as e:
-            logger.critical(f"Failed to derive treasury account from mnemonic: {e}", exc_info=True)
-            raise
+       try:
+           mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
+           self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
+           self.treasury_address = account.address_from_private_key(self.treasury_private_key)
+           logger.info(f"AlgorandService initialized. Treasury Address: {self.treasury_address}")
+       except Exception as e:
+           logger.critical(f"Failed to derive treasury account from mnemonic: {e}", exc_info=True)
+           raise
 
     # NEW GENERIC METHOD: Get balance for any asset
     async def get_asset_balance(self, address: str, asset_id: int) -> Decimal:
