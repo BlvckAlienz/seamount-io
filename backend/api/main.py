@@ -60,6 +60,9 @@ except ImportError as e:
     def get_kyc_service():
         raise HTTPException(status_code=503, detail="KYC service not available")
     
+    def get_db_service():
+        raise HTTPException(status_code=503, detail="Database service not available")
+    
     def initialize_dependencies(*args, **kwargs):
         logging.warning("Dependencies initialization skipped due to import errors")
 
@@ -256,8 +259,8 @@ async def lifespan(app: FastAPI):
                     kyc_service = KYCService(
                         settings, 
                         supabase_client, 
-                        get_db_service(),  # Use the correct function
-                        get_audit_service()
+                        database_service,
+                        audit_service
                     )
 
                     # Test KYC service initialization with health check
@@ -301,11 +304,17 @@ async def lifespan(app: FastAPI):
                     logger.info(f"Business model initialized. Starter license fee in Nigeria: {license_fee}")
                 except Exception as e:
                     logger.warning(f"Business model calculation failed: {e}")
-            yield
-        except Exception as e:
-            logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-            raise
-        logger.info("--- Seamount API Shutting Down ---")
+            except Exception as e:
+                logger.error(f"Service initialization error: {e}")
+                # Don't raise the error, continue with partial initialization
+                logger.warning("Continuing with partial service initialization")
+    except Exception as e:
+        logger.critical(f"FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+        raise
+    
+    yield
+    
+    logger.info("--- Seamount API Shutting Down ---")
 
 app = FastAPI(
     title="Seamount.io API",
