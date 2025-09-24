@@ -1,13 +1,293 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Seamount Tools - Cross-Border Savings Calculator</title>
-    <meta name="description" content="Calculate how much you save on cross-border transfers with Seamount">
-</head>
-<body>
-    <div id="root"></div>
+    
+    <!-- Professional SEO & Branding Meta Tags -->
+    <title>Seamount Cross-Border Savings Calculator | Save 70% on International Transfers</title>
+    <meta name="description" content="Calculate your savings with stablecoin cross-border payments. Save 60-80% vs banks with transparent pricing, instant settlement, and no hidden fees." />
+    <meta name="keywords" content="cross-border payments, stablecoins, international transfers, remittance calculator, forex savings, USDS" />
+    <meta name="author" content="Seamount.io" />
+    
+    <!-- Open Graph for Professional Social Sharing -->
+    <meta property="og:title" content="Seamount Cross-Border Savings Calculator" />
+    <meta property="og:description" content="Save 60-80% on international transfers with stablecoins. No hidden bank fees, instant settlement." />
+    <meta property="og:image" content="https://seamount.io/og-image.png" />
+    <meta property="og:url" content="https://tools.seamount.io" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Seamount" />
+    
+    <!-- Twitter Card for Professional Sharing -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@seamountusd" />
+    <meta name="twitter:title" content="Seamount Cross-Border Savings Calculator" />
+    <meta name="twitter:description" content="Save 60-80% on international transfers with stablecoins" />
+    <meta name="twitter:image" content="https://seamount.io/og-image.png" />
+    
+    <!-- Unified Branding - Favicon Integration from Main Site -->
+    <link rel="icon" type="image/x-icon" href="https://seamount.io/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://seamount.io/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://seamount.io/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://seamount.io/favicon-16x16.png" />
+    <link rel="manifest" href="https://seamount.io/site.webmanifest" />
+    <meta name="theme-color" content="#1e40af" />
+    
+    <!-- Enhanced Performance & Security Headers -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="referrer" content="origin-when-cross-origin" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Preload Critical Resources for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://seamount.io" />
+    
+    <!-- CRITICAL CSS Reset - Eliminates All Styling Conflicts -->
+    <style>
+      /* Complete CSS Reset for Professional Financial Platform */
+      *, *::before, *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        scroll-behavior: smooth;
+      }
+      
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100%;
+        min-height: 100vh;
+        background: transparent !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        line-height: 1.5;
+        color: #111827;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overflow-x: hidden;
+      }
+      
+      #root {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100%;
+        min-height: 100vh;
+        background: transparent !important;
+        display: block;
+      }
+      
+      /* Remove any existing app wrapper interference */
+      .App, .app, body > div:first-child {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: none !important;
+        min-height: auto !important;
+        height: auto !important;
+      }
+      
+      /* Ensure proper element resets */
+      button {
+        border: none;
+        background: none;
+        font-family: inherit;
+        cursor: pointer;
+      }
+      
+      input, select, textarea {
+        font-family: inherit;
+        border: none;
+        background: none;
+      }
+      
+      /* Professional focus states for accessibility */
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+      }
+      
+      /* Loading spinner for professional UX */
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(59, 130, 246, 0.3);
+        border-radius: 50%;
+        border-top-color: #3b82f6;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Mobile optimization for better conversion */
+      @media (max-width: 768px) {
+        body {
+          font-size: 14px;
+        }
+      }
+      
+      /* Ensure modal and overlay proper layering */
+      [style*="z-index: 1000"], [style*="z-index: 50"] {
+        z-index: 9999 !important;
+      }
+      
+      /* Critical: Complete style isolation */
+      .seamount-financial-platform {
+        all: initial;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        width: 100%;
+        min-height: 100vh;
+        display: block;
+      }
+    </style>
+    
+    <!-- Tailwind CSS CDN for Consistent Professional Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Enhanced Tailwind Configuration for Seamount Branding -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'seamount': {
+                50: '#eff6ff',
+                100: '#dbeafe',
+                200: '#bfdbfe',
+                300: '#93c5fd',
+                400: '#60a5fa',
+                500: '#3b82f6',
+                600: '#1e40af',
+                700: '#1e3a8a',
+                800: '#1e3a8a',
+                900: '#1e3a8a'
+              }
+            },
+            fontFamily: {
+              'sans': ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+            },
+            animation: {
+              'bounce-slow': 'bounce 2s infinite',
+              'pulse-slow': 'pulse 3s infinite',
+              'fade-in': 'fadeIn 0.5s ease-in-out'
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' }
+              }
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  
+  <body>
+    <!-- Main Application Container with Professional Styling -->
+    <div id="root" class="seamount-financial-platform"></div>
+    
+    <!-- Professional No-JavaScript Fallback -->
+    <noscript>
+      <div style="
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        text-align: center;
+        padding: 2rem;
+      ">
+        <div style="
+          background: white; 
+          padding: 3rem; 
+          border-radius: 16px; 
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          max-width: 480px;
+          width: 100%;
+        ">
+          <div style="margin-bottom: 2rem;">
+            <h1 style="
+              color: #1e40af; 
+              margin-bottom: 1rem; 
+              font-size: 1.875rem; 
+              font-weight: 700;
+              line-height: 1.2;
+            ">Seamount Cross-Border Calculator</h1>
+            <p style="
+              color: #6b7280; 
+              margin-bottom: 2rem; 
+              font-size: 1.125rem;
+              line-height: 1.6;
+            ">JavaScript is required to access our professional financial platform and calculate your cross-border transfer savings.</p>
+          </div>
+          <div style="space-y: 1rem;">
+            <a href="https://seamount.io" style="
+              display: inline-block;
+              background: linear-gradient(135deg, #1e40af, #4338ca);
+              color: white;
+              padding: 1rem 2rem;
+              text-decoration: none;
+              border-radius: 8px;
+              font-weight: 600;
+              font-size: 1rem;
+              margin-right: 1rem;
+              margin-bottom: 1rem;
+              transition: all 0.2s;
+            ">Visit Main Platform</a>
+            <p style="color: #9ca3af; font-size: 0.875rem; margin-top: 1.5rem;">
+              Enable JavaScript to access real-time FX rates, savings calculations, and our stablecoin education center.
+            </p>
+          </div>
+        </div>
+      </div>
+    </noscript>
+    
+    <!-- Enhanced Error Handling & Analytics -->
+    <script>
+      // Professional error boundary for better user experience
+      window.addEventListener('error', function(event) {
+        console.error('Application Error:', {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          error: event.error
+        });
+      });
+      
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled Promise Rejection:', {
+          reason: event.reason,
+          promise: event.promise
+        });
+      });
+      
+      // Performance monitoring for optimization insights
+      window.addEventListener('load', function() {
+        const perfData = performance.timing;
+        const loadTime = perfData.loadEventEnd - perfData.navigationStart;
+        console.log('Seamount Financial Platform loaded in:', loadTime, 'ms');
+      });
+      
+      // Seamount platform ready indicator
+      window.addEventListener('DOMContentLoaded', function() {
+        console.log('Seamount Cross-Border Savings Calculator initializing...');
+      });
+    </script>
+    
+    <!-- Application Entry Point -->
     <script type="module" src="/src/main.jsx"></script>
-</body>
+  </body>
 </html>
