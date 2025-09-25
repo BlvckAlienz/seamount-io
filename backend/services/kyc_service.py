@@ -618,3 +618,7 @@ class KYCService:
             
             logger.warning(f"KYC verification failed for user {user_id}")
             return {"success": True, "status": "rejected", "tier": 0}
+            
+        except Exception as e:
+            logger.error(f"Error handling check unrecognised for user {user_id}: {e}")
+            raise
