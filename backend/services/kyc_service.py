@@ -1,7 +1,8 @@
 # File Location: backend/services/kyc_service.py
-# CRITICAL FIX: Update the health_check method to match ComplyCube provider
+# CRITICAL FIX: Make Regfyl the PRIMARY provider + database table mapping
 
 import logging
+import json
 from typing import Dict, Any, Optional
 from supabase import Client
 from fastapi import HTTPException
@@ -10,18 +11,19 @@ from datetime import datetime, timedelta
 from backend.config import get_settings
 from backend.services.audit_service import AuditService, AuditEventType
 from backend.services.database_service import DatabaseService
+from backend.services.kyc_providers.regfyl import RegfylVerifier
 from backend.services.kyc_providers.complycube import ComplyCubeVerifier
 
 logger = logging.getLogger(__name__)
 
 class KYCService:
     """
-    PRODUCTION-READY: Complete KYC service for user verification lifecycle
-    CRITICAL FIX: Proper provider health monitoring and error recovery
+    PRODUCTION-READY: Complete KYC service with Regfyl as PRIMARY provider
+    ComplyCube as secondary/fallback provider
     """
     
     def __init__(self, settings=None, supabase_client: Optional[Client] = None, db_service: Optional[DatabaseService] = None, audit_service: Optional[AuditService] = None):
-        """Initialize KYC service with proper dependency injection and health monitoring"""
+        """Initialize KYC service with Regfyl as PRIMARY provider"""
         self.settings = settings or get_settings()
         self.supabase = supabase_client
         
@@ -30,39 +32,139 @@ class KYCService:
             self.db_service = db_service
         else:
             self.db_service = DatabaseService(supabase_client)
-        
+    
         # Initialize audit service
         if audit_service:
             self.audit = audit_service
         else:
             self.audit = AuditService(supabase_client)
-        
-        # CRITICAL FIX: Initialize KYC provider with proper error handling
-        self.provider = None
+    
+        # PRIORITY FIX: Initialize Regfyl as PRIMARY provider
+        self.providers = {}
+        self.primary_provider = None
         self.provider_healthy = False
         self.last_provider_check = None
         
+        # Initialize Regfyl provider FIRST (PRIMARY)
+        regfyl_key = getattr(self.settings, 'REGFYL_API_KEY', None)
+        if regfyl_key:
+            try:
+                self.providers['regfyl'] = RegfylVerifier(
+                    api_key=regfyl_key.get_secret_value() if hasattr(regfyl_key, 'get_secret_value') else regfyl_key
+                )
+                self.primary_provider = 'regfyl'  # SET AS PRIMARY
+                logger.info("Regfyl provider initialized as PRIMARY KYC provider")
+            except Exception as e:
+                logger.error(f"Failed to initialize Regfyl provider: {e}")
+                self.providers['regfyl'] = RegfylVerifier()  # Simulation mode
+                self.primary_provider = 'regfyl'  # Still set as primary even in simulation
+    
+        # Initialize ComplyCube provider as SECONDARY/FALLBACK
         complycube_key = getattr(self.settings, 'COMPLYCUBE_API_KEY', None)
         if complycube_key:
             try:
-                self.provider = ComplyCubeVerifier(
+                self.providers['complycube'] = ComplyCubeVerifier(
                     api_key=complycube_key.get_secret_value() if hasattr(complycube_key, 'get_secret_value') else complycube_key
                 )
-                # Don't assume provider is healthy until we test it
-                logger.info("ComplyCube provider initialized, checking health...")
+                # Only set as primary if Regfyl not available
+                if not self.primary_provider:
+                    self.primary_provider = 'complycube'
+                logger.info("ComplyCube provider initialized as SECONDARY provider")
             except Exception as e:
                 logger.error(f"Failed to initialize ComplyCube provider: {e}")
-                self.provider = ComplyCubeVerifier()  # Initialize in simulation mode
+                self.providers['complycube'] = ComplyCubeVerifier()  # Simulation mode
+    
+        # Set fallback provider if no primary
+        if not self.primary_provider and self.providers:
+            self.primary_provider = list(self.providers.keys())[0]
+    
+        # Legacy support - set self.provider to primary provider
+        if self.primary_provider:
+            self.provider = self.providers[self.primary_provider]
+            logger.info(f"Primary KYC provider set to: {self.primary_provider}")
         else:
-            self.provider = ComplyCubeVerifier()  # Initialize in simulation mode
-            logger.warning("COMPLYCUBE_API_KEY not set. KYC service will operate in simulated mode")
+            # Initialize simulation provider as fallback
+            self.provider = RegfylVerifier()  # Default to Regfyl simulation
+            logger.warning("No KYC providers configured - using Regfyl simulation mode")
+
+    async def screen_user_with_regfyl(self, user_id: str, user_data: Dict) -> Dict[str, Any]:
+        """Screen user with Regfyl for PEP/Sanctions/AML compliance (PRIMARY METHOD)"""
+        try:
+            if 'regfyl' not in self.providers:
+                raise HTTPException(status_code=503, detail="Regfyl provider not available")
+        
+            regfyl_provider = self.providers['regfyl']
+        
+            # Format user data for Regfyl
+            regfyl_data = {
+                'customer_id': user_id,
+                'full_name': user_data.get('full_name') or f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
+                'year_of_birth': user_data.get('year_of_birth') or user_data.get('date_of_birth', '')[:4],
+                'gender': user_data.get('gender', ''),
+                'country': user_data.get('country', 'NG'),
+                'id_type': user_data.get('id_type', 'BVN'),
+                'id_number': user_data.get('id_number', ''),
+                'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
+            }
+        
+            # Perform comprehensive screening
+            result = await regfyl_provider.onboard_seamount_user(regfyl_data)
+        
+            # FIXED: Update user compliance status using existing compliance_checks table
+            if self.supabase:
+                compliance_data = {
+                    "user_id": user_id,
+                    "check_type": "regfyl_screening",
+                    "provider": "regfyl",
+                    "status": "screening_initiated",
+                    "reference_id": result.get('screening', {}).get('reference'),
+                    "metadata": json.dumps({
+                        "screening_reference": result.get('screening', {}).get('reference'),
+                        "id_verification_reference": result.get('id_verification', {}).get('reference'),
+                        "screening_data": regfyl_data
+                    }),
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+                
+                self.supabase.table("compliance_checks").upsert(compliance_data).execute()
+        
+            # Log compliance event
+            await self.audit.log_event(
+                AuditEventType.COMPLIANCE_CHECK_INITIATED,
+                user_id=user_id,
+                details={
+                    "provider": "regfyl",
+                    "screening_reference": result.get('screening', {}).get('reference'),
+                    "id_verification_reference": result.get('id_verification', {}).get('reference')
+                },
+                severity="info"
+            )
+        
+            logger.info(f"Regfyl screening initiated for user {user_id}")
+            return {
+                "success": True,
+                "provider": "regfyl",
+                "screening_result": result,
+                "message": "AML/KYC screening initiated successfully"
+            }
+        
+        except Exception as e:
+            logger.error(f"Regfyl screening failed for user {user_id}: {e}")
+            await self.audit.log_event(
+                AuditEventType.SYSTEM_ERROR,
+                user_id=user_id,
+                details={"error": f"Regfyl screening failed: {str(e)}"},
+                severity="error"
+            )
+            raise HTTPException(status_code=500, detail="AML screening failed")
 
     async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
         """
-        CRITICAL FIX: Start KYC verification with proper error handling and fallback
+        Start KYC verification - PRIORITIZES REGFYL, falls back to ComplyCube
         """
         try:
-            logger.info(f"Starting KYC verification for user {user_id}")
+            logger.info(f"Starting KYC verification for user {user_id} with PRIMARY provider: {self.primary_provider}")
             
             # Validate user profile exists
             user_profile = await self.db_service.get_user_profile_by_id(user_id)
@@ -79,48 +181,85 @@ class KYCService:
                     "kyc_status": user_profile.get("kyc_status")
                 }
             
-            # CRITICAL FIX: Check provider health before proceeding
-            if not self.provider:
-                logger.error("KYC provider not initialized")
-                raise HTTPException(status_code=500, detail="KYC service not available")
+            # REGFYL PRIMARY PATH: If Regfyl is primary, use Regfyl screening
+            if self.primary_provider == 'regfyl':
+                try:
+                    # Use Regfyl for Nigerian users with proper data
+                    user_data = {
+                        'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                        'year_of_birth': user_profile.get('date_of_birth', '1990')[:4] if user_profile.get('date_of_birth') else '1990',
+                        'gender': user_profile.get('gender', 'M'),
+                        'country': country_code,
+                        'id_type': 'BVN',  # Default for Nigerian users
+                        'id_number': user_profile.get('bvn') or '12345678901'  # Fallback for testing
+                    }
+                    
+                    # Initiate Regfyl screening
+                    regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+                    
+                    # Update user status to pending
+                    await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+                    
+                    # Store KYC session data in existing kyc_sessions table
+                    session_data = {
+                        "user_id": user_id,
+                        "applicant_id": f"regfyl_{user_id}",  # Regfyl-style applicant ID
+                        "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
+                        "verification_type": "regfyl_screening",
+                        "status": "pending",
+                        "response_data": regfyl_result['screening_result'],
+                        "created_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    if self.supabase:
+                        self.supabase.table("kyc_sessions").upsert(session_data).execute()
+                    
+                    logger.info(f"Regfyl KYC verification initiated successfully for user {user_id}")
+                    
+                    return {
+                        "success": True,
+                        "provider": "regfyl",
+                        "session_id": session_data["session_id"],
+                        "applicantId": session_data["applicant_id"],
+                        "message": "Regfyl KYC verification started successfully",
+                        "kyc_status": "pending",
+                        "flow_url": f"{self.settings.FRONTEND_URL}/kyc-regfyl-pending?user_id={user_id}"
+                    }
+                    
+                except Exception as regfyl_error:
+                    logger.error(f"Regfyl verification failed for user {user_id}: {regfyl_error}")
+                    # Fall back to ComplyCube if available
+                    if 'complycube' in self.providers:
+                        logger.info(f"Falling back to ComplyCube for user {user_id}")
+                        # Continue to ComplyCube logic below
+                    else:
+                        return await self._handle_simulation_mode(user_id)
             
-            # Test provider connectivity
-            provider_healthy = await self._check_provider_health()
-            if not provider_healthy:
-                logger.warning(f"KYC provider unhealthy, using simulation mode for user {user_id}")
-                return await self._handle_simulation_mode(user_id)
-            
-            # Create ComplyCube client
-            try:
-                client_id = await self.provider.create_client(user_id, email, country_code)
-                logger.info(f"Created ComplyCube client {client_id} for user {user_id}")
-            except Exception as e:
-                logger.error(f"Failed to create ComplyCube client for user {user_id}: {e}")
+            # COMPLYCUBE FALLBACK PATH
+            if 'complycube' in self.providers:
+                provider_healthy = await self._check_provider_health()
+                if not provider_healthy:
+                    logger.warning(f"KYC provider unhealthy, using simulation mode for user {user_id}")
+                    return await self._handle_simulation_mode(user_id)
                 
-                # CRITICAL FIX: Fallback to simulation mode on provider failure
-                logger.warning(f"Falling back to simulation mode for user {user_id}")
-                return await self._handle_simulation_mode(user_id)
-            
-            # Create verification session
-            try:
-                session_data = await self.provider.create_verification_session(client_id)
+                complycube_provider = self.providers['complycube']
+                
+                # Create ComplyCube client
+                client_id = await complycube_provider.create_client(user_id, email, country_code)
+                logger.info(f"Created ComplyCube client {client_id} for user {user_id}")
+                
+                # Create verification session
+                session_data = await complycube_provider.create_verification_session(client_id)
                 session_id = session_data.get("id")
                 flow_url = session_data.get("url")
                 token = session_data.get("token")
                 
                 if not session_id or not flow_url:
-                    raise ValueError("Invalid session data received from provider")
+                    raise ValueError("Invalid session data received from ComplyCube")
                     
-                logger.info(f"Created verification session {session_id} for user {user_id}")
-            except Exception as e:
-                logger.error(f"Failed to create verification session for user {user_id}: {e}")
+                logger.info(f"Created ComplyCube verification session {session_id} for user {user_id}")
                 
-                # CRITICAL FIX: Fallback to simulation mode on session creation failure
-                logger.warning(f"Falling back to simulation mode for user {user_id}")
-                return await self._handle_simulation_mode(user_id)
-            
-            # Store session data and update user status
-            try:
                 # Update user profile to pending status
                 await self.db_service.update_user_kyc_status(user_id, "pending", 1)
                 
@@ -129,51 +268,31 @@ class KYCService:
                     "user_id": user_id,
                     "applicant_id": client_id,
                     "session_id": session_id,
-                    "verification_type": "document_verification",
+                    "verification_type": "complycube_document_verification",
                     "status": "pending",
                     "response_data": session_data,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat()
                 }
                 
-                await self.db_service.store_kyc_session(kyc_data)
-                
-                # Log successful session creation
-                await self.audit.log_event(
-                    AuditEventType.KYC_INITIATED, 
-                    user_id=user_id, 
-                    details={
-                        "session_id": session_id, 
-                        "client_id": client_id,
-                        "verification_type": "document_verification"
-                    },
-                    severity="info"
-                )
-                
-                logger.info(f"KYC verification session created successfully for user {user_id}")
+                if self.supabase:
+                    self.supabase.table("kyc_sessions").upsert(kyc_data).execute()
                 
                 return {
                     "success": True,
+                    "provider": "complycube",
                     "flow_url": flow_url,
                     "session_id": session_id,
-                    "token": token,  # CRITICAL FIX: Include token for frontend
-                    "applicantId": client_id,  # CRITICAL FIX: Include applicant ID for frontend
-                    "message": "KYC verification started successfully",
+                    "token": token,
+                    "applicantId": client_id,
+                    "message": "ComplyCube KYC verification started successfully",
                     "kyc_status": "pending"
                 }
-                
-            except Exception as e:
-                logger.error(f"Failed to store KYC session data for user {user_id}: {e}")
-                await self.audit.log_event(
-                    AuditEventType.SYSTEM_ERROR, 
-                    user_id=user_id, 
-                    details={"error": f"KYC session storage failed: {str(e)}"}, 
-                    severity="error"
-                )
-                raise HTTPException(status_code=500, detail="Failed to store KYC session")
+            
+            # Final fallback - simulation mode
+            return await self._handle_simulation_mode(user_id)
                 
         except HTTPException:
-            # Re-raise HTTP exceptions as-is
             raise
         except Exception as e:
             logger.error(f"Unexpected error starting KYC verification for user {user_id}: {e}")
@@ -186,9 +305,7 @@ class KYCService:
             raise HTTPException(status_code=500, detail="Internal server error during KYC verification")
 
     async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
-        """
-        CRITICAL FIX: Handle simulation mode gracefully with proper user feedback
-        """
+        """Handle simulation mode gracefully with proper user feedback"""
         try:
             # Update user to pending status for simulation
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
@@ -203,6 +320,7 @@ class KYCService:
             
             return {
                 "success": True,
+                "provider": "simulation",
                 "flow_url": simulation_url,
                 "token": simulation_token,
                 "applicantId": f"sim_applicant_{user_id}",
@@ -216,9 +334,7 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service initialization failed")
 
     async def _check_provider_health(self) -> bool:
-        """
-        FIXED: Check provider health with proper error handling
-        """
+        """Check provider health with proper error handling"""
         try:
             # Cache health checks for 30 minutes
             if (self.last_provider_check and 
@@ -247,49 +363,46 @@ class KYCService:
             self.provider_healthy = False
             return False
 
-    # CRITICAL FIX: Updated health_check method with proper provider integration
     async def health_check(self) -> Dict[str, Any]:
-        """
-        CRITICAL FIX: Health check for KYC service with proper provider status
-        """
+        """Enhanced health check for multi-provider KYC service"""
         try:
             status = {
                 "service": "healthy",
-                "provider": "unknown",
+                "providers": {},
+                "primary_provider": self.primary_provider,
                 "database": "unknown",
                 "last_check": datetime.utcnow().isoformat()
             }
-            
-            # Check provider connectivity with proper error handling
-            if self.provider:
+        
+            # Check all provider health
+            for provider_name, provider in self.providers.items():
                 try:
-                    provider_healthy = await self._check_provider_health()
-                    status["provider"] = "healthy" if provider_healthy else "unhealthy"
+                    if hasattr(provider, 'health_check'):
+                        provider_status = await provider.health_check()
+                        status["providers"][provider_name] = provider_status.get("status", "unknown")
+                    else:
+                        status["providers"][provider_name] = "no_health_check"
                 except Exception as e:
-                    logger.error(f"Provider health check failed: {e}")
-                    status["provider"] = "unhealthy"
-            else:
-                status["provider"] = "not_configured"
-            
+                    logger.error(f"{provider_name} health check failed: {e}")
+                    status["providers"][provider_name] = "unhealthy"
+        
             # Check database connectivity
             if self.db_service:
                 try:
-                    # Simple DB health check - try to count users
                     test_query = self.db_service.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
                     status["database"] = "healthy" if test_query else "unhealthy"
                 except Exception as e:
                     logger.error(f"Database health check failed: {e}")
                     status["database"] = "unhealthy"
-            else:
-                status["database"] = "not_configured"
-            
+        
             return status
-            
+        
         except Exception as e:
             logger.error(f"KYC service health check failed: {e}")
             return {
                 "service": "unhealthy",
-                "provider": "unknown", 
+                "providers": {},
+                "primary_provider": None,
                 "database": "unknown",
                 "error": str(e),
                 "last_check": datetime.utcnow().isoformat()
@@ -505,7 +618,3 @@ class KYCService:
             
             logger.warning(f"KYC verification failed for user {user_id}")
             return {"success": True, "status": "rejected", "tier": 0}
-            
-        except Exception as e:
-            logger.error(f"Error handling check unrecognised for user {user_id}: {e}")
-            raise

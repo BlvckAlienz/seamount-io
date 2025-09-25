@@ -12,6 +12,8 @@ from datetime import datetime
 from backend.dependencies import get_supabase_client
 from backend.config import get_settings, Settings
 from backend.services.wallet_service import WalletService
+from backend.services.kyc_providers.regfyl import regfyl_service
+from backend.services.database_service import DatabaseService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -261,3 +263,322 @@ async def handle_flutterwave_failure(data):
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave failure: {str(e)}")
+        
+# ============================================================================
+# REGFYL WEBHOOK HANDLERS (FIXED TABLE NAMES)
+# ============================================================================
+
+@router.post("/webhooks/regfyl/screening")
+async def regfyl_screening_webhook(request: Request):
+    """Handle Regfyl customer screening callbacks"""
+    try:
+        payload = await request.json()
+        
+        # Verify webhook signature
+        signature = request.headers.get("x-Signature")
+        if not signature:
+            logger.warning("Missing Regfyl webhook signature")
+            raise HTTPException(status_code=401, detail="Missing signature")
+        
+        # Verify signature using Regfyl service
+        body = await request.body()
+        expected_signature = regfyl_service._generate_signature(body.decode('utf-8'))
+        
+        if not hmac.compare_digest(signature, expected_signature):
+            logger.warning("Invalid Regfyl webhook signature")
+            raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse callback data
+        callback_result = regfyl_service.parse_callback(payload)
+        customer_id = callback_result['customer_id']
+        
+        if not customer_id:
+            logger.error("No customer_id in Regfyl callback")
+            return {"status": "error", "message": "Missing customer_id"}
+        
+        # Update user compliance status using EXISTING compliance_checks table
+        supabase = get_supabase_client()
+        
+        compliance_data = {
+            "user_id": customer_id,
+            "check_type": "regfyl_screening",
+            "provider": "regfyl",
+            "status": callback_result['status'],
+            "reference_id": callback_result['reference'],
+            "risk_level": callback_result['risk_level'],
+            "metadata": json.dumps({
+                "action_required": callback_result['action_required'],
+                "callback_data": payload
+            }),
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Use UPSERT with compliance_checks table
+        supabase.table("compliance_checks").upsert(compliance_data).execute()
+        
+        logger.info(f"Regfyl screening callback processed for user {customer_id}: {callback_result['status']}")
+        
+        return {"status": "success", "message": "Screening callback processed"}
+        
+    except Exception as e:
+        logger.error(f"Regfyl screening webhook failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+@router.post("/webhooks/regfyl/id-verification")
+async def regfyl_id_verification_webhook(request: Request):
+    """Handle Regfyl ID verification callbacks"""
+    try:
+        payload = await request.json()
+        
+        # Verify webhook signature
+        signature = request.headers.get("x-Signature")
+        if signature:
+            body = await request.body()
+            expected_signature = regfyl_service._generate_signature(body.decode('utf-8'))
+            
+            if not hmac.compare_digest(signature, expected_signature):
+                logger.warning("Invalid Regfyl ID verification webhook signature")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse callback data
+        callback_result = regfyl_service.parse_callback(payload)
+        customer_id = callback_result['customer_id']
+        
+        if not customer_id:
+            logger.error("No customer_id in Regfyl ID verification callback")
+            return {"status": "error", "message": "Missing customer_id"}
+        
+        supabase = get_supabase_client()
+        
+        # Update both compliance_checks and user KYC status based on ID verification result
+        compliance_data = {
+            "user_id": customer_id,
+            "check_type": "regfyl_id_verification",
+            "provider": "regfyl",
+            "status": callback_result['status'],
+            "reference_id": callback_result['reference'],
+            "risk_level": callback_result['risk_level'],
+            "metadata": json.dumps({
+                "action_required": callback_result['action_required'],
+                "callback_data": payload
+            }),
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Store in compliance_checks table
+        supabase.table("compliance_checks").upsert(compliance_data).execute()
+        
+        # Update user profile based on verification result
+        if callback_result['status'] in ['Reviewed - Cleared', 'Cleared']:
+            # ID verification passed - update to tier 2
+            supabase.table("user_profiles").update({
+                "kyc_status": "id_verified",
+                "kyc_tier": 2,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", customer_id).execute()
+            
+        elif callback_result['action_required']:
+            # ID verification requires action
+            supabase.table("user_profiles").update({
+                "kyc_status": "manual_review",
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", customer_id).execute()
+        
+        logger.info(f"Regfyl ID verification callback processed for user {customer_id}: {callback_result['status']}")
+        
+        return {"status": "success", "message": "ID verification callback processed"}
+        
+    except Exception as e:
+        logger.error(f"Regfyl ID verification webhook failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+@router.post("/webhooks/regfyl/transaction-monitoring")
+async def regfyl_transaction_monitoring_webhook(request: Request):
+    """Handle Regfyl transaction monitoring callbacks"""
+    try:
+        payload = await request.json()
+        
+        # Verify webhook signature
+        signature = request.headers.get("x-Signature")
+        if signature:
+            body = await request.body()
+            expected_signature = regfyl_service._generate_signature(body.decode('utf-8'))
+            
+            if not hmac.compare_digest(signature, expected_signature):
+                logger.warning("Invalid Regfyl transaction monitoring webhook signature")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse callback data
+        callback_result = regfyl_service.parse_callback(payload)
+        customer_id = callback_result['customer_id']
+        transaction_reference = payload.get('transactionReference')
+        
+        if not customer_id or not transaction_reference:
+            logger.error("Missing required data in Regfyl transaction monitoring callback")
+            return {"status": "error", "message": "Missing required data"}
+        
+        supabase = get_supabase_client()
+        
+        # Store transaction monitoring result in compliance_logs table
+        compliance_data = {
+            "user_id": customer_id,
+            "transaction_id": transaction_reference,
+            "compliance_type": "regfyl_transaction_monitoring",
+            "provider": "regfyl",
+            "status": callback_result['status'],
+            "reference_id": callback_result['reference'],
+            "risk_level": callback_result['risk_level'],
+            "metadata": json.dumps({
+                "action_required": callback_result['action_required'],
+                "callback_data": payload
+            }),
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        # Store in compliance_logs table
+        supabase.table("compliance_logs").upsert(compliance_data).execute()
+        
+        # If high risk or action required, flag the transaction
+        if callback_result['action_required'] or callback_result['risk_level'] == 'HIGH':
+            # Update transaction status in existing transactions table
+            supabase.table("transactions").update({
+                "status": "flagged",
+                "metadata": json.dumps({
+                    "compliance_flag": "regfyl_manual_review",
+                    "compliance_notes": f"Regfyl flagged: {callback_result['status']}"
+                }),
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("transaction_id", transaction_reference).execute()
+            
+            logger.warning(f"Transaction {transaction_reference} flagged by Regfyl for manual review")
+        
+        logger.info(f"Regfyl transaction monitoring callback processed: {transaction_reference}")
+        
+        return {"status": "success", "message": "Transaction monitoring callback processed"}
+        
+    except Exception as e:
+        logger.error(f"Regfyl transaction monitoring webhook failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+@router.post("/webhooks/regfyl/business-screening")
+async def regfyl_business_screening_webhook(request: Request):
+    """Handle Regfyl business screening callbacks"""
+    try:
+        payload = await request.json()
+        
+        # Verify webhook signature
+        signature = request.headers.get("x-Signature")
+        if signature:
+            body = await request.body()
+            expected_signature = regfyl_service._generate_signature(body.decode('utf-8'))
+            
+            if not hmac.compare_digest(signature, expected_signature):
+                logger.warning("Invalid Regfyl business screening webhook signature")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse callback data
+        callback_result = regfyl_service.parse_callback(payload)
+        customer_id = callback_result['customer_id']
+        
+        if not customer_id:
+            logger.error("No customer_id in Regfyl business screening callback")
+            return {"status": "error", "message": "Missing customer_id"}
+        
+        supabase = get_supabase_client()
+        
+        # Store business screening result in compliance_logs table
+        compliance_data = {
+            "user_id": customer_id,
+            "compliance_type": "regfyl_business_screening",
+            "provider": "regfyl",
+            "status": callback_result['status'],
+            "reference_id": callback_result['reference'],
+            "risk_level": callback_result['risk_level'],
+            "metadata": json.dumps({
+                "action_required": callback_result['action_required'],
+                "callback_data": payload,
+                "business_screening": True
+            }),
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        # Store in compliance_logs table
+        supabase.table("compliance_logs").upsert(compliance_data).execute()
+        
+        logger.info(f"Regfyl business screening callback processed for business {customer_id}: {callback_result['status']}")
+        
+        return {"status": "success", "message": "Business screening callback processed"}
+        
+    except Exception as e:
+        logger.error(f"Regfyl business screening webhook failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        
+# ADD THIS HELPER METHOD after the other webhook handlers:
+
+async def handle_paystack_transfer_success(event_data):
+    """Handle successful Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        amount = float(data.get("amount", 0)) / 100  # Convert from kobo
+        
+        supabase = get_supabase_client()
+        
+        # Update payout transaction status
+        supabase.table("payout_transactions").update({
+            "status": "completed",
+            "provider_tx_id": data.get("id"),
+            "completed_at": datetime.utcnow().isoformat(),
+            "routing_metadata": json.dumps({
+                "paystack_transfer_code": data.get("transfer_code"),
+                "paystack_recipient": data.get("recipient")
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.info(f"Paystack transfer completed: {reference} - {amount} NGN")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer success: {str(e)}")
+
+async def handle_paystack_transfer_failed(event_data):
+    """Handle failed Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        
+        supabase = get_supabase_client()
+        
+        supabase.table("payout_transactions").update({
+            "status": "failed",
+            "routing_metadata": json.dumps({
+                "failure_reason": data.get("failures"),
+                "paystack_transfer_code": data.get("transfer_code")
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.warning(f"Paystack transfer failed: {reference}")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer failure: {str(e)}")
+
+async def handle_paystack_transfer_reversed(event_data):
+    """Handle reversed Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        
+        supabase = get_supabase_client()
+        
+        supabase.table("payout_transactions").update({
+            "status": "reversed",
+            "routing_metadata": json.dumps({
+                "reversal_reason": "Transfer reversed by Paystack"
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.warning(f"Paystack transfer reversed: {reference}")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer reversal: {str(e)}")

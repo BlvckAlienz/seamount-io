@@ -40,7 +40,7 @@ class ErrorBoundary extends React.Component {
               >
                 Refresh Platform
               </button>
-              
+              <a
                 href="https://seamount.io"
                 className="block w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
               >
@@ -60,7 +60,7 @@ class ErrorBoundary extends React.Component {
 const LoadingFallback = () => (
   <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
     <div className="text-center">
-      <div className="loading-spinner mx-auto mb-4"></div>
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
       <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Seamount Platform</h2>
       <p className="text-gray-600">Preparing your cross-border savings calculator...</p>
     </div>

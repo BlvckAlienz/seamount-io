@@ -255,6 +255,15 @@ class Settings(BaseSettings):
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
     COINGECKO_API_KEY: Optional[SecretStr] = None
     
+    # Add after the existing KYC configuration section:
+
+    # --- Regfyl KYC/AML Provider ---
+    REGFYL_API_KEY: Optional[SecretStr] = None
+    REGFYL_BASE_URL: str = Field(default="https://api.portal.regfyl.com")
+    REGFYL_COMPANY_NAME: str = Field(default="Frontwater-Tech Development Ventures Nigeria Limited")
+    REGFYL_RC_NUMBER: str = Field(default="1258168")
+    REGFYL_ENVIRONMENT: str = Field(default="PRODUCTION")
+    
     # --- Algorand Network ---
     ALGORAND_NODE_URL: str = Field(default="https://mainnet-api.algonode.cloud")
     ALGORAND_INDEXER_URL: str = Field(default="https://mainnet-idx.algonode.cloud")

@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 import traceback
 import uuid
 from datetime import datetime
+from pydantic import BaseModel, Field
 
 from backend.dependencies import get_current_user, get_supabase_client, get_kyc_service, get_wallet_service
 from backend.models import UserProfile
@@ -20,6 +21,15 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
+
+class RegfylScreeningRequest(BaseModel):
+    """Request model for Regfyl screening"""
+    full_name: str = Field(..., description="User's full legal name")
+    year_of_birth: str = Field(..., description="Year of birth (YYYY format)")
+    gender: Optional[str] = Field(None, description="Gender (M/F/Other)")
+    country: str = Field(default="NG", description="Country code (ISO 2-letter)")
+    id_type: str = Field(..., description="ID type (BVN/NIN/PHONE_NUMBER)")
+    id_number: str = Field(..., description="ID number for verification")
 
 @router.get("/profile-check")
 async def check_profile_completeness(
@@ -474,3 +484,77 @@ async def get_kyc_requirements(
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"[KYC Requirements] Error for user {current_user.get('id', 'unknown')} [Error ID: {error_id}]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch KYC requirements. Error ID: {error_id}")
+        
+@router.post("/kyc/regfyl/screen", response_model=Dict[str, Any])
+async def initiate_regfyl_screening(
+    request: RegfylScreeningRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase_client: Client = Depends(get_supabase_client)
+):
+    """
+    Initiate Regfyl AML/KYC screening for user
+    Performs PEP, sanctions, adverse media, and ID verification
+    """
+    try:
+        user_id = current_user["user_id"]
+        
+        # Initialize KYC service
+        kyc_service = KYCService(supabase_client=supabase_client)
+        
+        # Prepare user data for Regfyl screening
+        user_data = {
+            "full_name": request.full_name,
+            "year_of_birth": request.year_of_birth,
+            "gender": request.gender,
+            "country": request.country,
+            "id_type": request.id_type,
+            "id_number": request.id_number,
+        }
+        
+        # Initiate screening
+        result = await kyc_service.screen_user_with_regfyl(user_id, user_data)
+        
+        return {
+            "success": True,
+            "data": result,
+            "message": "Regfyl AML/KYC screening initiated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Regfyl screening initiation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to initiate AML/KYC screening"
+        )
+        
+@router.post("/kyc/regfyl/monitor-transaction", response_model=Dict[str, Any])
+async def monitor_transaction_regfyl(
+    transaction_data: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase_client: Client = Depends(get_supabase_client)
+):
+    """
+    Monitor transaction through Regfyl for suspicious activity
+    Called automatically during payment processing
+    """
+    try:
+        # Initialize Regfyl service directly for transaction monitoring
+        from backend.services.kyc_providers.regfyl import regfyl_service
+        
+        # Monitor the transaction
+        result = await regfyl_service.monitor_seamount_transaction(transaction_data)
+        
+        return {
+            "success": True,
+            "reference": result.get("reference"),
+            "message": "Transaction monitoring initiated"
+        }
+        
+    except Exception as e:
+        logger.error(f"Transaction monitoring failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Transaction monitoring failed"
+        )
