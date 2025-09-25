@@ -59,14 +59,41 @@ class RegfylAPITester:
                     response_status = response.status
                     
                     print(f"📊 Response Status: {response_status}")
+                    print(f"📋 Full Response: {response_text}")
                     
                     if response_status == 200:
                         try:
                             json_data = json.loads(response_text)
                             
-                            # Extract company details as specified in the guide
+                            # Debug: Print the entire JSON structure to understand the format
+                            print(f"🔍 JSON Structure: {json.dumps(json_data, indent=2)}")
+                            
+                            # Try multiple possible key locations for company details
+                            # Option 1: Direct keys (as mentioned in the guide)
                             company_name = json_data.get('companyName')
                             rc_number = json_data.get('rcNumber')
+                            
+                            # Option 2: Nested under data or result key
+                            if not company_name and 'data' in json_data:
+                                company_name = json_data['data'].get('companyName')
+                                rc_number = json_data['data'].get('rcNumber')
+                            
+                            if not company_name and 'result' in json_data:
+                                company_name = json_data['result'].get('companyName')
+                                rc_number = json_data['result'].get('rcNumber')
+                            
+                            # Option 3: Alternative key names
+                            if not company_name:
+                                company_name = json_data.get('name') or json_data.get('company')
+                            
+                            if not rc_number:
+                                rc_number = json_data.get('rc') or json_data.get('registrationNumber')
+                            
+                            # Option 4: Check if it's an array response
+                            if isinstance(json_data, list) and len(json_data) > 0:
+                                first_item = json_data[0]
+                                company_name = first_item.get('companyName')
+                                rc_number = first_item.get('rcNumber')
                             
                             if company_name and rc_number:
                                 print("✅ Company details extracted successfully!")
@@ -77,11 +104,14 @@ class RegfylAPITester:
                                     "full_response": json_data
                                 }
                             else:
-                                print("❌ Company details not found in response")
+                                print("❌ Company details not found in expected format")
+                                print("🔍 Available keys in response:")
+                                self._print_all_keys(json_data)
                                 return {
                                     "success": False,
                                     "error": "Company details not found in response",
-                                    "response": json_data
+                                    "response": json_data,
+                                    "available_keys": list(self._get_all_keys(json_data))
                                 }
                                 
                         except json.JSONDecodeError as e:
@@ -105,6 +135,31 @@ class RegfylAPITester:
                 "success": False,
                 "error": f"Request failed: {str(e)}"
             }
+    
+    def _get_all_keys(self, obj, prefix=""):
+        """Extract all keys from a nested JSON object"""
+        keys = []
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                full_key = f"{prefix}.{key}" if prefix else key
+                keys.append(full_key)
+                if isinstance(value, (dict, list)):
+                    keys.extend(self._get_all_keys(value, full_key))
+        elif isinstance(obj, list) and obj:
+            keys.extend(self._get_all_keys(obj[0], f"{prefix}[0]"))
+        return keys
+    
+    def _print_all_keys(self, obj, prefix=""):
+        """Print all keys in the JSON response for debugging"""
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                full_key = f"{prefix}.{key}" if prefix else key
+                print(f"   🔑 {full_key}: {type(value).__name__}")
+                if isinstance(value, (dict, list)):
+                    self._print_all_keys(value, full_key)
+        elif isinstance(obj, list) and obj:
+            print(f"   📋 Array with {len(obj)} items")
+            self._print_all_keys(obj[0], f"{prefix}[0]")
 
 def load_secret_key_from_env() -> str:
     """
@@ -213,12 +268,16 @@ async def main():
         print("\n❌ Failed to extract company details")
         print(f"   Error: {company_result.get('error', 'Unknown error')}")
         
+        # Show available keys for debugging
+        if 'available_keys' in company_result:
+            print(f"   🔍 Available keys in response: {company_result['available_keys']}")
+        
         # Provide troubleshooting tips
         print("\n🔧 Troubleshooting Tips:")
-        print("1. Verify your secret key is correct (available from primary account holder's dashboard)")
-        print("2. Check that your API key has proper permissions")
-        print("3. Ensure you're using the correct API endpoint")
-        print("4. Contact Regfyl support if issues persist")
+        print("1. The API might return company details in a different format than expected")
+        print("2. Check if you need to use a different endpoint or method")
+        print("3. Verify your account has company details set up in the Regfyl portal")
+        print("4. Contact Regfyl support for the exact endpoint format")
 
 if __name__ == "__main__":
     asyncio.run(main())
