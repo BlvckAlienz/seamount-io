@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Activity, Send, RefreshCw, Shield, AlertTriangle, Bitcoin, Ethereum } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Activity, Send, RefreshCw, Shield, AlertTriangle, Bitcoin, Coins } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import AdvancedChart from '../components/charts/AdvancedChart';
@@ -17,7 +17,7 @@ const AssetIcon = ({ asset }: { asset: string }) => {
     case 'goBTC':
       return <Bitcoin className={`${iconClass} text-orange-500`} />;
     case 'goETH':
-      return <Ethereum className={`${iconClass} text-blue-400`} />;
+	  return <Coins className={`${iconClass} text-blue-400`} />;
     case 'USDT':
     case 'USDCa':
       return <DollarSign className={`${iconClass} text-green-500`} />;
