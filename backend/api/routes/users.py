@@ -7,7 +7,8 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
-from backend.dependencies import get_supabase_client, get_current_user, get_optional_auth
+from backend.dependencies import get_supabase_client, get_current_user, get_optional_auth, get_wallet_service
+from backend.services.wallet_service import WalletService  # Add this impor
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -199,7 +200,7 @@ async def update_user_profile(
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service = Depends(get_wallet_service)  # Remove the WalletService type annotation
 ):
     """Provision Algorand wallet for authenticated user"""
     try:
@@ -207,26 +208,26 @@ async def provision_wallets(
         logger.info(f"Provisioning wallet for user: {user_id}")
         
         # Check if wallet already exists
-        existing_wallet = await wallet_service.get_wallet_balances(user_id)
-        if existing_wallet.get('wallet_address'):
+        existing_wallet = await wallet_service.get_user_balances(user_id)  # Updated method name
+        if existing_wallet.get('wallet_exists'):
             return {
                 "success": True,
                 "wallet_address": existing_wallet['wallet_address'],
                 "message": "Wallet already exists"
             }
         
-        # Create new wallet
-        result = await wallet_service.create_wallet_for_user(user_id)
+        # Create new wallet - use the correct method name from your WalletService
+        result = await wallet_service.create_algorand_wallet(user_id)
         
         if result["success"]:
             return {
                 "success": True,
-                "wallet_address": result["address"],
+                "wallet_address": result["wallet_address"],
                 "mnemonic": result["mnemonic"],  # Return once for backup
                 "message": "Wallet created successfully"
             }
         else:
-            raise HTTPException(status_code=500, detail=result.get("error"))
+            raise HTTPException(status_code=500, detail=result.get("error", "Wallet creation failed"))
             
     except Exception as e:
         logger.error(f"Wallet provisioning failed for user {current_user['id']}: {e}")
