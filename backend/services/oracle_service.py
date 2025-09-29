@@ -1,3 +1,5 @@
+# File: backend/services/oracle_service.py - ENHANCED 3-TIER ORACLE SYSTEM
+
 import asyncio
 import aiohttp
 import logging
@@ -6,11 +8,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 from collections import deque
+import json
 
-from config import Settings
-from .database_service import DatabaseService
+from backend.config import settings
+from backend.services.database_service import DatabaseService
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -30,99 +32,340 @@ class PriceData:
             data['volume_24h'] = str(self.volume_24h)
         return data
 
-class OracleService:
-    def __init__(self, settings: Settings, db_service: DatabaseService):
-        self.settings = settings
+class EnhancedOracleService:
+    """
+    3-Tier Oracle System for Real-Time Price Data
+    Tier 1: Binance API (highest volume, free)
+    Tier 2: CoinGecko Pro (professional grade)
+    Tier 3: DIA Oracle (Algorand-native)
+    """
+    
+    def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
         self.rate_cache: Dict[str, Dict[str, Any]] = {}
-        self.source_weights = {'coinbase': 0.3, 'coingecko': 0.3, 'chainlink': 0.4}
-        self.audit_trail = deque(maxlen=1000)
-        logger.info("OracleService initialized successfully.")
-
-    async def fetch_from_source(self, session: aiohttp.ClientSession, source: str, asset_id: str) -> Optional[PriceData]:
-        """
-        Fetches price for a specific asset (e.g., 'bitcoin', 'ethereum') from a source.
-        """
-        try:
-            if source == 'coingecko':
-                # Use the free API endpoint for simple price data
-                api_url = f"https://api.coingecko.com/api/v3/simple/price?ids={asset_id}&vs_currencies=usd&include_24hr_vol=true"
-                async with session.get(api_url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        price = Decimal(str(data[asset_id]['usd']))
-                        volume = Decimal(str(data[asset_id].get('usd_24h_vol', 0)))
-                        return PriceData(
-                            currency_pair=f"{asset_id.upper()}/USD",
-                            rate=price,
-                            source=source,
-                            timestamp=datetime.now(),
-                            confidence=0.98, # High confidence for CoinGecko
-                            volume_24h=volume
-                        )
-                    else:
-                        logger.warning(f"CoinGecko API error: {response.status}")
-            # Add more sources (e.g., Binance, Kraken) here later for redundancy
-        except Exception as e:
-            logger.error(f"Error fetching from {source} for {asset_id}: {e}")
-        return None
-
+        self.cache_ttl = 30  # 30 seconds cache
+        self.request_timeout = 5  # 5 second timeout per request
+        
+        # Asset mapping for different APIs
+        self.asset_mapping = {
+            'binance': {
+                'bitcoin': 'BTCUSDT',
+                'ethereum': 'ETHUSDT', 
+                'algorand': 'ALGOUSDT',
+                'tether': 'USDCUSDT'  # Proxy for USDT rate
+            },
+            'coingecko': {
+                'bitcoin': 'bitcoin',
+                'ethereum': 'ethereum',
+                'algorand': 'algorand',
+                'tether': 'tether'
+            },
+            'dia': {
+                'bitcoin': 'BTC',
+                'ethereum': 'ETH', 
+                'algorand': 'ALGO',
+                'tether': 'USDT'
+            }
+        }
+        
+        logger.info("Enhanced 3-Tier Oracle Service initialized")
+    
     async def get_asset_price(self, asset_name: str) -> Tuple[Decimal, Dict]:
         """
-        Gets the current USD price of a specific asset (e.g., 'bitcoin', 'ethereum').
-        This is the primary method for other services to use.
+        Main method to get asset price with 3-tier fallback
+        Returns: (price, metadata)
         """
         currency_pair = f"{asset_name.upper()}/USD"
+        
+        # Check cache first
         cached = self.rate_cache.get(currency_pair)
-        if cached and (datetime.now() - cached['timestamp']) < timedelta(seconds=30): # Cache for 30 sec
+        if cached and (datetime.now() - cached['timestamp']) < timedelta(seconds=self.cache_ttl):
+            logger.debug(f"Returning cached price for {currency_pair}")
             return cached['price'], cached['metadata']
-
-        # For now, we primarily use CoinGecko. We can add more sources later.
-        async with aiohttp.ClientSession() as session:
-            price_data = await self.fetch_from_source(session, 'coingecko', asset_name)
-
+        
+        # Try 3-tier fallback system
+        price_data = await self._fetch_with_fallback(asset_name)
+        
         if not price_data:
-            # Fallback to cache even if stale, then error
+            # Use stale cache if available
             if cached:
-                logger.warning(f"Using stale cached price for {currency_pair} after fetch failure.")
-                return cached['price'], cached['metadata']
-            raise ValueError(f"Could not fetch price data for {currency_pair}")
-
-        # For a single source, consensus is easy.
-        consensus_price = price_data.rate
-        confidence = price_data.confidence
-
+                logger.warning(f"All oracles failed, using stale cache for {currency_pair}")
+                return cached['price'], {**cached['metadata'], 'stale': True}
+            
+            # Final fallback to hardcoded rates
+            fallback_price = self._get_emergency_fallback(asset_name)
+            if fallback_price:
+                return fallback_price, {
+                    'source': 'emergency_fallback',
+                    'timestamp': datetime.now().isoformat(),
+                    'confidence': 0.5,
+                    'warning': 'All oracles failed, using emergency fallback'
+                }
+            
+            raise ValueError(f"Could not fetch price for {currency_pair} - all sources failed")
+        
+        # Store in cache
         metadata = {
             'timestamp': datetime.now().isoformat(),
-            'sources_used': [price_data.source],
-            'confidence': confidence,
-            'source_data': price_data.to_dict()
+            'source': price_data.source,
+            'confidence': price_data.confidence,
+            'volume_24h': str(price_data.volume_24h) if price_data.volume_24h else None
         }
-        self.rate_cache[currency_pair] = {'price': consensus_price, 'metadata': metadata, 'timestamp': datetime.now()}
         
+        self.rate_cache[currency_pair] = {
+            'price': price_data.rate,
+            'metadata': metadata,
+            'timestamp': datetime.now()
+        }
+        
+        # Store in database asynchronously
         asyncio.create_task(self.store_price_data([price_data]))
-        self.audit_trail.append({'action': 'get_asset_price', 'asset': asset_name, 'price': str(consensus_price), 'time': datetime.now().isoformat()})
         
-        return consensus_price, metadata
-
-    async def store_price_data(self, price_data: List[PriceData]):
-        """
-        Persists price data to the Supabase database via the DatabaseService.
-        """
+        return price_data.rate, metadata
+    
+    async def _fetch_with_fallback(self, asset_name: str) -> Optional[PriceData]:
+        """Execute 3-tier fallback strategy"""
+        
+        # Tier 1: Binance (Highest volume, most reliable)
+        logger.debug(f"Trying Tier 1: Binance for {asset_name}")
+        binance_data = await self._fetch_from_binance(asset_name)
+        if binance_data:
+            binance_data.confidence = 0.95  # Highest confidence
+            return binance_data
+        
+        # Tier 2: CoinGecko Pro (Professional API)
+        logger.debug(f"Tier 1 failed, trying Tier 2: CoinGecko for {asset_name}")
+        coingecko_data = await self._fetch_from_coingecko(asset_name)
+        if coingecko_data:
+            coingecko_data.confidence = 0.90
+            return coingecko_data
+        
+        # Tier 3: DIA Oracle (Algorand-native, great for ecosystem integration)
+        logger.debug(f"Tier 2 failed, trying Tier 3: DIA for {asset_name}")
+        dia_data = await self._fetch_from_dia(asset_name)
+        if dia_data:
+            dia_data.confidence = 0.85
+            return dia_data
+        
+        logger.error(f"All 3 oracle tiers failed for {asset_name}")
+        return None
+    
+    async def _fetch_from_binance(self, asset_name: str) -> Optional[PriceData]:
+        """Tier 1: Binance API (Free, 1200 requests/min)"""
         try:
-            records_to_insert = []
+            symbol = self.asset_mapping['binance'].get(asset_name.lower())
+            if not symbol:
+                return None
+            
+            url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=self.request_timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        price = Decimal(str(data['lastPrice']))
+                        volume = Decimal(str(data['volume']))
+                        
+                        return PriceData(
+                            currency_pair=f"{asset_name.upper()}/USD",
+                            rate=price,
+                            source='binance',
+                            timestamp=datetime.now(),
+                            confidence=0.95,
+                            volume_24h=volume
+                        )
+                        
+        except Exception as e:
+            logger.warning(f"Binance API failed for {asset_name}: {e}")
+        
+        return None
+    
+    async def _fetch_from_coingecko(self, asset_name: str) -> Optional[PriceData]:
+        """Tier 2: CoinGecko Pro API"""
+        try:
+            asset_id = self.asset_mapping['coingecko'].get(asset_name.lower())
+            if not asset_id:
+                return None
+            
+            # Use Pro API if key available, otherwise free API
+            if hasattr(settings, 'COINGECKO_API_KEY') and settings.COINGECKO_API_KEY:
+                api_key = settings.COINGECKO_API_KEY.get_secret_value()
+                url = f"https://pro-api.coingecko.com/api/v3/simple/price?ids={asset_id}&vs_currencies=usd&include_24hr_vol=true"
+                headers = {"X-Cg-Pro-Api-Key": api_key}
+            else:
+                url = f"https://api.coingecko.com/api/v3/simple/price?ids={asset_id}&vs_currencies=usd&include_24hr_vol=true"
+                headers = {}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=self.request_timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        asset_data = data[asset_id]
+                        price = Decimal(str(asset_data['usd']))
+                        volume = Decimal(str(asset_data.get('usd_24h_vol', 0)))
+                        
+                        return PriceData(
+                            currency_pair=f"{asset_name.upper()}/USD",
+                            rate=price,
+                            source='coingecko',
+                            timestamp=datetime.now(),
+                            confidence=0.90,
+                            volume_24h=volume
+                        )
+                        
+        except Exception as e:
+            logger.warning(f"CoinGecko API failed for {asset_name}: {e}")
+        
+        return None
+    
+    async def _fetch_from_dia(self, asset_name: str) -> Optional[PriceData]:
+        """Tier 3: DIA Oracle (Algorand ecosystem integration)"""
+        try:
+            symbol = self.asset_mapping['dia'].get(asset_name.lower())
+            if not symbol:
+                return None
+            
+            # DIA API endpoint for asset prices
+            url = f"https://api.diadata.org/v1/quotation/{symbol}"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=self.request_timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        price = Decimal(str(data['Price']))
+                        
+                        return PriceData(
+                            currency_pair=f"{asset_name.upper()}/USD", 
+                            rate=price,
+                            source='dia_oracle',
+                            timestamp=datetime.now(),
+                            confidence=0.85,
+                            volume_24h=None  # DIA doesn't provide volume in this endpoint
+                        )
+                        
+        except Exception as e:
+            logger.warning(f"DIA Oracle failed for {asset_name}: {e}")
+        
+        return None
+    
+    def _get_emergency_fallback(self, asset_name: str) -> Optional[Decimal]:
+        """Emergency fallback rates when all oracles fail"""
+        emergency_rates = {
+            'bitcoin': Decimal("63500.00"),
+            'ethereum': Decimal("2650.00"),
+            'algorand': Decimal("0.18"),
+            'tether': Decimal("1.00")
+        }
+        
+        rate = emergency_rates.get(asset_name.lower())
+        if rate:
+            logger.critical(f"Using emergency fallback rate for {asset_name}: ${rate}")
+        
+        return rate
+    
+    async def get_ngn_usd_rate(self) -> Tuple[Decimal, Dict]:
+        """Get NGN/USD exchange rate for fiat conversions"""
+        try:
+            # Use multiple sources for NGN/USD rate
+            sources = [
+                "https://api.exchangerate-api.com/v4/latest/USD",  # Free API
+                "https://api.fixer.io/latest?base=USD&symbols=NGN"  # Backup
+            ]
+            
+            for url in sources:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url, timeout=5) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                if 'rates' in data and 'NGN' in data['rates']:
+                                    ngn_rate = Decimal(str(data['rates']['NGN']))
+                                    return ngn_rate, {
+                                        'source': 'exchange_rate_api',
+                                        'timestamp': datetime.now().isoformat(),
+                                        'confidence': 0.90
+                                    }
+                except Exception as e:
+                    logger.warning(f"NGN rate source failed: {e}")
+                    continue
+            
+            # Fallback to recent average
+            fallback_rate = Decimal("1620.00")  # Recent NGN/USD rate
+            return fallback_rate, {
+                'source': 'fallback',
+                'timestamp': datetime.now().isoformat(),
+                'confidence': 0.70,
+                'warning': 'Using fallback NGN/USD rate'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get NGN/USD rate: {e}")
+            raise ValueError("Could not determine NGN/USD exchange rate")
+    
+    async def store_price_data(self, price_data: List[PriceData]):
+        """Store price data in database for analytics"""
+        try:
+            records = []
             for pd in price_data:
-                records_to_insert.append({
+                records.append({
                     "currency_pair": pd.currency_pair,
                     "rate": float(pd.rate),
                     "source": pd.source,
                     "confidence": pd.confidence,
-                    "volume": float(pd.volume_24h or 0),
+                    "volume_24h": float(pd.volume_24h) if pd.volume_24h else None,
                     "timestamp": pd.timestamp.isoformat()
                 })
             
-            if records_to_insert:
-                await self.db_service.log_batch_event("price_history", records_to_insert)
-                logger.info(f"Successfully stored {len(records_to_insert)} price points.")
+            if records:
+                await self.db_service.log_batch_event("price_history", records)
+                logger.debug(f"Stored {len(records)} price points to database")
+                
         except Exception as e:
-            logger.error(f"Failed to store price data: {e}", exc_info=True)
+            logger.error(f"Failed to store price data: {e}")
+    
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Check health of all oracle sources"""
+        health_status = {
+            'binance': {'status': 'unknown', 'response_time': None},
+            'coingecko': {'status': 'unknown', 'response_time': None}, 
+            'dia': {'status': 'unknown', 'response_time': None}
+        }
+        
+        # Test each source with a simple query
+        test_asset = 'bitcoin'
+        
+        # Test Binance
+        start_time = datetime.now()
+        binance_result = await self._fetch_from_binance(test_asset)
+        health_status['binance'] = {
+            'status': 'healthy' if binance_result else 'unhealthy',
+            'response_time': (datetime.now() - start_time).total_seconds()
+        }
+        
+        # Test CoinGecko
+        start_time = datetime.now()
+        coingecko_result = await self._fetch_from_coingecko(test_asset)
+        health_status['coingecko'] = {
+            'status': 'healthy' if coingecko_result else 'unhealthy',
+            'response_time': (datetime.now() - start_time).total_seconds()
+        }
+        
+        # Test DIA
+        start_time = datetime.now()
+        dia_result = await self._fetch_from_dia(test_asset)
+        health_status['dia'] = {
+            'status': 'healthy' if dia_result else 'unhealthy',
+            'response_time': (datetime.now() - start_time).total_seconds()
+        }
+        
+        # Overall health
+        healthy_sources = sum(1 for source in health_status.values() if source['status'] == 'healthy')
+        overall_status = 'healthy' if healthy_sources >= 2 else 'degraded' if healthy_sources == 1 else 'critical'
+        
+        return {
+            'overall_status': overall_status,
+            'healthy_sources': healthy_sources,
+            'total_sources': 3,
+            'sources': health_status,
+            'last_check': datetime.now().isoformat()
+        }

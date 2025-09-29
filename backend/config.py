@@ -25,201 +25,260 @@ class PricingRegion(str, Enum):
 
 class BusinessModelConfig:
     """
-    Seamount.io Business Model Configuration
-    Updated for Phase 1: Multi-Asset Dollar & Digital Asset Corridor
-    Based on seamount_business_case.md premium positioning
+    Competitively Optimized Fee Structure
+    Cross-border: 2.9% (vs Traditional 3-7%, Digital 1-2%)
+    Speed Premium: Sub-5-second settlement justifies positioning
     """
     
-    # --- PHASE 1: MULTI-ASSET REVENUE MODEL (PREMIUM) ---
-    # Fiat-to-Crypto On-Ramp: 2.5% - 3.0% FX spread
-    ON_RAMP_FEE_RATE = Decimal("0.030")  # 3.0% (PREMIUM END)
+    # --- OPTIMIZED FEE STRUCTURE ---
     
-    # P2P & Asset Swaps: 0.8% - 1.0% transaction fee
+    # Cross-Border P2P: 2.9% (COMPETITIVE SWEET SPOT)
+    # vs Sendwave: ~2% (but 48hr settlement)
+    # vs Remitly: 2.5-4% + $3.99
+    # vs Western Union: 3-7%
+    CROSS_BORDER_FEE_RATE = Decimal("0.029")  # 2.9% - Optimal positioning
+    
+    # Fiat On-Ramp: 2.5% (PREMIUM BUT JUSTIFIED)
+    # vs Quidax: ~1-2%
+    # vs Market: 1-3%
+    ON_RAMP_FEE_RATE = Decimal("0.025")  # 2.5% - Premium for multi-asset
+    
+    # Local P2P: 0.8% (COMPETITIVE)
+    P2P_FEE_RATE = Decimal("0.008")  # 0.8% - Speed premium over Quidax 0.1%
+    
+    # Asset Swaps: Tiered by complexity
     SWAP_FEE_STRUCTURE = {
-        "stable_stable": Decimal("0.010"),  # 1.0% for stable/stable swaps (PREMIUM)
-        "stable_volatile": Decimal("0.015"),  # 1.5% for stable/volatile swaps (PREMIUM)
-        "volatile_volatile": Decimal("0.020")  # 2.0% for volatile/volatile swaps (PREMIUM)
+        "stable_stable": Decimal("0.008"),    # 0.8%
+        "stable_volatile": Decimal("0.012"),  # 1.2%
+        "volatile_volatile": Decimal("0.018") # 1.8%
     }
     
-    # P2P Transfer Fees
-    P2P_FEE_RATE = Decimal("0.010")  # 1.0% (PREMIUM)
+    # --- NETWORK FEE OPTIMIZATION ---
+    # Increased markup from 10% to 35% (users won't notice $0.01 vs $0.0135)
+    NETWORK_FEE_MARKUP = Decimal("0.35")  # 35% markup (revenue optimization)
     
-    # Minimum and Maximum Fees
+    BASE_NETWORK_FEES = {
+        "algorand_transfer": Decimal("0.0135"),  # $0.0135 (35% markup)
+        "asset_transfer": Decimal("0.0135"),
+        "opt_in": Decimal("0.0135")
+    }
+    
+    # --- MINIMUM FEES (MAINTAINED) ---
     MINIMUM_FEES = {
-        "on_ramp": Decimal("2.00"),      # $2 minimum
-        "swap": Decimal("1.00"),         # $1 minimum
-        "p2p": Decimal("0.50")           # $0.50 minimum
+        "cross_border": Decimal("2.50"),     # $2.50 minimum
+        "on_ramp": Decimal("1.50"),          # $1.50 minimum
+        "swap": Decimal("0.75"),             # $0.75 minimum
+        "p2p": Decimal("0.50")               # $0.50 minimum
     }
     
-    # --- B2B API ACCESS FEES (MONTHLY SUBSCRIPTION) ---
-    # From seamount_business_case.md: $299-1K/mo
-    API_SUBSCRIPTION_FEES = {
-        LicenseTier.STARTER: Decimal("299"),      # $299/month
-        LicenseTier.GROWTH: Decimal("650"),       # $650/month (blended avg)
-        LicenseTier.ENTERPRISE: Decimal("1000")   # $1000/month
-    }
-    
-    # B2B Employee limits per tier
-    EMPLOYEE_LIMITS = {
-        LicenseTier.STARTER: 50,
-        LicenseTier.GROWTH: 500,
-        LicenseTier.ENTERPRISE: float('inf')  # Unlimited
-    }
-
-    # B2B Transaction Fee Discounts (vs retail rates)
+    # --- VOLUME-BASED DISCOUNTS (OPTIMIZED) ---
+    # Removed starter tier 15% discount - too generous for market entry
     LICENSE_DISCOUNTS = {
-        LicenseTier.STARTER: Decimal("0.20"),    # 20% discount
-        LicenseTier.GROWTH: Decimal("0.35"),     # 35% discount
-        LicenseTier.ENTERPRISE: Decimal("0.50")  # 50% discount
-    }
-
-    # --- PHASE 2: GOLD CERTIFICATES (SGC) ---
-    GOLD_PREMIUM_RATE = Decimal("0.050")  # 5% premium (as per business case)
-
-    # --- PHASE 3: USDS STABLECOIN (FUTURE) ---
-    USDS_SEIGNIORAGE_RATES = {
-        "retail": Decimal("0.015"),  # 1.5% for retail
-        "corporate": Decimal("0.020")  # 2.0% for corporate (PREMIUM)
+        LicenseTier.STARTER: Decimal("0.05"),    # 5% discount (reduced)
+        LicenseTier.GROWTH: Decimal("0.20"),     # 20% discount
+        LicenseTier.ENTERPRISE: Decimal("0.30")  # 30% discount
     }
     
-    TREASURY_YIELD_RATE = Decimal("0.30")     # 30% target yield
-    TREASURY_TAX_RATE = Decimal("0.30")       # 30% tax rate
-    TREASURY_NET_YIELD_RATE = Decimal("0.21")  # 21% net yield after tax
-
+    # --- PROVIDER COST CALCULATIONS ---
+    PROVIDER_COSTS = {
+        "cashramp_p2p": Decimal("0.012"),        # 1.2%
+        "paystack_onramp": Decimal("0.015"),     # 1.5%
+        "kyc_per_user": Decimal("2.00"),         # $2 per KYC
+        "operational_buffer": Decimal("0.003")    # 0.3%
+    }
+    
+    # --- COMPETITIVE ANALYSIS METHODS ---
+    
     @staticmethod
-    def calculate_on_ramp_fee(amount: Decimal, is_licensed: bool = False, tier: Optional[LicenseTier] = None) -> Tuple[Decimal, Dict]:
+    def calculate_cross_border_economics(amount_usd: Decimal) -> Dict:
         """
-        Calculate fiat on-ramp fee with premium pricing
+        Calculate competitive positioning for cross-border transfers
+        Shows user cost vs competitor alternatives
         """
-        base_fee = amount * BusinessModelConfig.ON_RAMP_FEE_RATE
+        # Seamount costs
+        seamount_fee = amount_usd * BusinessModelConfig.CROSS_BORDER_FEE_RATE
+        network_fee = BusinessModelConfig.BASE_NETWORK_FEES["algorand_transfer"]
+        total_seamount_cost = seamount_fee + network_fee
         
-        # Apply license discount if applicable
-        if is_licensed and tier:
-            discount = BusinessModelConfig.LICENSE_DISCOUNTS[tier]
-            base_fee = base_fee * (Decimal("1.0") - discount)
+        # Provider costs
+        cashramp_cost = amount_usd * BusinessModelConfig.PROVIDER_COSTS["cashramp_p2p"]
+        operational_cost = amount_usd * BusinessModelConfig.PROVIDER_COSTS["operational_buffer"]
+        kyc_cost = BusinessModelConfig.PROVIDER_COSTS["kyc_per_user"] / 10  # Amortized
         
-        # Apply minimum fee
-        final_fee = max(BusinessModelConfig.MINIMUM_FEES["on_ramp"], base_fee)
+        total_provider_cost = cashramp_cost + operational_cost + kyc_cost
+        net_profit = seamount_fee - total_provider_cost
+        profit_margin = (net_profit / seamount_fee * 100) if seamount_fee > 0 else 0
         
-        calculation_details = {
-            "amount": float(amount),
-            "base_rate": float(BusinessModelConfig.ON_RAMP_FEE_RATE),
-            "base_fee": float(base_fee),
-            "min_fee": float(BusinessModelConfig.MINIMUM_FEES["on_ramp"]),
-            "final_fee": float(final_fee),
-            "effective_rate": float(final_fee / amount),
-            "is_licensed": is_licensed,
-            "tier": tier.value if tier else None,
-            "discount_applied": float(BusinessModelConfig.LICENSE_DISCOUNTS[tier]) if tier else 0.0
+        # Competitive comparison
+        competitors = {
+            "western_union": amount_usd * Decimal("0.055"),    # 5.5% average
+            "moneygram": amount_usd * Decimal("0.045"),        # 4.5% average
+            "remitly_express": amount_usd * Decimal("0.035") + Decimal("3.99"),  # 3.5% + $3.99
+            "sendwave": amount_usd * Decimal("0.02"),          # 2% (but 48hr settlement)
         }
         
-        return final_fee, calculation_details
-
-    @staticmethod
-    def calculate_swap_fee(amount: Decimal, from_asset_type: str, to_asset_type: str, 
-                          is_licensed: bool = False, tier: Optional[LicenseTier] = None) -> Tuple[Decimal, Dict]:
-        """
-        Calculate asset swap fee with premium tiered pricing
-        """
-        # Determine fee tier based on asset types
-        if from_asset_type == "stable" and to_asset_type == "stable":
-            base_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["stable_stable"]
-        elif (from_asset_type == "stable" and to_asset_type == "volatile") or \
-             (from_asset_type == "volatile" and to_asset_type == "stable"):
-            base_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["stable_volatile"]
-        else:
-            base_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["volatile_volatile"]
-        
-        base_fee = amount * base_rate
-        
-        # Apply license discount if applicable
-        if is_licensed and tier:
-            discount = BusinessModelConfig.LICENSE_DISCOUNTS[tier]
-            base_fee = base_fee * (Decimal("1.0") - discount)
-        
-        # Apply minimum fee
-        final_fee = max(BusinessModelConfig.MINIMUM_FEES["swap"], base_fee)
-        
-        calculation_details = {
-            "amount": float(amount),
-            "from_asset_type": from_asset_type,
-            "to_asset_type": to_asset_type,
-            "base_rate": float(base_rate),
-            "base_fee": float(base_fee),
-            "min_fee": float(BusinessModelConfig.MINIMUM_FEES["swap"]),
-            "final_fee": float(final_fee),
-            "effective_rate": float(final_fee / amount),
-            "is_licensed": is_licensed,
-            "tier": tier.value if tier else None,
-            "discount_applied": float(BusinessModelConfig.LICENSE_DISCOUNTS[tier]) if tier else 0.0
-        }
-        
-        return final_fee, calculation_details
-
-    @staticmethod
-    def calculate_api_subscription_fee(tier: LicenseTier) -> Decimal:
-        """Calculate monthly API subscription fee based on tier"""
-        return BusinessModelConfig.API_SUBSCRIPTION_FEES[tier]
-
-    @staticmethod
-    def calculate_license_fee(tier: LicenseTier, region: PricingRegion) -> Decimal:
-        """Calculate license fee based on tier and region"""
-        base_fee = BusinessModelConfig.API_SUBSCRIPTION_FEES[tier]
-        
-        # Apply regional pricing adjustments if enabled
-        if region != PricingRegion.DEFAULT:
-            # Add regional pricing logic here
-            regional_multipliers = {
-                PricingRegion.NIGERIA: Decimal("1.0"),
-                PricingRegion.KENYA: Decimal("1.0"),
-                PricingRegion.GHANA: Decimal("1.0"),
-                PricingRegion.SOUTH_AFRICA: Decimal("1.1"),  # 10% premium for South Africa
-            }
-            base_fee = base_fee * regional_multipliers.get(region, Decimal("1.0"))
-        
-        return base_fee
-
-    @staticmethod
-    def calculate_annual_revenue_projection(customers_by_tier: Dict[LicenseTier, int],
-                                          avg_monthly_volume: Dict[LicenseTier, Decimal]) -> Dict:
-        """
-        Project annual revenue including both subscription and transaction fees
-        """
-        annual_revenue = Decimal("0")
-        revenue_breakdown = {}
-        
-        for tier, customer_count in customers_by_tier.items():
-            if customer_count == 0:
-                continue
-                
-            # Subscription revenue
-            subscription_fee = BusinessModelConfig.calculate_api_subscription_fee(tier)
-            annual_subscription = subscription_fee * Decimal("12") * customer_count
-            
-            # Transaction fee revenue
-            avg_volume = avg_monthly_volume.get(tier, Decimal("0"))
-            avg_fee_rate = BusinessModelConfig.ON_RAMP_FEE_RATE * (Decimal("1.0") - BusinessModelConfig.LICENSE_DISCOUNTS[tier])
-            monthly_fees = avg_volume * avg_fee_rate * customer_count
-            annual_fees = monthly_fees * Decimal("12")
-            
-            tier_annual_revenue = annual_subscription + annual_fees
-            
-            annual_revenue += tier_annual_revenue
-            
-            revenue_breakdown[tier.value] = {
-                "customers": customer_count,
-                "monthly_subscription": float(subscription_fee),
-                "annual_subscription": float(annual_subscription),
-                "avg_monthly_volume": float(avg_volume),
-                "effective_fee_rate": float(avg_fee_rate),
-                "annual_transaction_fees": float(annual_fees),
-                "total_annual_revenue": float(tier_annual_revenue)
-            }
+        savings_vs_traditional = competitors["western_union"] - total_seamount_cost
+        savings_percentage = (savings_vs_traditional / competitors["western_union"] * 100)
         
         return {
-            "total_annual_revenue": float(annual_revenue),
-            "monthly_revenue_run_rate": float(annual_revenue / Decimal("12")),
-            "revenue_breakdown": revenue_breakdown
+            "amount_usd": float(amount_usd),
+            "seamount": {
+                "fee": float(seamount_fee),
+                "network_fee": float(network_fee),
+                "total_cost": float(total_seamount_cost),
+                "settlement_time": "< 5 seconds"
+            },
+            "economics": {
+                "revenue": float(seamount_fee),
+                "provider_costs": float(total_provider_cost),
+                "net_profit": float(net_profit),
+                "profit_margin_percent": float(profit_margin)
+            },
+            "competitive_analysis": {
+                "western_union_cost": float(competitors["western_union"]),
+                "remitly_cost": float(competitors["remitly_express"]),
+                "sendwave_cost": float(competitors["sendwave"]),
+                "savings_vs_traditional": float(savings_vs_traditional),
+                "savings_percentage": f"{float(savings_percentage):.1f}%",
+                "speed_advantage": "5000x faster than traditional, 17000x faster than Sendwave"
+            },
+            "value_proposition": {
+                "cost_savings": f"{float(savings_percentage):.0f}% cheaper than Western Union",
+                "speed": "Instant vs 24-48 hours",
+                "ux": "No seed phrases, gas fees, or blockchain complexity"
+            }
+        }
+    
+    @staticmethod
+    def calculate_monthly_revenue_projection(
+        monthly_volume: Decimal,
+        cross_border_percentage: Decimal = Decimal("0.70"),  # 70% cross-border
+        onramp_percentage: Decimal = Decimal("0.30")         # 30% on-ramp
+    ) -> Dict:
+        """
+        Project monthly revenue with optimized fee structure
+        """
+        cross_border_volume = monthly_volume * cross_border_percentage
+        onramp_volume = monthly_volume * onramp_percentage
+        
+        # Revenue calculations
+        cross_border_revenue = cross_border_volume * BusinessModelConfig.CROSS_BORDER_FEE_RATE
+        onramp_revenue = onramp_volume * BusinessModelConfig.ON_RAMP_FEE_RATE
+        total_revenue = cross_border_revenue + onramp_revenue
+        
+        # Cost calculations
+        cashramp_costs = cross_border_volume * BusinessModelConfig.PROVIDER_COSTS["cashramp_p2p"]
+        paystack_costs = onramp_volume * BusinessModelConfig.PROVIDER_COSTS["paystack_onramp"]
+        operational_costs = monthly_volume * BusinessModelConfig.PROVIDER_COSTS["operational_buffer"]
+        kyc_costs = Decimal("500")  # $500/month average
+        
+        total_costs = cashramp_costs + paystack_costs + operational_costs + kyc_costs
+        net_profit = total_revenue - total_costs
+        profit_margin = (net_profit / total_revenue * 100) if total_revenue > 0 else 0
+        
+        return {
+            "monthly_volume": float(monthly_volume),
+            "revenue_breakdown": {
+                "cross_border": float(cross_border_revenue),
+                "onramp": float(onramp_revenue),
+                "total": float(total_revenue)
+            },
+            "cost_breakdown": {
+                "cashramp": float(cashramp_costs),
+                "paystack": float(paystack_costs),
+                "operational": float(operational_costs),
+                "kyc": float(kyc_costs),
+                "total": float(total_costs)
+            },
+            "profitability": {
+                "net_profit": float(net_profit),
+                "profit_margin_percent": float(profit_margin),
+                "break_even_volume": float(total_costs / (BusinessModelConfig.CROSS_BORDER_FEE_RATE * 0.4))  # Approx
+            },
+            "scaling_metrics": {
+                "revenue_per_user": float(total_revenue / (monthly_volume / 500)),  # Assume $500 avg transaction
+                "cost_per_user": float(total_costs / (monthly_volume / 500)),
+                "ltv_estimate": float((total_revenue - total_costs) * 12 / (monthly_volume / 500))  # Annual per user
+            }
+        }
+    
+    @staticmethod
+    def get_fee_for_transaction(
+        transaction_type: str,
+        amount: Decimal,
+        from_asset: Optional[str] = None,
+        to_asset: Optional[str] = None,
+        user_tier: LicenseTier = LicenseTier.STARTER
+    ) -> Dict:
+        """
+        Calculate exact fee for any transaction type
+        This is the core method that will be called by fee_calculator.py
+        """
+        base_fee = Decimal("0")
+        fee_rate = Decimal("0")
+        minimum_fee = Decimal("0")
+        
+        # Determine base fee rate
+        if transaction_type == "cross_border":
+            fee_rate = BusinessModelConfig.CROSS_BORDER_FEE_RATE
+            minimum_fee = BusinessModelConfig.MINIMUM_FEES["cross_border"]
+        elif transaction_type == "on_ramp":
+            fee_rate = BusinessModelConfig.ON_RAMP_FEE_RATE
+            minimum_fee = BusinessModelConfig.MINIMUM_FEES["on_ramp"]
+        elif transaction_type == "p2p":
+            fee_rate = BusinessModelConfig.P2P_FEE_RATE
+            minimum_fee = BusinessModelConfig.MINIMUM_FEES["p2p"]
+        elif transaction_type == "swap":
+            # Determine swap type based on assets
+            if from_asset and to_asset:
+                from_stable = from_asset in ["USDT", "USDCa"]
+                to_stable = to_asset in ["USDT", "USDCa"]
+                
+                if from_stable and to_stable:
+                    fee_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["stable_stable"]
+                elif from_stable != to_stable:
+                    fee_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["stable_volatile"]
+                else:
+                    fee_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["volatile_volatile"]
+            else:
+                fee_rate = BusinessModelConfig.SWAP_FEE_STRUCTURE["stable_stable"]
+            minimum_fee = BusinessModelConfig.MINIMUM_FEES["swap"]
+        
+        # Calculate base fee
+        base_fee = amount * fee_rate
+        
+        # Apply minimum fee
+        if base_fee < minimum_fee:
+            base_fee = minimum_fee
+        
+        # Apply volume discount
+        discount_rate = BusinessModelConfig.LICENSE_DISCOUNTS.get(user_tier, Decimal("0"))
+        discount_amount = base_fee * discount_rate
+        discounted_fee = base_fee - discount_amount
+        
+        # Add network fee
+        network_fee = BusinessModelConfig.BASE_NETWORK_FEES.get("algorand_transfer", Decimal("0.01"))
+        total_fee = discounted_fee + network_fee
+        
+        # Calculate effective rate
+        effective_rate = (total_fee / amount * 100) if amount > 0 else 0
+        
+        return {
+            "transaction_type": transaction_type,
+            "amount": float(amount),
+            "base_fee": float(base_fee),
+            "discount_applied": float(discount_amount),
+            "discounted_fee": float(discounted_fee),
+            "network_fee": float(network_fee),
+            "total_fee": float(total_fee),
+            "total_amount": float(amount + total_fee),
+            "effective_rate_percent": float(effective_rate),
+            "user_tier": user_tier.value,
+            "fee_breakdown": {
+                "platform_fee": float(discounted_fee),
+                "network_fee": float(network_fee),
+                "discount_savings": float(discount_amount)
+            }
         }
 
 class Settings(BaseSettings):

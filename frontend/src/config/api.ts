@@ -1,41 +1,31 @@
 // File: frontend/src/config/api.ts
-// FIXED: Removed duplicate exports and organized properly
+// CRITICAL FIX: API base URL configuration
 
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
-import { API_BASE_URL } from './env';
 
-/**
- * A centralized Axios client for all API communications with the Seamount backend.
- * It includes interceptors to automatically handle authentication tokens and provide
- * robust, consistent logging for both successful and failed requests.
- */
- 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
- 
+// FIXED: Single source of truth for API base URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://seamount-api.onrender.com";
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
-  // Add this to prevent infinite retries on certain errors
   validateStatus: function (status) {
-    return status < 500; // Don't retry on server errors
+    return status < 500;
   },
 });
 
-/**
- * A typed object of all API endpoints.
- * Using this ensures type safety and prevents typos in API route strings.
- */
+// FIXED: Proper API endpoints for Seamount 2.0
 const API_ENDPOINTS = {
   LEADS: {
     BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
   USER: {
     PROFILE: '/api/v1/user/profile',
-    CREATE_PROFILE: '/api/v1/user/profile', // Use same endpoint for create/update
+    PROVISION_WALLETS: '/api/v1/user/provision-wallets', // FIXED: proper endpoint
   },
   SESSION: {
     INITIALIZE: '/api/v1/session/initialize',
@@ -45,24 +35,28 @@ const API_ENDPOINTS = {
   },
   WALLET: {
     CREATE: '/api/wallet/create',
-    PROVISION: '/api/wallet/provision' // Add this endpoint
   },
-   KYC: {
+  KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
     CHECK_PROFILE: '/api/v1/kyc/profile-check',
     GET_STATUS: '/api/v1/kyc/status',
     SKIP_VERIFICATION: '/api/v1/kyc/skip-verification',
     REQUIREMENTS: '/api/v1/kyc/requirements',
   },
+  PORTFOLIO: {
+    SUMMARY: '/api/v1/portfolio/summary', // FIXED: missing endpoint
+  },
+  TRADING: {
+    SWAP: '/api/v1/trading/swap',
+    BUY: '/api/v1/trading/buy',
+    SELL: '/api/v1/trading/sell',
+  }
 };
 
-// --- Axios Interceptors ---
-
-// 1. Request Interceptor: Automatically injects the Supabase JWT into every outgoing request.
-// This is the most reliable pattern as it guarantees the freshest token is used.
+// Request interceptor
 apiClient.interceptors.request.use(
   async (config) => {
-    const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
+    const fullUrl = `${config.baseURL}${config.url}`;
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
     
     try {
@@ -72,33 +66,24 @@ apiClient.interceptors.request.use(
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         console.log(`[API Auth] Token attached for authenticated request`);
-      } else {
-        // This is normal for public routes (e.g., session initialize, contact form).
-        console.log(`[API Auth] No session token - proceeding with unauthenticated request`);
       }
     } catch (error) {
-      console.error('[API Auth Error] Failed to get session for auth token:', error);
-      // Proceed with the request without auth if getting the session fails.
+      console.error('[API Auth Error] Failed to get session:', error);
     }
     
     return config;
   },
   (error) => {
-    console.error('[API Request Error] Error creating request:', error);
+    console.error('[API Request Error]:', error);
     return Promise.reject(error);
   }
 );
 
-// 2. Response Interceptor: Centralizes logging and error handling for all API responses.
+// Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
     console.log(`[API Response] <-- ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-    
-    // Log success for important operations
-    if (response.status >= 200 && response.status < 300) {
-      console.log(`[API Success] ${response.config.url?.split('/').pop() || 'Unknown'} operation completed`);
-    }
-    
+    console.log(`[API Success] ${response.config.url?.split('/').pop() || 'Unknown'} operation completed`);
     return response;
   },
   (error) => {
@@ -115,24 +100,13 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Function to initialize session
-const initializeSession = async (): Promise<string> => {
-  try {
-    const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
-    return response.data.session_id;
-  } catch (error) {
-    console.error('Session initialization failed, continuing without cookie banner');
-    return 'anonymous-session-fallback';
-  }
-};
-
-// User API functions
+// API functions
 const userAPI = {
   getProfile: () => apiClient.get(API_ENDPOINTS.USER.PROFILE),
-  updateProfile: (data: any) => apiClient.put(API_ENDPOINTS.USER.UPDATE, data),
+  updateProfile: (data: any) => apiClient.put(API_ENDPOINTS.USER.PROFILE, data),
+  provisionWallets: () => apiClient.post(API_ENDPOINTS.USER.PROVISION_WALLETS), // FIXED
 };
 
-// KYC API functions
 const kycAPI = {
   checkProfile: () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
   startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
@@ -141,32 +115,40 @@ const kycAPI = {
   getRequirements: () => apiClient.get(API_ENDPOINTS.KYC.REQUIREMENTS),
 };
 
-// Wallet API functions
 const walletAPI = {
   create: () => apiClient.post(API_ENDPOINTS.WALLET.CREATE),
 };
 
-// Export everything at once to avoid duplicates
+const portfolioAPI = {
+  getSummary: () => apiClient.get(API_ENDPOINTS.PORTFOLIO.SUMMARY), // NEW
+};
+
+const tradingAPI = {
+  swap: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SWAP, data), // NEW
+  buy: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.BUY, data), // NEW
+  sell: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SELL, data), // NEW
+};
+
+// Session initialization
+const initializeSession = async (): Promise<string> => {
+  try {
+    const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
+    return response.data.session_id;
+  } catch (error) {
+    console.error('Session initialization failed:', error);
+    return 'anonymous-session-fallback';
+  }
+};
+
 export {
   apiClient,
   API_ENDPOINTS,
   userAPI,
   kycAPI,
   walletAPI,
+  portfolioAPI,
+  tradingAPI,
   initializeSession,
 };
 
-// ADD helper function for the missing provision endpoint
-const provisionWallets = async () => {
-  try {
-    const response = await apiClient.post('/api/wallet/provision');
-    return response.data;
-  } catch (error) {
-    console.error('Wallet provision failed:', error);
-    // Fallback to regular wallet creation
-    return walletAPI.create();
-  }
-};
-
-// Default export for convenience
 export default apiClient;

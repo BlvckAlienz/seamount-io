@@ -195,3 +195,39 @@ async def update_user_profile(
             status_code=500, 
             detail=f"Failed to update profile. Error ID: {error_id}"
         )
+        
+@router.post("/provision-wallets")
+async def provision_wallets(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    wallet_service: WalletService = Depends(get_wallet_service)
+):
+    """Provision Algorand wallet for authenticated user"""
+    try:
+        user_id = current_user['id']
+        logger.info(f"Provisioning wallet for user: {user_id}")
+        
+        # Check if wallet already exists
+        existing_wallet = await wallet_service.get_wallet_balances(user_id)
+        if existing_wallet.get('wallet_address'):
+            return {
+                "success": True,
+                "wallet_address": existing_wallet['wallet_address'],
+                "message": "Wallet already exists"
+            }
+        
+        # Create new wallet
+        result = await wallet_service.create_wallet_for_user(user_id)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "wallet_address": result["address"],
+                "mnemonic": result["mnemonic"],  # Return once for backup
+                "message": "Wallet created successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result.get("error"))
+            
+    except Exception as e:
+        logger.error(f"Wallet provisioning failed for user {current_user['id']}: {e}")
+        raise HTTPException(status_code=500, detail="Wallet provisioning failed")
