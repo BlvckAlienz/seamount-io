@@ -369,3 +369,6 @@ class EnhancedOracleService:
             'sources': health_status,
             'last_check': datetime.now().isoformat()
         }
+        
+# Backward compatibility alias
+OracleService = EnhancedOracleService

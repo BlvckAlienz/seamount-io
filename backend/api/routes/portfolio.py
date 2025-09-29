@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/summary")
+@router.get("/portfolio/summary")  # FIXED: was /summary
 async def get_portfolio_summary(
     current_user: dict = Depends(get_current_user),
     db_service = Depends(get_db_service),
