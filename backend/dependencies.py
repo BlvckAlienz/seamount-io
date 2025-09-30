@@ -174,7 +174,7 @@ def get_oracle_service() -> "OracleService":
                 )
             
             # Initialize with both settings and database service
-            _oracle_service = OracleService(get_settings_cached(), db_service)
+            _oracle_service = OracleService(db_service)
             logger.info("✅ Oracle service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Oracle service: {e}")

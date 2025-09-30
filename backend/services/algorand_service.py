@@ -182,107 +182,107 @@ class AlgorandService:
             logger.error(f"Failed to fund account {user_address}: {e}", exc_info=True)
             raise
             
-async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:
-    """Get complete account information from Algorand blockchain"""
-    try:
-        account_info = self.algod_client.account_info(address)
-        return account_info
-    except AlgodHTTPError as e:
-        if "account not found" in str(e).lower():
-            logger.warning(f"Account {address} not found on Algorand")
+    async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:  # ADD INDENT
+        """Get complete account information from Algorand blockchain"""
+        try:
+            account_info = self.algod_client.account_info(address)
+            return account_info
+        except AlgodHTTPError as e:
+            if "account not found" in str(e).lower():
+                logger.warning(f"Account {address} not found on Algorand")
+                return None
+            logger.error(f"Failed to get account info for {address}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting account info: {e}")
             return None
-        logger.error(f"Failed to get account info for {address}: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error getting account info: {e}")
-        return None
 
-async def prepare_payment_txn(
-    self, 
-    sender: str, 
-    receiver: str, 
-    amount: Decimal
-) -> Dict[str, Any]:
-    """Prepare ALGO payment transaction for user signing"""
-    try:
-        params = self.algod_client.suggested_params()
-        amount_microalgos = int(amount * 1_000_000)
+    async def prepare_payment_txn(
+        self, 
+        sender: str, 
+        receiver: str, 
+        amount: Decimal
+)   -> Dict[str, Any]:
+        """Prepare ALGO payment transaction for user signing"""
+        try:
+            params = self.algod_client.suggested_params()
+            amount_microalgos = int(amount * 1_000_000)
         
-        txn = PaymentTxn(
-            sender=sender,
-            sp=params,
-            receiver=receiver,
-            amt=amount_microalgos
-        )
+            txn = PaymentTxn(
+                sender=sender,
+                sp=params,
+                receiver=receiver,
+                amt=amount_microalgos
+            )
         
-        unsigned_txn_b64 = encoding.msgpack_encode(txn)
+            unsigned_txn_b64 = encoding.msgpack_encode(txn)
         
-        return {
-            "success": True,
-            "unsigned_txn_b64": unsigned_txn_b64,
-            "tx_id": txn.get_txid(),
-            "amount": float(amount)
-        }
-    except Exception as e:
-        logger.error(f"Failed to prepare payment transaction: {e}")
-        raise
+            return {
+                "success": True,
+                "unsigned_txn_b64": unsigned_txn_b64,
+                "tx_id": txn.get_txid(),
+                "amount": float(amount)
+            }
+        except Exception as e:
+            logger.error(f"Failed to prepare payment transaction: {e}")
+            raise
 
-async def prepare_asset_transfer_txn(
-    self,
-    sender: str,
-    receiver: str, 
-    asset_id: int,
-    amount: Decimal
-) -> Dict[str, Any]:
-    """Prepare asset transfer transaction for user signing"""
-    try:
-        asset_config = self._get_asset_config(asset_id)
-        decimals = asset_config['decimals']
+    async def prepare_asset_transfer_txn(
+        self,
+        sender: str,
+        receiver: str, 
+        asset_id: int,
+        amount: Decimal
+    ) -> Dict[str, Any]:
+        """Prepare asset transfer transaction for user signing"""
+        try:
+            asset_config = self._get_asset_config(asset_id)
+            decimals = asset_config['decimals']
+            
+            params = self.algod_client.suggested_params()
+            amount_base_units = int(amount * (10 ** decimals))
         
-        params = self.algod_client.suggested_params()
-        amount_base_units = int(amount * (10 ** decimals))
+            txn = AssetTransferTxn(
+                sender=sender,
+                sp=params,
+                receiver=receiver,
+                amt=amount_base_units,
+                index=asset_id
+            )
         
-        txn = AssetTransferTxn(
-            sender=sender,
-            sp=params,
-            receiver=receiver,
-            amt=amount_base_units,
-            index=asset_id
-        )
+            unsigned_txn_b64 = encoding.msgpack_encode(txn)
         
-        unsigned_txn_b64 = encoding.msgpack_encode(txn)
-        
-        return {
-            "success": True,
-            "unsigned_txn_b64": unsigned_txn_b64,
-            "tx_id": txn.get_txid(),
-            "asset_id": asset_id,
-            "amount": float(amount)
-        }
-    except Exception as e:
-        logger.error(f"Failed to prepare asset transfer: {e}")
-        raise
+            return {
+                "success": True,
+                "unsigned_txn_b64": unsigned_txn_b64,
+                "tx_id": txn.get_txid(),
+                "asset_id": asset_id,
+                "amount": float(amount)
+            }
+        except Exception as e:
+            logger.error(f"Failed to prepare asset transfer: {e}")
+            raise
 
-async def submit_transaction(self, signed_txn: str) -> str:
-    """Submit signed transaction to Algorand network"""
-    try:
-        tx_id = self.algod_client.send_raw_transaction(signed_txn)
-        await self.wait_for_confirmation(tx_id)
-        logger.info(f"Transaction submitted and confirmed: {tx_id}")
-        return tx_id
-    except Exception as e:
-        logger.error(f"Transaction submission failed: {e}")
-        raise
+    async def submit_transaction(self, signed_txn: str) -> str:
+        """Submit signed transaction to Algorand network"""
+        try:
+            tx_id = self.algod_client.send_raw_transaction(signed_txn)
+            await self.wait_for_confirmation(tx_id)
+            logger.info(f"Transaction submitted and confirmed: {tx_id}")
+            return tx_id
+        except Exception as e:
+            logger.error(f"Transaction submission failed: {e}")
+            raise
 
-async def check_asset_opt_in(self, address: str, asset_id: int) -> bool:
-    """Check if address is opted into specific asset"""
-    try:
-        account_info = await self.get_account_info(address)
-        if not account_info:
+    async def check_asset_opt_in(self, address: str, asset_id: int) -> bool:
+        """Check if address is opted into specific asset"""
+        try:
+            account_info = await self.get_account_info(address)
+            if not account_info:
+                return False
+        
+            assets = account_info.get('assets', [])
+            return any(asset['asset-id'] == asset_id for asset in assets)
+        except Exception as e:
+            logger.error(f"Opt-in check failed: {e}")
             return False
-        
-        assets = account_info.get('assets', [])
-        return any(asset['asset-id'] == asset_id for asset in assets)
-    except Exception as e:
-        logger.error(f"Opt-in check failed: {e}")
-        return False
