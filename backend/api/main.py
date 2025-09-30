@@ -20,6 +20,7 @@ import traceback
 import aiohttp 
 import sys
 from pathlib import Path
+from decimal import Decimal
 
 # Add the project root to the Python path for clean imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -282,9 +283,16 @@ async def lifespan(app: FastAPI):
                 
                 # Only initialize services that require Supabase if client is available
                 if supabase_client:
-                    wallet_service = WalletService(settings, supabase_client)
                     database_service = DatabaseService(supabase_client)
                     audit_service = AuditService(supabase_client)
+    
+                    # Initialize AlgorandService
+                    from backend.services.algorand_service import AlgorandService
+                    algorand_service = AlgorandService(settings)
+    
+                    # Initialize WalletService with correct dependencies
+                    wallet_service = WalletService(database_service, algorand_service)
+    
                     kyc_service = KYCService(
                         settings, 
                         supabase_client, 
@@ -296,7 +304,7 @@ async def lifespan(app: FastAPI):
                     oracle_service = None
                     if oracle_service_available:
                         try:
-                            oracle_service = OracleService(settings, database_service)
+                            oracle_service = OracleService(database_service)
                             logger.info("✅ Oracle service initialized successfully")
                         except Exception as e:
                             logger.error(f"❌ Failed to initialize Oracle service: {e}")
@@ -318,7 +326,7 @@ async def lifespan(app: FastAPI):
                             audit_service,
                             kyc_service,
                             database_service,
-                            None,  # algorand_service
+                            algorand_service,
                             oracle_service
                         )
                         logger.info("✅ All dependencies initialized successfully")
@@ -336,13 +344,10 @@ async def lifespan(app: FastAPI):
                 
                 # Business model calculation
                 try:
-                    license_fee = settings.business_model.calculate_license_fee(
-                        LicenseTier.STARTER,
-                        PricingRegion.NIGERIA
-                    )
-                    logger.info(f"💰 Business model initialized. Starter license fee in Nigeria: {license_fee}")
+                    test_calc = settings.business_model.calculate_cross_border_economics(Decimal("1000"))
+                    logger.info(f"💰 Business model initialized. Test $1000 cross-border: ${test_calc['seamount']['total_cost']}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Business model calculation failed: {e}")
+                    logger.warning(f"⚠️ Business model validation failed: {e}")
                     
             except Exception as e:
                 logger.error(f"❌ Service initialization error: {e}")
