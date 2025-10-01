@@ -15,14 +15,15 @@ logger = logging.getLogger(__name__)
 class AlgorandService:
     """Algorand blockchain interaction service using free public nodes"""
     
-    def __init__(self):
+    def __init__(self, settings):  # Add settings parameter
+        self.settings = settings
         # Use free AlgoNode - no API key needed
         self.algod_client = algod.AlgodClient(
-            algod_token="",  # Empty for free nodes
-            algod_address=settings.ALGORAND_NODE_URL,
+            algod_token="",
+            algod_address=settings.ALGORAND_NODE_URL,  # Now works
             headers={"User-Agent": "Seamount/1.0"}
         )
-        
+    
         if not settings.ALGORAND_CREATOR_MNEMONIC:
             raise ValueError("ALGORAND_CREATOR_MNEMONIC required")
         
@@ -125,7 +126,7 @@ class AlgorandService:
 
     def _get_asset_config(self, asset_id: int) -> Dict:
         """Get asset configuration from settings"""
-        for asset_key, config in settings.SUPPORTED_ASSETS.items():
+        for asset_key, config in self.settings.SUPPORTED_ASSETS.items():
             if config['asset_id'] == asset_id:
                 return config
         raise ValueError(f"Asset ID {asset_id} not configured")
