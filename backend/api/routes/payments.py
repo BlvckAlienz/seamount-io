@@ -6,10 +6,13 @@ from typing import Dict, Any, Optional
 from decimal import Decimal
 import uuid
 import logging
+from datetime import datetime
 from backend.dependencies import get_supabase_client
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
 from backend.config import get_settings
+from backend.services.database_service import DatabaseService
+from backend.services.oracle_service import EnhancedOracleService
 from supabase import Client
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -26,11 +29,16 @@ class DepositRequest(BaseModel):
     currency: str
     user_country: str
 
+class OnRampRequest(BaseModel):
+    user_id: str
+    user_email: EmailStr
+    user_phone: str
+    amount_fiat: float
+
 class PaymentSmartRouter:
     """Routes payments to optimal provider based on region/currency"""
     
     def __init__(self):
-        # FIXED: Correct indentation
         self.settings = get_settings()
         try:
             self.paystack = PaystackProvider(self.settings) if hasattr(self.settings, 'PAYSTACK_SECRET_KEY') and self.settings.PAYSTACK_SECRET_KEY else None
@@ -40,7 +48,6 @@ class PaymentSmartRouter:
             self.paystack = None
             self.flutterwave = None
     
-    # FIXED: Correct indentation for select_provider method
     def select_provider(self, currency: str, country: str, amount: float) -> str:
         """Smart routing logic - prioritize Paystack for NGN"""
         
@@ -164,7 +171,7 @@ async def get_transaction_status(
     except Exception as e:
         logger.error(f"Failed to fetch transaction {transaction_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch transaction status")
-        
+
 @router.post("/on-ramp/ngn")
 async def initialize_ngn_onramp(
     request: Request,
@@ -177,8 +184,9 @@ async def initialize_ngn_onramp(
         user_id = deposit.user_id
         amount_ngn = Decimal(str(deposit.amount_fiat))
         
-        # Get NGN/USD rate from oracle
-        oracle_service = EnhancedOracleService(DatabaseService(supabase))
+        # Get NGN/USD rate from oracle - FIXED: Use available services
+        db_service = DatabaseService(supabase)
+        oracle_service = EnhancedOracleService(db_service)
         ngn_rate, _ = await oracle_service.get_ngn_usd_rate()
         
         # Calculate USDT amount (with 2.9% Seamount fee)
