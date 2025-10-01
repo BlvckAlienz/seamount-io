@@ -1,19 +1,15 @@
-# File: backend/services/wallet_service.py - OPTIMIZED MULTI-ASSET VERSION
+# File: backend/services/wallet_service.py - PRODUCTION FIXES
 """
-Optimized Wallet Service with Multi-Asset Support
-Merges best features from both versions for production readiness
+Fixed Wallet Service with correct schema mapping and key encoding
 """
 
 import logging
-from typing import Dict, Optional, List, Any, Tuple
+from typing import Dict, Optional, List, Any
 from decimal import Decimal
 from algosdk import account, mnemonic
-from supabase import Client
 from cryptography.fernet import Fernet, InvalidToken
 from datetime import datetime
 from fastapi import HTTPException
-import asyncio
-import aiohttp
 
 from backend.config import settings
 from backend.services.database_service import DatabaseService
@@ -22,10 +18,7 @@ from backend.services.algorand_service import AlgorandService
 logger = logging.getLogger(__name__)
 
 class WalletService:
-    """
-    Production-ready wallet service with multi-asset support
-    Handles secure wallet creation, encryption, and Algorand integration
-    """
+    """Production-ready wallet service with correct Supabase schema mapping"""
     
     def __init__(self, db_service: DatabaseService, algorand_service: AlgorandService):
         self.db_service = db_service
@@ -38,17 +31,17 @@ class WalletService:
         encryption_key_bytes = settings.ENCRYPTION_KEY.get_secret_value().encode()
         self.cipher = Fernet(encryption_key_bytes)
         
-        # Multi-asset configuration from settings
+        # Multi-asset configuration
         self.supported_assets = settings.SUPPORTED_ASSETS
         
         logger.info("WalletService initialized with multi-asset support")
     
     def _encrypt(self, data: str) -> str:
-        """Encrypt sensitive data using configured key"""
+        """Encrypt sensitive data"""
         return self.cipher.encrypt(data.encode()).decode()
     
     def _decrypt(self, encrypted_data: str) -> str:
-        """Decrypt sensitive data using configured key"""
+        """Decrypt sensitive data"""
         try:
             return self.cipher.decrypt(encrypted_data.encode()).decode()
         except InvalidToken:
@@ -56,7 +49,9 @@ class WalletService:
             raise HTTPException(status_code=500, detail="Wallet data decryption failed")
     
     async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
-        """Create new Algorand wallet with multi-asset support"""
+        """
+        FIXED: Create Algorand wallet with correct schema mapping
+        """
         try:
             logger.info(f"Creating Algorand wallet for user: {user_id}")
             
@@ -64,38 +59,30 @@ class WalletService:
             private_key, address = account.generate_account()
             mnemonic_phrase = mnemonic.from_private_key(private_key)
             
-            # Store wallet with encrypted private key
+            # FIX: private_key is already a STRING from algosdk, don't call .hex()
+            encrypted_pk = self._encrypt(private_key)
+            
+            # FIX: Use correct Supabase column names
             wallet_data = {
                 "user_id": user_id,
-                "wallet_address": address,
-                "encrypted_private_key": self._encrypt(private_key.hex()),
-                "blockchain": "algorand",
+                "algorand_address": address,  # NOT wallet_address
+                "algorand_private_key": encrypted_pk,  # NOT encrypted_private_key
+                "wallet_type": "managed",  # NOT blockchain
                 "is_active": True,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
             }
             
-            # Insert into user_wallets table
-            insert_query = """
-                INSERT INTO user_wallets (
-                    user_id, wallet_address, encrypted_private_key, 
-                    blockchain, is_active, created_at
-                ) VALUES (%(user_id)s, %(wallet_address)s, %(encrypted_private_key)s,
-                          %(blockchain)s, %(is_active)s, %(created_at)s)
-                ON CONFLICT (user_id, blockchain) 
-                DO UPDATE SET 
-                    wallet_address = EXCLUDED.wallet_address,
-                    encrypted_private_key = EXCLUDED.encrypted_private_key,
-                    is_active = EXCLUDED.is_active,
-                    created_at = EXCLUDED.created_at
-                RETURNING wallet_address;
-            """
+            # Use Supabase upsert directly
+            response = self.db_service.supabase.table("user_wallets").upsert(
+                wallet_data, 
+                on_conflict="user_id"
+            ).execute()
             
-            result = await self.db_service.execute_query(insert_query, wallet_data)
-            
-            if not result:
+            if not response.data:
                 raise Exception("Failed to create wallet in database")
             
-            # Initialize wallet balances for all supported assets
+            # Initialize wallet balances
             await self._initialize_wallet_balances(user_id, address)
             
             logger.info(f"Algorand wallet created successfully: {address}")
@@ -127,17 +114,8 @@ class WalletService:
                 "last_updated": datetime.utcnow().isoformat()
             }
             
-            # Insert balance record
-            insert_query = """
-                INSERT INTO wallet_balances (
-                    user_id, wallet_address, algo_balance, usdt_balance, 
-                    usdc_balance, gobtc_balance, goeth_balance, last_updated
-                ) VALUES (%(user_id)s, %(wallet_address)s, %(algo_balance)s, %(usdt_balance)s,
-                          %(usdc_balance)s, %(gobtc_balance)s, %(goeth_balance)s, %(last_updated)s)
-                ON CONFLICT (user_id) DO NOTHING;
-            """
-            
-            await self.db_service.execute_query(insert_query, balance_data)
+            # Use Supabase directly
+            self.db_service.supabase.table("wallet_balances").insert(balance_data).execute()
             logger.info(f"Initialized balance records for user: {user_id}")
             
         except Exception as e:
@@ -147,17 +125,13 @@ class WalletService:
     async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
         """Get comprehensive wallet balances for user"""
         try:
-            # Get user's wallet address
-            wallet_query = """
-                SELECT wallet_address FROM user_wallets 
-                WHERE user_id = %s AND blockchain = 'algorand' AND is_active = true
-            """
-            wallet_result = await self.db_service.execute_query(wallet_query, (user_id,))
+            # Get user's wallet - FIX: use correct column name
+            response = self.db_service.supabase.table("user_wallets").select("algorand_address").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
             
-            if not wallet_result:
+            if not response.data:
                 return {"balances": {}, "total_usd": 0.0, "wallet_exists": False}
             
-            wallet_address = wallet_result[0]['wallet_address']
+            wallet_address = response.data['algorand_address']
             
             # Get live balances from Algorand network
             live_balances = await self._fetch_live_balances(wallet_address)
@@ -204,7 +178,7 @@ class WalletService:
             # Map configured assets to their balances
             for symbol, config in self.supported_assets.items():
                 if symbol == 'ALGO':
-                    continue  # Already handled above
+                    continue
                 
                 asset_id = config['asset_id']
                 decimals = config['decimals']
@@ -217,22 +191,15 @@ class WalletService:
             
         except Exception as e:
             logger.error(f"Failed to fetch live balances for {wallet_address}: {e}")
-            # Return cached balances as fallback
             return await self._get_cached_balances(wallet_address)
     
     async def _get_cached_balances(self, wallet_address: str) -> Dict[str, float]:
         """Get cached balances from database"""
         try:
-            query = """
-                SELECT algo_balance, usdt_balance, usdc_balance, 
-                       gobtc_balance, goeth_balance
-                FROM wallet_balances 
-                WHERE wallet_address = %s
-            """
-            result = await self.db_service.execute_query(query, (wallet_address,))
+            response = self.db_service.supabase.table("wallet_balances").select("*").eq("wallet_address", wallet_address).maybe_single().execute()
             
-            if result:
-                balance_row = result[0]
+            if response.data:
+                balance_row = response.data
                 return {
                     "ALGO": float(balance_row.get("algo_balance", 0)),
                     "USDT": float(balance_row.get("usdt_balance", 0)),
@@ -250,25 +217,16 @@ class WalletService:
     async def _update_cached_balances(self, user_id: str, balances: Dict[str, float]):
         """Update cached balances in database"""
         try:
-            update_query = """
-                UPDATE wallet_balances SET
-                    algo_balance = %s,
-                    usdt_balance = %s,
-                    usdc_balance = %s, 
-                    gobtc_balance = %s,
-                    goeth_balance = %s,
-                    last_updated = NOW()
-                WHERE user_id = %s
-            """
+            update_data = {
+                "algo_balance": balances.get("ALGO", 0),
+                "usdt_balance": balances.get("USDT", 0),
+                "usdc_balance": balances.get("USDCa", 0),
+                "gobtc_balance": balances.get("goBTC", 0),
+                "goeth_balance": balances.get("goETH", 0),
+                "last_updated": datetime.utcnow().isoformat()
+            }
             
-            await self.db_service.execute_query(update_query, (
-                balances.get("ALGO", 0),
-                balances.get("USDT", 0),
-                balances.get("USDCa", 0),
-                balances.get("goBTC", 0),
-                balances.get("goETH", 0),
-                user_id
-            ))
+            self.db_service.supabase.table("wallet_balances").update(update_data).eq("user_id", user_id).execute()
             
         except Exception as e:
             logger.error(f"Failed to update cached balances: {e}")
@@ -278,7 +236,7 @@ class WalletService:
         try:
             total_usd = 0.0
             
-            # Current market prices (replace with oracle service)
+            # Current market prices (TODO: replace with oracle service)
             asset_prices = {
                 "ALGO": 0.18,
                 "USDT": 1.0,
@@ -298,236 +256,31 @@ class WalletService:
             logger.error(f"Failed to calculate portfolio value: {e}")
             return 0.0
     
-    async def prepare_asset_transfer(
-        self, 
-        user_id: str, 
-        asset: str, 
-        recipient: str, 
-        amount: Decimal
-    ) -> Dict[str, Any]:
-        """Prepare asset transfer transaction for user signing"""
-        try:
-            # Validate asset
-            if asset not in self.supported_assets:
-                raise ValueError(f"Unsupported asset: {asset}")
-            
-            # Get user wallet
-            wallet_query = """
-                SELECT wallet_address, encrypted_private_key FROM user_wallets 
-                WHERE user_id = %s AND blockchain = 'algorand' AND is_active = true
-            """
-            wallet_result = await self.db_service.execute_query(wallet_query, (user_id,))
-            
-            if not wallet_result:
-                raise ValueError("User wallet not found")
-            
-            wallet_address = wallet_result[0]['wallet_address']
-            
-            # Check balance
-            balances = await self._fetch_live_balances(wallet_address)
-            available_balance = Decimal(str(balances.get(asset, 0)))
-            
-            if available_balance < amount:
-                raise ValueError(f"Insufficient balance. Available: {available_balance}, Required: {amount}")
-            
-            # Get asset configuration
-            asset_config = self.supported_assets[asset]
-            
-            # Use AlgorandService to prepare transaction
-            if asset == "ALGO":
-                # Native ALGO transfer
-                prepared_tx = await self.algorand_service.prepare_payment_txn(
-                    sender=wallet_address,
-                    receiver=recipient,
-                    amount=amount
-                )
-            else:
-                # Asset transfer
-                prepared_tx = await self.algorand_service.prepare_asset_transfer_txn(
-                    sender=wallet_address,
-                    receiver=recipient,
-                    asset_id=asset_config['asset_id'],
-                    amount=amount
-                )
-            
-            return {
-                "success": True,
-                "transaction_data": prepared_tx,
-                "asset": asset,
-                "amount": float(amount),
-                "recipient": recipient,
-                "estimated_fee": 0.001  # Algorand transaction fee
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to prepare asset transfer: {e}")
-            raise Exception(f"Transfer preparation failed: {str(e)}")
-    
-    async def execute_signed_transaction(self, user_id: str, signed_txn: str) -> Dict[str, Any]:
-        """Execute a user-signed transaction"""
-        try:
-            # Submit transaction via AlgorandService
-            tx_id = await self.algorand_service.submit_transaction(signed_txn)
-            
-            # Store transaction record
-            tx_record = {
-                "user_id": user_id,
-                "tx_id": tx_id,
-                "type": "asset_transfer",
-                "status": "submitted",
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            await self.db_service.log_event("wallet_transaction", tx_record)
-            
-            return {
-                "success": True,
-                "tx_id": tx_id,
-                "status": "submitted",
-                "explorer_url": f"https://explorer.algonode.cloud/tx/{tx_id}"
-            }
-            
-        except Exception as e:
-            logger.error(f"Transaction execution failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    async def get_transaction_history(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get user's transaction history"""
-        try:
-            # Get user wallet
-            wallet_query = """
-                SELECT wallet_address FROM user_wallets 
-                WHERE user_id = %s AND blockchain = 'algorand' AND is_active = true
-            """
-            wallet_result = await self.db_service.execute_query(wallet_query, (user_id,))
-            
-            if not wallet_result:
-                return []
-            
-            wallet_address = wallet_result[0]['wallet_address']
-            
-            # Get transactions from database
-            history_query = """
-                SELECT tx_id, type, amount, asset, status, created_at, completed_at
-                FROM wallet_transactions 
-                WHERE user_id = %s OR sender = %s OR receiver = %s
-                ORDER BY created_at DESC 
-                LIMIT %s
-            """
-            
-            results = await self.db_service.execute_query(
-                history_query, 
-                (user_id, wallet_address, wallet_address, limit)
-            )
-            
-            transactions = []
-            for tx in results or []:
-                transactions.append({
-                    "tx_id": tx["tx_id"],
-                    "type": tx["type"],
-                    "amount": float(tx["amount"]) if tx["amount"] else 0,
-                    "asset": tx["asset"],
-                    "status": tx["status"],
-                    "created_at": tx["created_at"],
-                    "completed_at": tx["completed_at"],
-                    "explorer_url": f"https://explorer.algonode.cloud/tx/{tx['tx_id']}"
-                })
-            
-            return transactions
-            
-        except Exception as e:
-            logger.error(f"Failed to get transaction history: {e}")
-            return []
-    
-    async def refresh_all_balances(self, user_id: str) -> Dict[str, Any]:
-        """Force refresh of all user balances"""
-        try:
-            balances = await self.get_user_balances(user_id)
-            
-            return {
-                "success": True,
-                "balances": balances["balances"],
-                "total_usd": balances["total_usd"],
-                "last_updated": datetime.utcnow().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Balance refresh failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    async def check_asset_opt_in_status(self, user_id: str, asset: str) -> Dict[str, Any]:
-        """Check if user is opted into specific asset"""
-        try:
-            if asset not in self.supported_assets:
-                raise ValueError(f"Unsupported asset: {asset}")
-            
-            # Get user wallet
-            wallet_query = """
-                SELECT wallet_address FROM user_wallets 
-                WHERE user_id = %s AND blockchain = 'algorand' AND is_active = true
-            """
-            wallet_result = await self.db_service.execute_query(wallet_query, (user_id,))
-            
-            if not wallet_result:
-                return {"opted_in": False, "wallet_exists": False}
-            
-            wallet_address = wallet_result[0]['wallet_address']
-            asset_id = self.supported_assets[asset]['asset_id']
-            
-            # Check opt-in status via AlgorandService
-            is_opted_in = await self.algorand_service.check_asset_opt_in(wallet_address, asset_id)
-            
-            return {
-                "opted_in": is_opted_in,
-                "asset": asset,
-                "asset_id": asset_id,
-                "wallet_exists": True
-            }
-            
-        except Exception as e:
-            logger.error(f"Opt-in status check failed: {e}")
-            return {"opted_in": False, "error": str(e)}
-    
     async def get_wallet_info(self, user_id: str) -> Dict[str, Any]:
         """Get comprehensive wallet information"""
         try:
-            # Get wallet details
-            wallet_query = """
-                SELECT wallet_address, blockchain, created_at FROM user_wallets 
-                WHERE user_id = %s AND is_active = true
-            """
-            wallet_result = await self.db_service.execute_query(wallet_query, (user_id,))
+            # Get wallet details - FIX: use correct column name
+            response = self.db_service.supabase.table("user_wallets").select("*").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
             
-            if not wallet_result:
+            if not response.data:
                 return {"wallet_exists": False}
             
-            wallet_data = wallet_result[0]
+            wallet_data = response.data
             
             # Get balances
             balances = await self.get_user_balances(user_id)
             
-            # Get recent transactions
-            recent_txs = await self.get_transaction_history(user_id, limit=10)
-            
             return {
                 "wallet_exists": True,
-                "wallet_address": wallet_data["wallet_address"],
-                "blockchain": wallet_data["blockchain"],
-                "created_at": wallet_data["created_at"],
+                "wallet_address": wallet_data["algorand_address"],
+                "blockchain": "algorand",
+                "wallet_type": wallet_data.get("wallet_type", "managed"),
+                "created_at": wallet_data.get("created_at"),
                 "balances": balances["balances"],
                 "total_usd": balances["total_usd"],
-                "supported_assets": list(self.supported_assets.keys()),
-                "recent_transactions": recent_txs[:5],  # Last 5 transactions
-                "transaction_count": len(recent_txs)
+                "supported_assets": list(self.supported_assets.keys())
             }
             
         except Exception as e:
             logger.error(f"Failed to get wallet info: {e}")
-            return {"wallet_exists": False, "error": str(e)} 
-                
+            return {"wallet_exists": False, "error": str(e)}

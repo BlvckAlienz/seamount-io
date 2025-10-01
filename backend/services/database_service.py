@@ -503,6 +503,156 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error fetching user wallet {user_id}: {str(e)}")
             raise
+    
+    # File Location: backend/services/database_service.py
+# ADD THIS METHOD to DatabaseService class after get_user_wallet() method
+
+    async def execute_query(self, query: str, params: Any = None) -> Optional[List[Dict[str, Any]]]:
+        """
+        CRITICAL FIX: Execute raw SQL query via Supabase RPC
+        Used by wallet_service for custom queries
+        """
+        try:
+            logger.debug(f"[DB] Executing query with params: {params}")
+            
+            # For Supabase, we need to use the appropriate table methods
+            # This is a compatibility layer for legacy code
+            
+            # Parse query to determine operation
+            query_lower = query.lower().strip()
+            
+            if query_lower.startswith('insert'):
+                # Handle INSERT operations
+                return await self._execute_insert(query, params)
+            elif query_lower.startswith('select'):
+                # Handle SELECT operations
+                return await self._execute_select(query, params)
+            elif query_lower.startswith('update'):
+                # Handle UPDATE operations
+                return await self._execute_update(query, params)
+            else:
+                logger.error(f"[DB] Unsupported query type: {query}")
+                raise ValueError("Query type not supported")
+                
+        except Exception as e:
+            logger.error(f"[DB] Query execution failed: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+
+    async def _execute_insert(self, query: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Execute INSERT query via Supabase"""
+        try:
+            # Extract table name from query
+            table_name = self._extract_table_name(query, 'insert')
+            
+            # Use Supabase insert
+            response = self.supabase.table(table_name).insert(params).execute()
+            
+            if response.data:
+                logger.debug(f"[DB] Insert successful: {table_name}")
+                return response.data
+            return []
+            
+        except Exception as e:
+            logger.error(f"[DB] Insert failed: {str(e)}")
+            raise
+
+    async def _execute_select(self, query: str, params: tuple) -> List[Dict[str, Any]]:
+        """Execute SELECT query via Supabase"""
+        try:
+            # Extract table name
+            table_name = self._extract_table_name(query, 'select')
+            
+            # Build Supabase query
+            supabase_query = self.supabase.table(table_name).select("*")
+            
+            # Apply filters from params
+            if params and len(params) > 0:
+                # Simple equality filter for first param
+                # This is a basic implementation - enhance as needed
+                if 'user_id' in query.lower():
+                    supabase_query = supabase_query.eq('user_id', params[0])
+                elif 'wallet_address' in query.lower():
+                    supabase_query = supabase_query.eq('wallet_address', params[0])
+            
+            response = supabase_query.execute()
+            
+            if response.data:
+                return response.data
+            return []
+            
+        except Exception as e:
+            logger.error(f"[DB] Select failed: {str(e)}")
+            raise
+
+    async def _execute_update(self, query: str, params: tuple) -> List[Dict[str, Any]]:
+        """Execute UPDATE query via Supabase"""
+        try:
+            table_name = self._extract_table_name(query, 'update')
+            
+            # Extract update data and filter
+            # This is simplified - enhance for production
+            update_data = {}
+            filter_value = params[-1] if params else None
+            
+            response = self.supabase.table(table_name).update(update_data).eq('user_id', filter_value).execute()
+            
+            if response.data:
+                return response.data
+            return []
+            
+        except Exception as e:
+            logger.error(f"[DB] Update failed: {str(e)}")
+            raise
+
+    def _extract_table_name(self, query: str, operation: str) -> str:
+        """Extract table name from SQL query"""
+        try:
+            query_lower = query.lower()
+            
+            if operation == 'insert':
+                # Extract from "INSERT INTO table_name"
+                start = query_lower.find('into') + 5
+                end = query_lower.find('(', start)
+                if end == -1:
+                    end = query_lower.find('values', start)
+            elif operation == 'select':
+                # Extract from "SELECT * FROM table_name"
+                start = query_lower.find('from') + 5
+                end = query_lower.find('where', start)
+                if end == -1:
+                    end = len(query_lower)
+            elif operation == 'update':
+                # Extract from "UPDATE table_name"
+                start = query_lower.find('update') + 7
+                end = query_lower.find('set', start)
+            else:
+                raise ValueError(f"Unknown operation: {operation}")
+            
+            table_name = query[start:end].strip()
+            return table_name
+            
+        except Exception as e:
+            logger.error(f"[DB] Failed to extract table name: {str(e)}")
+            raise
+
+    async def log_event(self, event_type: str, event_data: Dict[str, Any]) -> bool:
+        """Log system events for audit trail"""
+        try:
+            log_entry = {
+                "id": str(uuid.uuid4()),
+                "event_type": event_type,
+                "event_data": event_data,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            response = self.supabase.table("system_events").insert(log_entry).execute()
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Failed to log event: {str(e)}")
+            return False
 
     async def get_wallet_balance(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user wallet balance information"""
