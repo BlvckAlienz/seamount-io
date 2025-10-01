@@ -1,18 +1,94 @@
-// File: frontend/src/pages/DashboardPage.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, DollarSign, Activity, Send, 
   RefreshCw, Shield, AlertTriangle, Bitcoin, Coins, Copy, 
-  Check, Eye, EyeOff, Download, Lock, ExternalLink 
+  Check, Eye, EyeOff, Download, Lock, ExternalLink, ArrowUpRight, ArrowDownLeft
 } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { portfolioAPI, userAPI } from '../config/api';
 
-// Mnemonic Backup Modal Component
+// Asset Card Component with 0-balance visibility
+const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; onSend: () => void }) => {
+  const getGradient = (symbol: string) => {
+    const gradients: { [key: string]: string } = {
+      'ALGO': 'from-purple-500 to-indigo-600',
+      'USDT': 'from-green-500 to-emerald-600',
+      'USDCa': 'from-blue-500 to-cyan-600',
+      'goBTC': 'from-orange-500 to-yellow-600',
+      'goETH': 'from-gray-400 to-slate-600'
+    };
+    return gradients[symbol] || 'from-gray-500 to-gray-600';
+  };
+
+  const getIcon = (symbol: string) => {
+    switch (symbol) {
+      case 'goBTC': return <Bitcoin className="h-8 w-8" />;
+      case 'goETH': return <Coins className="h-8 w-8" />;
+      case 'ALGO': return <Shield className="h-8 w-8" />;
+      default: return <DollarSign className="h-8 w-8" />;
+    }
+  };
+
+  const balance = asset.balance || 0;
+  const valueUsd = asset.value_usd || 0;
+  const hasBalance = balance > 0;
+
+  return (
+    <div className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10">
+      <div className={`absolute inset-0 bg-gradient-to-br ${getGradient(asset.symbol)} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`} />
+      
+      <div className="relative">
+        <div className="flex items-start justify-between mb-4">
+          <div className={`p-3 rounded-xl bg-gradient-to-br ${getGradient(asset.symbol)} text-white`}>
+            {getIcon(asset.symbol)}
+          </div>
+          <div className="text-right">
+            <div className={`text-2xl font-bold ${hasBalance ? 'text-white' : 'text-gray-500'}`}>
+              ${valueUsd.toFixed(2)}
+            </div>
+            <div className="text-sm text-gray-400">â‰ˆ {balance.toFixed(6)}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="text-white font-semibold">{asset.name}</div>
+            <div className="text-gray-400 text-sm">{asset.symbol}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-gray-400 text-sm">${asset.price_usd?.toFixed(2) || '0.00'}</div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={onBuy}
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+          >
+            <ArrowDownLeft className="h-4 w-4" />
+            Buy
+          </button>
+          <button
+            onClick={onSend}
+            disabled={!hasBalance}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+              hasBalance 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <ArrowUpRight className="h-4 w-4" />
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Mnemonic Backup Modal
 const MnemonicBackupModal = ({ 
   mnemonic, 
   walletAddress, 
@@ -31,7 +107,6 @@ const MnemonicBackupModal = ({
   const words = mnemonic.split(' ');
 
   useEffect(() => {
-    // Generate 3 random word positions for verification
     const positions: number[] = [];
     while (positions.length < 3) {
       const pos = Math.floor(Math.random() * 25);
@@ -48,7 +123,7 @@ const MnemonicBackupModal = ({
   };
 
   const downloadMnemonic = () => {
-    const blob = new Blob([`Seamount Wallet Recovery Phrase\n\nWallet Address: ${walletAddress}\n\nRecovery Phrase:\n${mnemonic}\n\n⚠️ KEEP THIS SAFE! Never share with anyone.`], { type: 'text/plain' });
+    const blob = new Blob([`Seamount Wallet Recovery Phrase\n\nWallet Address: ${walletAddress}\n\nRecovery Phrase:\n${mnemonic}\n\nâš ï¸ KEEP THIS SAFE! Never share with anyone.`], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -89,21 +164,19 @@ const MnemonicBackupModal = ({
                 Critical Security Warning
               </h3>
               <ul className="text-sm text-gray-300 space-y-1">
-                <li>• Never share your recovery phrase with anyone</li>
-                <li>• Seamount will NEVER ask for your phrase</li>
-                <li>• Store it offline in multiple secure locations</li>
-                <li>• Anyone with this phrase can access your funds</li>
+                <li>â€¢ Never share your recovery phrase with anyone</li>
+                <li>â€¢ Seamount will NEVER ask for your phrase</li>
+                <li>â€¢ Store it offline in multiple secure locations</li>
+                <li>â€¢ Anyone with this phrase can access your funds</li>
               </ul>
             </div>
 
-            <div className="flex gap-3">
-              <Button 
-                onClick={() => setStep(2)} 
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
-                I Understand - Show Recovery Phrase
-              </Button>
-            </div>
+            <button 
+              onClick={() => setStep(2)} 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
+            >
+              I Understand - Show Recovery Phrase
+            </button>
           </>
         )}
 
@@ -146,31 +219,29 @@ const MnemonicBackupModal = ({
             </div>
 
             <div className="flex gap-3 mb-4">
-              <Button 
+              <button 
                 onClick={copyToClipboard}
-                variant="outline"
-                icon={copied ? Check : Copy}
-                className="flex-1"
+                className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
               >
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copied!' : 'Copy Phrase'}
-              </Button>
-              <Button 
+              </button>
+              <button 
                 onClick={downloadMnemonic}
-                variant="outline"
-                icon={Download}
-                className="flex-1"
+                className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                Download Backup
-              </Button>
+                <Download className="h-4 w-4" />
+                Download
+              </button>
             </div>
 
-            <Button 
+            <button 
               onClick={() => setStep(3)}
-              className="w-full bg-blue-600 hover:bg-blue-700"
               disabled={!showMnemonic}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50"
             >
               I've Saved My Recovery Phrase
-            </Button>
+            </button>
           </>
         )}
 
@@ -179,7 +250,7 @@ const MnemonicBackupModal = ({
             <div className="text-center mb-6">
               <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-white mb-2">Verify Your Phrase</h2>
-              <p className="text-gray-400">Enter the requested words to confirm you saved it</p>
+              <p className="text-gray-400">Enter the requested words to confirm</p>
             </div>
 
             <div className="space-y-4 mb-6">
@@ -192,7 +263,7 @@ const MnemonicBackupModal = ({
                     type="text"
                     value={userInputs[pos] || ''}
                     onChange={(e) => setUserInputs({ ...userInputs, [pos]: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
                     placeholder="Enter word"
                   />
                 </div>
@@ -200,73 +271,21 @@ const MnemonicBackupModal = ({
             </div>
 
             <div className="flex gap-3">
-              <Button 
+              <button 
                 onClick={() => setStep(2)}
-                variant="outline"
-                className="flex-1"
+                className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 Back
-              </Button>
-              <Button 
+              </button>
+              <button 
                 onClick={verifyWords}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
               >
                 Verify & Complete
-              </Button>
+              </button>
             </div>
           </>
         )}
-      </div>
-    </div>
-  );
-};
-
-// Asset Card Component
-const AssetCard = ({ asset }: { asset: any }) => {
-  const getGradient = (symbol: string) => {
-    const gradients: { [key: string]: string } = {
-      'ALGO': 'from-purple-500 to-indigo-600',
-      'USDT': 'from-green-500 to-emerald-600',
-      'USDCa': 'from-blue-500 to-cyan-600',
-      'goBTC': 'from-orange-500 to-yellow-600',
-      'goETH': 'from-gray-400 to-slate-600'
-    };
-    return gradients[symbol] || 'from-gray-500 to-gray-600';
-  };
-
-  const getIcon = (symbol: string) => {
-    switch (symbol) {
-      case 'goBTC': return <Bitcoin className="h-8 w-8" />;
-      case 'goETH': return <Coins className="h-8 w-8" />;
-      case 'ALGO': return <Shield className="h-8 w-8" />;
-      default: return <DollarSign className="h-8 w-8" />;
-    }
-  };
-
-  return (
-    <div className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10">
-      <div className={`absolute inset-0 bg-gradient-to-br ${getGradient(asset.symbol)} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`} />
-      
-      <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${getGradient(asset.symbol)} text-white`}>
-            {getIcon(asset.symbol)}
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-white">${asset.value_usd.toFixed(2)}</div>
-            <div className="text-sm text-gray-400">≈ {asset.balance.toFixed(6)}</div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-white font-semibold">{asset.name}</div>
-            <div className="text-gray-400 text-sm">{asset.symbol}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-gray-400 text-sm">${asset.price_usd.toFixed(2)}</div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -284,7 +303,7 @@ const WalletAddressCard = ({ address }: { address: string }) => {
   };
 
   return (
-    <Card className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border-blue-500/30">
+    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="text-sm text-gray-400 mb-1">Your Algorand Address</div>
@@ -293,58 +312,74 @@ const WalletAddressCard = ({ address }: { address: string }) => {
         <div className="flex gap-2 ml-4">
           <button
             onClick={copyAddress}
-            className="p-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${
+              copied 
+                ? 'bg-green-600 text-white' 
+                : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+            }`}
           >
-            {copied ? <Check className="h-4 w-4 text-white" /> : <Copy className="h-4 w-4 text-white" />}
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           </button>
-          <a
+          
             href={`https://algoexplorer.io/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
           >
-            <ExternalLink className="h-4 w-4 text-white" />
+            <ExternalLink className="h-4 w-4" />
           </a>
         </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
-const DashboardPage: React.FC = () => {
+// Main Dashboard Component
+const DashboardPage = () => {
+  const { userProfile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [portfolio, setPortfolio] = useState<any>(null);
-  const [walletAddress, setWalletAddress] = useState<string>('');
-  const [mnemonic, setMnemonic] = useState<string>('');
+  const [portfolioData, setPortfolioData] = useState<any>(null);
   const [showMnemonicModal, setShowMnemonicModal] = useState(false);
-  
-  const { user } = useAuth();
+  const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+
+  // Define supported assets
+  const SUPPORTED_ASSETS = [
+    { symbol: 'ALGO', name: 'Algorand', decimals: 6 },
+    { symbol: 'USDT', name: 'Tether', decimals: 6 },
+    { symbol: 'USDCa', name: 'USD Coin', decimals: 6 },
+    { symbol: 'goBTC', name: 'goBTC', decimals: 8 },
+    { symbol: 'goETH', name: 'goETH', decimals: 8 }
+  ];
 
   useEffect(() => {
-    loadPortfolioData();
+    fetchPortfolioData();
   }, []);
 
-  const loadPortfolioData = async () => {
+  const fetchPortfolioData = async () => {
     try {
       setLoading(true);
-      const [portfolioResponse, walletResponse] = await Promise.allSettled([
-        portfolioAPI.getSummary(),
-        userAPI.provisionWallets()
-      ]);
-
-      if (portfolioResponse.status === 'fulfilled') {
-        setPortfolio(portfolioResponse.value.data);
-      }
-
-      if (walletResponse.status === 'fulfilled' && walletResponse.value.data.wallet_address) {
-        setWalletAddress(walletResponse.value.data.wallet_address);
-        if (walletResponse.value.data.mnemonic) {
-          setMnemonic(walletResponse.value.data.mnemonic);
+      const response = await portfolioAPI.getPortfolio();
+      
+      if (response.data.success) {
+        setPortfolioData(response.data);
+        setWalletAddress(response.data.wallet_address || '');
+        
+        // Check for new wallet with mnemonic
+        if (response.data.mnemonic && !localStorage.getItem('mnemonic_backed_up')) {
+          setPendingMnemonic(response.data.mnemonic);
           setShowMnemonicModal(true);
         }
       }
-    } catch (error) {
-      console.error('Failed to load dashboard:', error);
+    } catch (error: any) {
+      console.error('Portfolio fetch error:', error);
+      
+      // If no wallet exists, create one
+      if (error.response?.status === 404) {
+        await createWallet();
+      } else {
+        toast.error('Failed to load portfolio');
+      }
     } finally {
       setLoading(false);
     }
@@ -353,89 +388,227 @@ const DashboardPage: React.FC = () => {
   const createWallet = async () => {
     try {
       const response = await userAPI.provisionWallets();
-      if (response.data.success) {
+      
+      if (response.data.success && response.data.mnemonic) {
+        setPendingMnemonic(response.data.mnemonic);
         setWalletAddress(response.data.wallet_address);
-        setMnemonic(response.data.mnemonic);
         setShowMnemonicModal(true);
+        await fetchPortfolioData();
       }
     } catch (error) {
+      console.error('Wallet creation error:', error);
       toast.error('Failed to create wallet');
     }
   };
 
-  if (loading) return <CardSkeleton count={4} />;
+  const handleMnemonicBackupComplete = () => {
+    localStorage.setItem('mnemonic_backed_up', 'true');
+    setShowMnemonicModal(false);
+    setPendingMnemonic(null);
+    toast.success('Wallet secured successfully!');
+  };
 
-  if (!walletAddress) {
+  const handleBuyAsset = (asset: any) => {
+    toast('Buy feature coming soon!', { icon: '🔜' });
+    // TODO: Navigate to buy flow
+  };
+
+  const handleSendAsset = (asset: any) => {
+    if (asset.balance <= 0) {
+      toast.error('Insufficient balance');
+      return;
+    }
+    toast('Send feature coming soon!', { icon: '🔜' });
+    // TODO: Navigate to send flow
+  };
+
+  const handleStartKYC = () => {
+    window.location.href = '/onboarding';
+  };
+
+  // Calculate portfolio metrics
+  const totalBalance = portfolioData?.total_usd || 0;
+  const assets = portfolioData?.balances || {};
+  
+  // Create asset array with pricing
+  const assetCards = SUPPORTED_ASSETS.map(asset => {
+    const balance = assets[asset.symbol] || 0;
+    const price = portfolioData?.prices?.[asset.symbol] || 0;
+    const value_usd = balance * price;
+    
+    return {
+      ...asset,
+      balance,
+      price_usd: price,
+      value_usd
+    };
+  });
+
+  const kycStatus = userProfile?.kyc_status || 'not_started';
+  const kycLevel = userProfile?.kyc_level || 0;
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Shield className="h-10 w-10 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-3">Create Your Wallet</h2>
-          <p className="text-gray-400 mb-6">Get started with a secure Algorand wallet to hold and trade digital assets</p>
-          <Button onClick={createWallet} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-            Create Wallet
-          </Button>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading your portfolio...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Wallet Address */}
-      <WalletAddressCard address={walletAddress} />
-
-      {/* Portfolio Value Header */}
-      <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-2xl p-8 border border-blue-500/30">
-        <div className="text-sm text-gray-400 mb-2">Total Portfolio Value</div>
-        <div className="text-5xl font-bold text-white mb-4">
-          ${(portfolio?.total_balance_usd || 0).toFixed(2)}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Portfolio</h1>
+          <p className="text-gray-400">Manage your multi-asset Algorand wallet</p>
         </div>
-        <div className="flex items-center gap-2 text-green-400">
-          <TrendingUp className="h-5 w-5" />
-          <span>+{(portfolio?.change_24h || 0).toFixed(2)}% (24h)</span>
-        </div>
-      </div>
 
-      {/* Assets Grid */}
-      {portfolio?.assets?.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {portfolio.assets.map((asset: any) => (
-            <AssetCard key={asset.symbol} asset={asset} />
-          ))}
-        </div>
-      ) : (
-        <Card className="text-center py-12">
-          <Coins className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No Assets Yet</h3>
-          <p className="text-gray-400 mb-6">Start building your portfolio by purchasing your first digital asset</p>
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            Buy Crypto
-          </Button>
-        </Card>
-      )}
+        {/* KYC Alert */}
+        {kycStatus !== 'verified' && (
+          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-6 mb-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="text-yellow-400 font-semibold mb-1">Identity Verification Required</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    Complete KYC to unlock full platform features and higher transaction limits
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Shield className="h-3 w-3" />
+                      Current Tier: {kycLevel}/3
+                    </span>
+                    <span>•</span>
+                    <span>Status: {kycStatus.replace('_', ' ')}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleStartKYC}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+              >
+                Start Verification
+              </button>
+            </div>
+          </div>
+        )}
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Button variant="outline" icon={Send} className="py-4">
-          Send
-        </Button>
-        <Button variant="outline" icon={RefreshCw} onClick={loadPortfolioData} className="py-4">
-          Refresh
-        </Button>
-        <Button variant="outline" icon={Activity} className="py-4">
-          Trade
-        </Button>
+        {/* Wallet Address */}
+        {walletAddress && (
+          <div className="mb-6">
+            <WalletAddressCard address={walletAddress} />
+          </div>
+        )}
+
+        {/* Portfolio Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm text-gray-400 mb-1">Total Balance</div>
+                <div className="text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+              </div>
+              <button
+                onClick={fetchPortfolioData}
+                className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
+              >
+                <RefreshCw className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Activity className="h-4 w-4 text-green-400" />
+              <span className="text-green-400">Live on Algorand Network</span>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+            <div className="text-sm text-gray-400 mb-2">Network</div>
+            <div className="text-2xl font-bold text-white mb-4">Algorand</div>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              Sub-5s Settlement
+            </div>
+          </div>
+        </div>
+
+        {/* Asset Cards Grid */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-white">Your Assets</h2>
+            <span className="text-sm text-gray-400">{SUPPORTED_ASSETS.length} supported</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {assetCards.map(asset => (
+              <AssetCard
+                key={asset.symbol}
+                asset={asset}
+                onBuy={() => handleBuyAsset(asset)}
+                onSend={() => handleSendAsset(asset)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
+              <ArrowDownLeft className="h-6 w-6 text-blue-400" />
+              <span className="text-sm text-gray-300">Buy</span>
+            </button>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
+              <ArrowUpRight className="h-6 w-6 text-purple-400" />
+              <span className="text-sm text-gray-300">Send</span>
+            </button>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
+              <RefreshCw className="h-6 w-6 text-green-400" />
+              <span className="text-sm text-gray-300">Swap</span>
+            </button>
+            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
+              <TrendingUp className="h-6 w-6 text-yellow-400" />
+              <span className="text-sm text-gray-300">Earn</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Platform Features Banner */}
+        <div className="mt-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
+              <p className="text-blue-100 text-sm mb-3">
+                Send money globally at 2.9% fee vs 7% traditional (2.4% savings!)
+              </p>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  Sub-5s settlement
+                </span>
+                <span className="flex items-center gap-1">
+                  <Shield className="h-3 w-3" />
+                  Bank-grade security
+                </span>
+              </div>
+            </div>
+            <button className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap">
+              Send Money
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Mnemonic Backup Modal */}
-      {showMnemonicModal && mnemonic && (
+      {showMnemonicModal && pendingMnemonic && (
         <MnemonicBackupModal
-          mnemonic={mnemonic}
+          mnemonic={pendingMnemonic}
           walletAddress={walletAddress}
-          onComplete={() => setShowMnemonicModal(false)}
+          onComplete={handleMnemonicBackupComplete}
         />
       )}
     </div>

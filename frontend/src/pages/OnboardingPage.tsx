@@ -1,309 +1,353 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient, API_ENDPOINTS } from '../config/api';
+import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, Copy, ArrowLeft, Shield, Wallet, CheckCircle, Globe } from 'lucide-react';
-import Button from '../components/ui/Button';
+import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check } from 'lucide-react';
 
-declare global {
-  interface Window {
-    ComplyCube?: {
-      mount: (options: any) => { mount: (selector: string) => void };
-    };
-  }
-}
-
-interface StepProps {
-  onNext: (data?: any) => void;
-  onPrev?: () => void;
-  stepData: any;
-}
-
-// --- STEP 0: Welcome Step ---
-const WelcomeStep: React.FC<StepProps> = ({ onNext }) => {
-  return (
-    <div className="text-center">
-      <div className="mb-8">
-        <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Globe className="h-10 w-10 text-blue-600" />
-        </div>
-        <h3 className="text-xl font-semibold mb-2">
-          Welcome to the Future of Cross-Border Payments
-        </h3>
-        <p className="text-gray-600">
-          Send USDS stablecoins globally with minimal fees and instant settlement.
-        </p>
+// Welcome Step
+const WelcomeStep = ({ onNext }) => (
+  <div className="text-center">
+    <div className="mb-8">
+      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+        <Globe className="h-10 w-10 text-white" />
       </div>
-      
-      <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left">
-        <h4 className="font-semibold text-blue-900 mb-3">What you'll get:</h4>
-        <ul className="text-blue-800 text-sm space-y-2">
-          {[
-            "Instant global transfers with USDS stablecoin",
-            "Low remittance fees (2.6% per transaction)", 
-            "24/7/365 decentralized settlement",
-            "Auto-conversion to preferred currencies"
-          ].map(item => (
-            <li key={item} className="flex items-center">
-              <CheckCircle className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
-      
-      <Button
-        onClick={() => onNext()}
-        className="w-full bg-blue-600 hover:bg-blue-700"
-      >
-        Let's Get Started
-      </Button>
+      <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+        Welcome to Seamount
+      </h3>
+      <p className="text-gray-400 text-lg">
+        The future of cross-border payments is here
+      </p>
     </div>
-  );
-};
+    
+    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-6 mb-8 text-left border border-blue-500/30">
+      <h4 className="font-semibold text-white mb-4 flex items-center">
+        <CheckCircle className="h-5 w-5 text-blue-400 mr-2" />
+        What You'll Get
+      </h4>
+      <div className="space-y-3 text-gray-300">
+        {[
+          "Multi-asset wallet (ALGO, USDT, USDCa, goBTC, goETH)",
+          "Sub-5-second settlement on Algorand",
+          "Cross-border transfers at 2.9% (vs 7% traditional)",
+          "Bank-grade security with Web3 benefits"
+        ].map(item => (
+          <div key={item} className="flex items-start">
+            <CheckCircle className="w-5 h-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <button
+      onClick={() => onNext()}
+      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
+    >
+      Get Started →
+    </button>
+  </div>
+);
 
-// --- STEP 1: Identity Verification ---
-const IdentityStep: React.FC<StepProps> = ({ onNext, onPrev }) => {
+// Identity Verification Step
+const IdentityStep = ({ onNext, onPrev }) => {
   const [loading, setLoading] = useState(false);
-  const [sdkInitialized, setSdkInitialized] = useState(false);
   const { refreshKycStatus } = useAuth();
 
   const startVerification = async () => {
     setLoading(true);
     try {
-      const { data } = await apiClient.post<{ token: string }>(
-        "/api/kyc/start-verification"
-      );
+      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
-      if (window.ComplyCube) {
-        const session = window.ComplyCube.mount({
-          token: data.token,
-          onComplete: async () => {
-            await refreshKycStatus();
-            toast.success('Verification completed!');
-            onNext();
-          },
-          onError: (error: any) => {
-            toast.error('Verification failed: ' + error.message);
-            setLoading(false);
-          }
-        });
-        session.mount('#complycube-mount');
-        setSdkInitialized(true);
+      if (data.success) {
+        toast.success('Verification started!');
+        await refreshKycStatus();
+        onNext();
       }
-    } catch (error: any) {
-      toast.error('Failed to start verification: ' + error.message);
+    } catch (error) {
+      toast.error('Verification failed: ' + (error.response?.data?.detail || error.message));
+    } finally {
       setLoading(false);
     }
   };
-  
+
   const handleSkip = () => {
-    toast('You can complete verification later from your settings.');
+    toast('You can verify later from Settings');
     onNext();
   };
 
   return (
     <div className="text-center">
       <div className="mb-6">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Shield className="h-8 w-8 text-blue-600" />
+        <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <Shield className="h-8 w-8 text-white" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">Verify Your Identity</h3>
-        <p className="text-gray-600">For your security, we need to confirm you're you. This unlocks all platform features.</p>
+        <h3 className="text-2xl font-semibold text-white mb-2">Verify Your Identity</h3>
+        <p className="text-gray-400">Unlock full platform features with quick verification</p>
       </div>
       
-      {sdkInitialized ? (
-        <div id="complycube-mount" style={{ minHeight: '450px' }} className="w-full"></div>
-      ) : (
-        <div className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg text-left">
-            <h4 className="font-medium text-blue-800 mb-2">Why we verify identity:</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li className="flex items-start">
-                <CheckCircle className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <span>Comply with financial regulations</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <span>Protect your account from fraud</span>
-              </li>
-              <li className="flex items-start">
-                <CheckCircle className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <span>Enable higher transaction limits</span>
-              </li>
-            </ul>
-          </div>
-          
-          <Button
-            onClick={startVerification}
-            loading={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            Start Secure Verification
-          </Button>
-          
+      <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
+        <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
+        <ul className="text-sm text-gray-300 space-y-2">
+          {[
+            "Comply with global financial regulations",
+            "Protect your account from fraud",
+            "Enable higher transaction limits",
+            "Access institutional features"
+          ].map(item => (
+            <li key={item} className="flex items-start">
+              <CheckCircle className="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      
+      <div className="space-y-3">
+        <button
+          onClick={startVerification}
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
+        >
+          {loading ? 'Starting...' : 'Start Verification'}
+        </button>
+        
+        <button
+          onClick={handleSkip}
+          className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
+        >
+          I'll Do This Later
+        </button>
+        
+        {onPrev && (
           <button
-            onClick={handleSkip}
-            className="w-full text-sm text-gray-600 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={onPrev}
+            className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
           >
-            I'll Do This Later
+            ← Back
           </button>
-          
-          {onPrev && (
-            <button
-              onClick={onPrev}
-              className="w-full text-sm text-gray-600 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              Back
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
-// --- STEP 2: Wallet Backup ---
-const WalletBackupStep: React.FC<StepProps & { mnemonic: string }> = ({ onNext, onPrev, mnemonic }) => {
+// Wallet Backup Step
+const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationWords, setVerificationWords] = useState([]);
+  const [userInputs, setUserInputs] = useState({});
+  
   const words = mnemonic.split(' ');
+
+  useEffect(() => {
+    // Generate 3 random positions for verification
+    const positions = [];
+    while (positions.length < 3) {
+      const pos = Math.floor(Math.random() * 25);
+      if (!positions.includes(pos)) positions.push(pos);
+    }
+    setVerificationWords(positions.sort((a, b) => a - b));
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(mnemonic);
     setCopied(true);
-    toast.success('Mnemonic phrase copied to clipboard!');
+    toast.success('Recovery phrase copied!');
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const downloadBackup = () => {
+    const blob = new Blob([
+      `Seamount Wallet Recovery Phrase\n\n`,
+      `KEEP THIS SAFE! Never share with anyone.\n\n`,
+      `Recovery Phrase:\n${mnemonic}\n\n`,
+      `Created: ${new Date().toISOString()}`
+    ], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'seamount-recovery-phrase.txt';
+    a.click();
+    toast.success('Recovery phrase downloaded!');
+  };
+
+  const verifyWords = () => {
+    const allCorrect = verificationWords.every(pos => 
+      userInputs[pos]?.toLowerCase().trim() === words[pos].toLowerCase()
+    );
+    
+    if (allCorrect) {
+      toast.success('Verification successful!');
+      onNext();
+    } else {
+      toast.error('Incorrect words. Please check and try again.');
+    }
+  };
+
+  if (verifying) {
+    return (
+      <div className="text-left">
+        <div className="text-center mb-6">
+          <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-white mb-2">Verify Your Phrase</h3>
+          <p className="text-gray-400">Enter these words to confirm you saved it</p>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          {verificationWords.map(pos => (
+            <div key={pos}>
+              <label className="block text-sm text-gray-400 mb-2">
+                Word #{pos + 1}
+              </label>
+              <input
+                type="text"
+                value={userInputs[pos] || ''}
+                onChange={(e) => setUserInputs({ ...userInputs, [pos]: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                placeholder="Enter word"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setVerifying(false)}
+            className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            ← Back
+          </button>
+          <button
+            onClick={verifyWords}
+            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 px-4 rounded-lg transition-all shadow-lg"
+          >
+            Verify & Complete
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="text-left">
-      <div className="mb-6 text-center">
-        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Wallet className="h-8 w-8 text-purple-600" />
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <Wallet className="h-8 w-8 text-white" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">Back Up Your Wallet</h3>
-        <p className="text-gray-600">This is your master key. Write it down and store it somewhere safe.</p>
+        <h3 className="text-2xl font-bold text-white mb-2">Back Up Your Wallet</h3>
+        <p className="text-gray-400">This is your master key. Store it safely offline.</p>
       </div>
       
-      <div className="relative border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-        <div className={`grid grid-cols-3 gap-2 text-gray-800 ${!showMnemonic ? 'blur-sm' : ''}`}>
+      <div className="relative border border-gray-700 rounded-xl p-5 mb-4 bg-gray-900/50">
+        <div className={`grid grid-cols-3 gap-2 text-gray-300 ${!showMnemonic ? 'blur-sm' : ''}`}>
           {words.map((word, index) => (
-            <div key={index} className="flex items-center">
-              <span className="text-gray-400 w-6 text-sm">{index + 1}.</span>
-              <span>{word}</span>
+            <div key={index} className="flex items-center bg-gray-800/50 rounded px-3 py-2 text-sm">
+              <span className="text-gray-500 w-6">{index + 1}.</span>
+              <span className="font-mono">{word}</span>
             </div>
           ))}
         </div>
         {!showMnemonic && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/90 rounded-lg">
-            <Button onClick={() => setShowMnemonic(true)} icon={Eye}>Reveal Phrase</Button>
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 rounded-xl">
+            <button
+              onClick={() => setShowMnemonic(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors"
+            >
+              <Eye className="h-5 w-5" />
+              Reveal Phrase
+            </button>
           </div>
         )}
       </div>
 
-      <div className="flex justify-center gap-4 mb-6">
-        <Button 
+      <div className="flex gap-3 mb-6">
+        <button 
           onClick={handleCopy} 
-          variant="secondary" 
-          icon={Copy} 
           disabled={!showMnemonic}
-          className={copied ? "bg-green-100 text-green-800 border-green-200" : ""}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border transition-colors ${
+            copied 
+              ? "bg-green-900/20 border-green-500 text-green-400" 
+              : "border-gray-700 text-gray-300 hover:bg-gray-800"
+          }`}
         >
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied!" : "Copy"}
-        </Button>
-        <Button 
-          onClick={() => setShowMnemonic(!showMnemonic)} 
-          variant="secondary" 
-          icon={showMnemonic ? EyeOff : Eye}
+        </button>
+        <button 
+          onClick={downloadBackup}
+          disabled={!showMnemonic}
+          className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 rounded-lg hover:bg-gray-800 transition-colors"
         >
-          {showMnemonic ? 'Hide' : 'Reveal'}
-        </Button>
+          <Download className="h-4 w-4" />
+          Download
+        </button>
       </div>
 
-      <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-4 rounded-r-lg mb-6">
-        <p className="font-bold">Do NOT lose this phrase.</p>
-        <p className="text-sm">Seamount cannot recover your wallet if you lose your mnemonic. You are in control.</p>
+      <div className="bg-red-900/20 border-l-4 border-red-500 text-red-300 p-4 rounded-r-lg mb-6">
+        <div className="flex items-start gap-3">
+          <Lock className="h-5 w-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold mb-1">Never Lose This Phrase</p>
+            <p className="text-sm">Seamount cannot recover your wallet. You are in full control.</p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">
-        <Button 
-          onClick={() => onNext()} 
-          disabled={!showMnemonic} 
-          className="w-full bg-purple-600 hover:bg-purple-700"
+        <button 
+          onClick={() => setVerifying(true)}
+          disabled={!showMnemonic}
+          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          I've Backed It Up, Continue
-        </Button>
+          I've Backed It Up →
+        </button>
         
         {onPrev && (
-          <Button 
-            onClick={onPrev} 
-            variant="secondary" 
-            className="w-full"
+          <button 
+            onClick={onPrev}
+            className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
           >
-            Back
-          </Button>
+            ← Back
+          </button>
         )}
       </div>
     </div>
   );
 };
 
-// --- Main Onboarding Component ---
-const OnboardingPage: React.FC = () => {
-  const [step, setStep] = useState<'welcome' | 'identity' | 'walletBackup'>('welcome');
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
-  const { completeOnboarding, triggerWalletCreation, userProfile } = useAuth();
+// Main Component
+const OnboardingPage = () => {
+  const [step, setStep] = useState('welcome');
+  const [mnemonic, setMnemonic] = useState(null);
+  const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Load ComplyCube SDK
-  useEffect(() => {
-    const scriptId = 'complycube-sdk';
-    if (document.getElementById(scriptId)) return;
-
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = "https://assets.complycube.com/web-sdk/v1/complycube.min.js";
-    script.async = true;
-    script.onload = () => console.log('ComplyCube SDK loaded.');
-    script.onerror = () => toast.error('Could not load verification service. Please refresh.');
-    document.body.appendChild(script);
-
-    return () => {
-      const sdkScript = document.getElementById(scriptId);
-      if (sdkScript) document.body.removeChild(sdkScript);
-    };
-  }, []);
-  
-  // Redirect if already verified
   useEffect(() => {
     if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
 
-  const handleWelcomeComplete = () => {
-    setStep('identity');
-  };
+  const handleWelcomeComplete = () => setStep('identity');
 
   const handleIdentityComplete = async () => {
-    const toastId = toast.loading('Creating your secure wallet...');
+    const toastId = toast.loading('Creating your wallet...');
     try {
-      // Enhanced wallet creation that returns mnemonic
-      const response = await apiClient.post<{ success: boolean; mnemonic?: string }>('/api/wallet/create');
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
       
       if (response.data.success && response.data.mnemonic) {
-        toast.success('Wallet created! Please back up your recovery phrase.', { id: toastId });
+        toast.success('Wallet created!', { id: toastId });
         setMnemonic(response.data.mnemonic);
         setStep('walletBackup');
       } else {
-        throw new Error('Wallet creation failed - no mnemonic returned');
+        throw new Error('No mnemonic returned');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Wallet creation error:', error);
-      toast.error('Could not create your wallet. You can try again later from your settings.', { id: toastId });
-      // Still complete onboarding to prevent infinite loop
+      toast.error('Could not create wallet. Try again from Settings.', { id: toastId });
       await completeOnboarding();
     }
   };
@@ -313,17 +357,13 @@ const OnboardingPage: React.FC = () => {
   };
 
   const handleStepBack = () => {
-    if (step === 'walletBackup') {
-      setStep('identity');
-    } else if (step === 'identity') {
-      setStep('welcome');
-    }
+    if (step === 'walletBackup') setStep('identity');
+    else if (step === 'identity') setStep('welcome');
   };
 
   const progressPercentage = 
     step === 'welcome' ? '33%' : 
-    step === 'identity' ? '66%' : 
-    '100%';
+    step === 'identity' ? '66%' : '100%';
 
   const stepTitles = {
     welcome: 'Welcome to Seamount',
@@ -332,49 +372,35 @@ const OnboardingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Progress Header */}
-        <div className="bg-white border-b border-gray-200 p-6">
-          <div className="flex justify-between items-center text-sm text-gray-500 mb-2">
-            <h2 className="font-semibold text-lg text-gray-900">
-              {stepTitles[step]}
-            </h2>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+        <div className="bg-gray-900/50 border-b border-gray-700 p-6">
+          <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
+            <h2 className="font-semibold text-lg text-white">{stepTitles[step]}</h2>
             <span>
               {step === 'welcome' ? '1 of 3' : 
-               step === 'identity' ? '2 of 3' : 
-               '3 of 3'}
+               step === 'identity' ? '2 of 3' : '3 of 3'}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-700 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-in-out"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
               style={{ width: progressPercentage }}
             />
           </div>
         </div>
         
-        {/* Step Content */}
-        <div className="p-6 md:p-8">
+        <div className="p-8">
           {step === 'welcome' ? (
-            <WelcomeStep onNext={handleWelcomeComplete} stepData={{}} />
+            <WelcomeStep onNext={handleWelcomeComplete} />
           ) : step === 'identity' ? (
-            <IdentityStep 
-              onNext={handleIdentityComplete} 
-              onPrev={handleStepBack}
-              stepData={{}} 
-            />
+            <IdentityStep onNext={handleIdentityComplete} onPrev={handleStepBack} />
           ) : mnemonic ? (
-            <WalletBackupStep 
-              onNext={handleBackupComplete} 
-              onPrev={handleStepBack}
-              stepData={{}} 
-              mnemonic={mnemonic} 
-            />
+            <WalletBackupStep onNext={handleBackupComplete} onPrev={handleStepBack} mnemonic={mnemonic} />
           ) : (
             <div className="text-center p-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Creating your wallet...</p>
+              <p className="text-gray-400">Creating your wallet...</p>
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 # File Location: backend/api/routes/users.py
-# CRITICAL FIX: Proper endpoint paths matching frontend expectations
+# CRITICAL FIX: Proper wallet provisioning with mnemonic return
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, Dict, Any
@@ -7,8 +7,8 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
-from backend.dependencies import get_supabase_client, get_current_user, get_optional_auth, get_wallet_service
-from backend.services.wallet_service import WalletService  # Add this impor
+from backend.dependencies import get_supabase_client, get_current_user, get_wallet_service
+from backend.services.wallet_service import WalletService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,19 +19,14 @@ async def create_user_profile(
     supabase=Depends(get_supabase_client)
 ):
     """Create user profile - matches frontend POST /api/v1/user/profile"""
-    
     try:
         data = await request.json()
-        logger.info(f"[Profile Create] Raw request data: {data}")
-        
-        # Extract user ID - must be provided in request
         user_id = data.get('id')
         if not user_id:
             raise HTTPException(status_code=400, detail="User ID is required")
         
-        # CRITICAL FIX: Verify user exists in auth.users before creating profile
+        # Verify user exists in auth system
         try:
-            # Check if user exists in auth system first
             auth_user = supabase.auth.admin.get_user(user_id)
             if not auth_user.user:
                 raise HTTPException(status_code=404, detail="User not found in authentication system")
@@ -39,9 +34,6 @@ async def create_user_profile(
             logger.error(f"[Profile Create] Auth user check failed: {auth_error}")
             raise HTTPException(status_code=400, detail="User must be authenticated before creating profile")
             
-        logger.info(f"[Profile Create] Creating profile for user: {user_id}")
-        
-        # FIXED: Define insert_data before use
         insert_data = {
             "id": user_id,
             "email": data.get('email', ''),
@@ -57,121 +49,72 @@ async def create_user_profile(
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        # FIXED: Separate upsert and select operations
-        try:
-            # Step 1: Upsert the data
-            upsert_result = supabase.from_("user_profiles").upsert(
-                insert_data, 
-                on_conflict="id"
-            ).execute()
+        # Upsert and fetch
+        upsert_result = supabase.from_("user_profiles").upsert(insert_data, on_conflict="id").execute()
+        fetch_result = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
+        
+        if not fetch_result.data:
+            raise HTTPException(status_code=500, detail="Profile created but could not be retrieved")
             
-            logger.info(f"[Profile Create] Upsert successful")
-            
-            # Step 2: Fetch the created/updated record
-            fetch_result = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
-            
-            if not fetch_result.data:
-                raise HTTPException(status_code=500, detail="Profile created but could not be retrieved")
-                
-            profile = fetch_result.data[0]
-            logger.info(f"[Profile Create] Profile created successfully: {profile.get('email')}")
-            
-            return {
-                "success": True,
-                "profile": profile,
-                "message": "Profile created successfully"
-            }
-            
-        except Exception as db_error:
-            error_id = str(uuid.uuid4())[:8]
-            logger.error(f"[Profile Create] Database error [Error ID: {error_id}]: {str(db_error)}")
-            logger.error(f"Traceback", exc_info=True)
-            
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Failed to create profile. Error ID: {error_id}"
-            )
-            
+        profile = fetch_result.data[0]
+        logger.info(f"[Profile Create] Profile created successfully: {profile.get('email')}")
+        
+        return {
+            "success": True,
+            "profile": profile,
+            "message": "Profile created successfully"
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"[Profile Create] Unexpected error [Error ID: {error_id}]: {str(e)}")
-        logger.error(f"Traceback", exc_info=True)
-        
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to create profile. Error ID: {error_id}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create profile. Error ID: {error_id}")
 
-@router.get("/profile")  # This creates /api/v1/user/profile endpoint
-async def get_user_profile(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Get user profile - matches frontend GET /api/v1/user/profile"""
-    
+@router.get("/profile")
+async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Get user profile"""
     try:
         user_id = current_user.get('id')
         logger.info(f"[Profile Get] Fetching profile for user: {user_id}")
-        
-        # Profile is already fetched by get_current_user dependency
-        logger.info(f"[Profile Get] Profile retrieved successfully for user: {user_id}")
-        logger.info(f"Profile API returning: {current_user}")
         
         return {
             "success": True,
             "profile": current_user
         }
-        
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"[Profile Get] Error [Error ID: {error_id}]: {str(e)}")
-        
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to fetch profile. Error ID: {error_id}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch profile. Error ID: {error_id}")
 
-@router.put("/profile")  # This creates /api/v1/user/profile endpoint
+@router.put("/profile")
 async def update_user_profile(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """Update user profile - matches frontend PUT /api/v1/user/profile"""
-    
+    """Update user profile"""
     try:
         data = await request.json()
         user_id = current_user.get('id')
         
-        logger.info(f"[Profile Update] Updating profile for user: {user_id}")
+        update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
         
-        # Build update data
-        update_data = {
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        # Add fields that are allowed to be updated
         allowed_fields = ['first_name', 'last_name', 'country_code', 'phone', 'date_of_birth', 'kyc_status']
         for field in allowed_fields:
             if field in data:
                 update_data[field] = data[field]
         
-        # Handle firstName/lastName from frontend
+        # Handle camelCase from frontend
         if 'firstName' in data:
             update_data['first_name'] = data['firstName']
         if 'lastName' in data:
             update_data['last_name'] = data['lastName']
         if 'countryCode' in data:
-            # Ensure country code is uppercase
             update_data['country_code'] = data['countryCode'].upper()
             
-        logger.info(f"[Profile Update] Update data: {update_data}")
-        
-        # FIXED: Separate update and select operations
         update_result = supabase.from_("user_profiles").update(update_data).eq("id", user_id).execute()
-        
-        # Fetch updated profile
         fetch_result = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
         
         if not fetch_result.data:
@@ -185,50 +128,50 @@ async def update_user_profile(
             "profile": profile,
             "message": "Profile updated successfully"
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"[Profile Update] Error [Error ID: {error_id}]: {str(e)}")
-        
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to update profile. Error ID: {error_id}"
-        )
-        
+        raise HTTPException(status_code=500, detail=f"Failed to update profile. Error ID: {error_id}")
+
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service = Depends(get_wallet_service)  # Remove the WalletService type annotation
+    wallet_service: WalletService = Depends(get_wallet_service)
 ):
-    """Provision Algorand wallet for authenticated user"""
+    """
+    CRITICAL FIX: Provision Algorand wallet with mnemonic return
+    """
     try:
         user_id = current_user['id']
-        logger.info(f"Provisioning wallet for user: {user_id}")
+        logger.info(f"[Wallet Provision] User: {user_id}")
         
-        # Check if wallet already exists
-        existing_wallet = await wallet_service.get_user_balances(user_id)  # Updated method name
+        # Check if wallet exists
+        existing_wallet = await wallet_service.get_user_balances(user_id)
         if existing_wallet.get('wallet_exists'):
             return {
                 "success": True,
                 "wallet_address": existing_wallet['wallet_address'],
-                "message": "Wallet already exists"
+                "message": "Wallet already exists",
+                "mnemonic": None  # Don't return mnemonic for existing wallets
             }
         
-        # Create new wallet - use the correct method name from your WalletService
+        # Create new wallet
         result = await wallet_service.create_algorand_wallet(user_id)
         
         if result["success"]:
+            logger.info(f"[Wallet Provision] Wallet created: {result['wallet_address']}")
             return {
                 "success": True,
                 "wallet_address": result["wallet_address"],
-                "mnemonic": result["mnemonic"],  # Return once for backup
+                "mnemonic": result["mnemonic"],  # Return for one-time backup
+                "supported_assets": result.get("supported_assets", []),
                 "message": "Wallet created successfully"
             }
         else:
             raise HTTPException(status_code=500, detail=result.get("error", "Wallet creation failed"))
             
     except Exception as e:
-        logger.error(f"Wallet provisioning failed for user {current_user['id']}: {e}")
+        logger.error(f"[Wallet Provision] Failed for user {current_user['id']}: {e}")
         raise HTTPException(status_code=500, detail="Wallet provisioning failed")
