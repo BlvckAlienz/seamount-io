@@ -14,7 +14,6 @@ from fastapi import HTTPException
 
 from backend.config import get_settings
 
-self.base_url = "https://api.portal.regfyl.com"  # Hardcode if not in settings
 logger = logging.getLogger(__name__)
 
 
@@ -27,10 +26,10 @@ class RegfylVerifier:
     def __init__(self, api_key: str = None):
         settings = get_settings()
         self.api_key = api_key or settings.REGFYL_API_KEY
-        self.base_url = settings.REGFYL_BASE_URL
-        self.company_name = settings.REGFYL_COMPANY_NAME
-        self.rc_number = settings.REGFYL_RC_NUMBER
-        self.environment = settings.REGFYL_ENVIRONMENT
+        self.base_url = getattr(settings, 'REGFYL_BASE_URL', "https://api.portal.regfyl.com")  # Fixed: added default
+        self.company_name = getattr(settings, 'REGFYL_COMPANY_NAME', '')
+        self.rc_number = getattr(settings, 'REGFYL_RC_NUMBER', '')
+        self.environment = getattr(settings, 'REGFYL_ENVIRONMENT', 'production')
         
         self.max_retries = 3
         self.timeout = aiohttp.ClientTimeout(total=30)
