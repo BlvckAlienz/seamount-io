@@ -248,26 +248,26 @@ class AlgorandService:
     async def mint_usdt(self, user_id: str, amount: Decimal, reference: str) -> Dict:
         """Mint USDT to user's Algorand wallet"""
     
-    # Get user's wallet address
-    wallet_data = await self.db_service.get_user_wallet(user_id)
-    recipient_address = wallet_data['algorand_address']
+        # Get user's wallet address
+        wallet_data = await self.db_service.get_user_wallet(user_id)
+        recipient_address = wallet_data['algorand_address']
+        
+        # USDT Asset ID on Algorand Mainnet
+        USDT_ASSET_ID = 312769  # Actual Algorand USDT asset
+        
+        # Transfer USDT from treasury to user
+        txn = AssetTransferTxn(
+            sender=self.treasury_address,
+            sp=self.algod_client.suggested_params(),
+            receiver=recipient_address,
+            amt=int(amount * 1_000_000),  # 6 decimals
+            index=USDT_ASSET_ID
+        )
     
-    # USDT Asset ID on Algorand Mainnet
-    USDT_ASSET_ID = 312769  # Actual Algorand USDT asset
-    
-    # Transfer USDT from treasury to user
-    txn = AssetTransferTxn(
-        sender=self.treasury_address,
-        sp=self.algod_client.suggested_params(),
-        receiver=recipient_address,
-        amt=int(amount * 1_000_000),  # 6 decimals
-        index=USDT_ASSET_ID
-    )
-    
-    signed_txn = txn.sign(self.treasury_private_key)
-    tx_id = self.algod_client.send_transaction(signed_txn)
-    
-    # Wait for confirmation
-    wait_for_confirmation(self.algod_client, tx_id, 4)
-    
-    return {"txn_id": tx_id, "amount": float(amount)}
+        signed_txn = txn.sign(self.treasury_private_key)
+        tx_id = self.algod_client.send_transaction(signed_txn)
+        
+        # Wait for confirmation
+        wait_for_confirmation(self.algod_client, tx_id, 4)
+        
+        return {"txn_id": tx_id, "amount": float(amount)}
