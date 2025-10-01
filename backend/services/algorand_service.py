@@ -246,7 +246,7 @@ class AlgorandService:
             return False
         
     async def mint_usdt(self, user_id: str, amount: Decimal, reference: str) -> Dict:
-    """Mint USDT to user's Algorand wallet"""
+        """Mint USDT to user's Algorand wallet"""
     
     # Get user's wallet address
     wallet_data = await self.db_service.get_user_wallet(user_id)
