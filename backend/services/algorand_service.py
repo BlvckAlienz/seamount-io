@@ -1,3 +1,4 @@
+# File: backend/services/algorand_service.py
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional
@@ -5,53 +6,56 @@ from typing import Dict, Any, Optional
 from algosdk import account, mnemonic, transaction, encoding
 from algosdk.v2client import algod
 from algosdk.error import AlgodHTTPError
-from algosdk.transaction import (
-    AssetTransferTxn,
-    PaymentTxn,
-    AssetOptInTxn,
-)
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from algosdk.transaction import AssetTransferTxn, PaymentTxn, AssetOptInTxn
 
-from config import Settings
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
 class AlgorandService:
-    """
-    The single source of truth for all interactions with the Algorand blockchain.
-    This service handles raw on-chain operations like transfers, minting, and balance checks.
-    """
-    def __init__(self, settings: Settings):
-       self.settings = settings
-       self.algod_client = algod.AlgodClient(
-           settings.ALGORAND_API_KEY.get_secret_value() if settings.ALGORAND_API_KEY else "",
-           settings.ALGORAND_NODE_URL
-       )
-       # REMOVE: self.usds_asset_id = settings.USDS_ASSET_ID
-       # REMOVE: self.decimals = 6
-
-       if not settings.ALGORAND_CREATOR_MNEMONIC:
-           raise ValueError("ALGORAND_CREATOR_MNEMONIC is not configured in environment.")
+    """Algorand blockchain interaction service using free public nodes"""
+    
+    def __init__(self):
+        # Use free AlgoNode - no API key needed
+        self.algod_client = algod.AlgodClient(
+            algod_token="",  # Empty for free nodes
+            algod_address=settings.ALGORAND_NODE_URL,
+            headers={"User-Agent": "Seamount/1.0"}
+        )
         
-       try:
-           mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
-           self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
-           self.treasury_address = account.address_from_private_key(self.treasury_private_key)
-           logger.info(f"AlgorandService initialized. Treasury Address: {self.treasury_address}")
-       except Exception as e:
-           logger.critical(f"Failed to derive treasury account from mnemonic: {e}", exc_info=True)
-           raise
+        if not settings.ALGORAND_CREATOR_MNEMONIC:
+            raise ValueError("ALGORAND_CREATOR_MNEMONIC required")
+        
+        try:
+            mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
+            self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
+            self.treasury_address = account.address_from_private_key(self.treasury_private_key)
+            logger.info(f"AlgorandService initialized. Treasury: {self.treasury_address}")
+        except Exception as e:
+            logger.critical(f"Failed to initialize treasury: {e}")
+            raise
 
-    # NEW GENERIC METHOD: Get balance for any asset
+    async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:
+        """Get account information from Algorand blockchain"""
+        try:
+            account_info = self.algod_client.account_info(address)
+            return account_info
+        except AlgodHTTPError as e:
+            if "account not found" in str(e).lower():
+                logger.warning(f"Account {address} not found")
+                return None
+            logger.error(f"Failed to get account info for {address}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting account info: {e}")
+            return None
+
     async def get_asset_balance(self, address: str, asset_id: int) -> Decimal:
-        """
-        Gets the balance for a given Algorand asset for a specific address.
-        Returns the balance in standard units (not micro-units).
-        """
+        """Get balance for specific asset"""
         try:
             asset_config = self._get_asset_config(asset_id)
             decimals = asset_config['decimals']
-
+            
             account_info = self.algod_client.account_info(address)
             for asset in account_info.get("assets", []):
                 if asset["asset-id"] == asset_id:
@@ -60,15 +64,9 @@ class AlgorandService:
             return Decimal("0.0")
         except AlgodHTTPError as e:
             if "account not found" in str(e):
-                logger.warning(f"Account {address} not found on-chain. Returning zero balance.")
                 return Decimal("0.0")
-            logger.error(f"Failed to get balance for asset {asset_id} on {address}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while getting balance: {e}")
             raise
 
-    # NEW GENERIC METHOD: Transfer any asset
     async def transfer_asset(
         self,
         sender_private_key: str,
@@ -77,17 +75,15 @@ class AlgorandService:
         amount: Decimal,
         memo: str = ""
     ) -> str:
-        """
-        Transfers an asset from a user's account to another. Requires the user's private key.
-        """
+        """Transfer asset between accounts"""
         try:
             asset_config = self._get_asset_config(asset_id)
             decimals = asset_config['decimals']
-
+            
             sender_address = account.address_from_private_key(sender_private_key)
             params = self.algod_client.suggested_params()
             amount_base_units = int(amount * (10**decimals))
-
+            
             txn = AssetTransferTxn(
                 sender=sender_address,
                 sp=params,
@@ -96,27 +92,25 @@ class AlgorandService:
                 index=asset_id,
                 note=memo.encode()
             )
+            
             signed_txn = txn.sign(sender_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
             await self.wait_for_confirmation(tx_id)
-            logger.info(f"Successfully sent {amount} of asset {asset_id} from {sender_address} to {receiver_address}. TxID: {tx_id}")
+            
+            logger.info(f"Transferred {amount} of asset {asset_id} to {receiver_address}")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to transfer asset {asset_id}: {e}", exc_info=True)
+            logger.error(f"Asset transfer failed: {e}")
             raise
 
-    # NEW METHOD: Prepare opt-in for any asset (crucial for goBTC/goETH)
     async def prepare_asset_opt_in(self, user_address: str, asset_id: int) -> Dict[str, Any]:
-        """
-        Prepares an asset opt-in transaction for the user to sign.
-        """
+        """Prepare opt-in transaction for user to sign"""
         try:
             if not account.is_valid_address(user_address):
-                raise ValueError("Invalid Algorand address provided for opt-in.")
+                raise ValueError("Invalid Algorand address")
             
             params = self.algod_client.suggested_params()
             txn = AssetOptInTxn(sender=user_address, sp=params, index=asset_id)
-            
             unsigned_txn_b64 = encoding.msgpack_encode(txn)
             
             return {
@@ -126,97 +120,69 @@ class AlgorandService:
                 "asset_id": asset_id
             }
         except Exception as e:
-            logger.error(f"Failed to prepare opt-in transaction for asset {asset_id}: {e}", exc_info=True)
+            logger.error(f"Failed to prepare opt-in: {e}")
             raise
 
-    # HELPER METHOD: Get configuration for an asset
     def _get_asset_config(self, asset_id: int) -> Dict:
-        """Finds the asset configuration from SUPPORTED_ASSETS by asset_id."""
-        for asset_key, config in self.settings.SUPPORTED_ASSETS.items():
+        """Get asset configuration from settings"""
+        for asset_key, config in settings.SUPPORTED_ASSETS.items():
             if config['asset_id'] == asset_id:
                 return config
-        raise ValueError(f"Asset ID {asset_id} is not configured in SUPPORTED_ASSETS.")
-    
+        raise ValueError(f"Asset ID {asset_id} not configured")
+
     async def wait_for_confirmation(self, tx_id: str) -> Dict[str, Any]:
-        """
-        Waits for a transaction to be confirmed on the Algorand network with exponential backoff.
-        """
-        logger.info(f"Waiting for confirmation of transaction: {tx_id}")
+        """Wait for transaction confirmation"""
+        logger.info(f"Waiting for confirmation: {tx_id}")
         last_round = self.algod_client.status().get("last-round")
-        for _ in range(10): # Check up to 10 rounds
+        
+        for _ in range(10):
             try:
                 txinfo = self.algod_client.pending_transaction_info(tx_id)
                 if txinfo.get("confirmed-round") and txinfo.get("confirmed-round") > 0:
-                    logger.info(f"Transaction {tx_id} confirmed in round {txinfo.get('confirmed-round')}.")
+                    logger.info(f"Transaction {tx_id} confirmed in round {txinfo.get('confirmed-round')}")
                     return txinfo
-                
                 self.algod_client.status_after_block(last_round + 1)
                 last_round += 1
             except AlgodHTTPError as e:
                 if 'not found' in str(e).lower():
-                    logger.warning(f"Pending transaction {tx_id} not found, it might already be confirmed.")
-                    # In a production system with an indexer, you would query it here as a fallback.
-                    pass 
-        raise TimeoutError(f"Transaction {tx_id} was not confirmed after multiple rounds.")
+                    pass
+        raise TimeoutError(f"Transaction {tx_id} not confirmed")
 
     async def fund_account_for_opt_in(self, user_address: str) -> Optional[str]:
-        """
-        Funds a new user account with the minimum balance required for an asset opt-in.
-        """
+        """Fund new account with minimum balance for opt-in"""
         try:
-            min_balance = 100000  # 0.1 ALGO for base account
-            asset_opt_in_fee = 100000  # 0.1 ALGO for asset holding
+            min_balance = 100000  # 0.1 ALGO base
+            asset_opt_in_fee = 100000  # 0.1 ALGO per asset
             total_funding = min_balance + asset_opt_in_fee
-
+            
             params = self.algod_client.suggested_params()
             txn = PaymentTxn(
-                sender=self.treasury_address, sp=params, receiver=user_address,
-                amt=total_funding, note=b"Seamount Account Funding for USDS Opt-in"
+                sender=self.treasury_address,
+                sp=params,
+                receiver=user_address,
+                amt=total_funding,
+                note=b"Seamount Account Funding"
             )
+            
             signed_txn = txn.sign(self.treasury_private_key)
             tx_id = self.algod_client.send_transaction(signed_txn)
             await self.wait_for_confirmation(tx_id)
-            logger.info(f"Successfully funded {user_address} with {total_funding} microAlgos. TxID: {tx_id}")
+            
+            logger.info(f"Funded {user_address} with {total_funding} microAlgos")
             return tx_id
         except Exception as e:
-            logger.error(f"Failed to fund account {user_address}: {e}", exc_info=True)
+            logger.error(f"Account funding failed: {e}")
             raise
-            
-    async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:  # ADD INDENT
-        """Get complete account information from Algorand blockchain"""
-        try:
-            account_info = self.algod_client.account_info(address)
-            return account_info
-        except AlgodHTTPError as e:
-            if "account not found" in str(e).lower():
-                logger.warning(f"Account {address} not found on Algorand")
-                return None
-            logger.error(f"Failed to get account info for {address}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error getting account info: {e}")
-            return None
 
-    async def prepare_payment_txn(
-        self, 
-        sender: str, 
-        receiver: str, 
-        amount: Decimal
-)   -> Dict[str, Any]:
-        """Prepare ALGO payment transaction for user signing"""
+    async def prepare_payment_txn(self, sender: str, receiver: str, amount: Decimal) -> Dict[str, Any]:
+        """Prepare ALGO payment transaction"""
         try:
             params = self.algod_client.suggested_params()
             amount_microalgos = int(amount * 1_000_000)
-        
-            txn = PaymentTxn(
-                sender=sender,
-                sp=params,
-                receiver=receiver,
-                amt=amount_microalgos
-            )
-        
+            
+            txn = PaymentTxn(sender=sender, sp=params, receiver=receiver, amt=amount_microalgos)
             unsigned_txn_b64 = encoding.msgpack_encode(txn)
-        
+            
             return {
                 "success": True,
                 "unsigned_txn_b64": unsigned_txn_b64,
@@ -224,34 +190,26 @@ class AlgorandService:
                 "amount": float(amount)
             }
         except Exception as e:
-            logger.error(f"Failed to prepare payment transaction: {e}")
+            logger.error(f"Failed to prepare payment: {e}")
             raise
 
     async def prepare_asset_transfer_txn(
-        self,
-        sender: str,
-        receiver: str, 
-        asset_id: int,
-        amount: Decimal
+        self, sender: str, receiver: str, asset_id: int, amount: Decimal
     ) -> Dict[str, Any]:
-        """Prepare asset transfer transaction for user signing"""
+        """Prepare asset transfer transaction"""
         try:
             asset_config = self._get_asset_config(asset_id)
             decimals = asset_config['decimals']
             
             params = self.algod_client.suggested_params()
             amount_base_units = int(amount * (10 ** decimals))
-        
+            
             txn = AssetTransferTxn(
-                sender=sender,
-                sp=params,
-                receiver=receiver,
-                amt=amount_base_units,
-                index=asset_id
+                sender=sender, sp=params, receiver=receiver, amt=amount_base_units, index=asset_id
             )
-        
+            
             unsigned_txn_b64 = encoding.msgpack_encode(txn)
-        
+            
             return {
                 "success": True,
                 "unsigned_txn_b64": unsigned_txn_b64,
@@ -264,23 +222,22 @@ class AlgorandService:
             raise
 
     async def submit_transaction(self, signed_txn: str) -> str:
-        """Submit signed transaction to Algorand network"""
+        """Submit signed transaction to network"""
         try:
             tx_id = self.algod_client.send_raw_transaction(signed_txn)
             await self.wait_for_confirmation(tx_id)
-            logger.info(f"Transaction submitted and confirmed: {tx_id}")
+            logger.info(f"Transaction confirmed: {tx_id}")
             return tx_id
         except Exception as e:
             logger.error(f"Transaction submission failed: {e}")
             raise
 
     async def check_asset_opt_in(self, address: str, asset_id: int) -> bool:
-        """Check if address is opted into specific asset"""
+        """Check if address is opted into asset"""
         try:
             account_info = await self.get_account_info(address)
             if not account_info:
                 return False
-        
             assets = account_info.get('assets', [])
             return any(asset['asset-id'] == asset_id for asset in assets)
         except Exception as e:
