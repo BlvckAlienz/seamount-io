@@ -47,7 +47,7 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
             <div className={`text-2xl font-bold ${hasBalance ? 'text-white' : 'text-gray-500'}`}>
               ${valueUsd.toFixed(2)}
             </div>
-            <div className="text-sm text-gray-400">â‰ˆ {balance.toFixed(6)}</div>
+            <div className="text-sm text-gray-400">≈ {balance.toFixed(6)}</div>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ const MnemonicBackupModal = ({
   };
 
   const downloadMnemonic = () => {
-    const blob = new Blob([`Seamount Wallet Recovery Phrase\n\nWallet Address: ${walletAddress}\n\nRecovery Phrase:\n${mnemonic}\n\nâš ï¸ KEEP THIS SAFE! Never share with anyone.`], { type: 'text/plain' });
+    const blob = new Blob([`Seamount Wallet Recovery Phrase\n\nWallet Address: ${walletAddress}\n\nRecovery Phrase:\n${mnemonic}\n\n⚠️ KEEP THIS SAFE! Never share with anyone.`], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -164,10 +164,10 @@ const MnemonicBackupModal = ({
                 Critical Security Warning
               </h3>
               <ul className="text-sm text-gray-300 space-y-1">
-                <li>â€¢ Never share your recovery phrase with anyone</li>
-                <li>â€¢ Seamount will NEVER ask for your phrase</li>
-                <li>â€¢ Store it offline in multiple secure locations</li>
-                <li>â€¢ Anyone with this phrase can access your funds</li>
+                <li>• Never share your recovery phrase with anyone</li>
+                <li>• Seamount will NEVER ask for your phrase</li>
+                <li>• Store it offline in multiple secure locations</li>
+                <li>• Anyone with this phrase can access your funds</li>
               </ul>
             </div>
 
@@ -291,7 +291,7 @@ const MnemonicBackupModal = ({
   );
 };
 
-// Wallet Address Display
+// Wallet Address Display - FIXED VERSION
 const WalletAddressCard = ({ address }: { address: string }) => {
   const [copied, setCopied] = useState(false);
 
@@ -320,7 +320,7 @@ const WalletAddressCard = ({ address }: { address: string }) => {
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           </button>
-          
+          <a
             href={`https://algoexplorer.io/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
