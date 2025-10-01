@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { portfolioAPI, userAPI } from '../config/api';
+import { portfolioService } from '../services/portfolio';
 
 // Asset Card Component with 0-balance visibility
 const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; onSend: () => void }) => {
@@ -359,22 +360,31 @@ const DashboardPage = () => {
   const fetchPortfolioData = async () => {
     try {
       setLoading(true);
-      const response = await portfolioAPI.getPortfolio();
-      
-      if (response.data.success) {
-        setPortfolioData(response.data);
-        setWalletAddress(response.data.wallet_address || '');
-        
-        // Check for new wallet with mnemonic
-        if (response.data.mnemonic && !localStorage.getItem('mnemonic_backed_up')) {
-          setPendingMnemonic(response.data.mnemonic);
-          setShowMnemonicModal(true);
-        }
+    
+      // Use portfolio service instead of direct API call
+      const data = await portfolioService.getPortfolio(userProfile?.id || '');
+    
+      if (data.wallet_exists) {
+        setPortfolioData({
+          success: true,
+          total_usd: data.total_balance_usd,
+          balances: data.assets.reduce((acc, asset) => {
+            acc[asset.symbol] = asset.balance;
+            return acc;
+          }, {} as Record<string, number>),
+          prices: data.assets.reduce((acc, asset) => {
+            acc[asset.symbol] = asset.price_usd;
+            return acc;
+          }, {} as Record<string, number>),
+          wallet_address: data.wallet_address
+        });
+        setWalletAddress(data.wallet_address);
+      } else {
+        // No wallet - create one
+        await createWallet();
       }
     } catch (error: any) {
       console.error('Portfolio fetch error:', error);
-      
-      // If no wallet exists, create one
       if (error.response?.status === 404) {
         await createWallet();
       } else {

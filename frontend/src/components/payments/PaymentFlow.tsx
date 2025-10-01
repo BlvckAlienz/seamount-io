@@ -100,6 +100,24 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
     }
   }, [paymentData, user, onComplete]);
 
+  const initiateNGNOnRamp = async (amountNGN: number) => {
+  try {
+    const { data } = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
+      user_id: user.id,
+      user_email: user.email,
+      user_phone: user.phone,
+      amount_fiat: amountNGN,
+      currency: "NGN"
+    });
+    
+    // Redirect to Paystack payment page
+    window.location.href = data.payment_url;
+    
+  } catch (error) {
+    toast.error("On-ramp failed: " + error.message);
+  }
+};
+
   const renderContent = () => {
     switch (currentStep) {
       case 'details':

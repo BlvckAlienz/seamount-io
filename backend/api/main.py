@@ -438,6 +438,13 @@ if routers_available.get('payments'):
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 
+try:
+    from backend.api.routes.transactions import router as transactions_router
+    app.include_router(transactions_router, prefix="/api/v1", tags=["Transactions"])
+    logger.info("✅ Transactions router registered")
+except ImportError as e:
+    logger.error(f"Transactions router import error: {e}")
+    
 # Import and register transactions router
 try:
     from backend.api.routes.transactions import router as transactions_router

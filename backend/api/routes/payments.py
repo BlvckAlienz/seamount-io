@@ -165,3 +165,69 @@ async def get_transaction_status(
         logger.error(f"Failed to fetch transaction {transaction_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch transaction status")
         
+@router.post("/on-ramp/ngn")
+async def initialize_ngn_onramp(
+    request: Request,
+    deposit: OnRampRequest,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """NGN → USDT auto-conversion via Paystack"""
+    
+    try:
+        user_id = deposit.user_id
+        amount_ngn = Decimal(str(deposit.amount_fiat))
+        
+        # Get NGN/USD rate from oracle
+        oracle_service = EnhancedOracleService(DatabaseService(supabase))
+        ngn_rate, _ = await oracle_service.get_ngn_usd_rate()
+        
+        # Calculate USDT amount (with 2.9% Seamount fee)
+        amount_usd = amount_ngn / ngn_rate
+        seamount_fee = amount_usd * Decimal("0.029")
+        usdt_to_mint = amount_usd - seamount_fee
+        
+        # Initialize Paystack payment
+        paystack = PaystackProvider(get_settings())
+        payment_result = await paystack.initialize_payment(
+            amount=float(amount_ngn),
+            currency="NGN",
+            email=deposit.user_email,
+            tx_ref=f"onramp_{uuid.uuid4().hex[:12]}",
+            phone=deposit.user_phone
+        )
+        
+        if payment_result['status'] != 'success':
+            raise HTTPException(400, "Paystack initialization failed")
+        
+        # Store pending mint
+        mint_data = {
+            "id": payment_result['tx_ref'],
+            "user_id": user_id,
+            "amount_ngn": float(amount_ngn),
+            "amount_usd": float(amount_usd),
+            "usdt_to_mint": float(usdt_to_mint),
+            "fee_usd": float(seamount_fee),
+            "status": "awaiting_payment",
+            "payment_url": payment_result['payment_link'],
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        supabase.table("pending_mints").insert(mint_data).execute()
+        
+        return {
+            "success": True,
+            "payment_url": payment_result['payment_link'],
+            "tx_ref": payment_result['tx_ref'],
+            "usdt_to_receive": float(usdt_to_mint),
+            "fee_breakdown": {
+                "amount_ngn": float(amount_ngn),
+                "exchange_rate": float(ngn_rate),
+                "amount_usd": float(amount_usd),
+                "seamount_fee": float(seamount_fee),
+                "net_usdt": float(usdt_to_mint)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"NGN on-ramp failed: {e}")
+        raise HTTPException(500, f"On-ramp failed: {e}")

@@ -14,6 +14,7 @@ from backend.config import get_settings, Settings
 from backend.services.wallet_service import WalletService
 from backend.services.kyc_providers.regfyl import regfyl_service
 from backend.services.database_service import DatabaseService
+from backend.services.algorand_service import AlgorandService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -263,7 +264,72 @@ async def handle_flutterwave_failure(data):
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave failure: {str(e)}")
+
+async def handle_paystack_transfer_success(event_data):
+    """Handle successful Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        amount = float(data.get("amount", 0)) / 100
         
+        supabase = get_supabase_client()
+        
+        supabase.table("payout_transactions").update({
+            "status": "completed",
+            "provider_tx_id": data.get("id"),
+            "completed_at": datetime.utcnow().isoformat(),
+            "routing_metadata": json.dumps({
+                "paystack_transfer_code": data.get("transfer_code"),
+                "paystack_recipient": data.get("recipient")
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.info(f"Paystack transfer completed: {reference} - {amount} NGN")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer success: {str(e)}")
+
+async def handle_paystack_transfer_failed(event_data):
+    """Handle failed Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        
+        supabase = get_supabase_client()
+        
+        supabase.table("payout_transactions").update({
+            "status": "failed",
+            "routing_metadata": json.dumps({
+                "failure_reason": data.get("failures"),
+                "paystack_transfer_code": data.get("transfer_code")
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.warning(f"Paystack transfer failed: {reference}")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer failure: {str(e)}")
+
+async def handle_paystack_transfer_reversed(event_data):
+    """Handle reversed Paystack transfer (payout)"""
+    try:
+        data = event_data.get("data", {})
+        reference = data.get("reference")
+        
+        supabase = get_supabase_client()
+        
+        supabase.table("payout_transactions").update({
+            "status": "reversed",
+            "routing_metadata": json.dumps({
+                "reversal_reason": "Transfer reversed by Paystack"
+            })
+        }).eq("reference", reference).execute()
+        
+        logger.warning(f"Paystack transfer reversed: {reference}")
+        
+    except Exception as e:
+        logger.error(f"Failed to handle transfer reversal: {str(e)}")
+
 # ============================================================================
 # REGFYL WEBHOOK HANDLERS (FIXED TABLE NAMES)
 # ============================================================================

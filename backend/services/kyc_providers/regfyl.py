@@ -14,7 +14,9 @@ from fastapi import HTTPException
 
 from backend.config import get_settings
 
+self.base_url = "https://api.portal.regfyl.com"  # Hardcode if not in settings
 logger = logging.getLogger(__name__)
+
 
 class RegfylVerifier:
     """
@@ -162,7 +164,7 @@ class RegfylVerifier:
         }
         
         try:
-            result = await self._make_request('customerScreening', payload)
+            result = await self._make_request('postCustomerScreening', payload)  # Fixed endpoint
             logger.info(f"Customer screening initiated for {customer_id}")
             return result
         except Exception as e:
