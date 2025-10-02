@@ -199,7 +199,7 @@ class RegfylVerifier:
         }
         
         try:
-            result = await self._make_request('customerScreening', payload)
+            result = await self._make_request('postCustomerScreening', payload)
             logger.info(f"ID verification initiated for {customer_id}")
             return result
         except Exception as e:

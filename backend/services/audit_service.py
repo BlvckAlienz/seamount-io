@@ -97,7 +97,7 @@ class AuditService:
                 "event_type": event_type.value,
                 "user_id": user_id,
                 "resource_id": resource_id,
-                "severity": severity.value,
+                "severity": severity,
                 "ip_address": ip_address,
                 "user_agent": user_agent,
                 "details": details or {},

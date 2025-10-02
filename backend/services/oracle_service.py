@@ -316,8 +316,8 @@ class EnhancedOracleService:
                     "timestamp": pd.timestamp.isoformat()
                 })
             
-            if records:
-                await self.db_service.log_batch_event("price_history", records)
+            for record in records:
+                await self.db_service.log_event("price_history", record)
                 logger.debug(f"Stored {len(records)} price points to database")
                 
         except Exception as e:
