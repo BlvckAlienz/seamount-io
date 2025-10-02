@@ -187,12 +187,19 @@ class KYCService:
                     # Use Regfyl for Nigerian users with proper data
                     user_data = {
                         'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                        'year_of_birth': user_profile.get('date_of_birth', '1990')[:4] if user_profile.get('date_of_birth') else '1990',
-                        'gender': user_profile.get('gender', 'M'),
+                        'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
+                        'gender': user_profile.get('gender', ''),
                         'country': country_code,
-                        'id_type': 'BVN',  # Default for Nigerian users
-                        'id_number': user_profile.get('bvn') or '12345678901'  # Fallback for testing
+                        'id_type': 'BVN',
+                        'id_number': user_profile.get('bvn', '')  # Remove synthetic fallback
                     }
+
+                    # ADD VALIDATION
+                    if not user_data['id_number'] or not user_data['full_name']:
+                        return {
+                            "success": False,
+                            "error": "Missing required KYC data: BVN and full name are required"
+                        }
                     
                     # Initiate Regfyl screening
                     regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)

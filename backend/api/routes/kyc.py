@@ -103,6 +103,19 @@ async def start_kyc_verification(
                     "kyc_status": current_user.get("kyc_status")
                 }
         
+        profile_complete_check = await check_profile_completeness(current_user, supabase)
+        if not profile_complete_check.get("can_start_kyc"):
+            raise HTTPException(status_code=400, detail="Profile incomplete - missing required fields")
+
+        # ADD SPECIFIC KYC DATA CHECK
+        required_kyc_fields = ['first_name', 'last_name', 'bvn', 'date_of_birth']
+        missing_kyc_fields = [field for field in required_kyc_fields if not current_user.get(field)]
+
+        if missing_kyc_fields:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Missing KYC data: {', '.join(missing_kyc_fields)}"
+            )
         # Start verification with Regfyl PRIMARY
         result = await kyc_service.start_verification_session(
             user_id,
@@ -333,3 +346,42 @@ async def skip_kyc_verification(
         error_id = str(uuid.uuid4())[:8]
         logger.error(f"[KYC Skip] Error [ID: {error_id}]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to skip verification. Error ID: {error_id}")
+    
+class KYCDataRequest(BaseModel):
+    bvn: str = Field(..., description="Bank Verification Number")
+    date_of_birth: str = Field(..., description="Date of birth (YYYY-MM-DD)")
+    gender: str = Field(..., description="Gender (M/F/Other)")
+
+@router.post("/submit-kyc-data")
+async def submit_kyc_data(
+    kyc_data: KYCDataRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Collect KYC data before starting verification"""
+    try:
+        user_id = current_user.get('id')
+        
+        # Validate BVN format (basic)
+        if not kyc_data.bvn.isdigit() or len(kyc_data.bvn) != 11:
+            raise HTTPException(status_code=400, detail="Invalid BVN format")
+            
+        # Update user profile with KYC data
+        update_data = {
+            'bvn': kyc_data.bvn,
+            'date_of_birth': kyc_data.date_of_birth,
+            'gender': kyc_data.gender,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
+        
+        return {
+            "success": True,
+            "message": "KYC data saved successfully",
+            "can_start_verification": True
+        }
+        
+    except Exception as e:
+        logger.error(f"[KYC Data Submit] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save KYC data")

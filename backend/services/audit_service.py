@@ -116,7 +116,7 @@ class AuditService:
             logger.log(
                 log_level,
                 f"[AUDIT] {event_type.value} | User: {user_id or 'N/A'} | "
-                f"Resource: {resource_id or 'N/A'} | Severity: {severity.value}"
+                f"Resource: {resource_id or 'N/A'} | Severity: {severity}"
             )
             
             # Store in database for compliance

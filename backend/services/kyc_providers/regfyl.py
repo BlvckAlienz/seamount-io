@@ -201,6 +201,7 @@ class RegfylVerifier:
         try:
             result = await self._make_request('postCustomerScreening', payload)
             logger.info(f"ID verification initiated for {customer_id}")
+            logger.info(f"Regfyl KYC Payload: {payload}")
             return result
         except Exception as e:
             logger.error(f"ID verification failed for {customer_id}: {e}")

@@ -94,6 +94,12 @@ async def update_user_profile(
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
+    # ADD KYC-SPECIFIC FIELDS
+    allowed_fields = [
+        'first_name', 'last_name', 'country_code', 'phone', 
+        'date_of_birth', 'gender', 'bvn', 'id_type'  # 🆕 ADD KYC FIELDS
+    ]
+    
     """Update user profile"""
     try:
         data = await request.json()
