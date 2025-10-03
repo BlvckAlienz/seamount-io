@@ -1,10 +1,11 @@
-# File Location: frontend/src/components/onboarding/KycVerification.tsx
-# CRITICAL FIX: Enhanced error handling and profile validation
+// File Location: frontend/src/components/onboarding/KycVerification.tsx
+// HYBRID APPROACH INTEGRATION: Smart BVN collection before verification
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ComplyCubeVerification from './ComplyCubeVerification';
+import BVNCollectionModal from './BVNCollectionModal';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 
@@ -22,10 +23,11 @@ interface KycVerificationProps {
 }
 
 export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, onError }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [profileCheck, setProfileCheck] = useState<ProfileCheck | null>(null);
   const [showComplyCube, setShowComplyCube] = useState(false);
+  const [showBVNModal, setShowBVNModal] = useState(false);
   const [error, setError] = useState<string>('');
   const [profileData, setProfileData] = useState({
     first_name: '',
@@ -33,7 +35,8 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
     email: ''
   });
 
-  // CRITICAL: Check profile completeness on component mount
+  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
+
   useEffect(() => {
     checkProfileCompleteness();
   }, [user]);
@@ -59,7 +62,6 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
       const data: ProfileCheck = await response.json();
       setProfileCheck(data);
 
-      // Pre-populate form with existing data if available
       if (user.user_metadata) {
         setProfileData({
           first_name: user.user_metadata.first_name || '',
@@ -85,7 +87,6 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
     setError('');
 
     try {
-      // Validate required fields
       const requiredFields = ['first_name', 'last_name', 'email'];
       const missingFields = requiredFields.filter(field => 
         !profileData[field as keyof typeof profileData]?.trim()
@@ -95,7 +96,6 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(profileData.email)) {
         throw new Error('Invalid email format');
@@ -115,10 +115,6 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
         throw new Error(errorData.detail || `Profile update failed: ${response.status}`);
       }
 
-      const result = await response.json();
-      console.log('Profile updated:', result);
-
-      // Re-check profile completeness
       await checkProfileCompleteness();
 
     } catch (err) {
@@ -131,8 +127,34 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
     }
   };
 
+  // HYBRID APPROACH: Check if BVN is needed before starting verification
   const handleStartKyc = async () => {
     if (!user || !profileCheck?.can_start_kyc) return;
+
+    // 🚨 CRITICAL: Nigerian users need BVN first
+    if (isNigerianUser) {
+      const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
+      
+      if (!hasBVN) {
+        // Show BVN collection modal
+        setShowBVNModal(true);
+        return;
+      }
+    }
+
+    // Proceed directly to verification if BVN exists or non-Nigerian
+    await initiateVerification();
+  };
+
+  const handleBVNComplete = async (bvnData: any) => {
+    setShowBVNModal(false);
+    
+    // BVN saved successfully, now start verification
+    await initiateVerification();
+  };
+
+  const initiateVerification = async () => {
+    if (!user) return;
 
     setLoading(true);
     setError('');
@@ -152,12 +174,17 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
       }
 
       const result = await response.json();
-      console.log('KYC started:', result);
       
       if (result.success) {
-        setShowComplyCube(true);
-        // Update profile check to reflect new status
-        setProfileCheck(prev => prev ? { ...prev, kyc_status: 'in_progress' } : null);
+        // Check which provider was used
+        if (result.provider === 'regfyl') {
+          // Regfyl doesn't have interactive flow - redirect to pending page
+          window.location.href = `/kyc-regfyl-pending?user_id=${userProfile?.id}`;
+        } else {
+          // ComplyCube has interactive flow
+          setShowComplyCube(true);
+          setProfileCheck(prev => prev ? { ...prev, kyc_status: 'in_progress' } : null);
+        }
       } else {
         throw new Error(result.message || 'Failed to start KYC verification');
       }
@@ -173,10 +200,7 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
   };
 
   const handleComplyCubeComplete = (status: string) => {
-    console.log('ComplyCube verification completed:', status);
     setShowComplyCube(false);
-    
-    // Update local status
     setProfileCheck(prev => prev ? { ...prev, kyc_status: status } : null);
     
     if (status === 'completed') {
@@ -214,7 +238,18 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
     );
   }
 
-  // Show ComplyCube verification if KYC is ready
+  // Show BVN Collection Modal
+  if (showBVNModal && user) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleBVNComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={user.email || ''}
+      />
+    );
+  }
+
+  // Show ComplyCube verification
   if (showComplyCube && profileCheck?.can_start_kyc) {
     return (
       <ComplyCubeVerification
@@ -225,7 +260,7 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
   }
 
   // Show KYC status if already in progress or completed
-  if (profileCheck?.kyc_status === 'in_progress') {
+  if (profileCheck?.kyc_status === 'in_progress' || profileCheck?.kyc_status === 'pending') {
     return (
       <Card className="p-6 border-yellow-200 bg-yellow-50">
         <h3 className="text-lg font-semibold text-yellow-800 mb-2">Verification In Progress</h3>
@@ -243,7 +278,7 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
     );
   }
 
-  if (profileCheck?.kyc_status === 'completed') {
+  if (profileCheck?.kyc_status === 'completed' || profileCheck?.kyc_status === 'verified') {
     return (
       <Card className="p-6 border-green-200 bg-green-50">
         <h3 className="text-lg font-semibold text-green-800 mb-2">✅ Verification Complete</h3>
@@ -316,43 +351,35 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address *
+              Email *
             </label>
             <input
               type="email"
               value={profileData.email}
               onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your email address"
+              placeholder="Enter your email"
             />
           </div>
-
-          <Button
-            onClick={handleUpdateProfile}
-            disabled={loading}
-            className="w-full mt-6"
-          >
-            {loading ? 'Updating Profile...' : 'Update Profile'}
-          </Button>
         </div>
 
-        {profileCheck?.missing_fields.length > 0 && (
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-yellow-800 text-sm">
-              <strong>Missing fields:</strong> {profileCheck.missing_fields.join(', ')}
-            </p>
-          </div>
-        )}
+        <Button 
+          onClick={handleUpdateProfile} 
+          disabled={loading}
+          className="w-full mt-6"
+        >
+          {loading ? 'Updating...' : 'Save Profile & Continue'}
+        </Button>
       </Card>
     );
   }
 
-  // Show KYC start button if profile is complete
+  // Show ready to start KYC
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4">Identity Verification</h3>
+      <h3 className="text-lg font-semibold mb-4">Start Identity Verification</h3>
       <p className="text-gray-600 mb-6">
-        Complete identity verification to unlock all platform features and increase your transaction limits.
+        Your profile is complete. Click below to start the identity verification process.
       </p>
 
       {error && (
@@ -361,22 +388,24 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
         </div>
       )}
 
-      <div className="space-y-4">
-        <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-          <h4 className="font-medium text-green-800 mb-2">✅ Profile Complete</h4>
-          <p className="text-green-700 text-sm">
-            Your profile information is complete and ready for verification.
+      {isNigerianUser && !userProfile?.bvn && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <p className="text-blue-700 text-sm">
+            Nigerian users: You'll need to provide your BVN, date of birth, and gender for verification.
           </p>
         </div>
+      )}
 
-        <Button
-          onClick={handleStartKyc}
-          disabled={loading || !profileCheck?.can_start_kyc}
-          className="w-full"
-        >
-          {loading ? 'Starting Verification...' : 'Start Identity Verification'}
-        </Button>
-      </div>
+      <Button 
+        onClick={handleStartKyc} 
+        disabled={loading}
+        className="w-full"
+      >
+        {loading ? 'Starting Verification...' : 'Start Verification'}
+      </Button>
     </Card>
   );
 };
+
+export default KycVerification;
