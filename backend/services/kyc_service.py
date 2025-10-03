@@ -33,11 +33,13 @@ class KYCService:
         else:
             self.db_service = DatabaseService(supabase_client)
     
-        # Initialize audit service
+        # Initialize audit service - FIXED: Use create_audit_service function
         if audit_service:
             self.audit = audit_service
         else:
-            self.audit = AuditService(supabase_client)
+            # 🚨 CRITICAL FIX: Use the correct factory function
+            from backend.services.audit_service import create_audit_service
+            self.audit = create_audit_service(supabase_client)
     
         # PRIORITY FIX: Initialize Regfyl as PRIMARY provider
         self.providers = {}
@@ -129,7 +131,7 @@ class KYCService:
                 
                 self.supabase.table("compliance_checks").upsert(compliance_data).execute()
         
-            # Log compliance event
+            # Log compliance event - FIXED: Use correct audit service
             await self.audit.log_event(
                 AuditEventType.COMPLIANCE_CHECK_INITIATED,
                 user_id=user_id,
@@ -198,7 +200,8 @@ class KYCService:
                     if not user_data['id_number'] or not user_data['full_name']:
                         return {
                             "success": False,
-                            "error": "Missing required KYC data: BVN and full name are required"
+                            "error": "Missing required KYC data: BVN and full name are required",
+                            "missing_fields": ["bvn", "full_name"] if not user_data['id_number'] else ["full_name"]
                         }
                     
                     # Initiate Regfyl screening
