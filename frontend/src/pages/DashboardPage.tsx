@@ -7,7 +7,8 @@ import {
 import { useAuth } from '../contexts/AuthContext'; 
 import toast from 'react-hot-toast'; 
 import { portfolioAPI, userAPI } from '../config/api'; 
-import { portfolioService } from '../services/portfolio'; 
+import { portfolioService } from '../services/portfolio';
+import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 
 // Asset Card Component with 0-balance visibility 
 const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; onSend: () => void }) => { 
@@ -540,6 +541,9 @@ const DashboardPage = () => {
             </div> 
           </div> 
         </div> 
+        
+        {/* Nigerian User Banner - Proactive BVN Education */}
+        <NigerianUserBanner />
 
         {/* KYC Alert */} 
         {kycStatus !== 'verified' && ( 
