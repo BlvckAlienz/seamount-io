@@ -6,7 +6,7 @@ import hmac
 import hashlib
 from fastapi import APIRouter, Depends, HTTPException, Request
 from supabase import Client
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import traceback
 import uuid
 from datetime import datetime
