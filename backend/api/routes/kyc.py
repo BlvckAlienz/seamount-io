@@ -82,80 +82,59 @@ async def start_kyc_verification(
     kyc_service: KYCService = Depends(get_kyc_service),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """
-    Start KYC with proper validation and clear error messages
-    """
+    """Start KYC verification with smart routing"""
     try:
         user_id = current_user.get('id')
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
-        # Check for active session
-        current_kyc_status = current_user.get('kyc_status')
-        if current_kyc_status == "in_progress":
-            session_response = supabase.from_("kyc_sessions").select("session_id").eq("user_id", user_id).eq("status", "pending").maybe_single().execute()
-            if session_response.data:
-                logger.warning(f"User {user_id} already has active KYC session")
-                return {
-                    "success": False,
-                    "error": "KYC verification session already active",
-                    "kyc_status": current_user.get("kyc_status")
-                }
+        # Check profile completeness
+        profile_check = await check_profile_completeness(current_user, supabase)
+        if not profile_check.get("can_start_kyc"):
+            raise HTTPException(status_code=400, detail="Profile incomplete")
         
-        # Profile completeness check
-        profile_complete_check = await check_profile_completeness(current_user, supabase)
-        if not profile_complete_check.get("can_start_kyc"):
-            missing = profile_complete_check.get("missing_fields", [])
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Profile incomplete. Missing: {', '.join(missing)}"
-            )
-
-        # Nigerian user check - CLEAR ERROR MESSAGE
-        if current_user.get('country_code') == 'NG' or current_user.get('country') == 'NG':
-            required_ng_fields = {
-                'bvn': 'Bank Verification Number (BVN)',
-                'date_of_birth': 'Date of Birth',
-                'gender': 'Gender'
-            }
-            missing_ng = []
-            
-            for field, label in required_ng_fields.items():
-                if not current_user.get(field):
-                    missing_ng.append(label)
-            
-            if missing_ng:
+        # Country-specific validation
+        country_code = current_user.get('country_code', 'US')
+        
+        if country_code == 'NG':
+            # Nigerian users need BVN
+            required = ['first_name', 'last_name', 'bvn', 'date_of_birth', 'gender']
+            missing = [f for f in required if not current_user.get(f)]
+            if missing:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Nigerian users must provide: {', '.join(missing_ng)}"
+                    detail=f"Missing required data: {', '.join(missing)}"
                 )
         
         # Start verification
         result = await kyc_service.start_verification_session(
             user_id,
             current_user.get('email'),
-            current_user.get('country_code', 'NG')
+            country_code
         )
         
         if not result.get("success"):
-            raise HTTPException(status_code=500, detail=result.get("error", "KYC verification failed"))
+            # Smart error codes
+            error = result.get("error", "Verification failed")
+            if "missing" in error.lower() or "required" in error.lower():
+                raise HTTPException(status_code=400, detail=error)
+            raise HTTPException(status_code=500, detail=error)
         
         return {
             "success": True,
-            "token": result.get("session_token") or result.get("token"),
-            "applicantId": result.get("applicant_id") or result.get("applicantId"),
+            "token": result.get("token"),
+            "applicantId": result.get("applicantId"),
             "provider": result.get("provider", "regfyl"),
-            "status": "success",
-            "message": f"KYC verification initiated with {result.get('provider', 'Regfyl')}",
-            "flow_url": result.get("flow_url", "")
+            "flow_url": result.get("flow_url"),
+            "message": f"Verification started with {result.get('provider', 'Regfyl')}"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
-        logger.error(f"[KYC Start] Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"KYC initialization failed. Error ID: {error_id}")
+        logger.error(f"[KYC Start] Error [{error_id}]: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Verification failed. Error ID: {error_id}")
 
 @router.post("/webhook")
 async def kyc_webhook_handler(
@@ -398,3 +377,91 @@ async def submit_kyc_data(
     except Exception as e:
         logger.error(f"[KYC Data Submit] Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to save KYC data")
+    
+
+@router.get("/detect-country")
+async def detect_country(
+    request: Request,
+    supabase: Client = Depends(get_supabase_client)
+) -> Dict[str, Any]:
+    """Detect user's country from IP address"""
+    try:
+        # Try IPInfo service first
+        from backend.services.ipinfo_service import IPInfoService
+        
+        # Get client IP
+        client_ip = request.headers.get('x-forwarded-for', '').split(',')[0].strip()
+        if not client_ip:
+            client_ip = request.client.host
+        
+        # Detect country
+        ipinfo = IPInfoService()
+        ip_data = await ipinfo.get_ip_info(client_ip)
+        
+        if ip_data and ip_data.get('country'):
+            country_code = ip_data.get('country', 'US')
+            
+            # Determine requirements
+            requires_bvn = country_code == 'NG'
+            requires_nin = country_code in ['NG', 'GH']  # Nigeria, Ghana
+            
+            return {
+                "success": True,
+                "country_code": country_code,
+                "country_name": _get_country_name(country_code),
+                "city": ip_data.get('city'),
+                "requires_bvn": requires_bvn,
+                "requires_nin": requires_nin,
+                "id_types": _get_id_types(country_code),
+                "detection_method": "ip_geolocation"
+            }
+        
+        # Fallback: Return US as default
+        return {
+            "success": True,
+            "country_code": "US",
+            "country_name": "United States",
+            "requires_bvn": False,
+            "requires_nin": False,
+            "id_types": ["PASSPORT", "DRIVERS_LICENSE"],
+            "detection_method": "fallback"
+        }
+        
+    except Exception as e:
+        logger.error(f"[Country Detection] Error: {str(e)}")
+        # Return safe default
+        return {
+            "success": True,
+            "country_code": "US",
+            "country_name": "United States",
+            "requires_bvn": False,
+            "requires_nin": False,
+            "id_types": ["PASSPORT", "DRIVERS_LICENSE"],
+            "detection_method": "error_fallback"
+        }
+
+def _get_country_name(code: str) -> str:
+    """Get country name from code"""
+    countries = {
+        "NG": "Nigeria",
+        "KE": "Kenya",
+        "GH": "Ghana",
+        "ZA": "South Africa",
+        "US": "United States",
+        "GB": "United Kingdom",
+        "CA": "Canada"
+    }
+    return countries.get(code, code)
+
+def _get_id_types(country_code: str) -> List[str]:
+    """Get supported ID types per country"""
+    id_mapping = {
+        "NG": ["BVN", "NIN", "PASSPORT", "DRIVERS_LICENSE"],
+        "KE": ["NATIONAL_ID", "PASSPORT"],
+        "GH": ["GHANA_CARD", "PASSPORT"],
+        "ZA": ["ID_BOOK", "ID_CARD", "PASSPORT"],
+        "US": ["PASSPORT", "DRIVERS_LICENSE", "STATE_ID"],
+        "GB": ["PASSPORT", "DRIVERS_LICENSE"],
+        "CA": ["PASSPORT", "DRIVERS_LICENSE"]
+    }
+    return id_mapping.get(country_code, ["PASSPORT", "NATIONAL_ID"])

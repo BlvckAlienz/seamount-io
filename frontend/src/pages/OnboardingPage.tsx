@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
-// Welcome Step
+// Welcome Step (unchanged)
 const WelcomeStep = ({ onNext }) => (
   <div className="text-center">
     <div className="mb-8">
@@ -50,7 +50,7 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step - FIXED
+// Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
   const [showBVNModal, setShowBVNModal] = useState(false);
@@ -62,14 +62,12 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     setLoading(true);
     
     try {
-      // CRITICAL FIX: Check if Nigerian user needs BVN first
       if (isNigerianUser && !hasBVN) {
         setShowBVNModal(true);
         setLoading(false);
         return;
       }
       
-      // Profile complete - proceed to verification
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
@@ -79,7 +77,6 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
         throw new Error(data.message || 'Verification failed');
       }
     } catch (error) {
-      // CRITICAL FIX: Handle 400 errors properly
       if (error.response?.status === 400) {
         const errorDetail = error.response?.data?.detail || '';
         
@@ -100,11 +97,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const handleBVNComplete = async (bvnData) => {
     setShowBVNModal(false);
     toast.success('Information saved! Starting verification...');
-    
-    // Retry verification after BVN saved
-    setTimeout(() => {
-      startVerification();
-    }, 1000);
+    setTimeout(() => startVerification(), 1000);
   };
 
   const handleSkip = () => {
@@ -112,7 +105,6 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     onNext();
   };
 
-  // Show BVN modal if needed
   if (showBVNModal && isNigerianUser) {
     return (
       <BVNCollectionModal
@@ -133,7 +125,6 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
         <p className="text-gray-400">Unlock full platform features with quick verification</p>
       </div>
       
-      {/* Nigerian User Notice */}
       {isNigerianUser && !hasBVN && (
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
           <div className="flex items-start gap-2">
@@ -194,8 +185,9 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   );
 };
 
-// Wallet Backup Step (unchanged)
+// Wallet Backup Step (keep existing - no changes needed)
 const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
+  // ... keep all existing code unchanged
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -383,9 +375,37 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
+  const [detectedCountry, setDetectedCountry] = useState(null);
   const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
+  // Country detection on mount
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const response = await fetch('/api/kyc/detect-country');
+        const data = await response.json();
+        
+        if (data.success) {
+          setDetectedCountry({
+            code: data.country_code,
+            name: data.country_name,
+            requires_bvn: data.requires_bvn
+          });
+          
+          if (data.requires_bvn) {
+            toast.success(`Detected: ${data.country_name}. BVN verification required.`);
+          }
+        }
+      } catch (error) {
+        console.error('Country detection failed:', error);
+      }
+    };
+    
+    detectCountry();
+  }, []);
+
+  // Redirect if already verified
   useEffect(() => {
     if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
@@ -395,9 +415,14 @@ const OnboardingPage = () => {
   const handleWelcomeComplete = () => setStep('identity');
 
   const handleIdentityComplete = async () => {
-    // CRITICAL FIX: Only create wallet after verification attempt
     const toastId = toast.loading('Creating your wallet...');
+    
     try {
+      // Save detected country
+      if (detectedCountry) {
+        localStorage.setItem('user_country', detectedCountry.code);
+      }
+      
       const response = await apiClient.post('/api/v1/user/provision-wallets');
       
       if (response.data.success && response.data.mnemonic) {

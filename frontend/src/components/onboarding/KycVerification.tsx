@@ -8,6 +8,8 @@ import ComplyCubeVerification from './ComplyCubeVerification';
 import BVNCollectionModal from './BVNCollectionModal';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import UniversalIDModal from './UniversalIDModal';
+import { AlertCircle } from 'lucide-react';
 
 interface ProfileCheck {
   profile_complete: boolean;
@@ -128,23 +130,43 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
   };
 
   // HYBRID APPROACH: Check if BVN is needed before starting verification
-  const handleStartKyc = async () => {
-    if (!user || !profileCheck?.can_start_kyc) return;
+const handleStartKyc = async () => {
+  if (!user || !profileCheck?.can_start_kyc) return;
 
-    // 🚨 CRITICAL: Nigerian users need BVN first
-    if (isNigerianUser) {
-      const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
-      
-      if (!hasBVN) {
-        // Show BVN collection modal
-        setShowBVNModal(true);
-        return;
+  // Detect country if not set
+  let country = userProfile?.country_code;
+  
+  if (!country) {
+    try {
+      const response = await fetch('/api/kyc/detect-country');
+      const data = await response.json();
+      if (data.success) {
+        country = data.country_code;
       }
+    } catch (error) {
+      console.error('Country detection failed:', error);
+      country = 'US'; // Fallback
     }
+  }
 
-    // Proceed directly to verification if BVN exists or non-Nigerian
-    await initiateVerification();
-  };
+  // Check if country-specific data needed
+  const needsIDData = ['NG', 'KE', 'GH'].includes(country);
+  
+  if (needsIDData) {
+    // Check if data already collected
+    const hasRequiredData = country === 'NG' 
+      ? userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender
+      : userProfile?.id_number && userProfile?.date_of_birth;
+    
+    if (!hasRequiredData) {
+      setShowBVNModal(true); // Will now show UniversalIDModal
+      return;
+    }
+  }
+
+  // Proceed to verification
+  await initiateVerification();
+};
 
   const handleBVNComplete = async (bvnData: any) => {
     setShowBVNModal(false);
@@ -239,15 +261,15 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
   }
 
   // Show BVN Collection Modal
-  if (showBVNModal && user) {
-    return (
-      <BVNCollectionModal
-        onComplete={handleBVNComplete}
-        onCancel={() => setShowBVNModal(false)}
-        userEmail={user.email || ''}
-      />
-    );
-  }
+ {showBVNModal && user && (
+  <UniversalIDModal
+    countryCode={userProfile?.country_code || 'US'}
+    countryName={userProfile?.country || 'United States'}
+    onComplete={handleBVNComplete}
+    onCancel={() => setShowBVNModal(false)}
+    userEmail={user.email || ''}
+  />
+)}
 
   // Show ComplyCube verification
   if (showComplyCube && profileCheck?.can_start_kyc) {

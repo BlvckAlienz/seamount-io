@@ -217,36 +217,47 @@ class ComplyCubeVerifier:
             logger.error(f"Failed to create ComplyCube client for user {user_id}: {str(e)}")
             raise HTTPException(status_code=500, detail="Could not create KYC profile")
     
-    async def create_verification_session(self, client_id: str, referrer: str = "https://seamount.io/*") -> Dict[str, Any]:
-        """
-        Create hosted verification session with proper token handling and CORS configuration
-        """
-        try:
-            token_response = await self._make_request("POST", "tokens", {
-                "clientId": client_id,
-                "referrer": referrer  # This fixes the CORS issue
-            })
+async def create_verification_session(self, client_id: str, referrer: str = None) -> Dict[str, Any]:
+    """Create hosted verification session with dynamic referrer"""
+    try:
+        # Determine referrer based on environment
+        if not referrer:
+            from backend.config import get_settings
+            settings = get_settings()
+            env = getattr(settings, 'ENVIRONMENT', 'production')
             
-            token = token_response.get("token")
-            if not token:
-                raise ValueError("Verification token not returned from ComplyCube")
-            
-            # Create the session URL
-            session_url = f"https://portal.complycube.com/verify?token={token}"
-            
-            return {
-                "id": f"session_{client_id}",
-                "url": session_url,
-                "token": token,
-                "client_id": client_id,
-                "expires_at": token_response.get("expiresAt")
+            referrer_map = {
+                'development': 'http://localhost:5173/*',
+                'staging': 'https://staging.seamount.io/*',
+                'production': 'https://seamount.io/*'
             }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to create verification session for client {client_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="Could not create verification session")
+            referrer = referrer_map.get(env, 'https://seamount.io/*')
+        
+        token_response = await self._make_request("POST", "tokens", {
+            "clientId": client_id,
+            "referrer": referrer
+        })
+        
+        token = token_response.get("token")
+        if not token:
+            raise ValueError("Verification token not returned")
+        
+        session_url = f"https://portal.complycube.com/verify?token={token}"
+        
+        return {
+            "id": f"session_{client_id}",
+            "url": session_url,
+            "token": token,
+            "client_id": client_id,
+            "expires_at": token_response.get("expiresAt"),
+            "referrer": referrer
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create verification session: {str(e)}")
+        raise HTTPException(status_code=500, detail="Session creation failed")
 
 # Export service instance with proper initialization
 complycube_service = ComplyCubeVerifier()
