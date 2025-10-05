@@ -83,8 +83,7 @@ async def start_kyc_verification(
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
     """
-    TRANSFORMATION FIX: Start KYC with Regfyl as PRIMARY provider
-    Falls back to ComplyCube only if Regfyl fails
+    Start KYC with proper validation and clear error messages
     """
     try:
         user_id = current_user.get('id')
@@ -103,20 +102,35 @@ async def start_kyc_verification(
                     "kyc_status": current_user.get("kyc_status")
                 }
         
+        # Profile completeness check
         profile_complete_check = await check_profile_completeness(current_user, supabase)
         if not profile_complete_check.get("can_start_kyc"):
-            raise HTTPException(status_code=400, detail="Profile incomplete - missing required fields")
-
-        # ADD SPECIFIC KYC DATA CHECK
-        required_kyc_fields = ['first_name', 'last_name', 'bvn', 'date_of_birth']
-        missing_kyc_fields = [field for field in required_kyc_fields if not current_user.get(field)]
-
-        if missing_kyc_fields:
+            missing = profile_complete_check.get("missing_fields", [])
             raise HTTPException(
                 status_code=400, 
-                detail=f"Missing KYC data: {', '.join(missing_kyc_fields)}"
+                detail=f"Profile incomplete. Missing: {', '.join(missing)}"
             )
-        # Start verification with Regfyl PRIMARY
+
+        # Nigerian user check - CLEAR ERROR MESSAGE
+        if current_user.get('country_code') == 'NG' or current_user.get('country') == 'NG':
+            required_ng_fields = {
+                'bvn': 'Bank Verification Number (BVN)',
+                'date_of_birth': 'Date of Birth',
+                'gender': 'Gender'
+            }
+            missing_ng = []
+            
+            for field, label in required_ng_fields.items():
+                if not current_user.get(field):
+                    missing_ng.append(label)
+            
+            if missing_ng:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Nigerian users must provide: {', '.join(missing_ng)}"
+                )
+        
+        # Start verification
         result = await kyc_service.start_verification_session(
             user_id,
             current_user.get('email'),
@@ -126,7 +140,6 @@ async def start_kyc_verification(
         if not result.get("success"):
             raise HTTPException(status_code=500, detail=result.get("error", "KYC verification failed"))
         
-        # Return unified response format
         return {
             "success": True,
             "token": result.get("session_token") or result.get("token"),

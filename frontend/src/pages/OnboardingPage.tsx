@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
-import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check } from 'lucide-react';
+import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
+import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
 // Welcome Step
 const WelcomeStep = ({ onNext }) => (
@@ -49,32 +50,78 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step
-const IdentityStep = ({ onNext, onPrev }) => {
+// Identity Verification Step - FIXED
+const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
-  const { refreshKycStatus } = useAuth();
+  const [showBVNModal, setShowBVNModal] = useState(false);
+  
+  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
+  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
 
   const startVerification = async () => {
     setLoading(true);
+    
     try {
+      // CRITICAL FIX: Check if Nigerian user needs BVN first
+      if (isNigerianUser && !hasBVN) {
+        setShowBVNModal(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Profile complete - proceed to verification
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
         toast.success('Verification started!');
-        await refreshKycStatus();
         onNext();
+      } else {
+        throw new Error(data.message || 'Verification failed');
       }
     } catch (error) {
-      toast.error('Verification failed: ' + (error.response?.data?.detail || error.message));
+      // CRITICAL FIX: Handle 400 errors properly
+      if (error.response?.status === 400) {
+        const errorDetail = error.response?.data?.detail || '';
+        
+        if (errorDetail.includes('bvn') || errorDetail.includes('date_of_birth')) {
+          toast.error('Please provide your BVN details first');
+          setShowBVNModal(true);
+        } else {
+          toast.error(errorDetail || 'Profile incomplete');
+        }
+      } else {
+        toast.error('Verification failed: ' + (error.response?.data?.detail || error.message));
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBVNComplete = async (bvnData) => {
+    setShowBVNModal(false);
+    toast.success('Information saved! Starting verification...');
+    
+    // Retry verification after BVN saved
+    setTimeout(() => {
+      startVerification();
+    }, 1000);
   };
 
   const handleSkip = () => {
     toast('You can verify later from Settings');
     onNext();
   };
+
+  // Show BVN modal if needed
+  if (showBVNModal && isNigerianUser) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleBVNComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+      />
+    );
+  }
 
   return (
     <div className="text-center">
@@ -85,6 +132,21 @@ const IdentityStep = ({ onNext, onPrev }) => {
         <h3 className="text-2xl font-semibold text-white mb-2">Verify Your Identity</h3>
         <p className="text-gray-400">Unlock full platform features with quick verification</p>
       </div>
+      
+      {/* Nigerian User Notice */}
+      {isNigerianUser && !hasBVN && (
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-blue-300 text-sm font-medium mb-1">🇳🇬 Nigerian User - Fast Track</p>
+              <p className="text-gray-300 text-xs">
+                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
         <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
@@ -109,7 +171,7 @@ const IdentityStep = ({ onNext, onPrev }) => {
           disabled={loading}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          {loading ? 'Starting...' : 'Start Verification'}
+          {loading ? 'Checking profile...' : 'Start Verification'}
         </button>
         
         <button
@@ -132,7 +194,7 @@ const IdentityStep = ({ onNext, onPrev }) => {
   );
 };
 
-// Wallet Backup Step
+// Wallet Backup Step (unchanged)
 const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -143,7 +205,6 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   const words = mnemonic.split(' ');
 
   useEffect(() => {
-    // Generate 3 random positions for verification
     const positions = [];
     while (positions.length < 3) {
       const pos = Math.floor(Math.random() * 25);
@@ -318,7 +379,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   );
 };
 
-// Main Component
+// Main Component - FIXED
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
@@ -334,6 +395,7 @@ const OnboardingPage = () => {
   const handleWelcomeComplete = () => setStep('identity');
 
   const handleIdentityComplete = async () => {
+    // CRITICAL FIX: Only create wallet after verification attempt
     const toastId = toast.loading('Creating your wallet...');
     try {
       const response = await apiClient.post('/api/v1/user/provision-wallets');
@@ -347,7 +409,7 @@ const OnboardingPage = () => {
       }
     } catch (error) {
       console.error('Wallet creation error:', error);
-      toast.error('Could not create wallet. Try again from Settings.', { id: toastId });
+      toast.error('Could not create wallet. Proceeding to dashboard.', { id: toastId });
       await completeOnboarding();
     }
   };
@@ -394,7 +456,11 @@ const OnboardingPage = () => {
           {step === 'welcome' ? (
             <WelcomeStep onNext={handleWelcomeComplete} />
           ) : step === 'identity' ? (
-            <IdentityStep onNext={handleIdentityComplete} onPrev={handleStepBack} />
+            <IdentityStep 
+              onNext={handleIdentityComplete} 
+              onPrev={handleStepBack} 
+              userProfile={userProfile}
+            />
           ) : mnemonic ? (
             <WalletBackupStep onNext={handleBackupComplete} onPrev={handleStepBack} mnemonic={mnemonic} />
           ) : (

@@ -303,18 +303,21 @@ useEffect(() => {
     
     const kycStatus = state.user.kyc_status || 'not_started';
     
-    // Update role based on KYC status
+    // CRITICAL FIX: Proper routing based on status
     if (kycStatus === 'verified' || kycStatus === 'approved') {
       updateUserRole('tribe');
       navigate('/dashboard');
     } else if (kycStatus === 'skipped') {
       updateUserRole('alien');
       navigate('/dashboard');
-    } else if (kycStatus === 'not_started' || kycStatus === 'pending' || kycStatus === 'in_progress') {
-      // CRITICAL FIX: Redirect ALL non-verified states to onboarding
+    } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
+      // Send to onboarding for KYC initiation
       navigate('/onboarding');
+    } else if (kycStatus === 'in_progress' || kycStatus === 'under_review') {
+      // Already in progress - send to dashboard with banner
+      navigate('/dashboard');
     }
-    // For other statuses, stay on current page
+    // For 'rejected' or other statuses, stay on current page
   }
 }, [state.session, state.user, state.loading, navigate, updateUserRole]);
 
