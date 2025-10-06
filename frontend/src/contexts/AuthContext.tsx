@@ -28,8 +28,9 @@ interface AuthContextType extends AuthState {
   onboardingStep?: number;
   updateOnboardingStep: (step: number, data: any) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-   updateUserRole: (role: 'tribe' | 'alien') => void;
+  updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
+  refreshUserProfile: () => Promise<UserProfile | null>; // ✅ FIXED: Added missing function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,38 +48,51 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading: true,
     error: null,
     isDemoMode: false,
-	role: 'alien', // Default role
+    role: 'alien', // Default role
   });
    
   const navigate = useNavigate();
 
-	const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
-	  try {
-		const { data } = await retryWithBackoff(
-		  () => apiClient.get<{ success: boolean; profile: UserProfile }>('/api/v1/user/profile'),
-		  maxRetries,
-		  delayMs
-		);
-		// FIX: Extract profile from response data
-		setState((prev) => ({ ...prev, user: data.profile, error: null }));
-		return data.profile;
-	  } catch (error: any) {
-		console.error('AuthContext: Failed to fetch user profile after retries:', error);
-		
-		if (error?.response?.status === 401) {
-		  toast.error('Your session has expired. Please sign in again.');
-		  await supabase.auth.signOut();
-		} else if (error?.response?.status === 404) {
-		  toast.error('Failed to load user profile. Please try again later.');
-		  setState((prev) => ({ ...prev, error: 'Profile not found.' }));
-		} else {
-		  toast.error('Could not connect to the server. Some features may be unavailable.');
-		  setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
-		}
-		
-		return null;
-	  }
-	}, []);
+  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
+    try {
+      const { data } = await retryWithBackoff(
+        () => apiClient.get<{ success: boolean; profile: UserProfile }>('/api/v1/user/profile'),
+        maxRetries,
+        delayMs
+      );
+      // FIX: Extract profile from response data
+      setState((prev) => ({ ...prev, user: data.profile, error: null }));
+      return data.profile;
+    } catch (error: any) {
+      console.error('AuthContext: Failed to fetch user profile after retries:', error);
+      
+      if (error?.response?.status === 401) {
+        toast.error('Your session has expired. Please sign in again.');
+        await supabase.auth.signOut();
+      } else if (error?.response?.status === 404) {
+        toast.error('Failed to load user profile. Please try again later.');
+        setState((prev) => ({ ...prev, error: 'Profile not found.' }));
+      } else {
+        toast.error('Could not connect to the server. Some features may be unavailable.');
+        setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
+      }
+      
+      return null;
+    }
+  }, []);
+
+  // ✅ FIXED: Added missing refreshUserProfile function
+  const refreshUserProfile = useCallback(async () => {
+    try {
+      console.log('Refreshing user profile...');
+      const profile = await fetchUserProfile(3, 1000);
+      console.log('User profile refreshed:', profile);
+      return profile;
+    } catch (error) {
+      console.error('Failed to refresh user profile:', error);
+      return null;
+    }
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -114,36 +128,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       authListener.subscription.unsubscribe();
     };
   }, [fetchUserProfile]);
-
-  const refreshUserProfile = useCallback(async () => {
-  try {
-    console.log('Refreshing user profile...');
-    const profile = await fetchUserProfile(3, 1000);
-    console.log('User profile refreshed:', profile);
-    return profile;
-  } catch (error) {
-    console.error('Failed to refresh user profile:', error);
-    return null;
-  }
-}, [fetchUserProfile]);
-
-// Add refreshUserProfile to the context value
-return (
-  <AuthContext.Provider value={{
-    ...state,
-    refreshUserProfile, // ← ADD THIS
-    updateUserRole,
-    triggerWalletCreation,
-    signUp,
-    signIn,
-    signOut,
-    enterDemoMode,
-    updateOnboardingStep,
-    completeOnboarding
-  }}>
-    {children}
-  </AuthContext.Provider>
-);
 
   const signUp = async (
     email: string,
@@ -272,7 +256,7 @@ return (
       loading: false,
       error: null,
       isDemoMode: true,
-	  role: 'alien',
+      role: 'alien',
     });
     navigate('/dashboard');
   };
@@ -297,86 +281,88 @@ return (
     }
   };
 
-const completeOnboarding = async () => {
-  try {
-    if (state.user) {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({ 
-          kyc_status: 'skipped',  // Change from 'pending' to 'skipped'
-          kyc_level: 1,
-          role: 'alien'  // Explicitly set role
-        })
-        .eq("id", state.user.id);
-        
-      await fetchUserProfile(3, 1000);
-      navigate('/dashboard');
-      toast.success('Onboarding completed successfully!');
+  const completeOnboarding = async () => {
+    try {
+      if (state.user) {
+        const { error } = await supabase
+          .from("user_profiles")
+          .update({ 
+            kyc_status: 'skipped',  // Change from 'pending' to 'skipped'
+            kyc_level: 1,
+            role: 'alien'  // Explicitly set role
+          })
+          .eq("id", state.user.id);
+          
+        await fetchUserProfile(3, 1000);
+        navigate('/dashboard');
+        toast.success('Onboarding completed successfully!');
+      }
+    } catch (err: any) {
+      console.error('Complete onboarding error:', err);
+      toast.error('Failed to complete onboarding');
     }
-  } catch (err: any) {
-    console.error('Complete onboarding error:', err);
-    toast.error('Failed to complete onboarding');
-  }
-};
+  };
 
-// Add these functions
-const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
-  setState(prev => ({ ...prev, role }));
-}, []);
+  // ✅ FIXED: Added missing function
+  const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
+    setState(prev => ({ ...prev, role }));
+  }, []);
 
-// Replace the problematic useEffect with this corrected version
-useEffect(() => {
-  if (state.session && state.user && !state.loading) {
-    console.log('Auth successful, checking KYC status for routing...');
-    console.log('User KYC Status:', state.user.kyc_status);
-    console.log('User Role:', state.user.role);
-    
-    const kycStatus = state.user.kyc_status || 'not_started';
-    
-    // CRITICAL FIX: Proper routing based on status
-    if (kycStatus === 'verified' || kycStatus === 'approved') {
-      updateUserRole('tribe');
-      navigate('/dashboard');
-    } else if (kycStatus === 'skipped') {
-      updateUserRole('alien');
-      navigate('/dashboard');
-    } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
-      // Send to onboarding for KYC initiation
-      navigate('/onboarding');
-    } else if (kycStatus === 'in_progress' || kycStatus === 'under_review') {
-      // Already in progress - send to dashboard with banner
-      navigate('/dashboard');
+  // ✅ FIXED: Added missing function
+  const triggerWalletCreation = useCallback(async () => {
+    try {
+      const response = await apiClient.post('/api/wallet/create');
+      return response.data.success;
+    } catch (error) {
+      console.error('Wallet creation failed:', error);
+      return false;
     }
-    // For 'rejected' or other statuses, stay on current page
-  }
-}, [state.session, state.user, state.loading, navigate, updateUserRole]);
+  }, []);
 
-const triggerWalletCreation = useCallback(async () => {
-  try {
-    const response = await apiClient.post('/api/wallet/create');
-    return response.data.success;
-  } catch (error) {
-    console.error('Wallet creation failed:', error);
-    return false;
-  }
-}, []);
+  // ✅ FIXED: Corrected useEffect for routing
+  useEffect(() => {
+    if (state.session && state.user && !state.loading) {
+      console.log('Auth successful, checking KYC status for routing...');
+      console.log('User KYC Status:', state.user.kyc_status);
+      console.log('User Role:', state.user.role);
+      
+      const kycStatus = state.user.kyc_status || 'not_started';
+      
+      // CRITICAL FIX: Proper routing based on status
+      if (kycStatus === 'verified' || kycStatus === 'approved') {
+        updateUserRole('tribe');
+        navigate('/dashboard');
+      } else if (kycStatus === 'skipped') {
+        updateUserRole('alien');
+        navigate('/dashboard');
+      } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
+        // Send to onboarding for KYC initiation
+        navigate('/onboarding');
+      } else if (kycStatus === 'in_progress' || kycStatus === 'under_review') {
+        // Already in progress - send to dashboard with banner
+        navigate('/dashboard');
+      }
+      // For 'rejected' or other statuses, stay on current page
+    }
+  }, [state.session, state.user, state.loading, navigate, updateUserRole]);
 
-// Add the return statement for the component
-return (
-  <AuthContext.Provider value={{
-    ...state,
-	updateUserRole,
-	triggerWalletCreation,
-    signUp,
-    signIn,
-    signOut,
-    enterDemoMode,
-    updateOnboardingStep,
-    completeOnboarding
-  }}>
-    {children}
-  </AuthContext.Provider>
-);
+  // ✅ FIXED: Single return statement with all required functions
+  return (
+    <AuthContext.Provider value={{
+      ...state,
+      refreshUserProfile, // ✅ Now properly included
+      updateUserRole,
+      triggerWalletCreation,
+      signUp,
+      signIn,
+      signOut,
+      enterDemoMode,
+      updateOnboardingStep,
+      completeOnboarding
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export { AuthProviderContent as AuthProvider };
