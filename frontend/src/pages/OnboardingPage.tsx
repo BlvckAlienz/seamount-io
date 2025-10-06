@@ -62,10 +62,11 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     setLoading(true);
     
     try {
+      // CRITICAL FIX: Block Nigerian users without BVN
       if (isNigerianUser && !hasBVN) {
         setShowBVNModal(true);
         setLoading(false);
-        return;
+        return; // Don't proceed
       }
       
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
@@ -73,26 +74,64 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       if (data.success) {
         toast.success('Verification started!');
         onNext();
-      } else {
-        throw new Error(data.message || 'Verification failed');
       }
     } catch (error) {
       if (error.response?.status === 400) {
-        const errorDetail = error.response?.data?.detail || '';
+        // Show specific error
+        const errorMsg = error.response?.data?.detail || 'Missing required information';
         
-        if (errorDetail.includes('bvn') || errorDetail.includes('date_of_birth')) {
-          toast.error('Please provide your BVN details first');
-          setShowBVNModal(true);
+        if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth')) {
+          toast.error('Please provide your BVN details');
+          setShowBVNModal(true); // Force modal
         } else {
-          toast.error(errorDetail || 'Profile incomplete');
+          toast.error(errorMsg);
         }
       } else {
-        toast.error('Verification failed: ' + (error.response?.data?.detail || error.message));
+        toast.error('Verification failed');
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleBVNComplete = async (bvnData) => {
+    setShowBVNModal(false);
+    toast.success('Information saved! Starting verification...');
+    // Retry after BVN saved
+    setTimeout(() => startVerification(), 1000);
+  };
+
+  // Render BVN modal BEFORE identity step UI
+  if (showBVNModal && isNigerianUser) {
+    return (
+      <UniversalIDModal
+        countryCode="NG"
+        countryName="Nigeria"
+        onComplete={handleBVNComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+      />
+    );
+  }
+
+  return (
+    <div className="text-center">
+      {/* Existing identity step UI */}
+      {isNigerianUser && !hasBVN && (
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-blue-400 inline mr-2" />
+          <span className="text-blue-300 text-sm">
+            Nigerian users: BVN verification required for compliance
+          </span>
+        </div>
+      )}
+      
+      <button onClick={startVerification} disabled={loading}>
+        {loading ? 'Checking profile...' : 'Start Verification'}
+      </button>
+    </div>
+  );
+};
 
   const handleBVNComplete = async (bvnData) => {
     setShowBVNModal(false);
