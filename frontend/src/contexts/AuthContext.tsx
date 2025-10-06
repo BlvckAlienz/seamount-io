@@ -303,21 +303,39 @@ useEffect(() => {
     
     const kycStatus = state.user.kyc_status || 'not_started';
     
-    // CRITICAL FIX: Proper routing based on status
-    if (kycStatus === 'verified' || kycStatus === 'approved') {
+    // CRITICAL FIX: Detect stuck "pending" status
+    if (kycStatus === 'pending') {
+      // Check if user has been pending for too long (> 30 minutes)
+      const kycStartedAt = state.user.kyc_started_at;
+      if (kycStartedAt) {
+        const startTime = new Date(kycStartedAt).getTime();
+        const now = new Date().getTime();
+        const thirtyMinutes = 30 * 60 * 1000;
+        
+        if (now - startTime > thirtyMinutes) {
+          // Stuck pending - reset to not_started
+          console.warn('Detected stuck pending status - resetting');
+          supabase.table('user_profiles')
+            .update({ kyc_status: 'not_started', kyc_level: 0 })
+            .eq('id', state.user.id)
+            .execute();
+          navigate('/onboarding');
+          return;
+        }
+      }
+      // Normal pending - send to onboarding to continue
+      navigate('/onboarding');
+    } else if (kycStatus === 'verified' || kycStatus === 'approved') {
       updateUserRole('tribe');
       navigate('/dashboard');
     } else if (kycStatus === 'skipped') {
       updateUserRole('alien');
       navigate('/dashboard');
-    } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
-      // Send to onboarding for KYC initiation
+    } else if (kycStatus === 'not_started') {
       navigate('/onboarding');
     } else if (kycStatus === 'in_progress' || kycStatus === 'under_review') {
-      // Already in progress - send to dashboard with banner
       navigate('/dashboard');
     }
-    // For 'rejected' or other statuses, stay on current page
   }
 }, [state.session, state.user, state.loading, navigate, updateUserRole]);
 

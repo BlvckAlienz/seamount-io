@@ -58,40 +58,48 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
   const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
 
-  const startVerification = async () => {
-    setLoading(true);
+const startVerification = async () => {
+  setLoading(true);
+  
+  try {
+    const { data } = await apiClient.post('/api/v1/kyc/start-verification');
     
-    try {
-      // CRITICAL FIX: Block Nigerian users without BVN
-      if (isNigerianUser && !hasBVN) {
-        setShowBVNModal(true);
-        setLoading(false);
-        return;
-      }
-      
-      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
-      
-      if (data.success) {
-        toast.success('Verification started!');
-        onNext();
-      }
-    } catch (error) {
-      if (error.response?.status === 400) {
-        const errorMsg = error.response?.data?.detail || 'Missing required information';
-        
-        if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth')) {
-          toast.error('Please provide your BVN details');
-          setShowBVNModal(true);
-        } else {
-          toast.error(errorMsg);
-        }
-      } else {
-        toast.error('Verification failed');
-      }
-    } finally {
-      setLoading(false);
+    if (data.success) {
+      toast.success('Verification started!');
+      onNext();
+    } else {
+      throw new Error(data.message || 'Verification failed');
     }
-  };
+  } catch (error: any) {
+    if (error.response?.status === 400) {
+      const errorDetail = error.response?.data?.detail;
+      const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
+      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+      
+      if (errorType === 'missing_bvn') {
+        // Nigerian user missing BVN data
+        toast.error('BVN verification required for Nigerian users');
+        setShowBVNModal(true);
+      } else if (errorType === 'profile_incomplete') {
+        // Generic profile incomplete
+        const missingFields = errorDetail.missing_fields || [];
+        toast.error(`Please complete: ${missingFields.join(', ')}`);
+        // TODO: Show inline profile editor or redirect to profile page
+      } else {
+        // Generic 400 error
+        toast.error(errorMessage || 'Please complete your profile before verification');
+      }
+    } else if (error.response?.status === 500) {
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+      toast.error(errorMessage || 'Verification service temporarily unavailable');
+    } else {
+      toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleBVNComplete = async (bvnData) => {
     setShowBVNModal(false);

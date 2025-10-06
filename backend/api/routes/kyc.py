@@ -82,59 +82,93 @@ async def start_kyc_verification(
     kyc_service: KYCService = Depends(get_kyc_service),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """Start KYC verification with smart routing"""
+    """Start KYC verification with atomic status transitions"""
     try:
         user_id = current_user.get('id')
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
-        # Check profile completeness
+        # STEP 1: Validate profile BEFORE any status changes
         profile_check = await check_profile_completeness(current_user, supabase)
         if not profile_check.get("can_start_kyc"):
-            raise HTTPException(status_code=400, detail="Profile incomplete")
+            raise HTTPException(
+                status_code=400, 
+                detail={
+                    "type": "profile_incomplete",
+                    "message": f"Missing required fields: {', '.join(profile_check.get('missing_fields', []))}",
+                    "missing_fields": profile_check.get('missing_fields', [])
+                }
+            )
         
-        # Country-specific validation
+        # STEP 2: Country-specific validation (Nigerian users)
         country_code = current_user.get('country_code', 'US')
-        
         if country_code == 'NG':
-            # Nigerian users need BVN
             required = ['first_name', 'last_name', 'bvn', 'date_of_birth', 'gender']
             missing = [f for f in required if not current_user.get(f)]
             if missing:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Missing required data: {', '.join(missing)}"
+                    detail={
+                        "type": "missing_bvn",
+                        "message": f"Nigerian users require: {', '.join(missing)}",
+                        "missing_fields": missing
+                    }
                 )
         
-        # Start verification
-        result = await kyc_service.start_verification_session(
-            user_id,
-            current_user.get('email'),
-            country_code
-        )
+        # STEP 3: ONLY NOW update status to pending (validations passed)
+        update_result = supabase.table('user_profiles').update({
+            'kyc_status': 'pending',
+            'kyc_level': 1,
+            'kyc_started_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }).eq('id', user_id).execute()
         
-        if not result.get("success"):
-            # Smart error codes
-            error = result.get("error", "Verification failed")
-            if "missing" in error.lower() or "required" in error.lower():
-                raise HTTPException(status_code=400, detail=error)
-            raise HTTPException(status_code=500, detail=error)
-        
-        return {
-            "success": True,
-            "token": result.get("token"),
-            "applicantId": result.get("applicantId"),
-            "provider": result.get("provider", "regfyl"),
-            "flow_url": result.get("flow_url"),
-            "message": f"Verification started with {result.get('provider', 'Regfyl')}"
-        }
+        # STEP 4: Start verification with rollback on failure
+        try:
+            result = await kyc_service.start_verification_session(
+                user_id,
+                current_user.get('email'),
+                country_code
+            )
+            
+            if not result.get("success"):
+                # ROLLBACK status on failure
+                supabase.table('user_profiles').update({
+                    'kyc_status': 'not_started',
+                    'kyc_level': 0,
+                    'updated_at': datetime.utcnow().isoformat()
+                }).eq('id', user_id).execute()
+                
+                error_msg = result.get("error", "Verification failed")
+                raise HTTPException(status_code=500, detail={"type": "verification_failed", "message": error_msg})
+            
+            return {
+                "success": True,
+                "token": result.get("token"),
+                "applicantId": result.get("applicantId"),
+                "provider": result.get("provider", "regfyl"),
+                "flow_url": result.get("flow_url"),
+                "message": f"Verification started with {result.get('provider', 'Regfyl')}"
+            }
+            
+        except Exception as e:
+            # ROLLBACK status on exception
+            supabase.table('user_profiles').update({
+                'kyc_status': 'not_started',
+                'kyc_level': 0,
+                'updated_at': datetime.utcnow().isoformat()
+            }).eq('id', user_id).execute()
+            
+            error_id = str(uuid.uuid4())[:8]
+            logger.error(f"[KYC Start] Error [{error_id}]: {str(e)}")
+            raise HTTPException(status_code=500, detail={"type": "system_error", "message": f"Verification failed. Error ID: {error_id}"})
         
     except HTTPException:
         raise
     except Exception as e:
         error_id = str(uuid.uuid4())[:8]
-        logger.error(f"[KYC Start] Error [{error_id}]: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Verification failed. Error ID: {error_id}")
+        logger.error(f"[KYC Start] Unexpected error [{error_id}]: {str(e)}")
+        raise HTTPException(status_code=500, detail={"type": "system_error", "message": f"Verification failed. Error ID: {error_id}"})
 
 @router.post("/webhook")
 async def kyc_webhook_handler(
