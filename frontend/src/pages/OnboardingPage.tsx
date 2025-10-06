@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
-import { Eye, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
 // Welcome Step
@@ -16,7 +16,9 @@ const WelcomeStep = ({ onNext }) => (
       <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
         Welcome to Seamount
       </h3>
-      <p className="text-gray-400 text-lg">The future of cross-border payments is here</p>
+      <p className="text-gray-400 text-lg">
+        The future of cross-border payments is here
+      </p>
     </div>
     
     <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-6 mb-8 text-left border border-blue-500/30">
@@ -27,7 +29,7 @@ const WelcomeStep = ({ onNext }) => (
       <div className="space-y-3 text-gray-300">
         {[
           "Multi-asset wallet (ALGO, USDT, USDCa, goBTC, goETH)",
-          "Sub-5-second settlement on Algorand", 
+          "Sub-5-second settlement on Algorand",
           "Cross-border transfers at 2.9% (vs 7% traditional)",
           "Bank-grade security with Web3 benefits"
         ].map(item => (
@@ -48,90 +50,69 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step - SIMPLIFIED & CORRECT
+// Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
-  const [showIDModal, setShowIDModal] = useState(false);
-  const { refreshUserProfile, forceKYCStatus } = useAuth();
+  const [showBVNModal, setShowBVNModal] = useState(false);
   
-  const isNigerianUser = userProfile?.country_code === 'NG';
-  const hasBVN = !!userProfile?.bvn;
+  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
+  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
 
-  // 🎯 CORRECT: Only set to 'pending' when user actually starts verification
-  const startVerification = async (method: 'bvn' | 'document' = 'document') => {
+  const startVerification = async () => {
     setLoading(true);
     
     try {
-      console.log(`🚀 Starting ${method} verification for user:`, userProfile?.id);
-      
-      // For Nigerian users choosing BVN method
-      if (method === 'bvn' && isNigerianUser && !hasBVN) {
-        setShowIDModal(true);
+      // CRITICAL FIX: Block Nigerian users without BVN
+      if (isNigerianUser && !hasBVN) {
+        setShowBVNModal(true);
         setLoading(false);
         return;
       }
       
-      // 🎯 SET STATUS TO 'pending' ONLY WHEN VERIFICATION ACTUALLY STARTS
-      await forceKYCStatus('pending');
-      
-      // Call verification API
-      const { data } = await apiClient.post('/api/v1/kyc/start-verification', {
-        method,
-        country_code: userProfile?.country_code || 'US'
-      });
+      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
-        toast.success('Verification started successfully!');
-        onNext(); // Proceed to wallet creation
+        toast.success('Verification started!');
+        onNext();
       }
-    } catch (error: any) {
-      console.error('Verification error:', error);
-      
-      // 🛠️ REVERT STATUS if verification fails
-      await forceKYCStatus('not_started');
-      
+    } catch (error) {
       if (error.response?.status === 400) {
-        const errorMsg = error.response?.data?.detail || 'Missing information';
+        const errorMsg = error.response?.data?.detail || 'Missing required information';
         
-        if (errorMsg.includes('bvn') && isNigerianUser) {
-          toast.error('BVN verification required for Nigerian users');
-          setShowIDModal(true);
+        if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth')) {
+          toast.error('Please provide your BVN details');
+          setShowBVNModal(true);
         } else {
-          toast.error('Please complete your profile information');
+          toast.error(errorMsg);
         }
       } else {
-        toast.error('Verification service unavailable. Skip and continue to wallet?');
+        toast.error('Verification failed');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // 🎯 CORRECT: Skip verification sets status to 'skipped'
-  const skipVerification = async () => {
-    setLoading(true);
-    try {
-      await forceKYCStatus('skipped');
-      toast.success('Verification skipped');
-      onNext();
-    } catch (error) {
-      toast.error('Failed to skip verification');
-    } finally {
-      setLoading(false);
-    }
+  const handleBVNComplete = async (bvnData) => {
+    setShowBVNModal(false);
+    toast.success('Information saved! Starting verification...');
+    setTimeout(() => startVerification(), 1000);
   };
 
-  const handleIDComplete = async (idData) => {
-    setShowIDModal(false);
-    toast.success('BVN information saved!');
-    
-    if (refreshUserProfile) {
-      await refreshUserProfile();
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    startVerification('bvn');
+  const handleSkip = () => {
+    toast('You can verify later from Settings');
+    onNext();
   };
+
+  if (showBVNModal && isNigerianUser) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleBVNComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+      />
+    );
+  }
 
   return (
     <div className="text-center">
@@ -149,39 +130,21 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
             <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-blue-300 text-sm font-medium mb-1">🇳🇬 Nigerian User - Fast Track</p>
-              <p className="text-gray-300 text-xs">Use BVN for instant verification</p>
+              <p className="text-gray-300 text-xs">
+                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+              </p>
             </div>
           </div>
         </div>
       )}
       
-      <div className="space-y-3 mb-6">
-        <button
-          onClick={() => startVerification('document')}
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
-        >
-          {loading ? 'Starting...' : 'Start Document Verification'}
-        </button>
-        
-        {isNigerianUser && (
-          <button
-            onClick={() => startVerification('bvn')}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
-          >
-            {loading ? 'Starting...' : '🇳🇬 BVN Instant Verification'}
-          </button>
-        )}
-      </div>
-
       <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
         <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
         <ul className="text-sm text-gray-300 space-y-2">
           {[
             "Comply with global financial regulations",
             "Protect your account from fraud",
-            "Enable higher transaction limits", 
+            "Enable higher transaction limits",
             "Access institutional features"
           ].map(item => (
             <li key={item} className="flex items-start">
@@ -194,11 +157,18 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       
       <div className="space-y-3">
         <button
-          onClick={skipVerification}
+          onClick={startVerification}
           disabled={loading}
-          className="w-full border border-gray-600 text-gray-400 hover:text-gray-300 hover:bg-gray-700/50 py-3 rounded-xl transition-colors"
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          Skip Verification
+          {loading ? 'Checking profile...' : 'Start Verification'}
+        </button>
+        
+        <button
+          onClick={handleSkip}
+          className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
+        >
+          I'll Do This Later
         </button>
         
         {onPrev && (
@@ -210,19 +180,11 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           </button>
         )}
       </div>
-
-      {showIDModal && isNigerianUser && (
-        <BVNCollectionModal
-          onComplete={handleIDComplete}
-          onCancel={() => setShowIDModal(false)}
-          userEmail={userProfile?.email || ''}
-        />
-      )}
     </div>
   );
 };
 
-// Wallet Backup Step (keep existing)
+// Wallet Backup Step
 const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -288,7 +250,9 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
         <div className="space-y-4 mb-6">
           {verificationWords.map(pos => (
             <div key={pos}>
-              <label className="block text-sm text-gray-400 mb-2">Word #{pos + 1}</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Word #{pos + 1}
+              </label>
               <input
                 type="text"
                 value={userInputs[pos] || ''}
@@ -409,12 +373,39 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
+  const [detectedCountry, setDetectedCountry] = useState(null);
   const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already completed
+  // Country detection on mount
   useEffect(() => {
-    if (userProfile?.kyc_status === 'verified' || userProfile?.kyc_status === 'skipped') {
+    const detectCountry = async () => {
+      try {
+        const response = await fetch('/api/kyc/detect-country');
+        const data = await response.json();
+        
+        if (data.success) {
+          setDetectedCountry({
+            code: data.country_code,
+            name: data.country_name,
+            requires_bvn: data.requires_bvn
+          });
+          
+          if (data.requires_bvn) {
+            toast.success(`Detected: ${data.country_name}. BVN verification required.`);
+          }
+        }
+      } catch (error) {
+        console.error('Country detection failed:', error);
+      }
+    };
+    
+    detectCountry();
+  }, []);
+
+  // Redirect if already verified
+  useEffect(() => {
+    if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
@@ -425,6 +416,11 @@ const OnboardingPage = () => {
     const toastId = toast.loading('Creating your wallet...');
     
     try {
+      // Save detected country
+      if (detectedCountry) {
+        localStorage.setItem('user_country', detectedCountry.code);
+      }
+      
       const response = await apiClient.post('/api/v1/user/provision-wallets');
       
       if (response.data.success && response.data.mnemonic) {
