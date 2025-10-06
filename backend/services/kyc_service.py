@@ -186,23 +186,30 @@ class KYCService:
             # REGFYL PRIMARY PATH: If Regfyl is primary, use Regfyl screening
             if self.primary_provider == 'regfyl':
                 try:
-                    # Use Regfyl for Nigerian users with proper data
-                    user_data = {
-                        'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                        'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
-                        'gender': user_profile.get('gender', ''),
-                        'country': country_code,
-                        'id_type': 'BVN',
-                        'id_number': user_profile.get('bvn', '')  # Remove synthetic fallback
-                    }
-
-                    # ADD VALIDATION
-                    if not user_data['id_number'] or not user_data['full_name']:
-                        return {
-                            "success": False,
-                            "error": "Missing required KYC data: BVN and full name are required",
-                            "missing_fields": ["bvn", "full_name"] if not user_data['id_number'] else ["full_name"]
+                    # ONLY use Regfyl for Nigerian users with BVN
+                    if country_code == 'NG':
+                        user_data = {
+                            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
+                            'gender': user_profile.get('gender', ''),
+                            'country': country_code,
+                            'id_type': 'BVN',
+                            'id_number': user_profile.get('bvn', '')
                         }
+
+                        if not user_data['id_number'] or not user_data['full_name']:
+                            return {
+                                "success": False,
+                                "error": "Nigerian users require BVN and full name",
+                                "missing_fields": ["bvn"] if not user_data['id_number'] else []
+                            }
+            
+                        regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+                        # ... rest of Regfyl flow
+                    else:
+                        # Non-Nigerian users: fall through to ComplyCube
+                        logger.info(f"Non-Nigerian user, using ComplyCube for {user_id}")
+                        # Continue to ComplyCube logic below
                     
                     # Initiate Regfyl screening
                     regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
