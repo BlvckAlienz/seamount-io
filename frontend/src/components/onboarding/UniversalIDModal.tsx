@@ -24,16 +24,25 @@ const UniversalIDModal: React.FC<UniversalIDModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const countryConfig = getCountryConfig(countryCode);
-    if (countryConfig) {
-      setConfig(countryConfig);
-      // Auto-select first ID type
-      if (countryConfig.supportedIDTypes.length > 0) {
+// In UniversalIDModal, enhance the useEffect to auto-select BVN for Nigeria
+useEffect(() => {
+  const countryConfig = getCountryConfig(countryCode);
+  if (countryConfig) {
+    setConfig(countryConfig);
+    
+    // 🎯 AUTO-SELECT BVN FOR NIGERIAN USERS
+    if (countryCode === 'NG') {
+      const bvnOption = countryConfig.supportedIDTypes.find(type => type.value === 'BVN');
+      if (bvnOption) {
+        setSelectedIDType('BVN');
+      } else if (countryConfig.supportedIDTypes.length > 0) {
         setSelectedIDType(countryConfig.supportedIDTypes[0].value);
       }
+    } else if (countryConfig.supportedIDTypes.length > 0) {
+      setSelectedIDType(countryConfig.supportedIDTypes[0].value);
     }
-  }, [countryCode]);
+  }
+}, [countryCode]);
 
   const validateField = (requirement: IDRequirement, value: string): string | null => {
     if (!value.trim()) {

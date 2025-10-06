@@ -50,25 +50,55 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step
+// Identity Verification Step - ENHANCED WITH UNIVERSAL VALIDATION
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
-  const [showBVNModal, setShowBVNModal] = useState(false);
+  const [showIDModal, setShowIDModal] = useState(false);
+  const { refreshUserProfile } = useAuth(); // We'll add this to AuthContext
   
   const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
-  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
+  
+  // ENHANCED: Universal profile completeness check
+  const checkProfileCompleteness = () => {
+    const missingFields = [];
+    
+    // Basic requirements for ALL users
+    if (!userProfile?.first_name?.trim()) missingFields.push('first_name');
+    if (!userProfile?.last_name?.trim()) missingFields.push('last_name');
+    if (!userProfile?.email?.trim() || !userProfile.email.includes('@')) missingFields.push('email');
+    
+    // Nigerian-specific requirements
+    if (isNigerianUser) {
+      if (!userProfile?.bvn) missingFields.push('bvn');
+      if (!userProfile?.date_of_birth) missingFields.push('date_of_birth');
+      if (!userProfile?.gender) missingFields.push('gender');
+    }
+    
+    return missingFields;
+  };
 
   const startVerification = async () => {
     setLoading(true);
     
     try {
-      // CRITICAL FIX: Block Nigerian users without BVN
-      if (isNigerianUser && !hasBVN) {
-        setShowBVNModal(true);
+      // 🚨 PHASE 1: PRE-FLIGHT VALIDATION - BLOCK API CALL IF INCOMPLETE
+      const missingFields = checkProfileCompleteness();
+      
+      if (missingFields.length > 0) {
+        // Handle Nigerian users with missing BVN data
+        if (isNigerianUser && missingFields.some(f => ['bvn', 'date_of_birth', 'gender'].includes(f))) {
+          setShowIDModal(true);
+          setLoading(false);
+          return; // STOP - no API call
+        }
+        
+        // Handle all users with missing basic profile data
+        toast.error(`Please complete your profile: ${missingFields.join(', ').replace('_', ' ')}`);
         setLoading(false);
-        return;
+        return; // STOP - no API call
       }
       
+      // 🚀 PROCEED WITH VERIFICATION - Profile is complete
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
@@ -76,27 +106,49 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
         onNext();
       }
     } catch (error) {
+      console.error('Verification error:', error);
+      
+      // ENHANCED ERROR HANDLING
       if (error.response?.status === 400) {
         const errorMsg = error.response?.data?.detail || 'Missing required information';
         
-        if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth')) {
+        // Smart error detection
+        if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth') || errorMsg.includes('gender')) {
           toast.error('Please provide your BVN details');
-          setShowBVNModal(true);
+          setShowIDModal(true);
+        } else if (errorMsg.includes('profile') || errorMsg.includes('first_name') || errorMsg.includes('last_name')) {
+          toast.error('Please complete your profile information');
+          // We should refresh profile to ensure we have latest data
+          if (refreshUserProfile) {
+            await refreshUserProfile();
+          }
         } else {
           toast.error(errorMsg);
         }
+      } else if (error.response?.status === 500) {
+        toast.error('Verification service temporarily unavailable');
       } else {
-        toast.error('Verification failed');
+        toast.error('Verification failed. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBVNComplete = async (bvnData) => {
-    setShowBVNModal(false);
+  // 🎯 PHASE 2: IMPROVED BVN COMPLETION HANDLER
+  const handleIDComplete = async (idData) => {
+    setShowIDModal(false);
     toast.success('Information saved! Starting verification...');
-    setTimeout(() => startVerification(), 1000);
+    
+    // Refresh user profile to get updated BVN data
+    if (refreshUserProfile) {
+      await refreshUserProfile();
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // Auto-retry verification with updated profile
+    startVerification();
   };
 
   const handleSkip = () => {
@@ -104,11 +156,14 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     onNext();
   };
 
-  if (showBVNModal && isNigerianUser) {
+  // 🎪 PHASE 3: USE UNIVERSALIDMODAL INSTEAD OF LEGACY BVN MODAL
+  if (showIDModal && isNigerianUser) {
     return (
-      <BVNCollectionModal
-        onComplete={handleBVNComplete}
-        onCancel={() => setShowBVNModal(false)}
+      <UniversalIDModal
+        countryCode="NG"
+        countryName="Nigeria" 
+        onComplete={handleIDComplete}
+        onCancel={() => setShowIDModal(false)}
         userEmail={userProfile?.email || ''}
       />
     );
@@ -378,30 +433,56 @@ const OnboardingPage = () => {
   const navigate = useNavigate();
 
   // Country detection on mount
-  useEffect(() => {
-    const detectCountry = async () => {
-      try {
-        const response = await fetch('/api/kyc/detect-country');
-        const data = await response.json();
+useEffect(() => {
+  const detectCountry = async () => {
+    try {
+      // TRY THE CORRECT ENDPOINT FIRST
+      const response = await fetch('/api/v1/kyc/detect-country');
+      const data = await response.json();
+      
+      if (data.success) {
+        setDetectedCountry({
+          code: data.country_code,
+          name: data.country_name,
+          requires_bvn: data.requires_bvn
+        });
         
-        if (data.success) {
-          setDetectedCountry({
-            code: data.country_code,
-            name: data.country_name,
-            requires_bvn: data.requires_bvn
-          });
-          
-          if (data.requires_bvn) {
-            toast.success(`Detected: ${data.country_name}. BVN verification required.`);
-          }
+        if (data.requires_bvn) {
+          toast.success(`Detected: ${data.country_name}. BVN verification required.`);
         }
-      } catch (error) {
-        console.error('Country detection failed:', error);
       }
-    };
-    
-    detectCountry();
-  }, []);
+    } catch (error) {
+      console.error('Country detection endpoint failed, using fallback:', error);
+      
+      // 🎯 FALLBACK: Use user profile country or IP detection
+      let fallbackCountry = {
+        code: userProfile?.country_code || 'US',
+        name: userProfile?.country_code || 'United States',
+        requires_bvn: (userProfile?.country_code === 'NG')
+      };
+      
+      // If no country in profile, try IP detection
+      if (!userProfile?.country_code) {
+        try {
+          const ipResponse = await fetch('https://ipapi.co/json/');
+          const ipData = await ipResponse.json();
+          fallbackCountry = {
+            code: ipData.country_code || 'US',
+            name: ipData.country_name || 'United States',
+            requires_bvn: (ipData.country_code === 'NG')
+          };
+        } catch (ipError) {
+          console.error('IP detection failed:', ipError);
+        }
+      }
+      
+      setDetectedCountry(fallbackCountry);
+      console.log('Using fallback country:', fallbackCountry);
+    }
+  };
+  
+  detectCountry();
+}, [userProfile]);
 
   // Redirect if already verified
   useEffect(() => {

@@ -115,6 +115,36 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [fetchUserProfile]);
 
+  const refreshUserProfile = useCallback(async () => {
+  try {
+    console.log('Refreshing user profile...');
+    const profile = await fetchUserProfile(3, 1000);
+    console.log('User profile refreshed:', profile);
+    return profile;
+  } catch (error) {
+    console.error('Failed to refresh user profile:', error);
+    return null;
+  }
+}, [fetchUserProfile]);
+
+// Add refreshUserProfile to the context value
+return (
+  <AuthContext.Provider value={{
+    ...state,
+    refreshUserProfile, // ← ADD THIS
+    updateUserRole,
+    triggerWalletCreation,
+    signUp,
+    signIn,
+    signOut,
+    enterDemoMode,
+    updateOnboardingStep,
+    completeOnboarding
+  }}>
+    {children}
+  </AuthContext.Provider>
+);
+
   const signUp = async (
     email: string,
     password: string,
