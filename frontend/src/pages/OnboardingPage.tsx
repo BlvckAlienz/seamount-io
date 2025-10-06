@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
-// Welcome Step (unchanged)
+// Welcome Step
 const WelcomeStep = ({ onNext }) => (
   <div className="text-center">
     <div className="mb-8">
@@ -42,7 +42,7 @@ const WelcomeStep = ({ onNext }) => (
     </div>
     
     <button
-      onClick={() => onNext()}
+      onClick={onNext}
       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
     >
       Get Started →
@@ -66,7 +66,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       if (isNigerianUser && !hasBVN) {
         setShowBVNModal(true);
         setLoading(false);
-        return; // Don't proceed
+        return;
       }
       
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
@@ -77,12 +77,11 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       }
     } catch (error) {
       if (error.response?.status === 400) {
-        // Show specific error
         const errorMsg = error.response?.data?.detail || 'Missing required information';
         
         if (errorMsg.includes('bvn') || errorMsg.includes('date_of_birth')) {
           toast.error('Please provide your BVN details');
-          setShowBVNModal(true); // Force modal
+          setShowBVNModal(true);
         } else {
           toast.error(errorMsg);
         }
@@ -93,45 +92,6 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       setLoading(false);
     }
   };
-
-  const handleBVNComplete = async (bvnData) => {
-    setShowBVNModal(false);
-    toast.success('Information saved! Starting verification...');
-    // Retry after BVN saved
-    setTimeout(() => startVerification(), 1000);
-  };
-
-  // Render BVN modal BEFORE identity step UI
-  if (showBVNModal && isNigerianUser) {
-    return (
-      <UniversalIDModal
-        countryCode="NG"
-        countryName="Nigeria"
-        onComplete={handleBVNComplete}
-        onCancel={() => setShowBVNModal(false)}
-        userEmail={userProfile?.email || ''}
-      />
-    );
-  }
-
-  return (
-    <div className="text-center">
-      {/* Existing identity step UI */}
-      {isNigerianUser && !hasBVN && (
-        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-blue-400 inline mr-2" />
-          <span className="text-blue-300 text-sm">
-            Nigerian users: BVN verification required for compliance
-          </span>
-        </div>
-      )}
-      
-      <button onClick={startVerification} disabled={loading}>
-        {loading ? 'Checking profile...' : 'Start Verification'}
-      </button>
-    </div>
-  );
-};
 
   const handleBVNComplete = async (bvnData) => {
     setShowBVNModal(false);
@@ -224,9 +184,8 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   );
 };
 
-// Wallet Backup Step (keep existing - no changes needed)
+// Wallet Backup Step
 const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
-  // ... keep all existing code unchanged
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -410,7 +369,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   );
 };
 
-// Main Component - FIXED
+// Main Component
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
