@@ -30,7 +30,8 @@ interface AuthContextType extends AuthState {
   completeOnboarding: () => Promise<void>;
   updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
-  refreshUserProfile: () => Promise<UserProfile | null>; // ✅ FIXED: Added missing function
+  refreshUserProfile: () => Promise<UserProfile | null>;
+  forceKYCStatus: (status: string) => Promise<void>; // 🚀 NEW: Force status update
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +49,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading: true,
     error: null,
     isDemoMode: false,
-    role: 'alien', // Default role
+    role: 'alien',
   });
    
   const navigate = useNavigate();
@@ -60,7 +61,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         maxRetries,
         delayMs
       );
-      // FIX: Extract profile from response data
       setState((prev) => ({ ...prev, user: data.profile, error: null }));
       return data.profile;
     } catch (error: any) {
@@ -81,7 +81,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // ✅ FIXED: Added missing refreshUserProfile function
   const refreshUserProfile = useCallback(async () => {
     try {
       console.log('Refreshing user profile...');
@@ -93,6 +92,26 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     }
   }, [fetchUserProfile]);
+
+  // 🚀 NUCLEAR FIX: Force KYC status update
+  const forceKYCStatus = useCallback(async (status: string) => {
+    try {
+      if (state.user) {
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({ kyc_status: status })
+          .eq('id', state.user.id);
+          
+        if (error) throw error;
+        
+        await refreshUserProfile();
+        toast.success(`KYC status updated to: ${status}`);
+      }
+    } catch (error) {
+      console.error('Force KYC status error:', error);
+      toast.error('Failed to update KYC status');
+    }
+  }, [state.user, refreshUserProfile]);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -113,7 +132,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       setState((prev) => ({ ...prev, session, loading: true }));
       
       if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        // Add a small delay to ensure tokens are properly processed
         setTimeout(async () => {
           await fetchUserProfile(5, 2000);
         }, 1000);
@@ -128,6 +146,53 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       authListener.subscription.unsubscribe();
     };
   }, [fetchUserProfile]);
+
+  // 🚀 CRITICAL FIX: SMART KYC ROUTING - NO MORE LOOPS
+  useEffect(() => {
+    if (state.session && state.user && !state.loading) {
+      console.log('🔐 AUTH: Checking KYC status for routing...');
+      console.log('📊 User KYC Status:', state.user.kyc_status);
+      console.log('🌍 User Country:', state.user.country_code);
+      console.log('👤 User Role:', state.user.role);
+      
+      const kycStatus = state.user.kyc_status || 'not_started';
+      const currentPath = window.location.pathname;
+      
+      // 🎯 INTELLIGENT ROUTING LOGIC
+      if (kycStatus === 'verified' || kycStatus === 'approved') {
+        console.log('✅ KYC Verified - routing to dashboard');
+        updateUserRole('tribe');
+        if (currentPath === '/onboarding') {
+          navigate('/dashboard');
+        }
+      } 
+      else if (kycStatus === 'skipped') {
+        console.log('⏭️ KYC Skipped - routing to dashboard');
+        updateUserRole('alien');
+        if (currentPath === '/onboarding') {
+          navigate('/dashboard');
+        }
+      }
+      else if (kycStatus === 'not_started') {
+        console.log('🚀 KYC Not Started - routing to onboarding');
+        if (currentPath !== '/onboarding') {
+          navigate('/onboarding');
+        }
+      }
+      else if (kycStatus === 'pending' || kycStatus === 'in_progress' || kycStatus === 'under_review') {
+        console.log('⏳ KYC In Progress - routing to dashboard with status');
+        // User can use platform while KYC is processing
+        if (currentPath === '/onboarding') {
+          navigate('/dashboard');
+        }
+      }
+      else if (kycStatus === 'rejected') {
+        console.log('❌ KYC Rejected - staying on current page for resubmission');
+        // Stay on current page, show rejection message
+      }
+      // For any other status, don't automatically redirect
+    }
+  }, [state.session, state.user, state.loading, navigate]);
 
   const signUp = async (
     email: string,
@@ -201,7 +266,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (error) throw error;
       
-      // Profile will be fetched by the auth state change listener
       return { success: true };
       
     } catch (err: any) {
@@ -272,7 +336,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           
         if (error) throw error;
         
-        // Fetch updated profile
         await fetchUserProfile(3, 1000);
       }
     } catch (err: any) {
@@ -287,9 +350,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { error } = await supabase
           .from("user_profiles")
           .update({ 
-            kyc_status: 'skipped',  // Change from 'pending' to 'skipped'
+            kyc_status: 'skipped',
             kyc_level: 1,
-            role: 'alien'  // Explicitly set role
+            role: 'alien'
           })
           .eq("id", state.user.id);
           
@@ -303,15 +366,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // ✅ FIXED: Added missing function
   const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
     setState(prev => ({ ...prev, role }));
   }, []);
 
-  // ✅ FIXED: Added missing function
   const triggerWalletCreation = useCallback(async () => {
     try {
-      const response = await apiClient.post('/api/wallet/create');
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
       return response.data.success;
     } catch (error) {
       console.error('Wallet creation failed:', error);
@@ -319,38 +380,11 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // ✅ FIXED: Corrected useEffect for routing
-  useEffect(() => {
-    if (state.session && state.user && !state.loading) {
-      console.log('Auth successful, checking KYC status for routing...');
-      console.log('User KYC Status:', state.user.kyc_status);
-      console.log('User Role:', state.user.role);
-      
-      const kycStatus = state.user.kyc_status || 'not_started';
-      
-      // CRITICAL FIX: Proper routing based on status
-      if (kycStatus === 'verified' || kycStatus === 'approved') {
-        updateUserRole('tribe');
-        navigate('/dashboard');
-      } else if (kycStatus === 'skipped') {
-        updateUserRole('alien');
-        navigate('/dashboard');
-      } else if (kycStatus === 'not_started' || kycStatus === 'pending') {
-        // Send to onboarding for KYC initiation
-        navigate('/onboarding');
-      } else if (kycStatus === 'in_progress' || kycStatus === 'under_review') {
-        // Already in progress - send to dashboard with banner
-        navigate('/dashboard');
-      }
-      // For 'rejected' or other statuses, stay on current page
-    }
-  }, [state.session, state.user, state.loading, navigate, updateUserRole]);
-
-  // ✅ FIXED: Single return statement with all required functions
   return (
     <AuthContext.Provider value={{
       ...state,
-      refreshUserProfile, // ✅ Now properly included
+      refreshUserProfile,
+      forceKYCStatus, // 🚀 ADDED
       updateUserRole,
       triggerWalletCreation,
       signUp,
