@@ -31,7 +31,7 @@ interface AuthContextType extends AuthState {
   updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
   refreshUserProfile: () => Promise<UserProfile | null>;
-  forceKYCStatus: (status: string) => Promise<void>; // 🚀 NEW: Force status update
+  forceKYCStatus: (status: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -93,7 +93,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [fetchUserProfile]);
 
-  // 🚀 NUCLEAR FIX: Force KYC status update
   const forceKYCStatus = useCallback(async (status: string) => {
     try {
       if (state.user) {
@@ -147,7 +146,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [fetchUserProfile]);
 
-  // 🚀 CRITICAL FIX: SMART KYC ROUTING - NO MORE LOOPS
+  // 🚀 CRITICAL FIX: CORRECT KYC STATUS FLOW - NO MORE PREMATURE "pending"
   useEffect(() => {
     if (state.session && state.user && !state.loading) {
       console.log('🔐 AUTH: Checking KYC status for routing...');
@@ -158,7 +157,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       const kycStatus = state.user.kyc_status || 'not_started';
       const currentPath = window.location.pathname;
       
-      // 🎯 INTELLIGENT ROUTING LOGIC
+      // 🎯 CORRECT ROUTING LOGIC - NEW USERS START AT "not_started"
       if (kycStatus === 'verified' || kycStatus === 'approved') {
         console.log('✅ KYC Verified - routing to dashboard');
         updateUserRole('tribe');
@@ -180,8 +179,8 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
       else if (kycStatus === 'pending' || kycStatus === 'in_progress' || kycStatus === 'under_review') {
-        console.log('⏳ KYC In Progress - routing to dashboard with status');
-        // User can use platform while KYC is processing
+        console.log('⏳ KYC In Progress - user initiated, routing to dashboard');
+        // User started KYC but it's processing - they can use platform
         if (currentPath === '/onboarding') {
           navigate('/dashboard');
         }
@@ -190,7 +189,11 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('❌ KYC Rejected - staying on current page for resubmission');
         // Stay on current page, show rejection message
       }
-      // For any other status, don't automatically redirect
+      // 🚨 CRITICAL: If backend sets wrong status, force correct it
+      else if (kycStatus === 'pending' && currentPath !== '/dashboard') {
+        console.log('🛠️ Correcting misconfigured pending status - sending to onboarding');
+        navigate('/onboarding');
+      }
     }
   }, [state.session, state.user, state.loading, navigate]);
 
@@ -384,7 +387,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider value={{
       ...state,
       refreshUserProfile,
-      forceKYCStatus, // 🚀 ADDED
+      forceKYCStatus,
       updateUserRole,
       triggerWalletCreation,
       signUp,
