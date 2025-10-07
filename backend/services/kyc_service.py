@@ -176,101 +176,123 @@ async def screen_user_with_regfyl(self, user_id: str, user_data: Dict) -> Dict[s
 
 async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
     """
-    Start KYC verification - PRIORITIZES REGFYL, falls back to ComplyCube
+    UPDATED: Start KYC verification using Regfyl for ALL users
+    COMPLETELY REMOVES COMPLYCUBE LOGIC
     """
     try:
-        logger.info(f"Starting KYC verification for user {user_id} with PRIMARY provider: {self.primary_provider}")
+        logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
         
-        # Validate user profile exists
+        # 1. Validate user profile exists
         user_profile = await self.db_service.get_user_profile_by_id(user_id)
         if not user_profile:
             logger.error(f"User profile not found for user {user_id}")
             raise HTTPException(status_code=404, detail="User profile not found")
         
-        # Check if user already has active verification session
-        if user_profile.get("kyc_status") in ["approved", "verified", "in_progress"]:
-            logger.warning(f"User {user_id} already has active KYC verification")
+        # 2. Check for existing verification session
+        current_status = user_profile.get("kyc_status", "not_started")
+        if current_status in ["approved", "verified", "in_progress", "pending"]:
+            logger.warning(f"User {user_id} already has KYC status: {current_status}")
             return {
                 "success": False,
-                "error": "KYC verification already in progress",
-                "kyc_status": user_profile.get("kyc_status")
+                "error": f"KYC verification already {current_status}",
+                "kyc_status": current_status
             }
         
-        # REGFYl FOR ALL USERS
-        if self.primary_provider == 'regfyl':
-            try:
-                user_data = {
-                    'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                    'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
-                    'gender': user_profile.get('gender', ''),
-                    'country': country_code
-                }
-    
-                # Nigerian-specific requirements
-                if country_code == 'NG':
-                    if not user_profile.get('bvn'):
-                        return {
-                            "success": False,
-                            "error": "Nigerian users require BVN for verification",
-                            "missing_fields": ["bvn"]
-                        }
-                    user_data['id_type'] = 'BVN'
-                    user_data['id_number'] = user_profile.get('bvn')
-    
-                # All users need basic info
-                if not user_data['full_name']:
-                    return {
-                        "success": False,
-                        "error": "Full name required for verification"
-                    }
-    
-                # Start Regfyl screening
-                regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-    
-                # 🚨 CRITICAL FIX: Update user status with graceful error handling
-                try:
-                    await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-                except Exception as status_error:
-                    logger.warning(f"Could not update user KYC status: {status_error}")
-                    # Continue anyway - the Regfyl screening was successful
-    
-                # Store session with graceful error handling
-                if self.supabase:
-                    try:
-                        session_data = {
-                            "user_id": user_id,
-                            "applicant_id": f"regfyl_{user_id}",
-                            "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
-                            "verification_type": "regfyl_screening",
-                            "status": "pending",
-                            "response_data": regfyl_result['screening_result'],
-                            "created_at": datetime.utcnow().isoformat()
-                        }
-                        self.supabase.table("kyc_sessions").upsert(session_data).execute()
-                    except Exception as session_error:
-                        logger.warning(f"Could not save KYC session: {session_error}")
-                        # Continue anyway - the screening was successful
-    
-                return {
-                    "success": True,
-                    "provider": "regfyl",
-                    "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
-                    "applicantId": f"regfyl_{user_id}",
-                    "message": "Regfyl verification started",
-                    "status": "pending"
-                }
-    
-            except HTTPException:
-                raise
-            except Exception as e:
-                logger.error(f"Regfyl verification failed: {e}")
-                raise HTTPException(status_code=500, detail="Verification service unavailable")
-    
-        raise HTTPException(status_code=503, detail="No KYC provider available")
+        # 3. 🚨 FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
+        if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
+            return await self._start_regfyl_verification(user_id, user_profile, country_code)
+        else:
+            logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
+            raise HTTPException(status_code=503, detail="Verification service unavailable")
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in start_verification_session: {e}")
         raise HTTPException(status_code=500, detail="KYC service unavailable")
+
+async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
+    """Start verification using Regfyl for ALL users"""
+    
+    try:
+        # Prepare user data for Regfyl
+        user_data = {
+            'customer_id': user_id,
+            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+            'gender': user_profile.get('gender', ''),
+            'country': country_code,
+            'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
+        }
+        
+        # Add country-specific ID verification if data exists
+        if country_code == 'NG' and user_profile.get('bvn'):
+            user_data.update({
+                'id_type': 'BVN',
+                'id_number': user_profile.get('bvn'),
+                'verifyID': 'YES'
+            })
+        elif country_code in ['KE', 'GH'] and user_profile.get('id_number'):
+            user_data.update({
+                'id_type': 'NATIONAL_ID' if country_code == 'KE' else 'GHANA_CARD',
+                'id_number': user_profile.get('id_number'),
+                'verifyID': 'YES'
+            })
+        
+        # Validate required basic information
+        if not user_data['full_name']:
+            return {
+                "success": False,
+                "error": "Full name required for verification",
+                "missing_fields": ["first_name", "last_name"]
+            }
+        
+        # Start Regfyl screening
+        regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+        
+        # Update user status to pending
+        update_data = {
+            "kyc_status": "pending",
+            "kyc_level": 1,
+            "kyc_provider": "regfyl",  # 🚨 FORCE REGFYL IN DATABASE
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Use your existing database service to update status
+        await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+        
+        # Store session with Regfyl reference
+        if self.supabase:
+            try:
+                session_data = {
+                    "user_id": user_id,
+                    "applicant_id": f"regfyl_{user_id}",
+                    "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                    "verification_type": "regfyl_screening",
+                    "status": "pending",
+                    "response_data": regfyl_result,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                self.supabase.table("kyc_sessions").upsert(session_data).execute()
+            except Exception as session_error:
+                logger.warning(f"Could not save KYC session: {session_error}")
+        
+        logger.info(f"Regfyl verification initiated successfully for user {user_id}")
+        
+        return {
+            "success": True,
+            "provider": "regfyl",
+            "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+            "applicantId": f"regfyl_{user_id}",
+            "message": "Regfyl verification started successfully",
+            "status": "pending",
+            "next_step": "await_webhook"
+        }
+        
+    except Exception as e:
+        logger.error(f"Regfyl verification failed for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Verification service unavailable")
 
     async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
         try:
