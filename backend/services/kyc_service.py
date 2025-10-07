@@ -1,5 +1,5 @@
 # File Location: backend/services/kyc_service.py
-# CRITICAL FIX: Make Regfyl the PRIMARY provider + database table mapping
+# COMPLETE FIX: Regfyl-only KYC service with proper error handling
 
 import logging
 import json
@@ -17,12 +17,11 @@ logger = logging.getLogger(__name__)
 
 class KYCService:
     """
-    PRODUCTION-READY: Complete KYC service with Regfyl as PRIMARY provider
-    ComplyCube as secondary/fallback provider
+    PRODUCTION-READY: Complete KYC service with Regfyl as ONLY provider
     """
     
     def __init__(self, settings=None, supabase_client: Optional[Client] = None, db_service: Optional[DatabaseService] = None, audit_service: Optional[AuditService] = None):
-        """Initialize KYC service with Regfyl as PRIMARY provider"""
+        """Initialize KYC service with Regfyl as ONLY provider"""
         self.settings = settings or get_settings()
         self.supabase = supabase_client
         
@@ -32,638 +31,297 @@ class KYCService:
         else:
             self.db_service = DatabaseService(supabase_client)
     
-        # Initialize audit service - FIXED: Use create_audit_service function
+        # Initialize audit service
         if audit_service:
             self.audit = audit_service
         else:
-            # 🚨 CRITICAL FIX: Use the correct factory function
             from backend.services.audit_service import create_audit_service
             self.audit = create_audit_service(supabase_client)
     
-        # PRIORITY FIX: Initialize Regfyl as PRIMARY provider
+        # Initialize Regfyl as ONLY provider
         self.providers = {}
         self.primary_provider = None
-        self.provider_healthy = False
-        self.last_provider_check = None
         
-        # Initialize Regfyl provider FIRST (PRIMARY)
+        # Initialize Regfyl provider
         regfyl_key = getattr(self.settings, 'REGFYL_API_KEY', None)
         if regfyl_key:
             try:
                 self.providers['regfyl'] = RegfylVerifier(
                     api_key=regfyl_key.get_secret_value() if hasattr(regfyl_key, 'get_secret_value') else regfyl_key
                 )
-                self.primary_provider = 'regfyl'  # SET AS PRIMARY
+                self.primary_provider = 'regfyl'
                 logger.info("Regfyl provider initialized as PRIMARY KYC provider")
             except Exception as e:
                 logger.error(f"Failed to initialize Regfyl provider: {e}")
-                self.providers['regfyl'] = RegfylVerifier()  # Simulation mode
-                self.primary_provider = 'regfyl'  # Still set as primary even in simulation
-    
-        # Set fallback provider if no primary
-        if not self.primary_provider and self.providers:
-            self.primary_provider = list(self.providers.keys())[0]
-    
-        # Legacy support - set self.provider to primary provider
-        if self.primary_provider:
-            self.provider = self.providers[self.primary_provider]
-            logger.info(f"Primary KYC provider set to: {self.primary_provider}")
+                self.providers['regfyl'] = RegfylVerifier()
+                self.primary_provider = 'regfyl'
         else:
-            # Initialize simulation provider as fallback
-            self.provider = RegfylVerifier()  # Default to Regfyl simulation
-            logger.warning("No KYC providers configured - using Regfyl simulation mode")
+            logger.warning("Regfyl API key not configured - using simulation mode")
+            self.providers['regfyl'] = RegfylVerifier()
+            self.primary_provider = 'regfyl'
 
-async def screen_user_with_regfyl(self, user_id: str, user_data: Dict) -> Dict[str, Any]:
-    """Screen user with Regfyl for PEP/Sanctions/AML compliance (PRIMARY METHOD)"""
-    try:
-        if 'regfyl' not in self.providers:
-            raise HTTPException(status_code=503, detail="Regfyl provider not available")
-    
-        regfyl_provider = self.providers['regfyl']
-    
-        # Format user data for Regfyl
-        regfyl_data = {
-            'customer_id': user_id,
-            'full_name': user_data.get('full_name') or f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
-            'year_of_birth': user_data.get('year_of_birth') or user_data.get('date_of_birth', '')[:4],
-            'gender': user_data.get('gender', ''),
-            'country': user_data.get('country', 'NG'),
-            'id_type': user_data.get('id_type', 'BVN'),
-            'id_number': user_data.get('id_number', ''),
-            'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
-        }
-    
-        # Perform comprehensive screening
-        result = await regfyl_provider.onboard_seamount_user(regfyl_data)
-    
-        # ✅ CRITICAL FIX: Use correct column names that match your database
-        if self.supabase:
-            try:
-                compliance_data = {
-                    "user_id": user_id,
-                    "check_type": "regfyl_screening",
-                    "provider": "regfyl", 
-                    "status": "screening_initiated",
-                    "external_reference": result.get('screening', {}).get('reference'),
-                    "metadata": {
-                        "screening_reference": result.get('screening', {}).get('reference'),
-                        "id_verification_reference": result.get('id_verification', {}).get('reference'),
-                        "screening_data": regfyl_data
-                    },
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
-                }
-                
-                self.supabase.table("compliance_checks").upsert(compliance_data).execute()
-                
-            except Exception as db_error:
-                logger.warning(f"Could not save to compliance_checks: {db_error}")
-                # Don't fail the entire process - just log and continue
-    
-        # Log compliance event
+    async def screen_user_with_regfyl(self, user_id: str, user_data: Dict) -> Dict[str, Any]:
+        """Screen user with Regfyl for PEP/Sanctions/AML compliance (PRIMARY METHOD)"""
         try:
-            await self.audit.log_event(
-                AuditEventType.COMPLIANCE_CHECK_INITIATED,
-                user_id=user_id,
-                details={
-                    "provider": "regfyl",
-                    "screening_reference": result.get('screening', {}).get('reference'),
-                    "id_verification_reference": result.get('id_verification', {}).get('reference')
-                },
-                severity="info"
-            )
-        except Exception as audit_error:
-            logger.warning(f"Could not log audit event: {audit_error}")
-    
-        logger.info(f"Regfyl screening initiated for user {user_id}")
-        return {
-            "success": True,
-            "provider": "regfyl", 
-            "screening_result": result,
-            "message": "AML/KYC screening initiated successfully"
-        }
-    
-    except Exception as e:
-        logger.error(f"Regfyl screening failed for user {user_id}: {e}")
+            if 'regfyl' not in self.providers:
+                raise HTTPException(status_code=503, detail="Regfyl provider not available")
         
-        try:
-            await self.audit.log_event(
-                AuditEventType.SYSTEM_ERROR,
-                user_id=user_id, 
-                details={"error": f"Regfyl screening failed: {str(e)}"},
-                severity="error"
-            )
-        except Exception:
-            logger.error("Failed to log audit event for screening failure")
-            
-        raise HTTPException(status_code=500, detail="AML screening failed")
-
-async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
-    """
-    UPDATED: Start KYC verification using Regfyl for ALL users
-    COMPLETELY REMOVES COMPLYCUBE LOGIC
-    """
-    try:
-        # 🚨 CRITICAL: FORCE OVERRIDE ANY EXISTING COMPLYCUBE SETTINGS
-        if self.supabase:
-            try:
-                # Update user profile to FORCE Regfyl provider
-                override_data = {
-                    "kyc_provider": "regfyl",
-                    "complycube_applicant_id": None,
-                    "updated_at": datetime.utcnow().isoformat()
-                }
-                self.supabase.table("user_profiles").update(override_data).eq("id", user_id).execute()
-                logger.info(f"FORCED Regfyl provider for user {user_id}")
-            except Exception as override_error:
-                logger.warning(f"Could not override provider for user {user_id}: {override_error}")
-
-    try:
-        logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
+            regfyl_provider = self.providers['regfyl']
         
-        # 1. Validate user profile exists
-        user_profile = await self.db_service.get_user_profile_by_id(user_id)
-        if not user_profile:
-            logger.error(f"User profile not found for user {user_id}")
-            raise HTTPException(status_code=404, detail="User profile not found")
-        
-        # 2. Check for existing verification session
-        current_status = user_profile.get("kyc_status", "not_started")
-        if current_status in ["approved", "verified", "in_progress", "pending"]:
-            logger.warning(f"User {user_id} already has KYC status: {current_status}")
-            return {
-                "success": False,
-                "error": f"KYC verification already {current_status}",
-                "kyc_status": current_status
+            # Format user data for Regfyl
+            regfyl_data = {
+                'customer_id': user_id,
+                'full_name': user_data.get('full_name') or f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip(),
+                'year_of_birth': user_data.get('year_of_birth') or user_data.get('date_of_birth', '')[:4],
+                'gender': user_data.get('gender', ''),
+                'country': user_data.get('country', 'NG'),
+                'id_type': user_data.get('id_type', 'BVN'),
+                'id_number': user_data.get('id_number', ''),
+                'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
             }
         
-        # 3. 🚨 FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
-        if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
-            return await self._start_regfyl_verification(user_id, user_profile, country_code)
-        else:
-            logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
-            raise HTTPException(status_code=503, detail="Verification service unavailable")
+            # Perform comprehensive screening
+            result = await regfyl_provider.onboard_seamount_user(regfyl_data)
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in start_verification_session: {e}")
-        raise HTTPException(status_code=500, detail="KYC service unavailable")
-
-async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-    """Start verification using Regfyl for ALL users"""
-    
-    try:
-        # Prepare user data for Regfyl
-        user_data = {
-            'customer_id': user_id,
-            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
-            'gender': user_profile.get('gender', ''),
-            'country': country_code,
-            'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
-        }
-        
-        # Add country-specific ID verification if data exists
-        if country_code == 'NG' and user_profile.get('bvn'):
-            user_data.update({
-                'id_type': 'BVN',
-                'id_number': user_profile.get('bvn'),
-                'verifyID': 'YES'
-            })
-        elif country_code in ['KE', 'GH'] and user_profile.get('id_number'):
-            user_data.update({
-                'id_type': 'NATIONAL_ID' if country_code == 'KE' else 'GHANA_CARD',
-                'id_number': user_profile.get('id_number'),
-                'verifyID': 'YES'
-            })
-        
-        # Validate required basic information
-        if not user_data['full_name']:
-            return {
-                "success": False,
-                "error": "Full name required for verification",
-                "missing_fields": ["first_name", "last_name"]
-            }
-        
-        # Start Regfyl screening
-        regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-        
-        # Update user status to pending
-        update_data = {
-            "kyc_status": "pending",
-            "kyc_level": 1,
-            "kyc_provider": "regfyl",  # 🚨 FORCE REGFYL IN DATABASE
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Use your existing database service to update status
-        await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-        
-        # Store session with Regfyl reference
-        if self.supabase:
-            try:
-                session_data = {
-                    "user_id": user_id,
-                    "applicant_id": f"regfyl_{user_id}",
-                    "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
-                    "verification_type": "regfyl_screening",
-                    "status": "pending",
-                    "response_data": regfyl_result,
-                    "created_at": datetime.utcnow().isoformat()
-                }
-                self.supabase.table("kyc_sessions").upsert(session_data).execute()
-            except Exception as session_error:
-                logger.warning(f"Could not save KYC session: {session_error}")
-        
-        logger.info(f"Regfyl verification initiated successfully for user {user_id}")
-        
-        return {
-            "success": True,
-            "provider": "regfyl",
-            "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
-            "applicantId": f"regfyl_{user_id}",
-            "message": "Regfyl verification started successfully",
-            "status": "pending",
-            "next_step": "await_webhook"
-        }
-        
-    except Exception as e:
-        logger.error(f"Regfyl verification failed for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Verification service unavailable")
-
-    async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
-        try:
-            # Don't update status - just return simulation response
-            frontend_url = getattr(self.settings, 'FRONTEND_URL', 'https://seamount.io')
-        
-            logger.info(f"KYC simulation mode for user {user_id}")
-        
-            return {
-                "success": True,
-                "provider": "simulation",
-                "flow_url": f"{frontend_url}/kyc-complete?simulated=true",
-                "token": f"sim_token_{user_id}",
-                "applicantId": f"sim_applicant_{user_id}",
-                "simulation_mode": True
-            }
-        except Exception as e:
-            logger.error(f"Simulation mode error: {e}")
-            raise HTTPException(status_code=500, detail="KYC service unavailable")
-
-    async def _check_provider_health(self) -> bool:
-        """Check provider health with proper error handling"""
-        try:
-            # Cache health checks for 30 minutes
-            if (self.last_provider_check and 
-                datetime.utcnow() - datetime.fromisoformat(self.last_provider_check.replace('Z', '+00:00')) < timedelta(minutes=30)):
-                return self.provider_healthy
-    
-            if self.provider and hasattr(self.provider, 'health_check'):
-                self.provider_healthy = await self.provider.health_check()
-                self.last_provider_check = datetime.utcnow().isoformat()
-        
-                if self.provider_healthy:
-                    logger.info("KYC provider health check passed")
-                else:
-                    logger.error("KYC provider health check failed - will use simulation mode")
-            
-                return self.provider_healthy
-            else:
-                logger.warning("KYC provider does not support health checks")
-                # Assume healthy if we can't check
-                self.provider_healthy = True
-            return True
-        
-        except Exception as e:
-            logger.error(f"Error during provider health check: {e}")
-            # On error, assume unhealthy to trigger simulation mode
-            self.provider_healthy = False
-            return False
-
-    async def submit_kyc_data(self, user_id: str, kyc_data: Dict) -> Dict[str, Any]:
-        """
-        NEW: Progressive KYC data submission before verification
-        Allows users to submit BVN/ID info before starting verification
-        """
-        try:
-            # Validate required fields based on country
-            country_code = kyc_data.get('country_code', 'US')
-        
-            if country_code == 'NG':
-                required_fields = ['bvn', 'date_of_birth', 'gender']
-            elif country_code in ['KE', 'GH']:
-                required_fields = ['id_number', 'date_of_birth', 'gender']
-            else:
-                required_fields = ['date_of_birth', 'gender']  # Basic requirements for other countries
-        
-            missing = [f for f in required_fields if not kyc_data.get(f)]
-            if missing:
-                raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing)}")
-        
-            # Update user profile with KYC data
-            update_data = {
-                "bvn": kyc_data.get('bvn'),
-                "id_number": kyc_data.get('id_number'),
-                "date_of_birth": kyc_data.get('date_of_birth'),
-                "gender": kyc_data.get('gender'),
-                "country_code": country_code,
-                "updated_at": datetime.utcnow().isoformat()
-            }
-        
-            # Remove None values
-            update_data = {k: v for k, v in update_data.items() if v is not None}
-        
-            result = self.supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
-        
-            if not result.data:
-                raise HTTPException(status_code=500, detail="Failed to save KYC data")
-        
-            logger.info(f"KYC data saved for user {user_id}")
-        
-            return {
-                "success": True,
-                "message": "KYC data saved successfully",
-                "next_step": "start_verification"
-            }
-        
-        except Exception as e:
-            logger.error(f"Failed to submit KYC data: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-
-async def health_check(self) -> Dict[str, Any]:
-    """
-    Health check for the KYC service.
-    Checks the status of the service and its primary provider.
-    """
-    try:
-        # Base status structure
-        status = {
-            "service": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "primary_provider": self.primary_provider,
-            "provider_status": "unknown",
-            "database_status": "unknown"
-        }
-        
-        # 1. Check the primary provider's status
-        if self.primary_provider and self.primary_provider in self.providers:
-            provider = self.providers[self.primary_provider]
-            
-            # Check if the provider instance has a health_check method
-            if hasattr(provider, 'health_check') and callable(getattr(provider, 'health_check')):
+            # Save compliance data with proper error handling
+            if self.supabase:
                 try:
-                    provider_status = await provider.health_check()
-                    status["provider_status"] = provider_status.get("status", "unknown")
-                    # If the provider is unhealthy, mark the overall service as degraded
-                    if provider_status.get("status") != "healthy":
-                        status["service"] = "degraded"
-                except Exception as e:
-                    status["provider_status"] = f"error: {str(e)}"
-                    status["service"] = "unhealthy"
-            else:
-                # If the provider doesn't have a health_check method, check its simulation mode or basic attributes
-                status["provider_status"] = "no_health_check"
-                status["provider_simulation_mode"] = getattr(provider, 'simulation_mode', 'unknown')
-        else:
-            status["provider_status"] = "no_provider_configured"
-            status["service"] = "unhealthy"
+                    compliance_data = {
+                        "user_id": user_id,
+                        "check_type": "regfyl_screening",
+                        "provider": "regfyl", 
+                        "status": "screening_initiated",
+                        "external_reference": result.get('screening', {}).get('reference'),
+                        "metadata": {
+                            "screening_reference": result.get('screening', {}).get('reference'),
+                            "id_verification_reference": result.get('id_verification', {}).get('reference'),
+                            "screening_data": regfyl_data
+                        },
+                        "created_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    self.supabase.table("compliance_checks").upsert(compliance_data).execute()
+                    
+                except Exception as db_error:
+                    logger.warning(f"Could not save to compliance_checks: {db_error}")
+                    # Don't fail the entire process - just log and continue
         
-        # 2. Check database connectivity
-        if self.supabase:
+            # Log compliance event
             try:
-                # Perform a simple query to check database connection
-                result = self.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
-                status["database_status"] = "healthy" if result else "unhealthy"
-                if not result:
-                    status["service"] = "unhealthy"
-            except Exception as e:
-                status["database_status"] = f"error: {str(e)}"
-                status["service"] = "unhealthy"
+                await self.audit.log_event(
+                    AuditEventType.COMPLIANCE_CHECK_INITIATED,
+                    user_id=user_id,
+                    details={
+                        "provider": "regfyl",
+                        "screening_reference": result.get('screening', {}).get('reference'),
+                        "id_verification_reference": result.get('id_verification', {}).get('reference')
+                    },
+                    severity="info"
+                )
+            except Exception as audit_error:
+                logger.warning(f"Could not log audit event: {audit_error}")
         
-        return status
+            logger.info(f"Regfyl screening initiated for user {user_id}")
+            return {
+                "success": True,
+                "provider": "regfyl", 
+                "screening_result": result,
+                "message": "AML/KYC screening initiated successfully"
+            }
         
-    except Exception as e:
-        # Catch-all for any unexpected errors in the health check itself
-        logger.error(f"Health check execution failed: {e}")
-        return {
-            "service": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-    async def check_verification_status(self, user_id: str) -> Dict[str, Any]:
-        """Check current verification status for user with robust error handling"""
-        try:
-            logger.info(f"Checking verification status for user {user_id}")
+        except Exception as e:
+            logger.error(f"Regfyl screening failed for user {user_id}: {e}")
             
-            # Get user profile
+            try:
+                await self.audit.log_event(
+                    AuditEventType.SYSTEM_ERROR,
+                    user_id=user_id, 
+                    details={"error": f"Regfyl screening failed: {str(e)}"},
+                    severity="error"
+                )
+            except Exception:
+                logger.error("Failed to log audit event for screening failure")
+                
+            raise HTTPException(status_code=500, detail="AML screening failed")
+
+    async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
+        """
+        Start KYC verification using Regfyl for ALL users
+        COMPLETELY REMOVES COMPLYCUBE LOGIC
+        """
+        try:
+            logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
+            
+            # 1. Validate user profile exists
             user_profile = await self.db_service.get_user_profile_by_id(user_id)
             if not user_profile:
+                logger.error(f"User profile not found for user {user_id}")
                 raise HTTPException(status_code=404, detail="User profile not found")
             
-            # Get KYC session data
-            kyc_session = await self.db_service.get_kyc_session_by_user_id(user_id)
-            
+            # 2. Check for existing verification session
             current_status = user_profile.get("kyc_status", "not_started")
-            kyc_tier = user_profile.get("kyc_tier", 0)
+            if current_status in ["approved", "verified", "in_progress", "pending"]:
+                logger.warning(f"User {user_id} already has KYC status: {current_status}")
+                return {
+                    "success": False,
+                    "error": f"KYC verification already {current_status}",
+                    "kyc_status": current_status
+                }
             
-            response_data = {
-                "user_id": user_id,
-                "kyc_status": current_status,
-                "kyc_tier": kyc_tier,
-                "verification_required": current_status not in ["approved", "verified"],
-                "last_updated": user_profile.get("updated_at")
+            # 3. 🚨 FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
+            if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
+                return await self._start_regfyl_verification(user_id, user_profile, country_code)
+            else:
+                logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
+                raise HTTPException(status_code=503, detail="Verification service unavailable")
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in start_verification_session: {e}")
+            raise HTTPException(status_code=500, detail="KYC service unavailable")
+
+    async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
+        """Start verification using Regfyl for ALL users"""
+        
+        try:
+            # Prepare user data for Regfyl
+            user_data = {
+                'customer_id': user_id,
+                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+                'gender': user_profile.get('gender', ''),
+                'country': country_code,
+                'callback_url': f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
             }
             
-            # Add session details if available
-            if kyc_session:
-                response_data.update({
-                    "session_id": kyc_session.get("session_id"),
-                    "applicant_id": kyc_session.get("applicant_id"),
-                    "verification_type": kyc_session.get("verification_type", "document_verification"),
-                    "submission_date": kyc_session.get("created_at")
+            # Add country-specific ID verification if data exists
+            if country_code == 'NG' and user_profile.get('bvn'):
+                user_data.update({
+                    'id_type': 'BVN',
+                    'id_number': user_profile.get('bvn'),
+                    'verifyID': 'YES'
+                })
+            elif country_code in ['KE', 'GH'] and user_profile.get('id_number'):
+                user_data.update({
+                    'id_type': 'NATIONAL_ID' if country_code == 'KE' else 'GHANA_CARD',
+                    'id_number': user_profile.get('id_number'),
+                    'verifyID': 'YES'
                 })
             
-            logger.info(f"Verification status check completed for user {user_id}: {current_status}")
-            return response_data
+            # Validate required basic information
+            if not user_data['full_name']:
+                return {
+                    "success": False,
+                    "error": "Full name required for verification",
+                    "missing_fields": ["first_name", "last_name"]
+                }
             
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error checking verification status for user {user_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to check verification status")
-
-    async def process_webhook_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process ComplyCube webhook events with comprehensive error handling"""
-        try:
-            event_type = event_data.get("type")
-            applicant_id = event_data.get("applicantId") 
+            # Start Regfyl screening
+            regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
             
-            if not event_type or not applicant_id:
-                logger.error(f"Invalid webhook event data: {event_data}")
-                raise HTTPException(status_code=400, detail="Invalid webhook event data")
+            # Update user status to pending
+            update_data = {
+                "kyc_status": "pending",
+                "kyc_level": 1,
+                "kyc_provider": "regfyl",  # 🚨 FORCE REGFYL IN DATABASE
+                "updated_at": datetime.utcnow().isoformat()
+            }
             
-            logger.info(f"Processing webhook event {event_type} for applicant {applicant_id}")
-            
-            # Find user by applicant_id
-            kyc_session = await self.db_service.get_kyc_session_by_applicant_id(applicant_id)
-            if not kyc_session:
-                logger.error(f"No KYC session found for applicant {applicant_id}")
-                raise HTTPException(status_code=404, detail="KYC session not found")
-            
-            user_id = kyc_session.get("user_id")
-            if not user_id:
-                logger.error(f"No user_id found in KYC session for applicant {applicant_id}")
-                raise HTTPException(status_code=404, detail="User not found")
-            
-            # Process different event types
-            if event_type == "check.completed":
-                return await self._handle_check_completed(user_id, applicant_id, event_data)
-            elif event_type == "check.pending": 
-                return await self._handle_check_pending(user_id, applicant_id, event_data)
-            elif event_type == "check.clear":
-                return await self._handle_check_clear(user_id, applicant_id, event_data)
-            elif event_type == "check.consider":
-                return await self._handle_check_consider(user_id, applicant_id, event_data)
-            elif event_type == "check.unrecognised":
-                return await self._handle_check_unrecognised(user_id, applicant_id, event_data)
-            else:
-                logger.warning(f"Unknown webhook event type: {event_type}")
-                return {"success": True, "message": f"Event {event_type} acknowledged but not processed"}
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Error processing webhook event: {e}")
-            raise HTTPException(status_code=500, detail="Failed to process webhook event")
-
-    async def _handle_check_completed(self, user_id: str, applicant_id: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle completed verification check"""
-        try:
-            # Update KYC session status
-            await self.db_service.update_kyc_session_status(applicant_id, "completed", event_data)
-            
-            # Update user profile to tier 2 (document verified)
-            await self.db_service.update_user_kyc_status(user_id, "approved", 2)
-            
-            # Log successful completion
-            await self.audit.log_event(
-                AuditEventType.KYC_COMPLETED,
-                user_id=user_id,
-                details={
-                    "applicant_id": applicant_id,
-                    "event_type": "check.completed",
-                    "verification_result": "approved"
-                },
-                severity="info"
-            )
-            
-            logger.info(f"KYC verification completed successfully for user {user_id}")
-            return {"success": True, "status": "approved", "tier": 2}
-            
-        except Exception as e:
-            logger.error(f"Error handling check completed for user {user_id}: {e}")
-            raise
-
-    async def _handle_check_pending(self, user_id: str, applicant_id: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle pending verification check"""
-        try:
-            # Update KYC session status
-            await self.db_service.update_kyc_session_status(applicant_id, "pending", event_data)
-            
-            # Keep user at tier 1 while pending
+            # Use your existing database service to update status
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
             
-            logger.info(f"KYC verification pending for user {user_id}")
-            return {"success": True, "status": "pending", "tier": 1}
+            # Store session with Regfyl reference
+            if self.supabase:
+                try:
+                    session_data = {
+                        "user_id": user_id,
+                        "applicant_id": f"regfyl_{user_id}",
+                        "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                        "verification_type": "regfyl_screening",
+                        "status": "pending",
+                        "response_data": regfyl_result,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    self.supabase.table("kyc_sessions").upsert(session_data).execute()
+                except Exception as session_error:
+                    logger.warning(f"Could not save KYC session: {session_error}")
+            
+            logger.info(f"Regfyl verification initiated successfully for user {user_id}")
+            
+            return {
+                "success": True,
+                "provider": "regfyl",
+                "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                "applicantId": f"regfyl_{user_id}",
+                "message": "Regfyl verification started successfully",
+                "status": "pending",
+                "next_step": "await_webhook"
+            }
             
         except Exception as e:
-            logger.error(f"Error handling check pending for user {user_id}: {e}")
-            raise
+            logger.error(f"Regfyl verification failed for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail="Verification service unavailable")
 
-    async def _handle_check_clear(self, user_id: str, applicant_id: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle clear (approved) verification check"""
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Health check for the KYC service.
+        Checks the status of the service and its primary provider.
+        """
         try:
-            # Update KYC session status
-            await self.db_service.update_kyc_session_status(applicant_id, "approved", event_data)
+            # Base status structure
+            status = {
+                "service": "healthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "primary_provider": self.primary_provider,
+                "provider_status": "unknown",
+                "database_status": "unknown"
+            }
             
-            # Update user profile to tier 3 (fully verified)
-            await self.db_service.update_user_kyc_status(user_id, "verified", 3)
+            # 1. Check the primary provider's status
+            if self.primary_provider and self.primary_provider in self.providers:
+                provider = self.providers[self.primary_provider]
+                
+                # Check if the provider instance has a health_check method
+                if hasattr(provider, 'health_check') and callable(getattr(provider, 'health_check')):
+                    try:
+                        provider_status = await provider.health_check()
+                        status["provider_status"] = provider_status.get("status", "unknown")
+                        # If the provider is unhealthy, mark the overall service as degraded
+                        if provider_status.get("status") != "healthy":
+                            status["service"] = "degraded"
+                    except Exception as e:
+                        status["provider_status"] = f"error: {str(e)}"
+                        status["service"] = "unhealthy"
+                else:
+                    # If the provider doesn't have a health_check method, check its simulation mode or basic attributes
+                    status["provider_status"] = "no_health_check"
+                    status["provider_simulation_mode"] = getattr(provider, 'simulation_mode', 'unknown')
+            else:
+                status["provider_status"] = "no_provider_configured"
+                status["service"] = "unhealthy"
             
-            # Log successful verification
-            await self.audit.log_event(
-                AuditEventType.KYC_APPROVED,
-                user_id=user_id,
-                details={
-                    "applicant_id": applicant_id,
-                    "event_type": "check.clear",
-                    "verification_result": "verified",
-                    "tier": 3
-                },
-                severity="info"
-            )
+            # 2. Check database connectivity
+            if self.supabase:
+                try:
+                    # Perform a simple query to check database connection
+                    result = self.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
+                    status["database_status"] = "healthy" if result else "unhealthy"
+                    if not result:
+                        status["service"] = "unhealthy"
+                except Exception as e:
+                    status["database_status"] = f"error: {str(e)}"
+                    status["service"] = "unhealthy"
             
-            logger.info(f"KYC verification approved (tier 3) for user {user_id}")
-            return {"success": True, "status": "verified", "tier": 3}
+            return status
             
         except Exception as e:
-            logger.error(f"Error handling check clear for user {user_id}: {e}")
-            raise
-
-    async def _handle_check_consider(self, user_id: str, applicant_id: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle consider (manual review needed) verification check"""
-        try:
-            # Update KYC session status
-            await self.db_service.update_kyc_session_status(applicant_id, "manual_review", event_data)
-            
-            # Keep user at tier 1 for manual review
-            await self.db_service.update_user_kyc_status(user_id, "manual_review", 1)
-            
-            # Log manual review requirement
-            await self.audit.log_event(
-                AuditEventType.KYC_MANUAL_REVIEW,
-                user_id=user_id,
-                details={
-                    "applicant_id": applicant_id,
-                    "event_type": "check.consider",
-                    "verification_result": "manual_review_required"
-                },
-                severity="warning"
-            )
-            
-            logger.warning(f"KYC verification requires manual review for user {user_id}")
-            return {"success": True, "status": "manual_review", "tier": 1}
-            
-        except Exception as e:
-            logger.error(f"Error handling check consider for user {user_id}: {e}")
-            raise
-
-    async def _handle_check_unrecognised(self, user_id: str, applicant_id: str, event_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle unrecognised (failed) verification check"""
-        try:
-            # Update KYC session status
-            await self.db_service.update_kyc_session_status(applicant_id, "failed", event_data)
-            
-            # Update user profile to rejected status
-            await self.db_service.update_user_kyc_status(user_id, "rejected", 0)
-            
-            # Log verification failure
-            await self.audit.log_event(
-                AuditEventType.KYC_REJECTED,
-                user_id=user_id,
-                details={
-                    "applicant_id": applicant_id,
-                    "event_type": "check.unrecognised",
-                    "verification_result": "rejected"
-                },
-                severity="warning"
-            )
-            
-            logger.warning(f"KYC verification failed for user {user_id}")
-            return {"success": True, "status": "rejected", "tier": 0}
-            
-        except Exception as e:
-            logger.error(f"Error handling check unrecognised for user {user_id}: {e}")
-            raise
+            # Catch-all for any unexpected errors in the health check itself
+            logger.error(f"Health check execution failed: {e}")
+            return {
+                "service": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
