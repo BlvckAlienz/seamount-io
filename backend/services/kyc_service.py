@@ -285,33 +285,23 @@ class KYCService:
             raise HTTPException(status_code=500, detail="Internal server error during KYC verification")
 
     async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
-        """Handle simulation mode gracefully with proper user feedback"""
         try:
-            # Update user to pending status for simulation
-            await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-            
+            # Don't update status - just return simulation response
             frontend_url = getattr(self.settings, 'FRONTEND_URL', 'https://seamount.io')
-            
-            # Generate simulated session data
-            simulation_token = f"sim_token_{user_id}"
-            simulation_url = f"{frontend_url}/kyc-complete?simulated=true&user_id={user_id}"
-            
-            logger.info(f"KYC simulation mode activated for user {user_id}")
-            
+        
+            logger.info(f"KYC simulation mode for user {user_id}")
+        
             return {
                 "success": True,
                 "provider": "simulation",
-                "flow_url": simulation_url,
-                "token": simulation_token,
+                "flow_url": f"{frontend_url}/kyc-complete?simulated=true",
+                "token": f"sim_token_{user_id}",
                 "applicantId": f"sim_applicant_{user_id}",
-                "message": "KYC verification started (simulation mode)",
-                "kyc_status": "pending",
                 "simulation_mode": True
             }
-            
         except Exception as e:
-            logger.error(f"Failed to handle simulation mode for user {user_id}: {e}")
-            raise HTTPException(status_code=500, detail="KYC service initialization failed")
+            logger.error(f"Simulation mode error: {e}")
+            raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _check_provider_health(self) -> bool:
         """Check provider health with proper error handling"""
