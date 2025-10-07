@@ -20,6 +20,5 @@ setup(
         "pyotp",
         "py-algorand-sdk",
         "pydantic-settings",
-        "complycube",
     ],
 )

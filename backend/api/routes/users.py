@@ -46,7 +46,6 @@ async def create_user_profile(
             "role": data.get('role', 'alien'),
             "is_active": True,
             "kyc_provider": "regfyl",  # 🚨 FORCE REGFYL
-            "complycube_applicant_id": None,  # 🚨 EXPLICITLY NULL
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }

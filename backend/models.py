@@ -42,7 +42,6 @@ class UserProfile(BaseModel):
     kyc_level: int = Field(default=0)
     kyc_status: KYCStatus = Field(default=KYCStatus.NOT_STARTED)
     access_level: AccessLevel = Field(default=AccessLevel.LIMITED)
-    complycube_applicant_id: Optional[str] = None
     kyc_initiated_at: Optional[datetime] = None
     kyc_completed_at: Optional[datetime] = None
     kyc_rejection_reason: Optional[str] = None
