@@ -159,7 +159,7 @@ const handleStartKyc = async () => {
       : userProfile?.id_number && userProfile?.date_of_birth;
     
     if (!hasRequiredData) {
-      setShowBVNModal(true); // Will now show UniversalIDModal
+      setShowBVNModal(true); // Now shows UniversalIDModal
       return;
     }
   }

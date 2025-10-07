@@ -321,47 +321,39 @@ class KYCDataRequest(BaseModel):
     date_of_birth: str = Field(..., description="Date of birth (YYYY-MM-DD)")
     gender: str = Field(..., description="Gender (M/F/Other)")
 
+# ADD TO kyc.py - New endpoint for progressive KYC data
+class KYCDataSubmission(BaseModel):
+    bvn: Optional[str] = None
+    id_number: Optional[str] = None
+    date_of_birth: str
+    gender: str
+    country_code: str = "US"
+
 @router.post("/submit-kyc-data")
 async def submit_kyc_data(
-    kyc_data: KYCDataRequest,
+    kyc_data: KYCDataSubmission,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase_client)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Collect KYC data before starting verification"""
-    try:
-        user_id = current_user.get('id')
-        
-        # Validate BVN format (basic)
-        if not kyc_data.bvn.isdigit() or len(kyc_data.bvn) != 11:
-            raise HTTPException(status_code=400, detail="Invalid BVN format")
-            
-        # Update user profile with KYC data
-        update_data = {
-            'bvn': kyc_data.bvn,
-            'date_of_birth': kyc_data.date_of_birth,
-            'gender': kyc_data.gender,
-            'updated_at': datetime.utcnow().isoformat()
-        }
-        
-        supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
-        
-        return {
-            "success": True,
-            "message": "KYC data saved successfully",
-            "can_start_verification": True
-        }
-        
-    except Exception as e:
-        logger.error(f"[KYC Data Submit] Error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to save KYC data")
-    
+    """
+    NEW: Progressive KYC data submission
+    Collect BVN/ID information before starting verification
+    """
+    user_id = current_user.get('id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID not found")
+
+    result = await kyc_service.submit_kyc_data(user_id, kyc_data.dict())
+    return result
 
 @router.get("/detect-country")
 async def detect_country(
     request: Request,
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """Detect user's country from IP address"""
+    """
+    UPDATED: Enhanced country detection with ID requirements
+    """
     try:
         # Try IPInfo service first
         from backend.services.ipinfo_service import IPInfoService
@@ -379,41 +371,46 @@ async def detect_country(
             country_code = ip_data.get('country', 'US')
             
             # Determine requirements
-            requires_bvn = country_code == 'NG'
-            requires_nin = country_code in ['NG', 'GH']  # Nigeria, Ghana
+            requirements = {
+                'NG': {'requires_id': True, 'id_types': ['BVN'], 'provider': 'regfyl'},
+                'KE': {'requires_id': True, 'id_types': ['National ID'], 'provider': 'regfyl'},
+                'GH': {'requires_id': True, 'id_types': ['Ghana Card'], 'provider': 'regfyl'},
+                'DEFAULT': {'requires_id': False, 'id_types': ['Passport', 'Driver License'], 'provider': 'regfyl'}
+            }
+            
+            country_req = requirements.get(country_code, requirements['DEFAULT'])
             
             return {
                 "success": True,
                 "country_code": country_code,
                 "country_name": _get_country_name(country_code),
                 "city": ip_data.get('city'),
-                "requires_bvn": requires_bvn,
-                "requires_nin": requires_nin,
-                "id_types": _get_id_types(country_code),
+                "requires_id": country_req['requires_id'],
+                "id_types": country_req['id_types'],
+                "provider": country_req['provider'],
                 "detection_method": "ip_geolocation"
             }
         
-        # Fallback: Return US as default
+        # Fallback
         return {
             "success": True,
             "country_code": "US",
-            "country_name": "United States",
-            "requires_bvn": False,
-            "requires_nin": False,
+            "country_name": "United States", 
+            "requires_id": False,
             "id_types": ["PASSPORT", "DRIVERS_LICENSE"],
+            "provider": "regfyl",
             "detection_method": "fallback"
         }
         
     except Exception as e:
         logger.error(f"[Country Detection] Error: {str(e)}")
-        # Return safe default
         return {
             "success": True,
             "country_code": "US",
             "country_name": "United States",
-            "requires_bvn": False,
-            "requires_nin": False,
+            "requires_id": False,
             "id_types": ["PASSPORT", "DRIVERS_LICENSE"],
+            "provider": "regfyl",
             "detection_method": "error_fallback"
         }
 
