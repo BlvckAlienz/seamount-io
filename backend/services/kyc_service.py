@@ -183,106 +183,67 @@ class KYCService:
                     "kyc_status": user_profile.get("kyc_status")
                 }
             
-            # REGFYL PRIMARY PATH: If Regfyl is primary, use Regfyl screening
-            if self.primary_provider == 'regfyl' and country_code == 'NG':
-                # Nigerian users only
-                user_data = {
-                    'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                    'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
-                    'gender': user_profile.get('gender', ''),
-                    'country': country_code,
-                    'id_type': 'BVN',
-                    'id_number': user_profile.get('bvn', '')
-                }
-
-                if not user_data['id_number']:
-                    return {
-                        "success": False,
-                        "error": "Nigerian users require BVN for verification",
-                        "missing_fields": ["bvn"]
+            # REGFYL FOR ALL USERS
+            if self.primary_provider == 'regfyl':
+                try:
+                    user_data = {
+                        'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                        'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+                        'gender': user_profile.get('gender', ''),
+                        'country': country_code
                     }
-    
-                regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-    
-                await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-    
-                return {
-                    "success": True,
-                    "provider": "regfyl",
-                    "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
-                    "message": "Regfyl verification started"
-                }
+        
+                    # Nigerian-specific requirements
+                    if country_code == 'NG':
+                        if not user_profile.get('bvn'):
+                            return {
+                                "success": False,
+                                "error": "Nigerian users require BVN for verification",
+                                "missing_fields": ["bvn"]
+                            }
+                        user_data['id_type'] = 'BVN'
+                        user_data['id_number'] = user_profile.get('bvn')
+        
+                    # All users need basic info
+                    if not user_data['full_name']:
+                        return {
+                            "success": False,
+                            "error": "Full name required for verification"
+                        }
+        
+                    # Start Regfyl screening
+                    regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+        
+                    # Update status to pending
+                    await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+        
+                    # Store session
+                    if self.supabase:
+                        session_data = {
+                            "user_id": user_id,
+                            "applicant_id": f"regfyl_{user_id}",
+                            "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
+                            "verification_type": "regfyl_screening",
+                            "status": "pending",
+                            "response_data": regfyl_result['screening_result'],
+                            "created_at": datetime.utcnow().isoformat()
+                        }
+                        self.supabase.table("kyc_sessions").upsert(session_data).execute()
+        
+                    return {
+                        "success": True,
+                        "provider": "regfyl",
+                        "session_id": session_data["session_id"],
+                        "applicantId": session_data["applicant_id"],
+                        "message": "Regfyl verification started"
+                    }
+        
+                except Exception as e:
+                    logger.error(f"Regfyl verification failed: {e}")
+                    raise HTTPException(status_code=500, detail="Verification service unavailable")
 
-            # All other users: Use simulation mode (ComplyCube disabled)
-            return await self._handle_simulation_mode(user_id)
-            
-            # COMPLYCUBE FALLBACK PATH
-            if 'complycube' in self.providers:
-                provider_healthy = await self._check_provider_health()
-                if not provider_healthy:
-                    logger.warning(f"KYC provider unhealthy, using simulation mode for user {user_id}")
-                    return await self._handle_simulation_mode(user_id)
-                
-                complycube_provider = self.providers['complycube']
-                
-                # Create ComplyCube client
-                client_id = await complycube_provider.create_client(user_id, email, country_code)
-                logger.info(f"Created ComplyCube client {client_id} for user {user_id}")
-                
-                # Create verification session
-                session_data = await complycube_provider.create_verification_session(client_id)
-                session_id = session_data.get("id")
-                flow_url = session_data.get("url")
-                token = session_data.get("token")
-                
-                if not session_id or not flow_url:
-                    raise ValueError("Invalid session data received from ComplyCube")
-                    
-                logger.info(f"Created ComplyCube verification session {session_id} for user {user_id}")
-                
-                # Update user profile to pending status
-                await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-                
-                # Store KYC session data
-                kyc_data = {
-                    "user_id": user_id,
-                    "applicant_id": client_id,
-                    "session_id": session_id,
-                    "verification_type": "complycube_document_verification",
-                    "status": "pending",
-                    "response_data": session_data,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
-                }
-                
-                if self.supabase:
-                    self.supabase.table("kyc_sessions").upsert(kyc_data).execute()
-                
-                return {
-                    "success": True,
-                    "provider": "complycube",
-                    "flow_url": flow_url,
-                    "session_id": session_id,
-                    "token": token,
-                    "applicantId": client_id,
-                    "message": "ComplyCube KYC verification started successfully",
-                    "kyc_status": "pending"
-                }
-            
-            # Final fallback - simulation mode
-            return await self._handle_simulation_mode(user_id)
-                
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error starting KYC verification for user {user_id}: {e}")
-            await self.audit.log_event(
-                AuditEventType.SYSTEM_ERROR, 
-                user_id=user_id, 
-                details={"error": f"Unexpected KYC initiation error: {str(e)}"}, 
-                severity="critical"
-            )
-            raise HTTPException(status_code=500, detail="Internal server error during KYC verification")
+# Fallback should never reach here
+raise HTTPException(status_code=503, detail="No KYC provider available")
 
     async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
         try:
