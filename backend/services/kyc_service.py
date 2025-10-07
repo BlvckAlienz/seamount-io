@@ -373,54 +373,63 @@ async def start_verification_session(self, user_id: str, email: str, country_cod
 
 async def health_check(self) -> Dict[str, Any]:
     """
-    Enhanced health check for multi-provider KYC service.
-    Handles scenarios where provider-specific health checks are not available.
+    Health check for the KYC service.
+    Checks the status of the service and its primary provider.
     """
     try:
-        # Base health status
+        # Base status structure
         status = {
             "service": "healthy",
-            "providers": {},
+            "timestamp": datetime.utcnow().isoformat(),
             "primary_provider": self.primary_provider,
-            "database": "unknown",
-            "last_check": datetime.utcnow().isoformat()
+            "provider_status": "unknown",
+            "database_status": "unknown"
         }
         
-        # Check primary provider (Regfyl) status
-        if self.primary_provider == 'regfyl' and hasattr(self, 'providers'):
-            regfyl_provider = self.providers.get('regfyl')
+        # 1. Check the primary provider's status
+        if self.primary_provider and self.primary_provider in self.providers:
+            provider = self.providers[self.primary_provider]
             
-            if regfyl_provider:
-                if hasattr(regfyl_provider, 'health_check'):
-                    # Use Regfyl's own health check if available
-                    provider_status = await regfyl_provider.health_check()
-                    status["providers"]["regfyl"] = provider_status
-                else:
-                    # Fallback: Check basic provider functionality
-                    status["providers"]["regfyl"] = {
-                        "status": "no_health_check",
-                        "message": "Using simulation mode check",
-                        "simulation_mode": getattr(regfyl_provider, 'simulation_mode', True)
-                    }
+            # Check if the provider instance has a health_check method
+            if hasattr(provider, 'health_check') and callable(getattr(provider, 'health_check')):
+                try:
+                    provider_status = await provider.health_check()
+                    status["provider_status"] = provider_status.get("status", "unknown")
+                    # If the provider is unhealthy, mark the overall service as degraded
+                    if provider_status.get("status") != "healthy":
+                        status["service"] = "degraded"
+                except Exception as e:
+                    status["provider_status"] = f"error: {str(e)}"
+                    status["service"] = "unhealthy"
+            else:
+                # If the provider doesn't have a health_check method, check its simulation mode or basic attributes
+                status["provider_status"] = "no_health_check"
+                status["provider_simulation_mode"] = getattr(provider, 'simulation_mode', 'unknown')
+        else:
+            status["provider_status"] = "no_provider_configured"
+            status["service"] = "unhealthy"
         
-        # Check database connectivity
-        if self.db_service:
+        # 2. Check database connectivity
+        if self.supabase:
             try:
-                # Simple query to verify database connection
-                test_query = self.db_service.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
-                status["database"] = "healthy" if test_query else "unhealthy"
+                # Perform a simple query to check database connection
+                result = self.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
+                status["database_status"] = "healthy" if result else "unhealthy"
+                if not result:
+                    status["service"] = "unhealthy"
             except Exception as e:
-                logger.error(f"Database health check failed: {e}")
-                status["database"] = "unhealthy"
+                status["database_status"] = f"error: {str(e)}"
+                status["service"] = "unhealthy"
         
         return status
         
     except Exception as e:
-        logger.error(f"KYC service health check failed: {e}")
+        # Catch-all for any unexpected errors in the health check itself
+        logger.error(f"Health check execution failed: {e}")
         return {
             "service": "unhealthy",
             "error": str(e),
-            "last_check": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat()
         }
 
     async def check_verification_status(self, user_id: str) -> Dict[str, Any]:
