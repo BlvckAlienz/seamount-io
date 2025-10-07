@@ -241,9 +241,13 @@ class KYCService:
                 except Exception as e:
                     logger.error(f"Regfyl verification failed: {e}")
                     raise HTTPException(status_code=500, detail="Verification service unavailable")
-
-# Fallback should never reach here
-raise HTTPException(status_code=503, detail="No KYC provider available")
+        
+            # 🚨 CRITICAL FIX: Properly aligned raise statement outside the if block
+            raise HTTPException(status_code=503, detail="No KYC provider available")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in start_verification_session: {e}")
+            raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _handle_simulation_mode(self, user_id: str) -> Dict[str, Any]:
         try:
