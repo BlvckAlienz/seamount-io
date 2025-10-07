@@ -62,19 +62,19 @@ class KYCService:
                 self.primary_provider = 'regfyl'  # Still set as primary even in simulation
     
         # Initialize ComplyCube provider as SECONDARY/FALLBACK
-        complycube_key = getattr(self.settings, 'COMPLYCUBE_API_KEY', None)
-        if complycube_key:
-            try:
-                self.providers['complycube'] = ComplyCubeVerifier(
-                    api_key=complycube_key.get_secret_value() if hasattr(complycube_key, 'get_secret_value') else complycube_key
-                )
+    #    complycube_key = getattr(self.settings, 'COMPLYCUBE_API_KEY', None)
+    #    if complycube_key:
+    #        try:
+    #            self.providers['complycube'] = ComplyCubeVerifier(
+    #                api_key=complycube_key.get_secret_value() if hasattr(complycube_key, 'get_secret_value') else complycube_key
+    #            )
                 # Only set as primary if Regfyl not available
-                if not self.primary_provider:
-                    self.primary_provider = 'complycube'
-                logger.info("ComplyCube provider initialized as SECONDARY provider")
-            except Exception as e:
-                logger.error(f"Failed to initialize ComplyCube provider: {e}")
-                self.providers['complycube'] = ComplyCubeVerifier()  # Simulation mode
+    #            if not self.primary_provider:
+    #                self.primary_provider = 'complycube'
+    #            logger.info("ComplyCube provider initialized as SECONDARY provider")
+    #        except Exception as e:
+    #            logger.error(f"Failed to initialize ComplyCube provider: {e}")
+    #            self.providers['complycube'] = ComplyCubeVerifier()  # Simulation mode
     
         # Set fallback provider if no primary
         if not self.primary_provider and self.providers:
@@ -184,74 +184,37 @@ class KYCService:
                 }
             
             # REGFYL PRIMARY PATH: If Regfyl is primary, use Regfyl screening
-            if self.primary_provider == 'regfyl':
-                try:
-                    # ONLY use Regfyl for Nigerian users with BVN
-                    if country_code == 'NG':
-                        user_data = {
-                            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
-                            'gender': user_profile.get('gender', ''),
-                            'country': country_code,
-                            'id_type': 'BVN',
-                            'id_number': user_profile.get('bvn', '')
-                        }
+            if self.primary_provider == 'regfyl' and country_code == 'NG':
+                # Nigerian users only
+                user_data = {
+                    'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                    'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '',
+                    'gender': user_profile.get('gender', ''),
+                    'country': country_code,
+                    'id_type': 'BVN',
+                    'id_number': user_profile.get('bvn', '')
+                }
 
-                        if not user_data['id_number'] or not user_data['full_name']:
-                            return {
-                                "success": False,
-                                "error": "Nigerian users require BVN and full name",
-                                "missing_fields": ["bvn"] if not user_data['id_number'] else []
-                            }
-            
-                        regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-                        # ... rest of Regfyl flow
-                    else:
-                        # Non-Nigerian users: fall through to ComplyCube
-                        logger.info(f"Non-Nigerian user, using ComplyCube for {user_id}")
-                        # Continue to ComplyCube logic below
-                    
-                    # Initiate Regfyl screening
-                    regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-                    
-                    # Update user status to pending
-                    await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-                    
-                    # Store KYC session data in existing kyc_sessions table
-                    session_data = {
-                        "user_id": user_id,
-                        "applicant_id": f"regfyl_{user_id}",  # Regfyl-style applicant ID
-                        "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
-                        "verification_type": "regfyl_screening",
-                        "status": "pending",
-                        "response_data": regfyl_result['screening_result'],
-                        "created_at": datetime.utcnow().isoformat(),
-                        "updated_at": datetime.utcnow().isoformat()
-                    }
-                    
-                    if self.supabase:
-                        self.supabase.table("kyc_sessions").upsert(session_data).execute()
-                    
-                    logger.info(f"Regfyl KYC verification initiated successfully for user {user_id}")
-                    
+                if not user_data['id_number']:
                     return {
-                        "success": True,
-                        "provider": "regfyl",
-                        "session_id": session_data["session_id"],
-                        "applicantId": session_data["applicant_id"],
-                        "message": "Regfyl KYC verification started successfully",
-                        "kyc_status": "pending",
-                        "flow_url": f"{self.settings.FRONTEND_URL}/kyc-regfyl-pending?user_id={user_id}"
+                        "success": False,
+                        "error": "Nigerian users require BVN for verification",
+                        "missing_fields": ["bvn"]
                     }
-                    
-                except Exception as regfyl_error:
-                    logger.error(f"Regfyl verification failed for user {user_id}: {regfyl_error}")
-                    # Fall back to ComplyCube if available
-                    if 'complycube' in self.providers:
-                        logger.info(f"Falling back to ComplyCube for user {user_id}")
-                        # Continue to ComplyCube logic below
-                    else:
-                        return await self._handle_simulation_mode(user_id)
+    
+                regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+    
+                await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+    
+                return {
+                    "success": True,
+                    "provider": "regfyl",
+                    "session_id": regfyl_result['screening_result'].get('screening', {}).get('reference'),
+                    "message": "Regfyl verification started"
+                }
+
+            # All other users: Use simulation mode (ComplyCube disabled)
+            return await self._handle_simulation_mode(user_id)
             
             # COMPLYCUBE FALLBACK PATH
             if 'complycube' in self.providers:

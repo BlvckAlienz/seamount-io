@@ -26,7 +26,7 @@
     "react-select-country-list": "^2.2.0",
     "recharts": "^2.8.0",
     "tailwind-merge": "^1.14.0",
-    "vercel": "^48.2.0"
+    "vercel": "^28.18.5"
   },
   "devDependencies": {
     "@types/react": "18.2.55",

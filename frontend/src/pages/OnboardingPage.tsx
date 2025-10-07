@@ -385,32 +385,6 @@ const OnboardingPage = () => {
   const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Country detection on mount
-  useEffect(() => {
-    const detectCountry = async () => {
-      try {
-        const response = await fetch('/api/kyc/detect-country');
-        const data = await response.json();
-        
-        if (data.success) {
-          setDetectedCountry({
-            code: data.country_code,
-            name: data.country_name,
-            requires_bvn: data.requires_bvn
-          });
-          
-          if (data.requires_bvn) {
-            toast.success(`Detected: ${data.country_name}. BVN verification required.`);
-          }
-        }
-      } catch (error) {
-        console.error('Country detection failed:', error);
-      }
-    };
-    
-    detectCountry();
-  }, []);
-
   // Redirect if already verified
   useEffect(() => {
     if (userProfile?.kyc_status === 'verified') {
