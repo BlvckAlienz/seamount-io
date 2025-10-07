@@ -12,7 +12,6 @@ from backend.config import get_settings
 from backend.services.audit_service import AuditService, AuditEventType
 from backend.services.database_service import DatabaseService
 from backend.services.kyc_providers.regfyl import RegfylVerifier
-from backend.services.kyc_providers.complycube import ComplyCubeVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -60,21 +59,6 @@ class KYCService:
                 logger.error(f"Failed to initialize Regfyl provider: {e}")
                 self.providers['regfyl'] = RegfylVerifier()  # Simulation mode
                 self.primary_provider = 'regfyl'  # Still set as primary even in simulation
-    
-        # Initialize ComplyCube provider as SECONDARY/FALLBACK
-    #    complycube_key = getattr(self.settings, 'COMPLYCUBE_API_KEY', None)
-    #    if complycube_key:
-    #        try:
-    #            self.providers['complycube'] = ComplyCubeVerifier(
-    #                api_key=complycube_key.get_secret_value() if hasattr(complycube_key, 'get_secret_value') else complycube_key
-    #            )
-                # Only set as primary if Regfyl not available
-    #            if not self.primary_provider:
-    #                self.primary_provider = 'complycube'
-    #            logger.info("ComplyCube provider initialized as SECONDARY provider")
-    #        except Exception as e:
-    #            logger.error(f"Failed to initialize ComplyCube provider: {e}")
-    #            self.providers['complycube'] = ComplyCubeVerifier()  # Simulation mode
     
         # Set fallback provider if no primary
         if not self.primary_provider and self.providers:
@@ -179,6 +163,21 @@ async def start_verification_session(self, user_id: str, email: str, country_cod
     UPDATED: Start KYC verification using Regfyl for ALL users
     COMPLETELY REMOVES COMPLYCUBE LOGIC
     """
+    try:
+        # 🚨 CRITICAL: FORCE OVERRIDE ANY EXISTING COMPLYCUBE SETTINGS
+        if self.supabase:
+            try:
+                # Update user profile to FORCE Regfyl provider
+                override_data = {
+                    "kyc_provider": "regfyl",
+                    "complycube_applicant_id": None,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+                self.supabase.table("user_profiles").update(override_data).eq("id", user_id).execute()
+                logger.info(f"FORCED Regfyl provider for user {user_id}")
+            except Exception as override_error:
+                logger.warning(f"Could not override provider for user {user_id}: {override_error}")
+
     try:
         logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
         
