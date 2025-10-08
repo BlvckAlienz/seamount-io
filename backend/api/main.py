@@ -21,9 +21,7 @@ import aiohttp
 import sys
 from pathlib import Path
 from decimal import Decimal
-from backend.api.routes import oracle
-
-app.include_router(oracle.router, prefix="/api", tags=["oracle"])
+# REMOVED: import oracle here - we'll handle it properly later
 
 # Add the project root to the Python path for clean imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -440,6 +438,14 @@ if routers_available.get('payments'):
     logger.info("✅ Payments router registered")
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
+
+# FIXED: Include oracle router AFTER app is defined
+try:
+    from backend.api.routes import oracle
+    app.include_router(oracle.router, prefix="/api", tags=["oracle"])
+    logger.info("✅ Oracle router registered at /api")
+except ImportError as e:
+    logger.error(f"Oracle router import error: {e}")
 
 try:
     from backend.api.routes.transactions import router as transactions_router
