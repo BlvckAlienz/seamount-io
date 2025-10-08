@@ -184,10 +184,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <span className="text-lg sm:text-xl font-bold">Seamount.io</span>
           </div>
           <nav className="hidden md:flex space-x-6 lg:space-x-8 text-sm">
-            <a href="#mission" className="hover:text-blue-400 transition">Mission</a>
+            <a href="#how-it-works" className="hover:text-blue-400 transition">How It Works</a>
             <a href="#features" className="hover:text-blue-400 transition">Features</a>
             <a href="#calculator" className="hover:text-blue-400 transition">Calculator</a>
-            <a href="#contact" className="hover:text-blue-400 transition">Contact</a>
+            <a href="#business" className="hover:text-blue-400 transition">Business</a>
           </nav>
           <div className="flex items-center space-x-2 sm:space-x-3">
             <button 
@@ -207,16 +207,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </header>
 
       <main className="pt-16 sm:pt-20">
-        {/* Mission Section - New Hero */}
-        <section id="mission" className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <section id="how-it-works" className="min-h-screen flex items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.15)_0%,transparent_50%)]"></div>
           <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
           <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
           
           <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
             <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6">
-              <Heart className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
-              Built for African Resilience
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
+              160% Overcollateralized • Audited Reserves
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
@@ -224,17 +223,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Your Shield Against
               </span>
               <br />
-              <span className="text-white">Inflation & Economic Storms</span>
+              <span className="text-white">Economic Uncertainty</span>
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-2">
-              <strong className="text-green-400">Put your financial future in your hands.</strong> While inflation erodes your naira at 30%+ and banks offer 5% returns, Seamount delivers <span className="text-green-400 font-semibold">18-22% APY</span> on dollar-pegged stablecoins. No more watching your savings lose value. No more waiting days for remittances. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
+              <strong className="text-green-400">Built for African resilience.</strong> While inflation erodes local currencies and banks offer minimal returns, Seamount delivers <span className="text-green-400 font-semibold">18-22% APY</span> on dollar-pegged stablecoins. Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
             </p>
             
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 px-2">
               <div className="flex items-center gap-1 sm:gap-2">
                 <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />
-                <span>Beat 30% Inflation</span>
+                <span>Beat High Inflation</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-2">
                 <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
@@ -264,7 +263,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto px-2">
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-700/50">
                 <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-green-400 mb-2">18-22%</div>
-                <div className="text-xs sm:text-sm text-gray-400">Annual Yield vs 5% Banks</div>
+                <div className="text-xs sm:text-sm text-gray-400">Annual Yield</div>
               </div>
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-700/50">
                 <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-blue-400 mb-2">&lt;5 sec</div>
@@ -273,6 +272,106 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-700/50">
                 <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-purple-400 mb-2">160%</div>
                 <div className="text-xs sm:text-sm text-gray-400">Overcollateralized Safety</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="py-16 sm:py-24 bg-gray-950 relative">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-12 sm:mb-16 fade-in">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">How It Works</h2>
+              <p className="text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto">
+                From signup to earning yields—your complete journey in 6 simple steps.
+              </p>
+            </div>
+
+            <div className="space-y-6 sm:space-y-8">
+              {[
+                {
+                  icon: <UserPlus className="h-8 w-8 sm:h-10 sm:w-10 text-blue-400" />,
+                  step: "01",
+                  title: "Sign Up in Minutes",
+                  description: "Create your account with email. No lengthy forms—just essential info to get started.",
+                  color: "from-blue-600/20 to-blue-800/10 border-blue-700/30"
+                },
+                {
+                  icon: <FileCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-400" />,
+                  step: "02",
+                  title: "Complete KYC Verification",
+                  description: "Quick identity verification via Regfyl. Document upload takes ~3 minutes, approval within 24 hours.",
+                  color: "from-green-600/20 to-green-800/10 border-green-700/30"
+                },
+                {
+                  icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-purple-400" />,
+                  step: "03",
+                  title: "Algorand Wallet Creation",
+                  description: "We generate your non-custodial Algorand wallet automatically. You get full control—download your private key and store it securely. We never access your funds.",
+                  color: "from-purple-600/20 to-purple-800/10 border-purple-700/30"
+                },
+                {
+                  icon: <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-yellow-400" />,
+                  step: "04",
+                  title: "Secure Your Private Key",
+                  description: "Download and backup your 25-word seed phrase. Store offline in multiple secure locations. This is your only recovery method—we cannot reset it.",
+                  color: "from-yellow-600/20 to-yellow-800/10 border-yellow-700/30"
+                },
+                {
+                  icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-red-400" />,
+                  step: "05",
+                  title: "Fund Your Account",
+                  description: "Deposit fiat (USD/GBP/EUR/NGN/KES/ZAR/etc.) via Paystack or Cashramp. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH, or ALGO on Algorand rails.",
+                  color: "from-red-600/20 to-red-800/10 border-red-700/30"
+                },
+                {
+                  icon: <ArrowRightLeft className="h-8 w-8 sm:h-10 sm:w-10 text-teal-400" />,
+                  step: "06",
+                  title: "Send P2P & Off-Ramp",
+                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency via our liquidity providers. When USDS launches, hold for 18-22% APY yields.",
+                  color: "from-teal-600/20 to-teal-800/10 border-teal-700/30"
+                }
+              ].map((step, idx) => (
+                <div key={idx} className={`bg-gradient-to-br ${step.color} backdrop-blur-sm rounded-2xl p-4 sm:p-6 border flex gap-4 sm:gap-6 items-start fade-in hover:scale-[1.02] transition-transform duration-300`}>
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-900/50 rounded-xl flex items-center justify-center border border-gray-700/30 mb-2">
+                      {step.icon}
+                    </div>
+                    <div className="text-2xl sm:text-4xl font-bold text-gray-700 text-center">{step.step}</div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 flex items-center gap-2 sm:gap-3">
+                      {step.title}
+                      {idx === 5 && <span className="text-xs sm:text-sm px-2 sm:px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-green-400">USDS Coming Soon</span>}
+                    </h3>
+                    <p className="text-gray-300 text-sm sm:text-lg leading-relaxed">{step.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 sm:mt-12 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-2xl p-4 sm:p-6 border border-blue-700/30 fade-in">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-400 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 text-green-400">When USDS Launches</h4>
+                  <p className="text-gray-300 text-sm sm:text-lg leading-relaxed mb-3 sm:mb-4">
+                    Users who choose to hold USDS will gain exposure to our delta-neutral BTC-gold strategy, earning 18-22% APY with monthly liquidity. Your stablecoins work for you—no lock-ups longer than 30 days, with full transparency on backing and yields.
+                  </p>
+                  <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-gray-400">90% BTC + 10% Gold</span>
+                    </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <span className="text-gray-400">160% Overcollateralized</span>
+                    </div>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                      <span className="text-gray-400">Quarterly Audits</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -526,31 +625,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        <section id="contact" className="py-16 sm:py-24 bg-gray-900/50 relative">
+        <section id="business" className="py-16 sm:py-24 bg-gray-950 relative">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-12 sm:mb-16 fade-in">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">Contact Us</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">For Business</h2>
               <p className="text-lg sm:text-xl text-gray-400 max-w-3xl mx-auto">
-                Questions? Our team is here to help you get started.
+                Transform your business treasury and cross-border operations with institutional-grade stablecoin infrastructure.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
+            <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-gray-700/50 fade-in">
-                <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 text-blue-400 mb-4" />
-                <h3 className="text-xl sm:text-2xl font-bold mb-4">For Business</h3>
-                <ul className="space-y-3 text-sm sm:text-base text-gray-300">
+                <Briefcase className="h-8 w-8 sm:h-12 sm:w-12 text-blue-400 mb-3 sm:mb-4" />
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Business Solutions</h3>
+                <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-300">
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span><strong className="text-white">Global Payroll:</strong> Pay international teams instantly</span>
+                    <span><strong className="text-white">Global Payroll:</strong> Pay international teams instantly with multi-currency support</span>
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span><strong className="text-white">Treasury Management:</strong> Earn yields on idle funds</span>
+                    <span><strong className="text-white">Treasury Management:</strong> Earn yields on idle corporate funds (18-22% APY)</span>
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span><strong className="text-white">Trade Finance:</strong> Streamline B2B payments</span>
+                    <span><strong className="text-white">Trade Finance:</strong> Streamline cross-border B2B payments with programmable settlements</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-white">Liquidity Optimization:</strong> Turn working capital into revenue-generating assets</span>
                   </li>
                 </ul>
               </div>
@@ -598,7 +701,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       onChange={(e) => setFormState({...formState, message: e.target.value})}
                       className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-sm sm:text-base focus:border-blue-500 focus:outline-none transition resize-none"
                       rows={4}
-                      placeholder="Tell us about your needs..."
+                      placeholder="Tell us about your business needs..."
                       required
                     ></textarea>
                   </div>
@@ -698,8 +801,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div>
               <h4 className="text-white font-medium mb-3 sm:mb-4 text-sm sm:text-base">Company</h4>
               <ul className="space-y-2 text-xs sm:text-sm">
-                <li><a href="#mission" className="text-gray-400 hover:text-white">Mission</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-white">Contact</a></li>
+                <li><a href="#how-it-works" className="text-gray-400 hover:text-white">How It Works</a></li>
+                <li><a href="#business" className="text-gray-400 hover:text-white">Business</a></li>
               </ul>
             </div>
             <div>
