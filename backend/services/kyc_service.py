@@ -145,29 +145,29 @@ class KYCService:
                 
             raise HTTPException(status_code=500, detail="AML screening failed")
 
-async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
-    """
-    Start KYC verification using Regfyl for ALL users
-    COMPLETELY REMOVES COMPLYCUBE LOGIC
-    """
-    try:
-        logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
-        
-        # 1. Validate user profile exists
-        user_profile = await self.db_service.get_user_profile_by_id(user_id)
-        if not user_profile:
-            logger.error(f"User profile not found for user {user_id}")
-            raise HTTPException(status_code=404, detail="User profile not found")
-        
-        # 2. Check for existing verification session - ALLOW RESTART IF NOT_STARTED OR REJECTED
-        current_status = user_profile.get("kyc_status", "not_started")
-        if current_status in ["approved", "verified", "in_progress"]:  # ✅ REMOVED 'pending'
-            logger.warning(f"User {user_id} already has KYC status: {current_status}")
-            return {
-                "success": False,
-                "error": f"KYC verification already {current_status}",
-                "kyc_status": current_status
-            }
+    async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
+        """
+        Start KYC verification using Regfyl for ALL users
+        COMPLETELY REMOVES COMPLYCUBE LOGIC
+        """
+        try:
+            logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
+            
+            # 1. Validate user profile exists
+            user_profile = await self.db_service.get_user_profile_by_id(user_id)
+            if not user_profile:
+                logger.error(f"User profile not found for user {user_id}")
+                raise HTTPException(status_code=404, detail="User profile not found")
+            
+            # 2. Check for existing verification session - ALLOW RESTART IF NOT_STARTED OR REJECTED
+            current_status = user_profile.get("kyc_status", "not_started")
+            if current_status in ["approved", "verified", "in_progress"]:
+                logger.warning(f"User {user_id} already has KYC status: {current_status}")
+                return {
+                    "success": False,
+                    "error": f"KYC verification already {current_status}",
+                    "kyc_status": current_status
+                }
             
             # 3. 🚨 FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
             if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
@@ -175,7 +175,7 @@ async def start_verification_session(self, user_id: str, email: str, country_cod
             else:
                 logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
                 raise HTTPException(status_code=503, detail="Verification service unavailable")
-            
+                
         except HTTPException:
             # Re-raise HTTP exceptions
             raise
