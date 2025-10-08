@@ -24,8 +24,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const [calc, setCalc] = useState({
     amount: '10000',
     period: '365',
-    estimatedYield: 0.22,
-    creditSpread: 200,
+    estimatedYield: 0.12,
+    creditSpread: 120,
     riskScore: 35
   });
 
@@ -83,19 +83,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, [isClient]);
 
   const yieldData = useMemo(() => {
-    if (!isClient) return { annualYield: 2200, periodYield: 2200, adjustedAPY: 0.22 };
+    if (!isClient) return { annualYield: 1200, periodYield: 1200, adjustedAPY: 0.12 };
     
     const amount = parseFloat(calc.amount) || 0;
     const period = parseInt(calc.period);
     
-    let baseAPY = 0.18;
-    if (period === 90) baseAPY = 0.20;
-    else if (period === 180) baseAPY = 0.21;
-    else if (period === 365) baseAPY = 0.22;
+    let baseAPY = 0.09;
+    if (period === 90) baseAPY = 0.10;
+    else if (period === 180) baseAPY = 0.11;
+    else if (period === 365) baseAPY = 0.12;
     
-    const fundingAdjustment = (oracleData.fundingRate - 12.5) / 500;
-    const volAdjustment = (oracleData.btcVolatility - 65) / 1000;
-    const adjustedAPY = Math.max(0.16, Math.min(0.24, baseAPY + fundingAdjustment + volAdjustment));
+    const fundingAdjustment = (oracleData.fundingRate - 12.5) / 1000;
+    const volAdjustment = (oracleData.btcVolatility - 65) / 2000;
+    const adjustedAPY = Math.max(0.08, Math.min(0.14, baseAPY + fundingAdjustment + volAdjustment));
     
     const annualYield = amount * adjustedAPY;
     const periodYield = annualYield * (period / 365);
@@ -131,16 +131,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const faqs = [
     { 
-      question: "How does 18-22% APY work with BTC-gold backing?", 
-      answer: "USDS is backed by 90% BTC + 10% gold using delta-neutral hedging. We buy BTC spot while shorting equal value in perpetual futures, eliminating price risk. Returns come from: (1) Funding rate arbitrage (10-15% historically), (2) Gold treasury premium (5%), (3) Service and risk premiums. Combined, this delivers 18-22% tiered by duration. 160% overcollateralization protects against volatility."
+      question: "How does 9-12% APY work with BTC-gold backing?", 
+      answer: "USDS is backed by 90% BTC + 10% gold using delta-neutral hedging. We buy BTC spot while shorting equal value in perpetual futures, eliminating price risk. Returns come from: (1) Funding rate arbitrage (5-8% historically, up to 10-15% in bull markets), (2) Gold treasury premium (2-3%), (3) Risk premium (2-3%), (4) Service fees (1-2%). Combined, this delivers 9-12% tiered by duration with 160% overcollateralization protecting against volatility."
     },
     { 
       question: "What happens if BTC crashes or funding rates turn negative?", 
-      answer: "Delta-neutral hedging protects principal—if BTC drops 30%, our short position gains 30%, netting to zero. However, yields depend on funding rates staying positive (they're positive 85% of the time historically). In bear markets, funding can drop to 2-5% or briefly go negative, reducing yields to 16-18% range. Our 160% overcollateralization and 20% stablecoin reserve ensure USDS remains redeemable even in black swan events."
+      answer: "Delta-neutral hedging protects principal—if BTC drops 30%, our short position gains 30%, netting to zero. However, yields depend on funding rates staying positive (they're positive 85% of the time historically). In bear markets, funding can drop to 2-5% or briefly go negative, reducing yields to 8-10% range. Our 160% overcollateralization and 20% stablecoin reserve ensure USDS remains redeemable even in black swan events."
     },
     { 
       question: "How is this different from Nigerian T-bills at 20%?", 
-      answer: "T-bills lock funds for 3-12 months with government backing. We offer comparable yields (18-22%) with 1-month liquidity and cryptocurrency diversification. T-bills hedge naira inflation; USDS hedges via dollar peg + BTC/gold appreciation. Trade-off: T-bills have sovereign backing; we have transparent, audited crypto reserves with higher execution risk but better liquidity."
+      answer: "T-bills offer 20% in Nigerian Naira, which faces high inflation and currency devaluation risk. We offer 9-12% APY in USD-equivalent stablecoins, protecting against local currency depreciation. T-bills hedge naira inflation; USDS provides global diversification with cryptocurrency upside exposure. Trade-off: T-bills have sovereign backing; we have transparent, audited crypto reserves with higher liquidity and borderless transfer capabilities."
     },
     {
       question: "Is this regulated and safe?",
@@ -227,7 +227,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-2">
-              <strong className="text-green-400">Built for African resilience.</strong> While inflation erodes local currencies, Seamount delivers <span className="text-green-400 font-semibold">18-22% APY</span> with USDS (launching soon). Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
+              <strong className="text-green-400">Built for African resilience.</strong> While inflation erodes local currencies, Seamount delivers <span className="text-green-400 font-semibold">9-12% APY</span> in USD-equivalent stablecoins. Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
             </p>
             
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 px-2">
@@ -262,8 +262,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto px-2">
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-700/50">
-                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-green-400 mb-2">18-22%</div>
-                <div className="text-xs sm:text-sm text-gray-400">Annual Yield</div>
+                <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-green-400 mb-2">9-12%</div>
+                <div className="text-xs sm:text-sm text-gray-400">Annual Yield (USD)</div>
               </div>
               <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-700/50">
                 <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-blue-400 mb-2">&lt;5 sec</div>
@@ -327,7 +327,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <ArrowRightLeft className="h-8 w-8 sm:h-10 sm:w-10 text-teal-400" />,
                   step: "06",
                   title: "Send P2P & Off-Ramp",
-                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency via our liquidity providers. When USDS launches, hold for 18-22% APY yields.",
+                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency via our liquidity providers. When USDS launches, hold for 9-12% APY yields.",
                   color: "from-teal-600/20 to-teal-800/10 border-teal-700/30"
                 }
               ].map((step, idx) => (
@@ -355,7 +355,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <div>
                   <h4 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 text-green-400">When USDS Launches</h4>
                   <p className="text-gray-300 text-sm sm:text-lg leading-relaxed mb-3 sm:mb-4">
-                    Users who choose to hold USDS will gain exposure to our delta-neutral BTC-gold strategy, earning 18-22% APY with monthly liquidity. Your stablecoins work for you—no lock-ups longer than 30 days, with full transparency on backing and yields.
+                    Users who choose to hold USDS will gain exposure to our delta-neutral BTC-gold strategy, earning 9-12% APY with monthly liquidity. Your stablecoins work for you—no lock-ups longer than 30 days, with full transparency on backing and yields.
                   </p>
                   <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
                     <div className="flex items-center gap-1 sm:gap-2">
@@ -400,7 +400,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 },
                 {
                   icon: <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />,
-                  title: "18-22% APY on USDS",
+                  title: "9-12% APY on USDS",
                   description: "Earn competitive yields through delta-neutral BTC-gold hedging strategy. Monthly liquidity, quarterly audits."
                 },
                 {
@@ -466,10 +466,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       onChange={(e) => setCalc({...calc, period: e.target.value})}
                       className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white text-base sm:text-lg focus:border-blue-500 focus:outline-none transition"
                     >
-                      <option value="30">30 Days (18% APY)</option>
-                      <option value="90">90 Days (20% APY)</option>
-                      <option value="180">180 Days (21% APY)</option>
-                      <option value="365">365 Days (22% APY)</option>
+                      <option value="30">30 Days (9% APY)</option>
+                      <option value="90">90 Days (10% APY)</option>
+                      <option value="180">180 Days (11% APY)</option>
+                      <option value="365">365 Days (12% APY)</option>
                     </select>
                   </div>
 
@@ -520,7 +520,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       </div>
                       <div>
                         <div className="text-gray-500 text-xs">Gold Premium</div>
-                        <div className="font-semibold text-purple-400">5%</div>
+                        <div className="font-semibold text-purple-400">2-3%</div>
                       </div>
                     </div>
                     {oracleData.lastUpdate && (
@@ -616,7 +616,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                     <div className="text-xs text-gray-300">
-                      <strong className="text-yellow-400">Risk Disclosure:</strong> Yields depend on BTC funding rates (currently {oracleData.fundingRate.toFixed(1)}%, historical 10-15%, volatile) and hedging execution. Bear markets can reduce yields to 16-18%. Not NDIC-insured. 160% overcollateralization protects principal.
+                      <strong className="text-yellow-400">Risk Disclosure:</strong> Yields depend on BTC funding rates (currently {oracleData.fundingRate.toFixed(1)}%, historical 5-8%, volatile) and hedging execution. Bear markets can reduce yields to 8-10%. Not NDIC-insured. 160% overcollateralization protects principal.
                     </div>
                   </div>
                 </div>
@@ -645,7 +645,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span><strong className="text-white">Treasury Management:</strong> Earn yields on idle corporate funds (18-22% APY)</span>
+                    <span><strong className="text-white">Treasury Management:</strong> Earn yields on idle corporate funds (9-12% APY)</span>
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
