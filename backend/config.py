@@ -74,9 +74,9 @@ class BusinessModelConfig:
     # --- VOLUME-BASED DISCOUNTS (OPTIMIZED) ---
     # Removed starter tier 15% discount - too generous for market entry
     LICENSE_DISCOUNTS = {
-        LicenseTier.STARTER: Decimal("0.05"),    # 5% discount (reduced)
-        LicenseTier.GROWTH: Decimal("0.20"),     # 20% discount
-        LicenseTier.ENTERPRISE: Decimal("0.30")  # 30% discount
+        LicenseTier.STARTER: Decimal("0.10"),    # 10% discount (reduced)
+        LicenseTier.GROWTH: Decimal("0.15"),     # 15% discount
+        LicenseTier.ENTERPRISE: Decimal("0.20")  # 20% discount
     }
     
     # --- PROVIDER COST CALCULATIONS ---
@@ -409,9 +409,16 @@ class Settings(BaseSettings):
     PAYSTACK_WEBHOOK_SECRET: Optional[SecretStr] = None
     
     # --- API URLs ---
-    API_BASE_URL: str = Field(default="http://localhost:8000")
+    API_BASE_URL: str = Field(default="https://seamount-api.onrender.com")
     FRONTEND_URL: str = Field(default="http://localhost:3000")
 
+    @computed_field
+    @property
+    def regfyl_callback_url(self) -> str:
+        """Generate correct Regfyl callback URL based on environment"""
+        base = self.API_BASE_URL.rstrip('/')
+        return f"{base}/webhooks/regfyl/screening"
+    
     @computed_field
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:

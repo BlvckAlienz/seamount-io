@@ -123,9 +123,9 @@ async def kyc_webhook_handler(
     """
     try:
         # Verify webhook signature if secret is configured
-        webhook_secret = settings.COMPLYCUBE_WEBHOOK_SECRET or settings.REGFYL_WEBHOOK_SECRET
+        webhook_secret = settings.REGFYL_WEBHOOK_SECRET
         if webhook_secret:
-            signature_header = request.headers.get('X-Webhook-Signature') or request.headers.get('ComplyCube-Signature')
+            signature_header = request.headers.get('X-Webhook-Signature')
             if signature_header:
                 body = await request.body()
                 

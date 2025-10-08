@@ -318,40 +318,42 @@ class RegfylVerifier:
     # SEAMOUNT.IO INTEGRATION HELPERS
     # ============================================================================
     
-    async def onboard_seamount_user(self, user_data: Dict) -> Dict:
-        """Complete onboarding flow for Seamount.io users"""
-        customer_id = user_data['customer_id']
-        results = {}
+async def onboard_seamount_user(self, user_data: Dict) -> Dict:
+    """Complete onboarding flow - handles missing BVN/DOB gracefully"""
+    customer_id = user_data['customer_id']
+    results = {}
+    
+    try:
+        # Basic screening (works without BVN)
+        screening_result = await self.screen_individual_customer(
+            customer_id=customer_id,
+            customer_name=user_data['full_name'],
+            year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),  # Default to age 25
+            gender=user_data.get('gender', ''),
+            callback_url=user_data.get('callback_url')
+        )
+        results['screening'] = screening_result
         
-        try:
-            # Basic customer screening
-            screening_result = await self.screen_individual_customer(
+        # ID verification ONLY if BVN exists
+        if user_data.get('country') == 'NG' and user_data.get('id_number'):
+            id_result = await self.verify_nigerian_id(
                 customer_id=customer_id,
                 customer_name=user_data['full_name'],
-                year_of_birth=user_data['year_of_birth'],
-                gender=user_data.get('gender', ''),
+                year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),
+                id_type=user_data.get('id_type', 'BVN'),
+                id_number=user_data['id_number'],
                 callback_url=user_data.get('callback_url')
             )
-            results['screening'] = screening_result
-            
-            # Nigerian ID verification
-            if user_data.get('country') == 'NG' and user_data.get('id_number'):
-                id_result = await self.verify_nigerian_id(
-                    customer_id=customer_id,
-                    customer_name=user_data['full_name'],
-                    year_of_birth=user_data['year_of_birth'],
-                    id_type=user_data['id_type'],
-                    id_number=user_data['id_number'],
-                    callback_url=user_data.get('callback_url')
-                )
-                results['id_verification'] = id_result
-            
-            logger.info(f"Seamount user onboarding initiated for {customer_id}")
-            return results
-            
-        except Exception as e:
-            logger.error(f"Seamount user onboarding failed for {customer_id}: {e}")
-            raise
+            results['id_verification'] = id_result
+        else:
+            logger.info(f"Skipping ID verification - no BVN provided for {customer_id}")
+            results['id_verification'] = {'status': 'skipped', 'reason': 'no_bvn_provided'}
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Seamount user onboarding failed for {customer_id}: {e}")
+        raise
 
     async def monitor_seamount_transaction(self, transaction_data: Dict) -> Dict:
         """Monitor Seamount.io transactions (USDS transfers, swaps, etc.)"""

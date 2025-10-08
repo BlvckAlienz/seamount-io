@@ -34,6 +34,7 @@ class AuditEventType(str, Enum):
     TRANSACTION_COMPLETED = "transaction_completed"
     TRANSACTION_FAILED = "transaction_failed"
     
+    COMPLIANCE_CHECK_INITIATED = "compliance_check_initiated"
     COMPLIANCE_CHECK = "compliance_check"
     COMPLIANCE_VIOLATION = "compliance_violation"
     
