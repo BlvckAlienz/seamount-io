@@ -111,13 +111,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     }
   ];
 
-  // Calculate yield only on client to avoid hydration mismatch
-  const yieldData = isClient ? calculateAdvancedYield() : { 
-    annualYield: 2200, 
-    periodYield: 2200, 
-    adjustedAPY: 0.22 
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white overflow-hidden">
       <style>{`
