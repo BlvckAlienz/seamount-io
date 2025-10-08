@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowRight, Globe, Shield, Zap, DollarSign, Users, Briefcase, Send, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Eye, Lock } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
+import { ArrowRight, Globe, Shield, Zap, DollarSign, Users, Briefcase, Send, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Eye, Lock, UserPlus, FileCheck, Wallet, CreditCard, ArrowRightLeft, CheckCircle } from 'lucide-react';
 
 interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
@@ -25,12 +24,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     riskScore: 35
   });
 
-  // Client-side only initialization
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Move live data updates to client-side only
   useEffect(() => {
     if (!isClient) return;
 
@@ -46,25 +43,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, [isClient]);
 
   const yieldData = useMemo(() => {
-  if (!isClient) return { annualYield: 2200, periodYield: 2200, adjustedAPY: 0.22 };
-  
-  const amount = parseFloat(calc.amount) || 0;
-  const period = parseInt(calc.period);
-  
-  let baseAPY = 0.18;
-  if (period === 90) baseAPY = 0.20;
-  else if (period === 180) baseAPY = 0.21;
-  else if (period === 365) baseAPY = 0.22;
-  
-  const fundingAdjustment = (calc.fundingRate - 12.5) / 500;
-  const volAdjustment = (calc.btcVolatility - 65) / 1000;
-  const adjustedAPY = Math.max(0.16, Math.min(0.24, baseAPY + fundingAdjustment + volAdjustment));
-  
-  const annualYield = amount * adjustedAPY;
-  const periodYield = annualYield * (period / 365);
-  
-  return { annualYield, periodYield, adjustedAPY };
-}, [isClient, calc.amount, calc.period, calc.btcVolatility, calc.fundingRate]);
+    if (!isClient) return { annualYield: 2200, periodYield: 2200, adjustedAPY: 0.22 };
+    
+    const amount = parseFloat(calc.amount) || 0;
+    const period = parseInt(calc.period);
+    
+    let baseAPY = 0.18;
+    if (period === 90) baseAPY = 0.20;
+    else if (period === 180) baseAPY = 0.21;
+    else if (period === 365) baseAPY = 0.22;
+    
+    const fundingAdjustment = (calc.fundingRate - 12.5) / 500;
+    const volAdjustment = (calc.btcVolatility - 65) / 1000;
+    const adjustedAPY = Math.max(0.16, Math.min(0.24, baseAPY + fundingAdjustment + volAdjustment));
+    
+    const annualYield = amount * adjustedAPY;
+    const periodYield = annualYield * (period / 365);
+    
+    return { annualYield, periodYield, adjustedAPY };
+  }, [isClient, calc.amount, calc.period, calc.btcVolatility, calc.fundingRate]);
 
   const handleContactSubmit = async () => {
     setFormStatus('sending');
@@ -142,8 +139,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
           <nav className="hidden md:flex space-x-8 text-sm">
             <a href="#features" className="hover:text-blue-400 transition">Features</a>
+            <a href="#how-it-works" className="hover:text-blue-400 transition">How It Works</a>
             <a href="#calculator" className="hover:text-blue-400 transition">Calculator</a>
-            <a href="#transparency" className="hover:text-blue-400 transition">Transparency</a>
+            <a href="#business" className="hover:text-blue-400 transition">Business</a>
             <a href="#contact" className="hover:text-blue-400 transition">Contact</a>
           </nav>
           <div className="flex items-center space-x-3">
@@ -172,7 +170,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <span className="text-white">On Delta-Neutral BTC-Gold</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 mb-4 max-w-3xl mx-auto leading-relaxed">
-              Pan-Africa cross-border platform. Fiat in → USDT/USDCa → P2P send → local off-ramp.
+              Pan-Africa cross-border stablecoins platform. Fiat in → USDT/USDCa → P2P send → local off-ramp.
               <span className="text-green-400 font-semibold"> Conservative yields</span> from hedged BTC + gold backing.
             </p>
             <p className="text-sm text-gray-400 mb-8 max-w-2xl mx-auto">
@@ -200,6 +198,160 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5 text-purple-400" />
                 <span>7+ African Markets</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" className="py-24 bg-gray-900/50 relative">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16 fade-in">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">Platform Features</h2>
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                Everything you need for secure, fast, and profitable cross-border transactions.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[
+                {
+                  icon: <Send className="h-8 w-8 text-blue-400" />,
+                  title: "Instant Cross-Border Payments",
+                  description: "Send money globally in seconds with minimal fees. Algorand's sub-5s settlement beats traditional remittance by days."
+                },
+                {
+                  icon: <DollarSign className="h-8 w-8 text-green-400" />,
+                  title: "Multi-Stablecoin Support",
+                  description: "Trade USDT, USDCa, USDS with seamless swaps. Access goBTC, goETH, and ALGO on the same platform."
+                },
+                {
+                  icon: <TrendingUp className="h-8 w-8 text-purple-400" />,
+                  title: "18-22% APY on USDS",
+                  description: "Earn competitive yields through delta-neutral BTC-gold hedging strategy. Monthly liquidity, quarterly audits."
+                },
+                {
+                  icon: <Shield className="h-8 w-8 text-yellow-400" />,
+                  title: "160% Overcollateralized",
+                  description: "Your funds backed by audited reserves with transparent collateralization. Real-time dashboard monitoring."
+                },
+                {
+                  icon: <Lock className="h-8 w-8 text-red-400" />,
+                  title: "Self-Custody Wallets",
+                  description: "Full control of your private keys. Non-custodial Algorand wallets with military-grade encryption."
+                },
+                {
+                  icon: <Globe className="h-8 w-8 text-teal-400" />,
+                  title: "Pan-Africa Coverage",
+                  description: "Support for NGN, KES, ZAR, ETB, RWF, TZS, GHS plus USD, GBP, EUR. Compliant across 7+ countries."
+                }
+              ].map((feature, idx) => (
+                <div key={idx} className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all duration-300 fade-in">
+                  <div className="w-14 h-14 bg-gray-900/50 rounded-xl flex items-center justify-center mb-4 border border-gray-700/30">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="how-it-works" className="py-24 bg-gray-950 relative">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16 fade-in">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">How It Works</h2>
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                From signup to earning yields—your complete journey in 6 simple steps.
+              </p>
+            </div>
+
+            <div className="space-y-8">
+              {[
+                {
+                  icon: <UserPlus className="h-10 w-10 text-blue-400" />,
+                  step: "01",
+                  title: "Sign Up in Minutes",
+                  description: "Create your account with email or social login. No lengthy forms—just essential info to get started.",
+                  color: "from-blue-600/20 to-blue-800/10 border-blue-700/30"
+                },
+                {
+                  icon: <FileCheck className="h-10 w-10 text-green-400" />,
+                  step: "02",
+                  title: "Complete KYC Verification",
+                  description: "Quick identity verification via Regfyl (Nigeria, Kenya) or ComplyCube (global). Document upload takes ~3 minutes, approval within 24 hours.",
+                  color: "from-green-600/20 to-green-800/10 border-green-700/30"
+                },
+                {
+                  icon: <Wallet className="h-10 w-10 text-purple-400" />,
+                  step: "03",
+                  title: "Algorand Wallet Creation",
+                  description: "We generate your non-custodial Algorand wallet automatically. You get full control—download your private key and store it securely. We never access your funds.",
+                  color: "from-purple-600/20 to-purple-800/10 border-purple-700/30"
+                },
+                {
+                  icon: <Lock className="h-10 w-10 text-yellow-400" />,
+                  step: "04",
+                  title: "Secure Your Private Key",
+                  description: "Download and backup your 25-word seed phrase. Store offline in multiple secure locations. This is your only recovery method—we cannot reset it.",
+                  color: "from-yellow-600/20 to-yellow-800/10 border-yellow-700/30"
+                },
+                {
+                  icon: <CreditCard className="h-10 w-10 text-red-400" />,
+                  step: "05",
+                  title: "Fund Your Account",
+                  description: "Deposit fiat (USD/GBP/EUR/NGN/KES/ZAR/etc.) via Paystack or Cashramp. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH, or ALGO on Algorand rails.",
+                  color: "from-red-600/20 to-red-800/10 border-red-700/30"
+                },
+                {
+                  icon: <ArrowRightLeft className="h-10 w-10 text-teal-400" />,
+                  step: "06",
+                  title: "Send P2P & Off-Ramp",
+                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency via our liquidity providers. When USDS launches, hold for 18-22% APY yields.",
+                  color: "from-teal-600/20 to-teal-800/10 border-teal-700/30"
+                }
+              ].map((step, idx) => (
+                <div key={idx} className={`bg-gradient-to-br ${step.color} backdrop-blur-sm rounded-2xl p-8 border flex gap-6 items-start fade-in hover:scale-[1.02] transition-transform duration-300`}>
+                  <div className="flex-shrink-0">
+                    <div className="w-16 h-16 bg-gray-900/50 rounded-xl flex items-center justify-center border border-gray-700/30 mb-2">
+                      {step.icon}
+                    </div>
+                    <div className="text-4xl font-bold text-gray-700 text-center">{step.step}</div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold mb-3 flex items-center gap-3">
+                      {step.title}
+                      {idx === 5 && <span className="text-sm px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-green-400">USDS Coming Soon</span>}
+                    </h3>
+                    <p className="text-gray-300 text-lg leading-relaxed">{step.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-12 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-2xl p-8 border border-blue-700/30 fade-in">
+              <div className="flex items-start gap-4">
+                <CheckCircle className="h-8 w-8 text-green-400 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="text-2xl font-bold mb-3 text-green-400">When USDS Launches</h4>
+                  <p className="text-gray-300 text-lg leading-relaxed mb-4">
+                    Users who choose to hold USDS will gain exposure to our delta-neutral BTC-gold strategy, earning 18-22% APY with monthly liquidity. Your stablecoins work for you—no lock-ups longer than 30 days, with full transparency on backing and yields.
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-gray-400">90% BTC + 10% Gold</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <span className="text-gray-400">160% Overcollateralized</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                      <span className="text-gray-400">Quarterly Audits</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -433,9 +585,171 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        {/* Rest of your sections remain the same */}
-        {/* ... Features, Transparency, FAQ, Contact sections ... */}
-        
+        <section id="business" className="py-24 bg-gray-950 relative">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16 fade-in">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">For Business</h2>
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                Transform your business treasury and cross-border operations with institutional-grade stablecoin infrastructure.
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8 mb-12">
+              <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 fade-in">
+                <Briefcase className="h-12 w-12 text-blue-400 mb-4" />
+                <h3 className="text-2xl font-bold mb-4">Business Solutions</h3>
+                <ul className="space-y-3 text-gray-300">
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-white">Global Payroll:</strong> Pay international teams instantly with multi-currency support</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-white">Treasury Management:</strong> Earn yields on idle corporate funds (18-22% APY)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-white">Trade Finance:</strong> Streamline cross-border B2B payments with programmable settlements</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-white">Liquidity Optimization:</strong> Turn working capital into revenue-generating assets</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-700/50 fade-in">
+                <h3 className="text-2xl font-bold mb-6">Get in Touch</h3>
+                <form onSubmit={(e) => { e.preventDefault(); handleContactSubmit(); }} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Your Name</label>
+                    <input 
+                      type="text"
+                      value={formState.name}
+                      onChange={(e) => setFormState({...formState, name: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none transition"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Business Name</label>
+                    <input 
+                      type="text"
+                      value={formState.businessName}
+                      onChange={(e) => setFormState({...formState, businessName: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none transition"
+                      placeholder="Your Company Ltd."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+                    <input 
+                      type="email"
+                      value={formState.email}
+                      onChange={(e) => setFormState({...formState, email: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none transition"
+                      placeholder="john@company.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Message</label>
+                    <textarea
+                      value={formState.message}
+                      onChange={(e) => setFormState({...formState, message: e.target.value})}
+                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none transition resize-none"
+                      rows={4}
+                      placeholder="Tell us about your business needs..."
+                      required
+                    ></textarea>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={formStatus === 'sending'}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50"
+                  >
+                    {formStatus === 'sending' ? 'Sending...' : formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="contact" className="py-24 bg-gray-900/50 relative">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-16 fade-in">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">Contact Us</h2>
+              <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+                Questions? Our team is here to help you get started.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 fade-in">
+              <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 text-center">
+                <div className="w-14 h-14 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                  <MapPin className="h-7 w-7 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Our Office</h3>
+                <p className="text-gray-400">Wood Avenue, Kilimani<br />Nairobi, Kenya</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 text-center">
+                <div className="w-14 h-14 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/30">
+                  <Mail className="h-7 w-7 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Email Us</h3>
+                <p className="text-gray-400">support@seamount.io</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 text-center">
+                <div className="w-14 h-14 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-purple-500/30">
+                  <Phone className="h-7 w-7 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Call Us</h3>
+                <p className="text-gray-400">+254 751 875 374</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-16 bg-gray-950">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-12 fade-in">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+              <p className="text-gray-400 max-w-2xl mx-auto">Get answers to common questions about Seamount's platform.</p>
+            </div>
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <div key={index} className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl border border-gray-800/80 backdrop-blur-sm overflow-hidden fade-in">
+                  <button onClick={() => setExpandedFaqs(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index])} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-800/30 transition-colors">
+                    <h3 className="font-semibold text-lg text-white pr-4">{faq.question}</h3>
+                    {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-blue-500 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-blue-500 flex-shrink-0" />}
+                  </button>
+                  {expandedFaqs.includes(index) && (
+                    <div className="px-6 pb-4 border-t border-gray-800/50">
+                      <p className="text-gray-300 pt-4">{faq.answer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-20 bg-gradient-to-r from-blue-900/20 to-purple-900/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Transform How You Move Money?</h2>
+              <button onClick={() => onOpenAuth('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg font-semibold rounded-lg transform hover:scale-105 transition">
+                Sign Up for Free
+              </button>
+              <p className="mt-4 text-sm text-gray-400">Already have an account? <button onClick={() => onOpenAuth('login')} className="text-blue-400 hover:underline font-semibold">Sign In</button></p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="bg-gray-950 border-t border-gray-800/60 py-12">
@@ -452,14 +766,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <h4 className="text-white font-medium mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
                 <li><a href="#features" className="text-gray-400 hover:text-white">Features</a></li>
+                <li><a href="#how-it-works" className="text-gray-400 hover:text-white">How It Works</a></li>
                 <li><a href="#calculator" className="text-gray-400 hover:text-white">Yield Calculator</a></li>
-                <li><a href="#transparency" className="text-gray-400 hover:text-white">Transparency</a></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-gray-400 hover:text-white">About Us</a></li>
+                <li><a href="#business" className="text-gray-400 hover:text-white">For Business</a></li>
                 <li><a href="#contact" className="text-gray-400 hover:text-white">Contact</a></li>
               </ul>
             </div>
