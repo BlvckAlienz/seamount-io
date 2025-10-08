@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, Users, Briefcase, Send, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Eye, Lock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
@@ -44,44 +45,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     return () => clearInterval(interval);
   }, [isClient]);
 
-  const calculateAdvancedYield = useCallback(() => {
-    const amount = parseFloat(calc.amount) || 0;
-    const period = parseInt(calc.period);
-    
-    let baseAPY = 0.18;
-    if (period === 90) baseAPY = 0.20;
-    else if (period === 180) baseAPY = 0.21;
-    else if (period === 365) baseAPY = 0.22;
-    
-    const fundingAdjustment = (calc.fundingRate - 12.5) / 500;
-    const volAdjustment = (calc.btcVolatility - 65) / 1000;
-    const adjustedAPY = Math.max(0.16, Math.min(0.24, baseAPY + fundingAdjustment + volAdjustment));
-    
-    const annualYield = amount * adjustedAPY;
-    const periodYield = annualYield * (period / 365);
-    const tBillRate = 0.20;
-    const creditSpreadBps = Math.round((adjustedAPY - tBillRate) * 10000);
-    
-    const fundingRisk = calc.fundingRate < 8 ? 15 : calc.fundingRate > 18 ? 10 : 5;
-    const volRisk = (calc.btcVolatility / 80) * 30;
-    const durationRisk = (period / 365) * 15;
-    const riskScore = Math.min(100, fundingRisk + volRisk + (15 - durationRisk) + 25);
-    
-    setCalc(prev => ({
-      ...prev,
-      estimatedYield: adjustedAPY,
-      creditSpread: creditSpreadBps,
-      riskScore: Math.round(riskScore)
-    }));
-    
-    return { annualYield, periodYield, adjustedAPY };
-  }, [calc.amount, calc.period, calc.btcVolatility, calc.fundingRate]);
-
-  useEffect(() => {
-    if (isClient) {
-      calculateAdvancedYield();
-    }
-  }, [calculateAdvancedYield, isClient]);
+  const yieldData = useMemo(() => {
+  if (!isClient) return { annualYield: 2200, periodYield: 2200, adjustedAPY: 0.22 };
+  
+  const amount = parseFloat(calc.amount) || 0;
+  const period = parseInt(calc.period);
+  
+  let baseAPY = 0.18;
+  if (period === 90) baseAPY = 0.20;
+  else if (period === 180) baseAPY = 0.21;
+  else if (period === 365) baseAPY = 0.22;
+  
+  const fundingAdjustment = (calc.fundingRate - 12.5) / 500;
+  const volAdjustment = (calc.btcVolatility - 65) / 1000;
+  const adjustedAPY = Math.max(0.16, Math.min(0.24, baseAPY + fundingAdjustment + volAdjustment));
+  
+  const annualYield = amount * adjustedAPY;
+  const periodYield = annualYield * (period / 365);
+  
+  return { annualYield, periodYield, adjustedAPY };
+}, [isClient, calc.amount, calc.period, calc.btcVolatility, calc.fundingRate]);
 
   const handleContactSubmit = async () => {
     setFormStatus('sending');
