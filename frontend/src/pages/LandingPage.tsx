@@ -220,14 +220,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
               <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 text-transparent bg-clip-text">
-                Your Shield Against
+                Beyond Cross-Border Payments
               </span>
               <br />
-              <span className="text-white">Economic Uncertainty</span>
+              <span className="text-green-400">Built for African resilience</span>
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-2">
-              <strong className="text-green-400">Built for African resilience.</strong> While inflation erodes local currencies and banks offer minimal returns, Seamount delivers <span className="text-green-400 font-semibold">18-22% APY</span> on dollar-pegged stablecoins. Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
+              While inflation erodes local currencies, Seamount delivers <span className="text-green-400 font-semibold">18-22% APY</span> on our BTC-gold backed asset - USDS (launching soon). Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
             </p>
             
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 px-2">
