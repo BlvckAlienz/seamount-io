@@ -67,7 +67,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         console.error('Oracle fetch error:', error);
         // Use fallback data instead of showing error
         setOracleData({
-          btcPrice: 63500,
+          btcPrice: 12500,
           btcVolatility: 65,
           fundingRate: 12.5,
           lastUpdate: new Date(),
@@ -207,7 +207,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </header>
 
       <main className="pt-16 sm:pt-20">
-        <section id="how-it-works" className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <section id="hero" className="min-h-screen flex items-center justify-center relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.15)_0%,transparent_50%)]"></div>
           <div className="absolute top-1/4 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
           <div className="absolute bottom-1/4 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
