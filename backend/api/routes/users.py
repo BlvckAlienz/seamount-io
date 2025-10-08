@@ -41,11 +41,11 @@ async def create_user_profile(
             "last_name": data.get('lastName') or data.get('last_name', ''),
             "country_code": (data.get('countryCode') or data.get('country_code', 'US')).upper(),
             "phone": data.get('phone', ''),
-            "kyc_status": data.get('kyc_status', 'not_started'),
-            "kyc_level": data.get('kyc_level', 0),
-            "role": data.get('role', 'alien'),
+            "kyc_status": "not_started",  # ✅ FIXED
+            "kyc_level": 0,
+            "role": "alien",
             "is_active": True,
-            "kyc_provider": "regfyl",  # 🚨 FORCE REGFYL
+            "kyc_provider": None,  # ✅ FIXED - NULL until KYC starts
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }

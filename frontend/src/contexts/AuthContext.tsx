@@ -273,9 +273,10 @@ const completeOnboarding = async () => {
       const { error } = await supabase
         .from("user_profiles")
         .update({ 
-          kyc_status: 'skipped',  // Change from 'pending' to 'skipped'
+          kyc_status: 'skipped',
           kyc_level: 1,
-          role: 'alien'  // Explicitly set role
+          role: 'alien',
+          kyc_provider: null  // ✅ ADDED
         })
         .eq("id", state.user.id);
         

@@ -133,6 +133,23 @@ export const KycVerification: React.FC<KycVerificationProps> = ({ onComplete, on
 const handleStartKyc = async () => {
   if (!user || !profileCheck?.can_start_kyc) return;
 
+  // ✅ RESET STATUS BEFORE STARTING
+  try {
+    await fetch('/api/v1/user/profile', {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${user.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        kyc_status: 'not_started',
+        kyc_provider: null
+      })
+    });
+  } catch (err) {
+    console.warn('Failed to reset KYC status:', err);
+  }
+
   // Detect country if not set
   let country = userProfile?.country_code;
   

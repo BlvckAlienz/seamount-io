@@ -180,9 +180,6 @@ async def kyc_webhook_handler(
             'completed': 'verified',
             'clear': 'verified',
             'passed': 'verified',
-            # ComplyCube statuses
-            'check.completed': 'verified',
-            'check.clear': 'verified',
             # Pending/Review statuses
             'pending': 'in_progress',
             'in_progress': 'in_progress',
