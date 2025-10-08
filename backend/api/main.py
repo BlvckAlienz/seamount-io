@@ -21,6 +21,9 @@ import aiohttp
 import sys
 from pathlib import Path
 from decimal import Decimal
+from backend.api.routes import oracle
+
+app.include_router(oracle.router, prefix="/api", tags=["oracle"])
 
 # Add the project root to the Python path for clean imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
