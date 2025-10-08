@@ -439,13 +439,32 @@ if routers_available.get('payments'):
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 
-# FIXED: Include oracle router AFTER app is defined
+# FIXED: Include oracle router with error handling
 try:
     from backend.api.routes import oracle
-    app.include_router(oracle.router, prefix="/api", tags=["oracle"])
+    app.include_router(oracle.router, prefix="/api", tags=["Oracle"])
     logger.info("✅ Oracle router registered at /api")
-except ImportError as e:
-    logger.error(f"Oracle router import error: {e}")
+except Exception as e:
+    logger.error(f"❌ Oracle router registration failed: {e}")
+    
+    # Create fallback oracle endpoint
+    from fastapi import APIRouter
+    fallback_oracle = APIRouter()
+    
+    @fallback_oracle.get("/oracle/price/{asset_name}")
+    async def fallback_price(asset_name: str):
+        fallback_prices = {
+            'bitcoin': '63500.00',
+            'ethereum': '2650.00', 
+            'algorand': '0.18'
+        }
+        return {
+            "price": fallback_prices.get(asset_name.lower(), '0.00'),
+            "metadata": {"source": "fallback", "warning": "Oracle service unavailable"},
+            "asset": asset_name
+        }
+    
+    app.include_router(fallback_oracle, prefix="/api", tags=["Oracle (Fallback)"])
 
 try:
     from backend.api.routes.transactions import router as transactions_router
