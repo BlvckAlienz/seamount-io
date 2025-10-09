@@ -52,11 +52,35 @@ const WelcomeStep = ({ onNext }) => (
 
 // Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
-  const [loading, setLoading] = useState(false);
   const [showBVNModal, setShowBVNModal] = useState(false);
+  const [loading, setLoading] = useState(false);
   
-  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
-  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
+  const userCountry = userProfile?.country_code || userProfile?.country || 'US';
+
+  const handleDataSubmit = async (collectedData) => {
+    try {
+      const response = await apiClient.post('/api/v1/kyc/submit-kyc-data', collectedData);
+      
+      if (response.data.success) {
+        toast.success('Verification started!');
+        setShowBVNModal(false);
+        onNext();
+      }
+    } catch (error) {
+      toast.error('Verification failed: ' + error.message);
+    }
+  };
+
+  if (showBVNModal) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleDataSubmit}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+        countryCode={userCountry}
+      />
+    );
+  }
 
 const startVerification = async () => {
   setLoading(true);

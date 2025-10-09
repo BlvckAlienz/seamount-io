@@ -328,20 +328,69 @@ class KYCDataSubmission(BaseModel):
 
 @router.post("/submit-kyc-data")
 async def submit_kyc_data(
-    kyc_data: KYCDataSubmission,
+    data: dict,
     current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
     kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """
-    NEW: Progressive KYC data submission
-    Collect BVN/ID information before starting verification
-    """
-    user_id = current_user.get('id')
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User ID not found")
-
-    result = await kyc_service.submit_kyc_data(user_id, kyc_data.dict())
-    return result
+    """Process collected KYC data and initiate Regfyl screening"""
+    try:
+        user_id = current_user.get('id')
+        
+        # Update user profile with collected data
+        update_data = {
+            'date_of_birth': data.get('dateOfBirth'),
+            'gender': data.get('gender'),
+            'phone': data.get('phoneNumber'),
+            'country_code': data.get('country'),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        # Store ID info securely
+        id_type = data.get('idType')
+        id_number = data.get('idNumber')
+        
+        if id_type and id_number:
+            # Map to Regfyl ID types
+            regfyl_id_map = {
+                'BVN': 'BVN',
+                'NIN': 'NIN',
+                'NATIONAL_ID': 'NATIONAL_ID',
+                'GHANA_CARD': 'GHANA_CARD',
+                'ID_NUMBER': 'ID_BOOK',
+                'PASSPORT': 'PASSPORT'
+            }
+            
+            update_data['id_type'] = regfyl_id_map.get(id_type, id_type)
+            update_data['id_number'] = id_number
+        
+        supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
+        
+        # Prepare Regfyl payload
+        user_data = {
+            'customer_id': user_id,
+            'full_name': f"{current_user.get('first_name')} {current_user.get('last_name')}",
+            'year_of_birth': data.get('dateOfBirth', '')[:4],
+            'gender': data.get('gender'),
+            'country': data.get('country'),
+            'id_type': id_type if id_type else None,
+            'id_number': id_number if id_number else None,
+            'phone': data.get('phoneNumber'),
+            'callback_url': f"{settings.API_BASE_URL}/webhooks/regfyl/screening"
+        }
+        
+        # Call Regfyl
+        result = await kyc_service.screen_user_with_regfyl(user_id, user_data)
+        
+        return {
+            "success": True,
+            "message": "Verification initiated",
+            "status": "pending"
+        }
+        
+    except Exception as e:
+        logger.error(f"[KYC Data Submit] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/detect-country")
 async def detect_country(

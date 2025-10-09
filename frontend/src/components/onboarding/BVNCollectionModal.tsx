@@ -1,210 +1,175 @@
-// File Location: frontend/src/components/onboarding/BVNCollectionModal.tsx
-// HYBRID APPROACH: Smart progressive BVN collection modal
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Shield, Globe } from 'lucide-react';
 
-import React, { useState } from 'react';
-import { X, Shield, Lock, AlertCircle, Phone } from 'lucide-react';
-import toast from 'react-hot-toast';
-
-interface BVNCollectionModalProps {
-  onComplete: (bvnData: BVNData) => void;
-  onCancel: () => void;
-  userEmail: string;
+interface CountryConfig {
+  name: string;
+  idTypes: Array<{ value: string; label: string; placeholder: string }>;
+  requiresID: boolean;
 }
 
-interface BVNData {
-  bvn: string;
-  date_of_birth: string;
-  gender: string;
+const COUNTRY_CONFIGS: Record<string, CountryConfig> = {
+  NG: {
+    name: 'Nigeria',
+    idTypes: [
+      { value: 'BVN', label: 'BVN (Bank Verification Number)', placeholder: '22123456789' },
+      { value: 'NIN', label: 'NIN (National ID Number)', placeholder: '12345678901' }
+    ],
+    requiresID: true
+  },
+  KE: {
+    name: 'Kenya',
+    idTypes: [
+      { value: 'NATIONAL_ID', label: 'Kenyan National ID', placeholder: '12345678' }
+    ],
+    requiresID: true
+  },
+  GH: {
+    name: 'Ghana',
+    idTypes: [
+      { value: 'GHANA_CARD', label: 'Ghana Card', placeholder: 'GHA-123456789-0' }
+    ],
+    requiresID: true
+  },
+  ZA: {
+    name: 'South Africa',
+    idTypes: [
+      { value: 'ID_NUMBER', label: 'SA ID Number', placeholder: '8001015009087' }
+    ],
+    requiresID: true
+  },
+  DEFAULT: {
+    name: 'Other',
+    idTypes: [
+      { value: 'PASSPORT', label: 'Passport Number', placeholder: 'A12345678' }
+    ],
+    requiresID: false // Passport is optional for non-priority markets
+  }
+};
+
+interface BVNCollectionModalProps {
+  onComplete: (data: any) => void;
+  onCancel: () => void;
+  userEmail: string;
+  countryCode?: string;
 }
 
 const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({ 
   onComplete, 
-  onCancel,
-  userEmail 
+  onCancel, 
+  userEmail,
+  countryCode = 'NG'
 }) => {
-  const [formData, setFormData] = useState<BVNData>({
-    bvn: '',
-    date_of_birth: '',
-    gender: ''
+  const [formData, setFormData] = useState({
+    idType: '',
+    idNumber: '',
+    dateOfBirth: '',
+    gender: '',
+    phoneNumber: ''
   });
-  const [loading, setLoading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const validateBVN = (bvn: string): boolean => {
-    // Must be exactly 11 digits
-    const bvnRegex = /^\d{11}$/;
-    return bvnRegex.test(bvn);
-  };
+  const config = COUNTRY_CONFIGS[countryCode] || COUNTRY_CONFIGS.DEFAULT;
 
-  const validateAge = (dob: string): boolean => {
-    // Must be 18+ years old
-    const birthDate = new Date(dob);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      return age - 1 >= 18;
+  // Auto-select ID type if only one option
+  useEffect(() => {
+    if (config.idTypes.length === 1) {
+      setFormData(prev => ({ ...prev, idType: config.idTypes[0].value }));
     }
-    return age >= 18;
-  };
+  }, [config]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validation
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.bvn.trim()) {
-      newErrors.bvn = 'BVN is required';
-    } else if (!validateBVN(formData.bvn)) {
-      newErrors.bvn = 'BVN must be exactly 11 digits';
+  const selectedIDType = config.idTypes.find(id => id.value === formData.idType);
+
+  const validateForm = () => {
+    if (config.requiresID && !formData.idNumber) {
+      setError(`${selectedIDType?.label || 'ID'} is required`);
+      return false;
     }
-    
-    if (!formData.date_of_birth) {
-      newErrors.date_of_birth = 'Date of birth is required';
-    } else if (!validateAge(formData.date_of_birth)) {
-      newErrors.date_of_birth = 'You must be at least 18 years old';
+    if (!formData.dateOfBirth) {
+      setError('Date of birth is required');
+      return false;
     }
-    
     if (!formData.gender) {
-      newErrors.gender = 'Gender is required';
+      setError('Gender is required');
+      return false;
     }
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
+    if (!formData.phoneNumber) {
+      setError('Phone number is required');
+      return false;
     }
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    setError('');
     
-    setLoading(true);
-    setErrors({});
-    
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
     try {
-      // Submit to backend
-      const token = localStorage.getItem('token') || sessionStorage.getItem('supabase.auth.token');
-      
-      const response = await fetch('/api/kyc/submit-kyc-data', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
+      await onComplete({
+        ...formData,
+        country: countryCode
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to save KYC data');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success('Information saved successfully');
-        onComplete(formData);
-      } else {
-        throw new Error(result.message || 'Failed to save KYC data');
-      }
-      
-    } catch (error: any) {
-      console.error('BVN submission error:', error);
-      toast.error(error.message || 'Failed to save information');
-      setErrors({ submit: error.message });
-    } finally {
-      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || 'Verification failed');
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-md w-full p-8 border border-blue-500/30 shadow-2xl relative">
-        {/* Close Button */}
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-        >
-          <X className="h-6 w-6" />
-        </button>
-
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="h-8 w-8 text-blue-400" />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
+            <Globe className="h-6 w-6 text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Quick Identity Check</h2>
-          <p className="text-gray-400 text-sm">
-            To comply with Nigerian banking regulations, we need to verify your BVN
-          </p>
-        </div>
-
-        {/* Compliance Notice */}
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6">
-          <h3 className="text-blue-400 font-semibold mb-2 flex items-center text-sm">
-            <Lock className="h-4 w-4 mr-2" />
-            Why we need this
-          </h3>
-          <ul className="text-xs text-gray-300 space-y-1">
-            <li>• Nigerian regulations require BVN verification for financial services</li>
-            <li>• Your data is encrypted and never shared</li>
-            <li>• This enables instant NGN deposits and withdrawals</li>
-          </ul>
-        </div>
-
-        {/* Error Alert */}
-        {errors.submit && (
-          <div className="mb-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-            <p className="text-red-400 text-sm flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {errors.submit}
-            </p>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* BVN Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Bank Verification Number (BVN) *
-            </label>
-            <input
-              type="text"
-              value={formData.bvn}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 11);
-                setFormData(prev => ({ ...prev, bvn: value }));
-                setErrors(prev => ({ ...prev, bvn: '' }));
-              }}
-              placeholder="Enter 11-digit BVN"
-              maxLength={11}
-              className={`w-full bg-gray-800 border ${
-                errors.bvn ? 'border-red-500' : 'border-gray-700'
-              } rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none transition-colors`}
-            />
-            {errors.bvn && (
-              <p className="text-red-400 text-xs mt-1">{errors.bvn}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowHelp(!showHelp)}
-              className="text-blue-400 hover:text-blue-300 text-xs mt-1 flex items-center gap-1"
-            >
-              <Phone className="h-3 w-3" />
-              How to find my BVN?
-            </button>
-            {showHelp && (
-              <div className="mt-2 p-3 bg-gray-800/50 rounded-lg text-xs text-gray-300">
-                <p className="font-semibold mb-1">Find your BVN:</p>
-                <ul className="space-y-1">
-                  <li>• Dial *565*0# from your registered phone</li>
-                  <li>• Check your bank statement</li>
-                  <li>• Visit any bank branch with valid ID</li>
-                </ul>
-              </div>
-            )}
+            <h2 className="text-2xl font-bold text-white">Identity Verification</h2>
+            <p className="text-gray-400 text-sm">{config.name}</p>
           </div>
-
+        </div>
+        
+        <p className="text-gray-300 mb-6">
+          Complete your profile to unlock full platform access
+        </p>
+        
+        <div className="space-y-4">
+          {/* ID Type Selection (if multiple options) */}
+          {config.idTypes.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                ID Type *
+              </label>
+              <select
+                value={formData.idType}
+                onChange={(e) => setFormData({...formData, idType: e.target.value, idNumber: ''})}
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="">Select ID type</option>
+                {config.idTypes.map(id => (
+                  <option key={id.value} value={id.value}>{id.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          {/* ID Number Input */}
+          {(formData.idType || config.idTypes.length === 1) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {selectedIDType?.label || config.idTypes[0].label} {config.requiresID && '*'}
+              </label>
+              <input
+                type="text"
+                value={formData.idNumber}
+                onChange={(e) => setFormData({...formData, idNumber: e.target.value})}
+                placeholder={selectedIDType?.placeholder || config.idTypes[0].placeholder}
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          )}
+          
           {/* Date of Birth */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -212,83 +177,89 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </label>
             <input
               type="date"
-              value={formData.date_of_birth}
-              onChange={(e) => {
-                setFormData(prev => ({ ...prev, date_of_birth: e.target.value }));
-                setErrors(prev => ({ ...prev, date_of_birth: '' }));
-              }}
-              max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-              className={`w-full bg-gray-800 border ${
-                errors.date_of_birth ? 'border-red-500' : 'border-gray-700'
-              } rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none transition-colors`}
+              value={formData.dateOfBirth}
+              onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
-            {errors.date_of_birth && (
-              <p className="text-red-400 text-xs mt-1">{errors.date_of_birth}</p>
-            )}
           </div>
-
+          
           {/* Gender */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Gender *
             </label>
-            <select
-              value={formData.gender}
-              onChange={(e) => {
-                setFormData(prev => ({ ...prev, gender: e.target.value }));
-                setErrors(prev => ({ ...prev, gender: '' }));
-              }}
-              className={`w-full bg-gray-800 border ${
-                errors.gender ? 'border-red-500' : 'border-gray-700'
-              } rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none transition-colors`}
-            >
-              <option value="">Select gender</option>
-              <option value="M">Male</option>
-              <option value="F">Female</option>
-              <option value="Other">Other</option>
-            </select>
-            {errors.gender && (
-              <p className="text-red-400 text-xs mt-1">{errors.gender}</p>
-            )}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, gender: 'M'})}
+                className={`px-4 py-3 rounded-lg border transition-all ${
+                  formData.gender === 'M' 
+                    ? 'bg-blue-600 border-blue-600 text-white' 
+                    : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-gray-600'
+                }`}
+              >
+                Male
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, gender: 'F'})}
+                className={`px-4 py-3 rounded-lg border transition-all ${
+                  formData.gender === 'F' 
+                    ? 'bg-blue-600 border-blue-600 text-white' 
+                    : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-gray-600'
+                }`}
+              >
+                Female
+              </button>
+            </div>
+          </div>
+          
+          {/* Phone Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Phone Number *
+            </label>
+            <input
+              type="tel"
+              value={formData.phoneNumber}
+              onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+              placeholder="+234 801 234 5678"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
           </div>
 
-          {/* Confirmation Checkbox */}
-          <div className="flex items-start gap-2">
-            <input
-              type="checkbox"
-              id="confirm"
-              required
-              className="mt-1 w-4 h-4 bg-gray-800 border-gray-700 rounded"
-            />
-            <label htmlFor="confirm" className="text-xs text-gray-400">
-              I confirm this information is accurate and matches my BVN records
-            </label>
-          </div>
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
-              type="button"
               onClick={onCancel}
-              disabled={loading}
-              className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-3 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-900 transition-colors"
+              disabled={isSubmitting}
             >
-              I'll do this later
+              Cancel
             </button>
             <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleSubmit}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all shadow-lg"
+              disabled={isSubmitting}
             >
-              {loading ? 'Saving...' : 'Continue to Verification'}
+              {isSubmitting ? 'Verifying...' : 'Continue'}
             </button>
           </div>
-        </form>
-
-        {/* Security Note */}
-        <p className="text-center text-xs text-gray-500 mt-4">
-          🔒 Your data is encrypted and stored securely
-        </p>
+        </div>
+        
+        <div className="mt-6 flex items-start gap-2 text-xs text-gray-500">
+          <Shield className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <p>Your data is encrypted and used only for regulatory compliance</p>
+        </div>
       </div>
     </div>
   );
