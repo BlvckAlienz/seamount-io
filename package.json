@@ -14,6 +14,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "dotenv": "^17.2.2",
-    "vercel": "^28.18.5"
+    "vercel": "^48.2.9"
   }
 }

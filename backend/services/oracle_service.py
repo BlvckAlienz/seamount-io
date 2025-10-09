@@ -118,10 +118,17 @@ class EnhancedOracleService:
             'timestamp': datetime.now()
         }
         
-        # Store in database asynchronously
-        asyncio.create_task(self.store_price_data([price_data]))
+        # Store in database asynchronously - FIXED: use asyncio.create_task with proper error handling
+        asyncio.create_task(self._store_price_data_safe([price_data]))
         
         return price_data.rate, metadata
+    
+    async def _store_price_data_safe(self, price_data: List[PriceData]):
+        """Wrapper for safe async price data storage with error handling"""
+        try:
+            await self.store_price_data(price_data)
+        except Exception as e:
+            logger.error(f"Background task: Failed to store price data: {str(e)}", exc_info=True)
     
     async def _fetch_with_fallback(self, asset_name: str) -> Optional[PriceData]:
         """Execute 3-tier fallback strategy"""
@@ -240,7 +247,7 @@ class EnhancedOracleService:
                             source='dia_oracle',
                             timestamp=datetime.now(),
                             confidence=0.85,
-                            volume_24h=None  # DIA doesn't provide volume in this endpoint
+                            volume_24h=None
                         )
                         
         except Exception as e:
@@ -303,8 +310,17 @@ class EnhancedOracleService:
             raise ValueError("Could not determine NGN/USD exchange rate")
     
     async def store_price_data(self, price_data: List[PriceData]):
-        """Store price data in database for analytics"""
+        """Store price data in database for analytics - FIXED: proper try/catch with validation"""
         try:
+            if not price_data:
+                logger.warning("[Oracle] No price data to store")
+                return
+            
+            # Verify db_service has log_event method before calling
+            if not hasattr(self.db_service, 'log_event'):
+                logger.error("[Oracle] DatabaseService missing log_event method - skipping storage")
+                return
+            
             records = []
             for pd in price_data:
                 records.append({
@@ -318,10 +334,13 @@ class EnhancedOracleService:
             
             for record in records:
                 await self.db_service.log_event("price_history", record)
-                logger.debug(f"Stored {len(records)} price points to database")
+            
+            logger.debug(f"[Oracle] Stored {len(records)} price points to database")
                 
+        except AttributeError as e:
+            logger.error(f"[Oracle] DatabaseService method error: {str(e)}", exc_info=True)
         except Exception as e:
-            logger.error(f"Failed to store price data: {e}")
+            logger.error(f"[Oracle] Failed to store price data: {str(e)}", exc_info=True)
     
     async def get_health_status(self) -> Dict[str, Any]:
         """Check health of all oracle sources"""
