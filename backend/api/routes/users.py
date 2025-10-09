@@ -182,3 +182,17 @@ async def provision_wallets(
     except Exception as e:
         logger.error(f"[Wallet Provision] Failed for user {current_user['id']}: {e}")
         raise HTTPException(status_code=500, detail="Wallet provisioning failed")
+    
+@router.post("/api/errors")
+async def log_client_error(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Log frontend errors for debugging"""
+    try:
+        error_data = await request.json()
+        logger.error(f"[Client Error] User: {current_user.get('id')} | {error_data}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error logging failed: {e}")
+        return {"success": False}, 500
