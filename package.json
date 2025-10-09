@@ -4,14 +4,9 @@
   "version": "1.0.0",
   "description": "Seamount.io fullstack application",
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"python run-backend.py\"",
-    "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build:frontend",
-    "build:frontend": "cd frontend && npm run build",
-    "install:all": "npm install && cd frontend && npm install",
-    "install:backend": "cd backend && pip install -r requirements.txt",
-    "lint": "npm run lint:frontend",
-    "lint:frontend": "cd frontend && npm run lint"
+    "build:frontend": "cd frontend && npm ci && npm run build",
+    "install:all": "npm install && cd frontend && npm ci"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

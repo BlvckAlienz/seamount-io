@@ -478,31 +478,38 @@ class DatabaseService:
             logger.error(f"[DB] Error retrieving encrypted key for {user_id}: {str(e)}")
             raise
 
-    async def get_user_wallet(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get complete wallet information for user"""
-        try:
-            logger.debug(f"[DB] Fetching user wallet: {user_id}")
+async def get_user_wallet(self, user_id: str) -> Optional[Dict[str, Any]]:
+    """Get complete wallet information for user"""
+    try:
+        logger.debug(f"[DB] Fetching user wallet: {user_id}")
+        
+        response = self.supabase.table("user_wallets") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .eq("is_active", True) \
+            .maybe_single() \
+            .execute()
+        
+        # ✅ CRITICAL FIX: Check response exists before accessing .data
+        if response and hasattr(response, 'data') and response.data:
+            wallet = response.data
+            return {
+                "id": str(wallet["id"]),
+                "user_id": str(wallet["user_id"]),
+                "algorand_address": wallet["algorand_address"],
+                "wallet_type": wallet["wallet_type"],
+                "is_active": wallet["is_active"],
+                "created_at": wallet.get("created_at"),
+                "updated_at": wallet.get("updated_at")
+            }
+        else:
+            logger.debug(f"[DB] No wallet found for user {user_id}")
+            return None
             
-            response = self.supabase.table("user_wallets").select("*").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
-            
-            if response.data:
-                wallet = response.data
-                return {
-                    "id": str(wallet["id"]),
-                    "user_id": str(wallet["user_id"]),
-                    "algorand_address": wallet["algorand_address"],
-                    "wallet_type": wallet["wallet_type"],
-                    "is_active": wallet["is_active"],
-                    "created_at": wallet.get("created_at"),
-                    "updated_at": wallet.get("updated_at")
-                }
-            else:
-                logger.debug(f"[DB] No wallet found for user {user_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"[DB] Error fetching user wallet {user_id}: {str(e)}")
-            raise
+    except Exception as e:
+        logger.error(f"[DB] Error fetching user wallet {user_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None  # ✅ Never crash - always return None
     
     # File Location: backend/services/database_service.py
 # ADD THIS METHOD to DatabaseService class after get_user_wallet() method

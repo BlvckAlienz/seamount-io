@@ -79,39 +79,39 @@ async def check_profile_completeness(
 @router.post("/start-verification")
 async def start_kyc_verification(
     current_user: dict = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service),
-    supabase: Client = Depends(get_supabase_client)
-) -> Dict[str, Any]:
-    """Start KYC verification - DIAGNOSTIC VERSION"""
-    try:
-        user_id = current_user.get('id')
-        logger.info(f"[KYC] Starting verification for user: {user_id}")
-        logger.info(f"[KYC] User data: {current_user}")
-        
-        # Simple validation
-        if not current_user.get('first_name') or not current_user.get('last_name'):
-            raise HTTPException(status_code=400, detail="Name required")
-        
-        # Try to start verification
-        try:
-            result = await kyc_service.start_verification_session(
-                user_id,
-                current_user.get('email'),
-                current_user.get('country_code', 'US')
-            )
-            
-            logger.info(f"[KYC] Verification result: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"[KYC] Service error: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Service error: {str(e)}")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[KYC] Unexpected error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    kyc_service: KYCService = Depends(get_kyc_service)
+):
+    user_id = current_user.get('id')
+    country = current_user.get('country_code', 'US')
+    
+    # Check if user has required data
+    required_fields = ['first_name', 'last_name', 'date_of_birth']
+    missing = [f for f in required_fields if not current_user.get(f)]
+    
+    # Nigerian users need BVN/NIN
+    if country == 'NG' and not current_user.get('id_number'):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "missing_bvn",
+                "message": "BVN or NIN required for Nigerian users",
+                "missing_fields": ["id_number", "date_of_birth", "gender"]
+            }
+        )
+    
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "type": "profile_incomplete",
+                "message": "Please complete your profile",
+                "missing_fields": missing
+            }
+        )
+    
+    # Start verification
+    result = await kyc_service.start_verification_session(user_id, current_user['email'], country)
+    return result
 
 @router.post("/webhook")
 async def kyc_webhook_handler(

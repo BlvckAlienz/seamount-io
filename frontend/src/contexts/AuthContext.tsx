@@ -298,33 +298,45 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
 // Replace the problematic useEffect with this corrected version
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
-    console.log('Auth successful, checking KYC status for routing...');
-    console.log('User KYC Status:', state.user.kyc_status);
-    console.log('User Role:', state.user.role);
-    
     const kycStatus = state.user.kyc_status || 'not_started';
+    const hasWallet = state.user.algorand_address;
     
-    // 🚨 REMOVED: Stuck pending reset logic
-    // Just route based on current status - let webhooks handle updates
+    console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
     
-    if (kycStatus === 'verified' || kycStatus === 'approved') {
-      updateUserRole('tribe');
-      navigate('/dashboard');
-    } else if (kycStatus === 'skipped') {
-      updateUserRole('alien');
-      navigate('/dashboard');
-    } else if (kycStatus === 'not_started') {
+    // NEW USER: No wallet yet → force onboarding
+    if (!hasWallet || kycStatus === 'not_started') {
       navigate('/onboarding');
-    } else if (kycStatus === 'pending' || kycStatus === 'in_progress' || kycStatus === 'under_review') {
-      // Don't reset - verification in progress
-      navigate('/dashboard');
-      toast('Verification in progress', { icon: '⏳' });
-    } else {
-      // Fallback for unknown states
-      navigate('/dashboard');
+      return;
     }
+    
+    // VERIFIED USER: approved/tribe → dashboard
+    if (kycStatus === 'approved' || state.user.role === 'tribe') {
+      navigate('/dashboard');
+      return;
+    }
+    
+// PENDING VERIFICATION: Only go to dashboard if wallet exists
+  if (['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
+    if (hasWallet) {
+      navigate('/dashboard');
+      toast('Verification in progress');
+    } else {
+      // Stuck in pending but no wallet - complete onboarding first
+      navigate('/onboarding');
+    }
+    return;
   }
-}, [state.session, state.user, state.loading, navigate, updateUserRole]);
+    
+    // SKIPPED KYC: wallet exists but skipped → dashboard
+    if (kycStatus === 'skipped' && hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // DEFAULT: Send to onboarding
+    navigate('/onboarding');
+  }
+}, [state.session, state.user, state.loading, navigate]);
 
 const triggerWalletCreation = useCallback(async () => {
   try {

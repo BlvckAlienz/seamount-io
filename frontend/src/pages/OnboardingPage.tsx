@@ -52,78 +52,54 @@ const WelcomeStep = ({ onNext }) => (
 
 // Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
-  const [showBVNModal, setShowBVNModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showBVNModal, setShowBVNModal] = useState(false);
   
-  const userCountry = userProfile?.country_code || userProfile?.country || 'US';
+  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
+  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
 
-  const handleDataSubmit = async (collectedData) => {
+  const startVerification = async () => {
+    setLoading(true);
+    
     try {
-      const response = await apiClient.post('/api/v1/kyc/submit-kyc-data', collectedData);
+      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
-      if (response.data.success) {
+      if (data.success) {
         toast.success('Verification started!');
-        setShowBVNModal(false);
         onNext();
+      } else {
+        throw new Error(data.message || 'Verification failed');
       }
-    } catch (error) {
-      toast.error('Verification failed: ' + error.message);
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        const errorDetail = error.response?.data?.detail;
+        const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
+        const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+        
+        if (errorType === 'missing_bvn') {
+          // Nigerian user missing BVN data
+          toast.error('BVN verification required for Nigerian users');
+          setShowBVNModal(true);
+        } else if (errorType === 'profile_incomplete') {
+          // Generic profile incomplete
+          const missingFields = errorDetail.missing_fields || [];
+          toast.error(`Please complete: ${missingFields.join(', ')}`);
+          // TODO: Show inline profile editor or redirect to profile page
+        } else {
+          // Generic 400 error
+          toast.error(errorMessage || 'Please complete your profile before verification');
+        }
+      } else if (error.response?.status === 500) {
+        const errorDetail = error.response?.data?.detail;
+        const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+        toast.error(errorMessage || 'Verification service temporarily unavailable');
+      } else {
+        toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
+      }
+    } finally {
+      setLoading(false);
     }
   };
-
-  if (showBVNModal) {
-    return (
-      <BVNCollectionModal
-        onComplete={handleDataSubmit}
-        onCancel={() => setShowBVNModal(false)}
-        userEmail={userProfile?.email || ''}
-        countryCode={userCountry}
-      />
-    );
-  }
-
-const startVerification = async () => {
-  setLoading(true);
-  
-  try {
-    const { data } = await apiClient.post('/api/v1/kyc/start-verification');
-    
-    if (data.success) {
-      toast.success('Verification started!');
-      onNext();
-    } else {
-      throw new Error(data.message || 'Verification failed');
-    }
-  } catch (error: any) {
-    if (error.response?.status === 400) {
-      const errorDetail = error.response?.data?.detail;
-      const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
-      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
-      
-      if (errorType === 'missing_bvn') {
-        // Nigerian user missing BVN data
-        toast.error('BVN verification required for Nigerian users');
-        setShowBVNModal(true);
-      } else if (errorType === 'profile_incomplete') {
-        // Generic profile incomplete
-        const missingFields = errorDetail.missing_fields || [];
-        toast.error(`Please complete: ${missingFields.join(', ')}`);
-        // TODO: Show inline profile editor or redirect to profile page
-      } else {
-        // Generic 400 error
-        toast.error(errorMessage || 'Please complete your profile before verification');
-      }
-    } else if (error.response?.status === 500) {
-      const errorDetail = error.response?.data?.detail;
-      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
-      toast.error(errorMessage || 'Verification service temporarily unavailable');
-    } else {
-      toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
-    }
-  } finally {
-    setLoading(false);
-  }
-};
 
   const handleBVNComplete = async (bvnData) => {
     setShowBVNModal(false);
@@ -418,30 +394,28 @@ const OnboardingPage = () => {
 
   const handleWelcomeComplete = () => setStep('identity');
 
-  const handleIdentityComplete = async () => {
-    const toastId = toast.loading('Creating your wallet...');
+const handleIdentityComplete = async () => {
+  const toastId = toast.loading('Creating your wallet...');
+  
+  try {
+    // ✅ CRITICAL: Always call provision-wallets
+    const response = await apiClient.post('/api/v1/user/provision-wallets');
     
-    try {
-      // Save detected country
-      if (detectedCountry) {
-        localStorage.setItem('user_country', detectedCountry.code);
-      }
-      
-      const response = await apiClient.post('/api/v1/user/provision-wallets');
-      
-      if (response.data.success && response.data.mnemonic) {
-        toast.success('Wallet created!', { id: toastId });
-        setMnemonic(response.data.mnemonic);
-        setStep('walletBackup');
-      } else {
-        throw new Error('No mnemonic returned');
-      }
-    } catch (error) {
-      console.error('Wallet creation error:', error);
-      toast.error('Could not create wallet. Proceeding to dashboard.', { id: toastId });
-      await completeOnboarding();
+    if (response.data.success && response.data.mnemonic) {
+      toast.success('Wallet created!', { id: toastId });
+      setMnemonic(response.data.mnemonic);
+      setStep('walletBackup');
+    } else {
+      throw new Error('Wallet creation failed');
     }
-  };
+  } catch (error) {
+    console.error('Wallet creation error:', error);
+    toast.error('Wallet creation failed', { id: toastId });
+    
+    // Don't skip to dashboard - retry or show error
+    toast.error('Please refresh and try again');
+  }
+};
 
   const handleBackupComplete = async () => {
     await completeOnboarding();
