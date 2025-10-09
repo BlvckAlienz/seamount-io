@@ -742,14 +742,5 @@ async def get_user_wallet(self, user_id: str) -> Optional[Dict[str, Any]]:
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
 
-    async def log_event(self, event_type: str, event_data: Dict[str, Any]) -> bool:
-        """TEMPORARY FIX: Skip system_events logging to unblock KYC"""
-        try:
-            logger.info(f"[DB] Would log event (TEMPORARILY SKIPPED): {event_type} - {event_data}")
-            return True  # Return success to avoid breaking flow
-        except Exception as e:
-            logger.error(f"[DB] Event logging failed: {str(e)}")
-            return True  # Still return success to avoid breaking flow
-
 # This alias ensures existing imports continue to work
 SuperDatabaseService = DatabaseService
