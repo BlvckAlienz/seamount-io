@@ -327,3 +327,4 @@ class KYCService:
                 "error": str(e),
                 "timestamp": datetime.utcnow().isoformat()
             }
+            

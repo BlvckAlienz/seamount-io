@@ -1,5 +1,5 @@
 # File Location: backend/services/kyc_providers/regfyl.py
-# PRODUCTION READY: Regfyl KYC/AML Provider Integration
+# PRODUCTION READY: Regfyl KYC/AML Provider Integration - INDENTATION FIXED
 
 import asyncio
 import hashlib
@@ -26,10 +26,10 @@ class RegfylVerifier:
     def __init__(self, api_key: str = None):
         settings = get_settings()
         self.api_key = api_key or settings.REGFYL_API_KEY
-        self.base_url = getattr(settings, 'REGFYL_BASE_URL', "https://api.portal.regfyl.com")  # Fixed: added default
+        self.base_url = getattr(settings, 'REGFYL_BASE_URL', "https://api.portal.regfyl.com")
         self.company_name = getattr(settings, 'REGFYL_COMPANY_NAME', '')
         self.rc_number = getattr(settings, 'REGFYL_RC_NUMBER', '')
-        self.environment = getattr(settings, 'REGFYL_ENVIRONMENT', 'production')
+        self.environment = getattr(settings, 'REGFYL_ENVIRONMENT', 'PRODUCTION')
         
         self.max_retries = 3
         self.timeout = aiohttp.ClientTimeout(total=30)
@@ -111,27 +111,27 @@ class RegfylVerifier:
     
     def _simulate_response(self, endpoint: str, data: Dict) -> Dict:
         """Simulate Regfyl responses for testing"""
-        if "customerScreening" in endpoint:
+        if "customerScreening" in endpoint or "postCustomerScreening" in endpoint:
             return {
                 "reference": f"REG_SIM_{uuid.uuid4().hex[:8]}",
-                "status": "success",
-                "message": "Customer screening initiated (simulation)",
+                "status": "200",
+                "description": "Data added successfully",
                 "customerID": data.get("customerID")
             }
         elif "postTransaction" in endpoint:
             return {
                 "reference": f"TXN_SIM_{uuid.uuid4().hex[:8]}",
-                "status": "success", 
-                "message": "Transaction monitoring initiated (simulation)",
+                "status": "200",
+                "description": "Data successfully added",
                 "transactionReference": data.get("transactionReference")
             }
         elif "postRiskAssessment" in endpoint:
             return {
                 "reference": f"BIZ_SIM_{uuid.uuid4().hex[:8]}",
-                "status": "success",
-                "message": "Business screening initiated (simulation)"
+                "status": "200",
+                "description": "Data added successfully"
             }
-        return {"status": "simulated", "message": "Running in simulation mode"}
+        return {"status": "200", "description": "Running in simulation mode"}
     
     # ============================================================================
     # CUSTOMER SCREENING METHODS
@@ -163,7 +163,7 @@ class RegfylVerifier:
         }
         
         try:
-            result = await self._make_request('postCustomerScreening', payload)  # Fixed endpoint
+            result = await self._make_request('postCustomerScreening', payload)
             logger.info(f"Customer screening initiated for {customer_id}")
             return result
         except Exception as e:
@@ -315,45 +315,45 @@ class RegfylVerifier:
             raise
 
     # ============================================================================
-    # SEAMOUNT.IO INTEGRATION HELPERS
+    # SEAMOUNT.IO INTEGRATION HELPERS - FIXED INDENTATION
     # ============================================================================
     
-async def onboard_seamount_user(self, user_data: Dict) -> Dict:
-    """Complete onboarding flow - handles missing BVN/DOB gracefully"""
-    customer_id = user_data['customer_id']
-    results = {}
-    
-    try:
-        # Basic screening (works without BVN)
-        screening_result = await self.screen_individual_customer(
-            customer_id=customer_id,
-            customer_name=user_data['full_name'],
-            year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),  # Default to age 25
-            gender=user_data.get('gender', ''),
-            callback_url=user_data.get('callback_url')
-        )
-        results['screening'] = screening_result
+    async def onboard_seamount_user(self, user_data: Dict) -> Dict:
+        """Complete onboarding flow - handles missing BVN/DOB gracefully"""
+        customer_id = user_data['customer_id']
+        results = {}
         
-        # ID verification ONLY if BVN exists
-        if user_data.get('country') == 'NG' and user_data.get('id_number'):
-            id_result = await self.verify_nigerian_id(
+        try:
+            # Basic screening (works without BVN)
+            screening_result = await self.screen_individual_customer(
                 customer_id=customer_id,
                 customer_name=user_data['full_name'],
                 year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),
-                id_type=user_data.get('id_type', 'BVN'),
-                id_number=user_data['id_number'],
+                gender=user_data.get('gender', ''),
                 callback_url=user_data.get('callback_url')
             )
-            results['id_verification'] = id_result
-        else:
-            logger.info(f"Skipping ID verification - no BVN provided for {customer_id}")
-            results['id_verification'] = {'status': 'skipped', 'reason': 'no_bvn_provided'}
-        
-        return results
-        
-    except Exception as e:
-        logger.error(f"Seamount user onboarding failed for {customer_id}: {e}")
-        raise
+            results['screening'] = screening_result
+            
+            # ID verification ONLY if BVN exists
+            if user_data.get('country') == 'NG' and user_data.get('id_number'):
+                id_result = await self.verify_nigerian_id(
+                    customer_id=customer_id,
+                    customer_name=user_data['full_name'],
+                    year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),
+                    id_type=user_data.get('id_type', 'BVN'),
+                    id_number=user_data['id_number'],
+                    callback_url=user_data.get('callback_url')
+                )
+                results['id_verification'] = id_result
+            else:
+                logger.info(f"Skipping ID verification - no BVN provided for {customer_id}")
+                results['id_verification'] = {'status': 'skipped', 'reason': 'no_bvn_provided'}
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Seamount user onboarding failed for {customer_id}: {e}")
+            raise
 
     async def monitor_seamount_transaction(self, transaction_data: Dict) -> Dict:
         """Monitor Seamount.io transactions (USDS transfers, swaps, etc.)"""
@@ -437,6 +437,7 @@ async def onboard_seamount_user(self, user_data: Dict) -> Dict:
             result['risk_level'] = 'HIGH'
         
         return result
+
 
 # Export service instance
 regfyl_service = RegfylVerifier()
