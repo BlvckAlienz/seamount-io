@@ -310,15 +310,10 @@ class EnhancedOracleService:
             raise ValueError("Could not determine NGN/USD exchange rate")
     
     async def store_price_data(self, price_data: List[PriceData]):
-        """Store price data in database for analytics - FIXED: proper try/catch with validation"""
+        """Store price data in database for analytics - FIXED: proper async/await handling"""
         try:
             if not price_data:
                 logger.warning("[Oracle] No price data to store")
-                return
-            
-            # Verify db_service has log_event method before calling
-            if not hasattr(self.db_service, 'log_event'):
-                logger.error("[Oracle] DatabaseService missing log_event method - skipping storage")
                 return
             
             records = []
@@ -333,9 +328,11 @@ class EnhancedOracleService:
                 })
             
             for record in records:
-                await self.db_service.log_event("price_history", record)
-            
-            logger.debug(f"[Oracle] Stored {len(records)} price points to database")
+                result = await self.db_service.log_event("price_history", record)
+                if result:
+                    logger.debug(f"[Oracle] Stored price point: {record['currency_pair']} @ {record['source']}")
+                else:
+                    logger.warning(f"[Oracle] Failed to store: {record['currency_pair']}")
                 
         except AttributeError as e:
             logger.error(f"[Oracle] DatabaseService method error: {str(e)}", exc_info=True)
