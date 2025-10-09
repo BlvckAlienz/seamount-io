@@ -42,7 +42,7 @@ const COUNTRY_CONFIGS: Record<string, CountryConfig> = {
     idTypes: [
       { value: 'PASSPORT', label: 'Passport Number', placeholder: 'A12345678' }
     ],
-    requiresID: false // Passport is optional for non-priority markets
+    requiresID: false
   }
 };
 
@@ -64,14 +64,14 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     idNumber: '',
     dateOfBirth: '',
     gender: '',
-    phoneNumber: ''
+    phoneNumber: '',
+    country: countryCode
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const config = COUNTRY_CONFIGS[countryCode] || COUNTRY_CONFIGS.DEFAULT;
 
-  // Auto-select ID type if only one option
   useEffect(() => {
     if (config.idTypes.length === 1) {
       setFormData(prev => ({ ...prev, idType: config.idTypes[0].value }));
@@ -107,10 +107,7 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onComplete({
-        ...formData,
-        country: countryCode
-      });
+      await onComplete(formData);
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setIsSubmitting(false);
@@ -135,7 +132,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
         </p>
         
         <div className="space-y-4">
-          {/* ID Type Selection (if multiple options) */}
           {config.idTypes.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -154,7 +150,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           )}
           
-          {/* ID Number Input */}
           {(formData.idType || config.idTypes.length === 1) && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -170,7 +165,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           )}
           
-          {/* Date of Birth */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Date of Birth *
@@ -184,7 +178,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             />
           </div>
           
-          {/* Gender */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Gender *
@@ -215,7 +208,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           </div>
           
-          {/* Phone Number */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Phone Number *
@@ -229,7 +221,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             />
           </div>
 
-          {/* Error Display */}
           {error && (
             <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
               <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -237,7 +228,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
               onClick={onCancel}

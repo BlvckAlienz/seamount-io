@@ -276,7 +276,8 @@ const completeOnboarding = async () => {
           kyc_status: 'skipped',
           kyc_level: 1,
           role: 'alien',
-          kyc_provider: null  // ✅ ADDED
+          kyc_provider: null,
+          verification_skipped: true
         })
         .eq("id", state.user.id);
         
@@ -315,17 +316,17 @@ useEffect(() => {
       return;
     }
     
-// PENDING VERIFICATION: Only go to dashboard if wallet exists
-  if (['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
-    if (hasWallet) {
-      navigate('/dashboard');
-      toast('Verification in progress');
-    } else {
-      // Stuck in pending but no wallet - complete onboarding first
-      navigate('/onboarding');
+    // PENDING VERIFICATION: Only go to dashboard if wallet exists
+    if (['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
+      if (hasWallet) {
+        navigate('/dashboard');
+        toast('Verification in progress');
+      } else {
+        // Stuck in pending but no wallet - complete onboarding first
+        navigate('/onboarding');
+      }
+      return;
     }
-    return;
-  }
     
     // SKIPPED KYC: wallet exists but skipped → dashboard
     if (kycStatus === 'skipped' && hasWallet) {

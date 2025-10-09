@@ -56,7 +56,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [showBVNModal, setShowBVNModal] = useState(false);
   
   const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
-  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
+  const hasRequiredData = userProfile?.id_number && userProfile?.date_of_birth && userProfile?.gender;
 
   const startVerification = async () => {
     setLoading(true);
@@ -76,17 +76,13 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
         const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
         const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
         
-        if (errorType === 'missing_bvn') {
-          // Nigerian user missing BVN data
-          toast.error('BVN verification required for Nigerian users');
+        if (errorType === 'missing_id') {
+          toast.error(errorMessage);
           setShowBVNModal(true);
         } else if (errorType === 'profile_incomplete') {
-          // Generic profile incomplete
           const missingFields = errorDetail.missing_fields || [];
           toast.error(`Please complete: ${missingFields.join(', ')}`);
-          // TODO: Show inline profile editor or redirect to profile page
         } else {
-          // Generic 400 error
           toast.error(errorMessage || 'Please complete your profile before verification');
         }
       } else if (error.response?.status === 500) {
@@ -102,9 +98,19 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   };
 
   const handleBVNComplete = async (bvnData) => {
-    setShowBVNModal(false);
-    toast.success('Information saved! Starting verification...');
-    setTimeout(() => startVerification(), 1000);
+    try {
+      // Submit collected data to backend
+      await apiClient.post('/api/v1/kyc/submit-kyc-data', bvnData);
+      
+      setShowBVNModal(false);
+      toast.success('Information saved! Starting verification...');
+      
+      // Wait for backend to process, then move to next step
+      setTimeout(() => onNext(), 1500);
+    } catch (error) {
+      console.error('Data submission error:', error);
+      toast.error('Failed to save information');
+    }
   };
 
   const handleSkip = () => {
@@ -112,12 +118,13 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     onNext();
   };
 
-  if (showBVNModal && isNigerianUser) {
+  if (showBVNModal) {
     return (
       <BVNCollectionModal
         onComplete={handleBVNComplete}
         onCancel={() => setShowBVNModal(false)}
         userEmail={userProfile?.email || ''}
+        countryCode={userProfile?.country_code || 'US'}
       />
     );
   }
@@ -132,14 +139,16 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
         <p className="text-gray-400">Unlock full platform features with quick verification</p>
       </div>
       
-      {isNigerianUser && !hasBVN && (
+      {!hasRequiredData && (
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-blue-300 text-sm font-medium mb-1">🇳🇬 Nigerian User - Fast Track</p>
+              <p className="text-blue-300 text-sm font-medium mb-1">
+                {isNigerianUser ? '🇳🇬 Nigerian User - Fast Track' : 'Quick Verification'}
+              </p>
               <p className="text-gray-300 text-xs">
-                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+                You'll be prompted for your ID details for instant verification via Regfyl.
               </p>
             </div>
           </div>
@@ -410,10 +419,7 @@ const handleIdentityComplete = async () => {
     }
   } catch (error) {
     console.error('Wallet creation error:', error);
-    toast.error('Wallet creation failed', { id: toastId });
-    
-    // Don't skip to dashboard - retry or show error
-    toast.error('Please refresh and try again');
+    toast.error('Wallet creation failed. Please refresh and try again.', { id: toastId });
   }
 };
 
