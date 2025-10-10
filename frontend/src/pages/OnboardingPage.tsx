@@ -45,7 +45,7 @@ const WelcomeStep = ({ onNext }) => (
       onClick={onNext}
       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
     >
-      Get Started â†’
+      Get Started
     </button>
   </div>
 );
@@ -137,7 +137,7 @@ const startVerification = async () => {
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-blue-300 text-sm font-medium mb-1">ðŸ‡³ðŸ‡¬ Nigerian User - Fast Track</p>
+              <p className="text-blue-300 text-sm font-medium mb-1">Nigerian User - Fast Track</p>
               <p className="text-gray-300 text-xs">
                 You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
               </p>
@@ -184,7 +184,7 @@ const startVerification = async () => {
             onClick={onPrev}
             className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
           >
-            â† Back
+            Back
           </button>
         )}
       </div>

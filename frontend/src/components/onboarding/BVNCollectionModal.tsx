@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Shield, Globe } from 'lucide-react';
-import { apiClient } from '../../config/api'; // ✅ FIXED IMPORT PATH
 
 interface CountryConfig {
   name: string;
@@ -43,7 +42,7 @@ const COUNTRY_CONFIGS: Record<string, CountryConfig> = {
     idTypes: [
       { value: 'PASSPORT', label: 'Passport Number', placeholder: 'A12345678' }
     ],
-    requiresID: false
+    requiresID: false // Passport is optional for non-priority markets
   }
 };
 
@@ -65,14 +64,14 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     idNumber: '',
     dateOfBirth: '',
     gender: '',
-    phoneNumber: '',
-    country: countryCode
+    phoneNumber: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const config = COUNTRY_CONFIGS[countryCode] || COUNTRY_CONFIGS.DEFAULT;
 
+  // Auto-select ID type if only one option
   useEffect(() => {
     if (config.idTypes.length === 1) {
       setFormData(prev => ({ ...prev, idType: config.idTypes[0].value }));
@@ -101,26 +100,22 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     return true;
   };
 
-const handleSubmit = async () => {
-  setError('');
-  
-  if (!validateForm()) return;
-
-  setIsSubmitting(true);
-  try {
-    // Use the apiClient instead of direct fetch
-    const response = await apiClient.post('/api/v1/kyc/submit-kyc-data', formData);
+  const handleSubmit = async () => {
+    setError('');
     
-    if (response.data.success) {
-      await onComplete(formData);
-    } else {
-      throw new Error(response.data.message || 'Verification failed');
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onComplete({
+        ...formData,
+        country: countryCode
+      });
+    } catch (err: any) {
+      setError(err.message || 'Verification failed');
+      setIsSubmitting(false);
     }
-  } catch (err: any) {
-    setError(err.response?.data?.detail || err.message || 'Verification failed');
-    setIsSubmitting(false);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -140,6 +135,7 @@ const handleSubmit = async () => {
         </p>
         
         <div className="space-y-4">
+          {/* ID Type Selection (if multiple options) */}
           {config.idTypes.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -158,6 +154,7 @@ const handleSubmit = async () => {
             </div>
           )}
           
+          {/* ID Number Input */}
           {(formData.idType || config.idTypes.length === 1) && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -173,6 +170,7 @@ const handleSubmit = async () => {
             </div>
           )}
           
+          {/* Date of Birth */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Date of Birth *
@@ -186,6 +184,7 @@ const handleSubmit = async () => {
             />
           </div>
           
+          {/* Gender */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Gender *
@@ -216,6 +215,7 @@ const handleSubmit = async () => {
             </div>
           </div>
           
+          {/* Phone Number */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Phone Number *
@@ -229,6 +229,7 @@ const handleSubmit = async () => {
             />
           </div>
 
+          {/* Error Display */}
           {error && (
             <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
               <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
@@ -236,6 +237,7 @@ const handleSubmit = async () => {
             </div>
           )}
 
+          {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <button
               onClick={onCancel}

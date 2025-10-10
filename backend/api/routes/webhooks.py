@@ -135,7 +135,7 @@ async def handle_paystack_charge_success(event_data):
         
         supabase.table("payment_transactions").update(update_data).eq("reference", reference).execute()
         
-        logger.info(f"✅ Payment completed: {reference} - {amount} {asset.upper()} credited to user {user_id}")
+        logger.info(f"âœ… Payment completed: {reference} - {amount} {asset.upper()} credited to user {user_id}")
         
     except Exception as e:
         logger.error(f"Failed to handle charge success: {str(e)}")
@@ -157,7 +157,7 @@ async def handle_paystack_charge_failed(event_data):
             })
         }).eq("reference", reference).execute()
         
-        logger.warning(f"❌ Payment failed: {reference}")
+        logger.warning(f"âŒ Payment failed: {reference}")
         
     except Exception as e:
         logger.error(f"Failed to handle charge failure: {str(e)}")
@@ -241,7 +241,7 @@ async def handle_flutterwave_success(data):
             })
         }).eq("reference", reference).execute()
         
-        logger.info(f"✅ Flutterwave payment completed: {reference} - {amount} {asset.upper()} credited")
+        logger.info(f"âœ… Flutterwave payment completed: {reference} - {amount} {asset.upper()} credited")
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave success: {str(e)}")
@@ -260,7 +260,7 @@ async def handle_flutterwave_failure(data):
             })
         }).eq("reference", reference).execute()
         
-        logger.warning(f"❌ Flutterwave payment failed: {reference}")
+        logger.warning(f"âŒ Flutterwave payment failed: {reference}")
         
     except Exception as e:
         logger.error(f"Failed to handle Flutterwave failure: {str(e)}")
