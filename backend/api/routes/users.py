@@ -145,11 +145,10 @@ async def update_user_profile(
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service: WalletService = Depends(get_wallet_service),
+    supabase: Client = Depends(get_supabase_client)  # Make sure supabase client is here
 ):
-    """
-    CRITICAL FIX: Provision Algorand wallet with mnemonic return
-    """
+    """Provision Algorand wallet with mnemonic return"""
     try:
         user_id = current_user['id']
         logger.info(f"[Wallet Provision] User: {user_id}")
@@ -157,11 +156,15 @@ async def provision_wallets(
         # Check if wallet exists
         existing_wallet = await wallet_service.get_user_balances(user_id)
         if existing_wallet.get('wallet_exists'):
+            # If wallet exists, get the address from the user_profiles table
+            profile_response = supabase.table("user_profiles").select("algorand_address").eq("id", user_id).execute()
+            wallet_address = profile_response.data[0].get('algorand_address') if profile_response.data else None
+            
             return {
                 "success": True,
-                "wallet_address": existing_wallet['wallet_address'],
+                "wallet_address": wallet_address,
                 "message": "Wallet already exists",
-                "mnemonic": None  # Don't return mnemonic for existing wallets
+                "mnemonic": None
             }
         
         # Create new wallet
@@ -169,10 +172,17 @@ async def provision_wallets(
         
         if result["success"]:
             logger.info(f"[Wallet Provision] Wallet created: {result['wallet_address']}")
+            
+            # CRITICAL: Force an immediate refresh of the user profile
+            await wallet_service.db_service.supabase.table("user_profiles").update({
+                "algorand_address": result["wallet_address"],
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", user_id).execute()
+            
             return {
                 "success": True,
                 "wallet_address": result["wallet_address"],
-                "mnemonic": result["mnemonic"],  # Return for one-time backup
+                "mnemonic": result["mnemonic"],
                 "supported_assets": result.get("supported_assets", []),
                 "message": "Wallet created successfully"
             }
