@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Shield, Globe } from 'lucide-react';
-import { apiClient } from '../config/api';
+import { apiClient } from '../../config/api'; // ✅ FIXED IMPORT PATH
 
 interface CountryConfig {
   name: string;
