@@ -276,8 +276,7 @@ const completeOnboarding = async () => {
           kyc_status: 'skipped',
           kyc_level: 1,
           role: 'alien',
-          kyc_provider: null,
-          verification_skipped: true
+          kyc_provider: null  // âœ… ADDED
         })
         .eq("id", state.user.id);
         
@@ -300,24 +299,36 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     const kycStatus = state.user.kyc_status || 'not_started';
-    // Check BOTH columns for wallet
-    const hasWallet = state.user.algorand_address || state.user.wallet_address;
+    const hasWallet = state.user.algorand_address;
     
     console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
     
-    // Users with wallets → dashboard
-    if (hasWallet) {
-      navigate('/dashboard');
+    // NEW USER: No wallet yet â†’ force onboarding
+    if (!hasWallet || kycStatus === 'not_started') {
+      navigate('/onboarding');
       return;
     }
     
-    // Verified users → dashboard
+    // VERIFIED USER: approved/tribe â†’ dashboard
     if (kycStatus === 'approved' || state.user.role === 'tribe') {
       navigate('/dashboard');
       return;
     }
     
-    // Default → onboarding
+    // PENDING VERIFICATION: in_progress/pending â†’ dashboard
+    if (['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
+      navigate('/dashboard');
+      toast('Verification in progress');
+      return;
+    }
+    
+    // SKIPPED KYC: wallet exists but skipped â†’ dashboard
+    if (kycStatus === 'skipped' && hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // DEFAULT: Send to onboarding
     navigate('/onboarding');
   }
 }, [state.session, state.user, state.loading, navigate]);

@@ -45,7 +45,7 @@ const WelcomeStep = ({ onNext }) => (
       onClick={onNext}
       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
     >
-      Get Started →
+      Get Started â†’
     </button>
   </div>
 );
@@ -53,23 +53,74 @@ const WelcomeStep = ({ onNext }) => (
 // Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
+  const [showBVNModal, setShowBVNModal] = useState(false);
+  
+  const isNigerianUser = userProfile?.country_code === 'NG' || userProfile?.country === 'NG';
+  const hasBVN = userProfile?.bvn && userProfile?.date_of_birth && userProfile?.gender;
 
-  const startVerification = async () => {
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
-      
-      if (data.success) {
-        toast.success('Verification started!');
-        onNext();
-      }
-    } catch (error: any) {
-      console.error('KYC error:', error);
-      toast.error(error.response?.data?.detail || 'Verification failed');
-    } finally {
-      setLoading(false);
+const startVerification = async () => {
+  setLoading(true);
+  
+  try {
+    const { data } = await apiClient.post('/api/v1/kyc/start-verification');
+    
+    if (data.success) {
+      toast.success('Verification started!');
+      onNext();
+    } else {
+      throw new Error(data.message || 'Verification failed');
     }
+  } catch (error: any) {
+    if (error.response?.status === 400) {
+      const errorDetail = error.response?.data?.detail;
+      const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
+      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+      
+      if (errorType === 'missing_bvn') {
+        // Nigerian user missing BVN data
+        toast.error('BVN verification required for Nigerian users');
+        setShowBVNModal(true);
+      } else if (errorType === 'profile_incomplete') {
+        // Generic profile incomplete
+        const missingFields = errorDetail.missing_fields || [];
+        toast.error(`Please complete: ${missingFields.join(', ')}`);
+        // TODO: Show inline profile editor or redirect to profile page
+      } else {
+        // Generic 400 error
+        toast.error(errorMessage || 'Please complete your profile before verification');
+      }
+    } else if (error.response?.status === 500) {
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'object' ? errorDetail.message : errorDetail;
+      toast.error(errorMessage || 'Verification service temporarily unavailable');
+    } else {
+      toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const handleBVNComplete = async (bvnData) => {
+    setShowBVNModal(false);
+    toast.success('Information saved! Starting verification...');
+    setTimeout(() => startVerification(), 1000);
   };
+
+  const handleSkip = () => {
+    toast('You can verify later from Settings');
+    onNext();
+  };
+
+  if (showBVNModal && isNigerianUser) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleBVNComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+      />
+    );
+  }
 
   return (
     <div className="text-center">
@@ -78,7 +129,38 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           <Shield className="h-8 w-8 text-white" />
         </div>
         <h3 className="text-2xl font-semibold text-white mb-2">Verify Your Identity</h3>
-        <p className="text-gray-400">Unlock full platform features</p>
+        <p className="text-gray-400">Unlock full platform features with quick verification</p>
+      </div>
+      
+      {isNigerianUser && !hasBVN && (
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-blue-300 text-sm font-medium mb-1">ðŸ‡³ðŸ‡¬ Nigerian User - Fast Track</p>
+              <p className="text-gray-300 text-xs">
+                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
+        <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
+        <ul className="text-sm text-gray-300 space-y-2">
+          {[
+            "Comply with global financial regulations",
+            "Protect your account from fraud",
+            "Enable higher transaction limits",
+            "Access institutional features"
+          ].map(item => (
+            <li key={item} className="flex items-start">
+              <CheckCircle className="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </div>
       
       <div className="space-y-3">
@@ -87,15 +169,24 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           disabled={loading}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          {loading ? 'Starting...' : 'Start Verification'}
+          {loading ? 'Checking profile...' : 'Start Verification'}
         </button>
         
         <button
-          onClick={onNext}
+          onClick={handleSkip}
           className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
         >
           I'll Do This Later
         </button>
+        
+        {onPrev && (
+          <button
+            onClick={onPrev}
+            className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
+          >
+            â† Back
+          </button>
+        )}
       </div>
     </div>
   );
@@ -186,7 +277,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
             onClick={() => setVerifying(false)}
             className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
           >
-            ← Back
+            â† Back
           </button>
           <button
             onClick={verifyWords}
@@ -270,7 +361,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
           disabled={!showMnemonic}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          I've Backed It Up →
+          I've Backed It Up â†’
         </button>
         
         {onPrev && (
@@ -278,7 +369,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
             onClick={onPrev}
             className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
           >
-            ← Back
+            â† Back
           </button>
         )}
       </div>
@@ -303,35 +394,34 @@ const OnboardingPage = () => {
 
   const handleWelcomeComplete = () => setStep('identity');
 
-const handleIdentityComplete = async () => {
-  const toastId = toast.loading('Creating your wallet...');
-  
-  try {
-    // ✅ CRITICAL: Always call provision-wallets
-    const response = await apiClient.post('/api/v1/user/provision-wallets');
+  const handleIdentityComplete = async () => {
+    const toastId = toast.loading('Creating your wallet...');
     
-    if (response.data.success && response.data.mnemonic) {
-      toast.success('Wallet created!', { id: toastId });
-      setMnemonic(response.data.mnemonic);
-      setStep('walletBackup');
-    } else {
-      throw new Error('Wallet creation failed');
+    try {
+      // Save detected country
+      if (detectedCountry) {
+        localStorage.setItem('user_country', detectedCountry.code);
+      }
+      
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      
+      if (response.data.success && response.data.mnemonic) {
+        toast.success('Wallet created!', { id: toastId });
+        setMnemonic(response.data.mnemonic);
+        setStep('walletBackup');
+      } else {
+        throw new Error('No mnemonic returned');
+      }
+    } catch (error) {
+      console.error('Wallet creation error:', error);
+      toast.error('Could not create wallet. Proceeding to dashboard.', { id: toastId });
+      await completeOnboarding();
     }
-  } catch (error) {
-    console.error('Wallet creation error:', error);
-    toast.error('Wallet creation failed. Please refresh and try again.', { id: toastId });
-  }
-};
+  };
 
-const handleBackupComplete = async () => {
-  // Refresh profile to get wallet address
-  await refreshProfile();
-  
-  // Small delay to ensure state updates
-  setTimeout(() => {
-    navigate('/dashboard');
-  }, 500);
-};
+  const handleBackupComplete = async () => {
+    await completeOnboarding();
+  };
 
   const handleStepBack = () => {
     if (step === 'walletBackup') setStep('identity');
