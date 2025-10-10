@@ -332,7 +332,7 @@ async def submit_kyc_data(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client)
 ):
-    """Submit KYC data collected from modal before verification"""
+    """Submit KYC data collected from modal - FIXED VERSION"""
     try:
         user_id = current_user.get('id')
         logger.info(f"[KYC Data] Submitting KYC data for user: {user_id}")
@@ -349,19 +349,21 @@ async def submit_kyc_data(
             update_data['gender'] = kyc_data['gender']
         if kyc_data.get('phoneNumber'):
             update_data['phone'] = kyc_data['phoneNumber']
+        if kyc_data.get('country'):
+            update_data['country_code'] = kyc_data['country']
         
-        # Handle ID data based on country
+        # Handle ID data
         country_code = kyc_data.get('country', current_user.get('country_code', 'US'))
-        if country_code == 'NG':
-            if kyc_data.get('idNumber'):
-                if kyc_data.get('idType') == 'BVN':
-                    update_data['bvn'] = kyc_data['idNumber']
-                update_data['id_number'] = kyc_data['idNumber']
-                update_data['id_type'] = kyc_data.get('idType', 'BVN')
-        else:
-            if kyc_data.get('idNumber'):
-                update_data['id_number'] = kyc_data['idNumber']
-                update_data['id_type'] = kyc_data.get('idType', 'PASSPORT')
+        id_type = kyc_data.get('idType')
+        id_number = kyc_data.get('idNumber')
+        
+        if id_number:
+            update_data['id_number'] = id_number
+            update_data['id_type'] = id_type
+            
+            # Special handling for Nigerian BVN
+            if country_code == 'NG' and id_type == 'BVN':
+                update_data['bvn'] = id_number
         
         # Update user profile
         response = supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()

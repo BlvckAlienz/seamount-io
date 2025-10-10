@@ -50,7 +50,7 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step - FIXED WITH MODAL INTEGRATION
+// Identity Verification Step - FIXED WITH PROPER MODAL FLOW
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
   const [showBVNModal, setShowBVNModal] = useState(false);
@@ -58,10 +58,20 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const isNigerianUser = userProfile?.country_code === 'NG';
   const hasRequiredData = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
 
+  // 🚨 FIXED: Check if we need modal BEFORE making API calls
   const startVerification = async () => {
+    // Nigerian users without required data: SHOW MODAL FIRST
+    if (isNigerianUser && !hasRequiredData) {
+      console.log('🔄 Nigerian user missing data - showing modal');
+      setShowBVNModal(true);
+      return;
+    }
+
+    // All other cases: Direct API call
     setLoading(true);
     
     try {
+      console.log('🔄 Starting verification with existing data');
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
@@ -73,12 +83,13 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     } catch (error: any) {
       console.error('KYC error:', error);
       
-      // Check if it's a missing data error that requires modal
+      // Check if backend says we need more data
       if (error.response?.status === 400) {
         const errorDetail = error.response?.data?.detail;
         const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
         
         if (errorType === 'missing_bvn' || errorType === 'profile_incomplete') {
+          console.log('🔄 Backend requires more data - showing modal');
           setShowBVNModal(true);
         } else {
           toast.error(error.response?.data?.detail || 'Verification failed');
@@ -91,18 +102,22 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     }
   };
 
+  // 🚨 FIXED: Handle modal completion properly
   const handleModalComplete = async (modalData: any) => {
     setShowBVNModal(false);
     setLoading(true);
     
     try {
-      // First submit the KYC data
+      console.log('🔄 Submitting KYC data from modal:', modalData);
+      
+      // 1. Submit KYC data to backend
       const submitResponse = await apiClient.post('/api/v1/kyc/submit-kyc-data', modalData);
       
       if (submitResponse.data.success) {
-        toast.success('Information saved! Starting verification...');
+        toast.success('Information saved!');
         
-        // Now start the verification with complete data
+        // 2. Now start verification with complete data
+        console.log('🔄 Starting verification after modal data');
         const verificationResponse = await apiClient.post('/api/v1/kyc/start-verification');
         
         if (verificationResponse.data.success) {
@@ -127,13 +142,17 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
     onNext();
   };
 
+  // 🚨 FIXED: Render modal when needed
   if (showBVNModal) {
     return (
       <BVNCollectionModal
         onComplete={handleModalComplete}
-        onCancel={() => setShowBVNModal(false)}
+        onCancel={() => {
+          setShowBVNModal(false);
+          setLoading(false);
+        }}
         userEmail={userProfile?.email || ''}
-        countryCode={userProfile?.country_code || 'US'}
+        countryCode={userProfile?.country_code || 'NG'}
       />
     );
   }
@@ -394,52 +413,73 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   );
 };
 
-// Main Component
+// Main Component - FIXED WALLET CREATION
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
-  const [detectedCountry, setDetectedCountry] = useState(null);
-  const { completeOnboarding, userProfile } = useAuth();
+  const { userProfile, refreshUser } = useAuth(); // Add refreshUser
   const navigate = useNavigate();
 
-  // Redirect if already verified
+  // Redirect if already verified AND has wallet
   useEffect(() => {
-    if (userProfile?.kyc_status === 'verified') {
+    if (userProfile?.kyc_status === 'verified' && userProfile?.algorand_address) {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
 
   const handleWelcomeComplete = () => setStep('identity');
 
-const handleIdentityComplete = async () => {
-  const toastId = toast.loading('Creating your wallet...');
-  
-  try {
-    // ✅ CRITICAL: Always call provision-wallets
-    const response = await apiClient.post('/api/v1/user/provision-wallets');
+  // 🚨 FIXED: Wallet creation with proper error handling
+  const handleIdentityComplete = async () => {
+    const toastId = toast.loading('Creating your wallet...');
     
-    if (response.data.success && response.data.mnemonic) {
-      toast.success('Wallet created!', { id: toastId });
-      setMnemonic(response.data.mnemonic);
-      setStep('walletBackup');
-    } else {
-      throw new Error('Wallet creation failed');
+    try {
+      console.log('🔄 Calling provision-wallets endpoint');
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      
+      if (response.data.success) {
+        if (response.data.mnemonic) {
+          toast.success('Wallet created!', { id: toastId });
+          setMnemonic(response.data.mnemonic);
+          setStep('walletBackup');
+        } else {
+          // Wallet exists but no mnemonic (already created)
+          toast.success('Wallet ready!', { id: toastId });
+          
+          // Refresh profile to get wallet address
+          await refreshUser();
+          
+          // Small delay then redirect
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1000);
+        }
+      } else {
+        throw new Error(response.data.message || 'Wallet creation failed');
+      }
+    } catch (error: any) {
+      console.error('Wallet creation error:', error);
+      toast.error('Wallet creation failed. Please try again.', { id: toastId });
     }
-  } catch (error) {
-    console.error('Wallet creation error:', error);
-    toast.error('Wallet creation failed. Please refresh and try again.', { id: toastId });
-  }
-};
+  };
 
-const handleBackupComplete = async () => {
-  // Refresh profile to get wallet address
-  await refreshProfile();
-  
-  // Small delay to ensure state updates
-  setTimeout(() => {
-    navigate('/dashboard');
-  }, 500);
-};
+  // 🚨 FIXED: Backup completion
+  const handleBackupComplete = async () => {
+    try {
+      // Refresh profile to ensure we have latest data
+      await refreshUser();
+      
+      toast.success('Onboarding completed!');
+      
+      // Navigate to dashboard
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
+    } catch (error) {
+      console.error('Backup completion error:', error);
+      navigate('/dashboard'); // Still navigate even if refresh fails
+    }
+  };
 
   const handleStepBack = () => {
     if (step === 'walletBackup') setStep('identity');

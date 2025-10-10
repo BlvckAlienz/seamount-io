@@ -296,46 +296,42 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
 }, []);
 
-// Replace the problematic useEffect with this corrected version
+// Replace the problematic useEffect with this FIXED version
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     const kycStatus = state.user.kyc_status || 'not_started';
-    const hasWallet = state.user.algorand_address || state.user.wallet_address;
+    const hasWallet = state.user.algorand_address;
     
-    console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
+    console.log('🔄 Auth Routing Check:', { 
+      kycStatus, 
+      hasWallet, 
+      userId: state.user.id 
+    });
     
-    // NEW USER: No wallet yet → force onboarding
+    // If user has wallet AND (verified OR skipped KYC) → dashboard
+    if (hasWallet && (kycStatus === 'verified' || kycStatus === 'skipped')) {
+      console.log('✅ Routing to dashboard - has wallet and KYC complete/skipped');
+      navigate('/dashboard');
+      return;
+    }
+    
+    // If user has wallet but KYC pending → still show dashboard
+    if (hasWallet && ['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
+      console.log('🔄 Routing to dashboard - has wallet, KYC pending');
+      navigate('/dashboard');
+      return;
+    }
+    
+    // If no wallet OR KYC not started → onboarding
     if (!hasWallet || kycStatus === 'not_started') {
+      console.log('🔄 Routing to onboarding - no wallet or KYC not started');
       navigate('/onboarding');
       return;
     }
     
-    // VERIFIED USER: approved/tribe → dashboard
-    if (kycStatus === 'approved' || state.user.role === 'tribe') {
-      navigate('/dashboard');
-      return;
-    }
-    
-    // PENDING VERIFICATION: Only go to dashboard if wallet exists
-    if (['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
-      if (hasWallet) {
-        navigate('/dashboard');
-        toast('Verification in progress');
-      } else {
-        // Stuck in pending but no wallet - complete onboarding first
-        navigate('/onboarding');
-      }
-      return;
-    }
-    
-    // SKIPPED KYC: wallet exists but skipped → dashboard
-    if (kycStatus === 'skipped' && hasWallet) {
-      navigate('/dashboard');
-      return;
-    }
-    
-    // DEFAULT: Send to onboarding
-    navigate('/onboarding');
+    // Default: dashboard
+    console.log('✅ Default routing to dashboard');
+    navigate('/dashboard');
   }
 }, [state.session, state.user, state.loading, navigate]);
 
@@ -349,10 +345,21 @@ const triggerWalletCreation = useCallback(async () => {
   }
 }, []);
 
+// Add this function to your AuthContext
+const refreshUser = useCallback(async () => {
+  try {
+    console.log('🔄 Refreshing user profile...');
+    await fetchUserProfile(3, 1000);
+  } catch (error) {
+    console.error('Failed to refresh user:', error);
+  }
+}, [fetchUserProfile]);
+
 // Add the return statement for the component
 return (
   <AuthContext.Provider value={{
     ...state,
+  refreshUser, 
 	updateUserRole,
 	triggerWalletCreation,
     signUp,
