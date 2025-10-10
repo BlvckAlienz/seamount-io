@@ -328,20 +328,58 @@ class KYCDataSubmission(BaseModel):
 
 @router.post("/submit-kyc-data")
 async def submit_kyc_data(
-    kyc_data: KYCDataSubmission,
+    kyc_data: dict,
     current_user: dict = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
+    supabase: Client = Depends(get_supabase_client)
 ):
-    """
-    NEW: Progressive KYC data submission
-    Collect BVN/ID information before starting verification
-    """
-    user_id = current_user.get('id')
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User ID not found")
-
-    result = await kyc_service.submit_kyc_data(user_id, kyc_data.dict())
-    return result
+    """Submit KYC data collected from modal before verification"""
+    try:
+        user_id = current_user.get('id')
+        logger.info(f"[KYC Data] Submitting KYC data for user: {user_id}")
+        
+        # Prepare update data
+        update_data = {
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
+        # Map frontend data to database fields
+        if kyc_data.get('dateOfBirth'):
+            update_data['date_of_birth'] = kyc_data['dateOfBirth']
+        if kyc_data.get('gender'):
+            update_data['gender'] = kyc_data['gender']
+        if kyc_data.get('phoneNumber'):
+            update_data['phone'] = kyc_data['phoneNumber']
+        
+        # Handle ID data based on country
+        country_code = kyc_data.get('country', current_user.get('country_code', 'US'))
+        if country_code == 'NG':
+            if kyc_data.get('idNumber'):
+                if kyc_data.get('idType') == 'BVN':
+                    update_data['bvn'] = kyc_data['idNumber']
+                update_data['id_number'] = kyc_data['idNumber']
+                update_data['id_type'] = kyc_data.get('idType', 'BVN')
+        else:
+            if kyc_data.get('idNumber'):
+                update_data['id_number'] = kyc_data['idNumber']
+                update_data['id_type'] = kyc_data.get('idType', 'PASSPORT')
+        
+        # Update user profile
+        response = supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Failed to update user profile")
+        
+        logger.info(f"[KYC Data] Successfully updated KYC data for user: {user_id}")
+        
+        return {
+            "success": True,
+            "message": "KYC data submitted successfully",
+            "user_id": user_id
+        }
+        
+    except Exception as e:
+        logger.error(f"[KYC Data] Error submitting KYC data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit KYC data: {str(e)}")
 
 @router.get("/detect-country")
 async def detect_country(

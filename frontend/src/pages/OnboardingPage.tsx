@@ -50,26 +50,93 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step
+// Identity Verification Step - FIXED WITH MODAL INTEGRATION
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
+  const [showBVNModal, setShowBVNModal] = useState(false);
+  
+  const isNigerianUser = userProfile?.country_code === 'NG';
+  const hasRequiredData = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
 
   const startVerification = async () => {
     setLoading(true);
+    
     try {
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
         toast.success('Verification started!');
         onNext();
+      } else {
+        throw new Error(data.message || 'Verification failed');
       }
     } catch (error: any) {
       console.error('KYC error:', error);
-      toast.error(error.response?.data?.detail || 'Verification failed');
+      
+      // Check if it's a missing data error that requires modal
+      if (error.response?.status === 400) {
+        const errorDetail = error.response?.data?.detail;
+        const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
+        
+        if (errorType === 'missing_bvn' || errorType === 'profile_incomplete') {
+          setShowBVNModal(true);
+        } else {
+          toast.error(error.response?.data?.detail || 'Verification failed');
+        }
+      } else {
+        toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleModalComplete = async (modalData: any) => {
+    setShowBVNModal(false);
+    setLoading(true);
+    
+    try {
+      // First submit the KYC data
+      const submitResponse = await apiClient.post('/api/v1/kyc/submit-kyc-data', modalData);
+      
+      if (submitResponse.data.success) {
+        toast.success('Information saved! Starting verification...');
+        
+        // Now start the verification with complete data
+        const verificationResponse = await apiClient.post('/api/v1/kyc/start-verification');
+        
+        if (verificationResponse.data.success) {
+          toast.success('Verification started!');
+          onNext();
+        } else {
+          throw new Error('Verification failed after data submission');
+        }
+      } else {
+        throw new Error('Failed to save KYC data');
+      }
+    } catch (error: any) {
+      console.error('Modal completion error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to complete verification');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkip = () => {
+    toast('You can verify later from Settings');
+    onNext();
+  };
+
+  if (showBVNModal) {
+    return (
+      <BVNCollectionModal
+        onComplete={handleModalComplete}
+        onCancel={() => setShowBVNModal(false)}
+        userEmail={userProfile?.email || ''}
+        countryCode={userProfile?.country_code || 'US'}
+      />
+    );
+  }
 
   return (
     <div className="text-center">
@@ -78,7 +145,38 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           <Shield className="h-8 w-8 text-white" />
         </div>
         <h3 className="text-2xl font-semibold text-white mb-2">Verify Your Identity</h3>
-        <p className="text-gray-400">Unlock full platform features</p>
+        <p className="text-gray-400">Unlock full platform features with quick verification</p>
+      </div>
+      
+      {isNigerianUser && !hasRequiredData && (
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-blue-300 text-sm font-medium mb-1">🇳🇬 Nigerian User - Fast Track</p>
+              <p className="text-gray-300 text-xs">
+                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
+        <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
+        <ul className="text-sm text-gray-300 space-y-2">
+          {[
+            "Comply with global financial regulations",
+            "Protect your account from fraud", 
+            "Enable higher transaction limits",
+            "Access institutional features"
+          ].map(item => (
+            <li key={item} className="flex items-start">
+              <CheckCircle className="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </div>
       
       <div className="space-y-3">
@@ -87,15 +185,25 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           disabled={loading}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          {loading ? 'Starting...' : 'Start Verification'}
+          {loading ? 'Checking profile...' : 'Start Verification'}
         </button>
         
         <button
-          onClick={onNext}
+          onClick={handleSkip}
+          disabled={loading}
           className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
         >
           I'll Do This Later
         </button>
+        
+        {onPrev && (
+          <button
+            onClick={onPrev}
+            className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
+          >
+            ← Back
+          </button>
+        )}
       </div>
     </div>
   );

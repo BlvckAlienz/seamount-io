@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Shield, Globe } from 'lucide-react';
+import { apiClient } from '../config/api';
 
 interface CountryConfig {
   name: string;
@@ -100,19 +101,26 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     return true;
   };
 
-  const handleSubmit = async () => {
-    setError('');
-    
-    if (!validateForm()) return;
+const handleSubmit = async () => {
+  setError('');
+  
+  if (!validateForm()) return;
 
-    setIsSubmitting(true);
-    try {
+  setIsSubmitting(true);
+  try {
+    // Use the apiClient instead of direct fetch
+    const response = await apiClient.post('/api/v1/kyc/submit-kyc-data', formData);
+    
+    if (response.data.success) {
       await onComplete(formData);
-    } catch (err: any) {
-      setError(err.message || 'Verification failed');
-      setIsSubmitting(false);
+    } else {
+      throw new Error(response.data.message || 'Verification failed');
     }
-  };
+  } catch (err: any) {
+    setError(err.response?.data?.detail || err.message || 'Verification failed');
+    setIsSubmitting(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

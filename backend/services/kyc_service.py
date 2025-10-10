@@ -183,6 +183,44 @@ class KYCService:
             logger.error(f"Unexpected error in start_verification_session: {e}")
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
+    async def submit_kyc_data(self, user_id: str, kyc_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Submit KYC data before starting verification"""
+        try:
+            # Update user profile with the collected data
+            update_data = {
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        
+            # Map the incoming data to database fields
+            if kyc_data.get('dateOfBirth'):
+                update_data['date_of_birth'] = kyc_data['dateOfBirth']
+            if kyc_data.get('gender'):
+                update_data['gender'] = kyc_data['gender']
+            if kyc_data.get('phoneNumber'):
+                update_data['phone'] = kyc_data['phoneNumber']
+            
+            # Handle ID data
+            country_code = kyc_data.get('country', 'US')
+            if country_code == 'NG' and kyc_data.get('idNumber'):
+                update_data['bvn'] = kyc_data['idNumber']
+                update_data['id_number'] = kyc_data['idNumber']
+                update_data['id_type'] = kyc_data.get('idType', 'BVN')
+            elif kyc_data.get('idNumber'):
+                update_data['id_number'] = kyc_data['idNumber']
+                update_data['id_type'] = kyc_data.get('idType', 'PASSPORT')
+        
+            # Update the user profile
+            await self.db_service.update_user_profile(user_id, update_data)
+        
+            return {
+                "success": True,
+                "message": "KYC data submitted successfully"
+            }
+        
+        except Exception as e:
+            logger.error(f"Error submitting KYC data for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to submit KYC data")
+
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
         """Start verification using Regfyl for ALL users"""
         
