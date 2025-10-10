@@ -328,60 +328,20 @@ class KYCDataSubmission(BaseModel):
 
 @router.post("/submit-kyc-data")
 async def submit_kyc_data(
-    kyc_data: dict,
+    kyc_data: KYCDataSubmission,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase_client)
+    kyc_service: KYCService = Depends(get_kyc_service)
 ):
-    """Submit KYC data collected from modal - FIXED VERSION"""
-    try:
-        user_id = current_user.get('id')
-        logger.info(f"[KYC Data] Submitting KYC data for user: {user_id}")
-        
-        # Prepare update data
-        update_data = {
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Map frontend data to database fields
-        if kyc_data.get('dateOfBirth'):
-            update_data['date_of_birth'] = kyc_data['dateOfBirth']
-        if kyc_data.get('gender'):
-            update_data['gender'] = kyc_data['gender']
-        if kyc_data.get('phoneNumber'):
-            update_data['phone'] = kyc_data['phoneNumber']
-        if kyc_data.get('country'):
-            update_data['country_code'] = kyc_data['country']
-        
-        # Handle ID data
-        country_code = kyc_data.get('country', current_user.get('country_code', 'US'))
-        id_type = kyc_data.get('idType')
-        id_number = kyc_data.get('idNumber')
-        
-        if id_number:
-            update_data['id_number'] = id_number
-            update_data['id_type'] = id_type
-            
-            # Special handling for Nigerian BVN
-            if country_code == 'NG' and id_type == 'BVN':
-                update_data['bvn'] = id_number
-        
-        # Update user profile
-        response = supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
-        
-        if not response.data:
-            raise HTTPException(status_code=500, detail="Failed to update user profile")
-        
-        logger.info(f"[KYC Data] Successfully updated KYC data for user: {user_id}")
-        
-        return {
-            "success": True,
-            "message": "KYC data submitted successfully",
-            "user_id": user_id
-        }
-        
-    except Exception as e:
-        logger.error(f"[KYC Data] Error submitting KYC data: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit KYC data: {str(e)}")
+    """
+    NEW: Progressive KYC data submission
+    Collect BVN/ID information before starting verification
+    """
+    user_id = current_user.get('id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID not found")
+
+    result = await kyc_service.submit_kyc_data(user_id, kyc_data.dict())
+    return result
 
 @router.get("/detect-country")
 async def detect_country(

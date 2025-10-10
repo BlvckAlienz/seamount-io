@@ -145,105 +145,43 @@ class KYCService:
                 
             raise HTTPException(status_code=500, detail="AML screening failed")
 
-async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
-    """
-    FIXED: Start KYC verification with proper data validation
-    """
-    try:
-        logger.info(f"Starting KYC verification for user {user_id}, country: {country_code}")
-        
-        # 1. Validate user profile exists and has required data
-        user_profile = await self.db_service.get_user_profile_by_id(user_id)
-        if not user_profile:
-            logger.error(f"User profile not found for user {user_id}")
-            raise HTTPException(status_code=404, detail="User profile not found")
-        
-        # 2. Check for required fields based on country
-        missing_fields = []
-        
-        # Base required fields for all users
-        if not user_profile.get('date_of_birth'):
-            missing_fields.append('date_of_birth')
-        if not user_profile.get('gender'):
-            missing_fields.append('gender') 
-        if not user_profile.get('phone'):
-            missing_fields.append('phone')
-            
-        # Country-specific ID requirements
-        if country_code == 'NG' and not user_profile.get('bvn') and not user_profile.get('id_number'):
-            missing_fields.append('bvn_or_nin')
-        elif country_code in ['KE', 'GH', 'ZA'] and not user_profile.get('id_number'):
-            missing_fields.append('national_id')
-        
-        if missing_fields:
-            logger.warning(f"User {user_id} missing required fields: {missing_fields}")
-            return {
-                "success": False,
-                "error": "missing_required_data",
-                "missing_fields": missing_fields,
-                "message": f"Please provide: {', '.join(missing_fields)}"
-            }
-        
-        # 3. Check for existing verification session
-        current_status = user_profile.get("kyc_status", "not_started")
-        if current_status in ["approved", "verified", "in_progress"]:
-            logger.warning(f"User {user_id} already has KYC status: {current_status}")
-            return {
-                "success": False,
-                "error": f"KYC verification already {current_status}",
-                "kyc_status": current_status
-            }
-        
-        # 4. Use Regfyl for ALL users
-        if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
-            return await self._start_regfyl_verification(user_id, user_profile, country_code)
-        else:
-            logger.error("REGFYL PROVIDER NOT CONFIGURED")
-            raise HTTPException(status_code=503, detail="Verification service unavailable")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in start_verification_session: {e}")
-        raise HTTPException(status_code=500, detail="KYC service unavailable")
-
-    async def submit_kyc_data(self, user_id: str, kyc_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Submit KYC data before starting verification"""
+    async def start_verification_session(self, user_id: str, email: str, country_code: str = "US") -> Dict[str, Any]:
+        """
+        Start KYC verification using Regfyl for ALL users
+        COMPLETELY REMOVES COMPLYCUBE LOGIC
+        """
         try:
-            # Update user profile with the collected data
-            update_data = {
-                "updated_at": datetime.utcnow().isoformat()
-            }
-        
-            # Map the incoming data to database fields
-            if kyc_data.get('dateOfBirth'):
-                update_data['date_of_birth'] = kyc_data['dateOfBirth']
-            if kyc_data.get('gender'):
-                update_data['gender'] = kyc_data['gender']
-            if kyc_data.get('phoneNumber'):
-                update_data['phone'] = kyc_data['phoneNumber']
+            logger.info(f"Starting KYC verification for user {user_id}, country: {country_code} - USING REGFYL")
             
-            # Handle ID data
-            country_code = kyc_data.get('country', 'US')
-            if country_code == 'NG' and kyc_data.get('idNumber'):
-                update_data['bvn'] = kyc_data['idNumber']
-                update_data['id_number'] = kyc_data['idNumber']
-                update_data['id_type'] = kyc_data.get('idType', 'BVN')
-            elif kyc_data.get('idNumber'):
-                update_data['id_number'] = kyc_data['idNumber']
-                update_data['id_type'] = kyc_data.get('idType', 'PASSPORT')
-        
-            # Update the user profile
-            await self.db_service.update_user_profile(user_id, update_data)
-        
-            return {
-                "success": True,
-                "message": "KYC data submitted successfully"
-            }
-        
+            # 1. Validate user profile exists
+            user_profile = await self.db_service.get_user_profile_by_id(user_id)
+            if not user_profile:
+                logger.error(f"User profile not found for user {user_id}")
+                raise HTTPException(status_code=404, detail="User profile not found")
+            
+            # 2. Check for existing verification session - ALLOW RESTART IF NOT_STARTED OR REJECTED
+            current_status = user_profile.get("kyc_status", "not_started")
+            if current_status in ["approved", "verified", "in_progress"]:
+                logger.warning(f"User {user_id} already has KYC status: {current_status}")
+                return {
+                    "success": False,
+                    "error": f"KYC verification already {current_status}",
+                    "kyc_status": current_status
+                }
+            
+            # 3. ðŸš¨ FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
+            if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
+                return await self._start_regfyl_verification(user_id, user_profile, country_code)
+            else:
+                logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
+                raise HTTPException(status_code=503, detail="Verification service unavailable")
+                
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
         except Exception as e:
-            logger.error(f"Error submitting KYC data for user {user_id}: {e}")
-            raise HTTPException(status_code=500, detail="Failed to submit KYC data")
+            logger.error(f"Unexpected error in start_verification_session: {e}")
+            raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
         """Start verification using Regfyl for ALL users"""

@@ -7,8 +7,6 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
-from supabase import Client
-
 from backend.dependencies import get_supabase_client, get_current_user, get_wallet_service
 from backend.services.wallet_service import WalletService
 
@@ -147,67 +145,43 @@ async def update_user_profile(
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service),
-    supabase: Client = Depends(get_supabase_client)
+    wallet_service: WalletService = Depends(get_wallet_service)
 ):
     """
-    CRITICAL FIX: Wallet provisioning with proper error handling and state consistency
+    CRITICAL FIX: Provision Algorand wallet with mnemonic return
     """
     try:
         user_id = current_user['id']
-        logger.info(f"[Wallet Provision] Starting for user: {user_id}")
+        logger.info(f"[Wallet Provision] User: {user_id}")
         
-        # Check if user profile already has a wallet address
-        profile_response = supabase.table("user_profiles").select("algorand_address").eq("id", user_id).execute()
-        existing_profile = profile_response.data[0] if profile_response.data else {}
-        
-        if existing_profile and existing_profile.get('algorand_address'):
-            logger.info(f"[Wallet Provision] User already has wallet: {existing_profile['algorand_address']}")
+        # Check if wallet exists
+        existing_wallet = await wallet_service.get_user_balances(user_id)
+        if existing_wallet.get('wallet_exists'):
             return {
                 "success": True,
-                "wallet_address": existing_profile['algorand_address'],
+                "wallet_address": existing_wallet['wallet_address'],
                 "message": "Wallet already exists",
-                "mnemonic": None
+                "mnemonic": None  # Don't return mnemonic for existing wallets
             }
         
-        # Check wallet service for existing wallet
-        wallet_info = await wallet_service.get_wallet_info(user_id)
-        if wallet_info.get('wallet_exists'):
-            wallet_address = wallet_info.get('wallet_address')
-            if wallet_address:
-                # Sync profile with existing wallet
-                supabase.table("user_profiles").update({
-                    "algorand_address": wallet_address,
-                    "updated_at": datetime.utcnow().isoformat()
-                }).eq("id", user_id).execute()
-                
-                return {
-                    "success": True,
-                    "wallet_address": wallet_address,
-                    "message": "Wallet synchronized",
-                    "mnemonic": None
-                }
-        
         # Create new wallet
-        logger.info(f"[Wallet Provision] Creating new wallet for user: {user_id}")
         result = await wallet_service.create_algorand_wallet(user_id)
         
         if result["success"]:
-            logger.info(f"[Wallet Provision] Wallet created successfully: {result['wallet_address']}")
+            logger.info(f"[Wallet Provision] Wallet created: {result['wallet_address']}")
             return {
                 "success": True,
                 "wallet_address": result["wallet_address"],
-                "mnemonic": result["mnemonic"],
+                "mnemonic": result["mnemonic"],  # Return for one-time backup
                 "supported_assets": result.get("supported_assets", []),
                 "message": "Wallet created successfully"
             }
         else:
-            logger.error(f"[Wallet Provision] Wallet creation failed: {result.get('error')}")
             raise HTTPException(status_code=500, detail=result.get("error", "Wallet creation failed"))
             
     except Exception as e:
-        logger.error(f"[Wallet Provision] CRITICAL FAILURE for user {user_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Wallet provisioning failed: {str(e)}")
+        logger.error(f"[Wallet Provision] Failed for user {current_user['id']}: {e}")
+        raise HTTPException(status_code=500, detail="Wallet provisioning failed")
     
 @router.post("/api/errors")
 async def log_client_error(

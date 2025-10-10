@@ -296,42 +296,29 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
 }, []);
 
-// Replace the problematic useEffect with this FIXED version
+// Replace the problematic useEffect with this corrected version
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     const kycStatus = state.user.kyc_status || 'not_started';
-    const hasWallet = state.user.algorand_address;
+    // Check BOTH columns for wallet
+    const hasWallet = state.user.algorand_address || state.user.wallet_address;
     
-    console.log('🔄 Auth Routing Check:', { 
-      kycStatus, 
-      hasWallet, 
-      userId: state.user.id 
-    });
+    console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
     
-    // If user has wallet AND (verified OR skipped KYC) → dashboard
-    if (hasWallet && (kycStatus === 'verified' || kycStatus === 'skipped')) {
-      console.log('✅ Routing to dashboard - has wallet and KYC complete/skipped');
+    // Users with wallets → dashboard
+    if (hasWallet) {
       navigate('/dashboard');
       return;
     }
     
-    // If user has wallet but KYC pending → still show dashboard
-    if (hasWallet && ['pending', 'in_progress', 'under_review'].includes(kycStatus)) {
-      console.log('🔄 Routing to dashboard - has wallet, KYC pending');
+    // Verified users → dashboard
+    if (kycStatus === 'approved' || state.user.role === 'tribe') {
       navigate('/dashboard');
       return;
     }
     
-    // If no wallet OR KYC not started → onboarding
-    if (!hasWallet || kycStatus === 'not_started') {
-      console.log('🔄 Routing to onboarding - no wallet or KYC not started');
-      navigate('/onboarding');
-      return;
-    }
-    
-    // Default: dashboard
-    console.log('✅ Default routing to dashboard');
-    navigate('/dashboard');
+    // Default → onboarding
+    navigate('/onboarding');
   }
 }, [state.session, state.user, state.loading, navigate]);
 
@@ -345,21 +332,10 @@ const triggerWalletCreation = useCallback(async () => {
   }
 }, []);
 
-// Add this function to your AuthContext
-const refreshUser = useCallback(async () => {
-  try {
-    console.log('🔄 Refreshing user profile...');
-    await fetchUserProfile(3, 1000);
-  } catch (error) {
-    console.error('Failed to refresh user:', error);
-  }
-}, [fetchUserProfile]);
-
 // Add the return statement for the component
 return (
   <AuthContext.Provider value={{
     ...state,
-  refreshUser, 
 	updateUserRole,
 	triggerWalletCreation,
     signUp,

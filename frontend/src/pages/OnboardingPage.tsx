@@ -50,149 +50,26 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step - COMPLETELY FIXED
+// Identity Verification Step
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
-  const [showBVNModal, setShowBVNModal] = useState(false);
-  const [verificationState, setVerificationState] = useState('idle');
-  
-  // 🚨 FIXED: Proper country detection and data requirements
-  const isNigerianUser = userProfile?.country_code === 'NG';
-  const isKenyanUser = userProfile?.country_code === 'KE';
-  const isGhanaianUser = userProfile?.country_code === 'GH';
-  const isSouthAfricanUser = userProfile?.country_code === 'ZA';
-  
-  // 🚨 FIXED: Check for ALL required data including ID numbers
-  const hasRequiredData = React.useMemo(() => {
-    const baseFields = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
-    
-    if (isNigerianUser) {
-      return baseFields && (userProfile?.bvn || userProfile?.id_number);
-    }
-    if (isKenyanUser || isGhanaianUser || isSouthAfricanUser) {
-      return baseFields && userProfile?.id_number;
-    }
-    
-    // For other countries, only base fields are required
-    return baseFields;
-  }, [userProfile, isNigerianUser, isKenyanUser, isGhanaianUser, isSouthAfricanUser]);
-
-  // 🚨 FIXED: Immediate modal trigger for users missing data
-  useEffect(() => {
-    const needsData = !hasRequiredData && (isNigerianUser || isKenyanUser || isGhanaianUser || isSouthAfricanUser);
-    
-    if (needsData) {
-      console.log('🚨 User missing required data - setting needs_data state');
-      setVerificationState('needs_data');
-    } else {
-      setVerificationState('ready');
-    }
-  }, [hasRequiredData, isNigerianUser, isKenyanUser, isGhanaianUser, isSouthAfricanUser]);
 
   const startVerification = async () => {
-    // 🚨 FIXED: Show modal immediately if data is missing
-    if (verificationState === 'needs_data') {
-      console.log('🔄 User missing data - showing modal immediately');
-      setShowBVNModal(true);
-      return;
-    }
-
-    // Only proceed with API if data is complete
     setLoading(true);
-    setVerificationState('checking');
-    
     try {
-      console.log('🔄 Starting verification with complete data');
       const { data } = await apiClient.post('/api/v1/kyc/start-verification');
       
       if (data.success) {
         toast.success('Verification started!');
         onNext();
-      } else {
-        throw new Error(data.message || 'Verification failed');
       }
-    } catch (error) {
-      console.error('KYC API error:', error);
-      
-      // Handle specific backend errors
-      if (error.response?.status === 400) {
-        const errorDetail = error.response?.data?.detail;
-        const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
-        
-        if (errorType === 'missing_bvn' || errorType === 'profile_incomplete' || errorType === 'missing_id') {
-          console.log('🔄 Backend requires additional data - showing modal');
-          setVerificationState('needs_data');
-          setShowBVNModal(true);
-        } else {
-          toast.error(error.response?.data?.detail || 'Please complete your profile information');
-        }
-      } else {
-        toast.error('Verification failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-      setVerificationState('idle');
-    }
-  };
-
-  // 🚨 FIXED: Proper modal completion handler
-  const handleModalComplete = async (modalData) => {
-    setShowBVNModal(false);
-    setLoading(true);
-    
-    try {
-      console.log('🔄 Submitting KYC data from modal');
-      
-      // 1. Submit collected data to backend
-      const submitResponse = await apiClient.post('/api/v1/kyc/submit-kyc-data', modalData);
-      
-      if (submitResponse.data.success) {
-        toast.success('Information saved!');
-        
-        // 2. Wait for backend to process
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 3. Now start verification with complete data
-        console.log('🔄 Starting verification after modal data submission');
-        const verificationResponse = await apiClient.post('/api/v1/kyc/start-verification');
-        
-        if (verificationResponse.data.success) {
-          toast.success('Verification started!');
-          onNext();
-        } else {
-          throw new Error('Verification failed after data submission');
-        }
-      } else {
-        throw new Error('Failed to save KYC data');
-      }
-    } catch (error) {
-      console.error('Modal completion error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to complete verification. Please try again.');
+    } catch (error: any) {
+      console.error('KYC error:', error);
+      toast.error(error.response?.data?.detail || 'Verification failed');
     } finally {
       setLoading(false);
     }
   };
-
-  const handleSkip = () => {
-    toast('You can verify later from Settings');
-    onNext();
-  };
-
-  // 🚨 FIXED: Render modal when state requires it
-  if (showBVNModal) {
-    return (
-      <BVNCollectionModal
-        onComplete={handleModalComplete}
-        onCancel={() => {
-          setShowBVNModal(false);
-          setLoading(false);
-          setVerificationState('idle');
-        }}
-        userEmail={userProfile?.email || ''}
-        countryCode={userProfile?.country_code || 'NG'}
-      />
-    );
-  }
 
   return (
     <div className="text-center">
@@ -201,82 +78,24 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
           <Shield className="h-8 w-8 text-white" />
         </div>
         <h3 className="text-2xl font-semibold text-white mb-2">Verify Your Identity</h3>
-        <p className="text-gray-400">Unlock full platform features with quick verification</p>
-      </div>
-      
-      {/* 🚨 FIXED: Dynamic messaging based on verification state */}
-      {verificationState === 'needs_data' && (
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-blue-300 text-sm font-medium mb-1">
-                {isNigerianUser ? '🇳🇬 Additional Information Required' : 
-                 isKenyanUser ? '🇰🇪 Additional Information Required' :
-                 isGhanaianUser ? '🇬🇭 Additional Information Required' :
-                 isSouthAfricanUser ? '🇿🇦 Additional Information Required' : 'Profile Information Needed'}
-              </p>
-              <p className="text-gray-300 text-xs">
-                {isNigerianUser 
-                  ? "We need your BVN/NIN, date of birth, gender, and phone number for instant verification."
-                  : isKenyanUser
-                  ? "We need your National ID, date of birth, gender, and phone number for verification."
-                  : isGhanaianUser
-                  ? "We need your Ghana Card, date of birth, gender, and phone number for verification."
-                  : isSouthAfricanUser
-                  ? "We need your ID Number, date of birth, gender, and phone number for verification."
-                  : "Please complete your profile information to continue with verification."}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="bg-blue-900/20 p-5 rounded-xl text-left border border-blue-500/30 mb-6">
-        <h4 className="font-medium text-blue-300 mb-3">Why We Verify</h4>
-        <ul className="text-sm text-gray-300 space-y-2">
-          {[
-            "Comply with global financial regulations",
-            "Protect your account from fraud", 
-            "Enable higher transaction limits",
-            "Access institutional features"
-          ].map(item => (
-            <li key={item} className="flex items-start">
-              <CheckCircle className="h-4 w-4 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
+        <p className="text-gray-400">Unlock full platform features</p>
       </div>
       
       <div className="space-y-3">
-        {/* 🚨 FIXED: Dynamic button text based on state */}
         <button
           onClick={startVerification}
-          disabled={loading || verificationState === 'checking'}
+          disabled={loading}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          {loading ? 'Checking...' : 
-           verificationState === 'needs_data' ? 'Provide Information' : 
-           'Start Verification'}
+          {loading ? 'Starting...' : 'Start Verification'}
         </button>
         
         <button
-          onClick={handleSkip}
-          disabled={loading}
+          onClick={onNext}
           className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
         >
           I'll Do This Later
         </button>
-        
-        {onPrev && (
-          <button
-            onClick={onPrev}
-            className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
-          >
-            ← Back
-          </button>
-        )}
       </div>
     </div>
   );
@@ -467,83 +286,52 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   );
 };
 
-// Main Component - FIXED WALLET CREATION
+// Main Component
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
-  const { userProfile, refreshUser } = useAuth(); // Add refreshUser
+  const [detectedCountry, setDetectedCountry] = useState(null);
+  const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already verified AND has wallet
+  // Redirect if already verified
   useEffect(() => {
-    if (userProfile?.kyc_status === 'verified' && userProfile?.algorand_address) {
+    if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
 
   const handleWelcomeComplete = () => setStep('identity');
 
-  // 🚨 FIXED: Wallet creation with proper error handling
 const handleIdentityComplete = async () => {
   const toastId = toast.loading('Creating your wallet...');
   
   try {
-    console.log('🔄 Calling provision-wallets endpoint');
+    // ✅ CRITICAL: Always call provision-wallets
     const response = await apiClient.post('/api/v1/user/provision-wallets');
     
-    // CRITICAL FIX: Use the wallet address from the provision-wallets response directly
-    if (response.data.success) {
-      const walletAddress = response.data.wallet_address;
-      
-      if (response.data.mnemonic) {
-        // New wallet: proceed to backup step
-        toast.success('Wallet created!', { id: toastId });
-        setMnemonic(response.data.mnemonic);
-        setStep('walletBackup');
-      } else if (walletAddress) {
-        // Existing wallet: update local state and proceed to dashboard
-        toast.success('Wallet ready!', { id: toastId });
-        
-        // Update the user profile in context to include the wallet address
-        if (userProfile) {
-          const updatedProfile = { ...userProfile, algorand_address: walletAddress };
-          // If your AuthContext has a method to update user, use it here
-          // For example: updateUserProfile(updatedProfile);
-        }
-        
-        // Navigate directly to dashboard
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
-      } else {
-        throw new Error('No wallet address received');
-      }
+    if (response.data.success && response.data.mnemonic) {
+      toast.success('Wallet created!', { id: toastId });
+      setMnemonic(response.data.mnemonic);
+      setStep('walletBackup');
     } else {
-      throw new Error(response.data.message || 'Wallet creation failed');
+      throw new Error('Wallet creation failed');
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Wallet creation error:', error);
-    toast.error(error.response?.data?.detail || 'Wallet creation failed. Please try again.', { id: toastId });
+    toast.error('Wallet creation failed. Please refresh and try again.', { id: toastId });
   }
 };
 
-  // 🚨 FIXED: Backup completion
-  const handleBackupComplete = async () => {
-    try {
-      // Refresh profile to ensure we have latest data
-      await refreshUser();
-      
-      toast.success('Onboarding completed!');
-      
-      // Navigate to dashboard
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
-    } catch (error) {
-      console.error('Backup completion error:', error);
-      navigate('/dashboard'); // Still navigate even if refresh fails
-    }
-  };
+const handleBackupComplete = async () => {
+  // Refresh profile to get wallet address
+  await refreshProfile();
+  
+  // Small delay to ensure state updates
+  setTimeout(() => {
+    navigate('/dashboard');
+  }, 500);
+};
 
   const handleStepBack = () => {
     if (step === 'walletBackup') setStep('identity');
