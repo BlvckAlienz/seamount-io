@@ -7,6 +7,8 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
+from supabase import Client
+
 from backend.dependencies import get_supabase_client, get_current_user, get_wallet_service
 from backend.services.wallet_service import WalletService
 
