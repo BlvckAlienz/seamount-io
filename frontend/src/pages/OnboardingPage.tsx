@@ -54,69 +54,87 @@ const WelcomeStep = ({ onNext }) => (
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
   const [showBVNModal, setShowBVNModal] = useState(false);
+  const [verificationState, setVerificationState] = useState('idle'); // 'idle', 'checking', 'needs_data', 'ready'
   
   const isNigerianUser = userProfile?.country_code === 'NG';
   const hasRequiredData = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
 
-  // 🚨 FIXED: Check if we need modal BEFORE making API calls
-const startVerification = async () => {
-  // FIXED LOGIC: Check for required data FIRST
-  if (isNigerianUser && !hasRequiredData) {
-    console.log('🔄 Nigerian user missing data - showing modal');
-    setShowBVNModal(true);
-    return; // Stop here and show the modal
-  }
-  
-  // Only proceed with API call if data is complete
-  setLoading(true);
-  try {
-    console.log('🔄 Starting verification with existing data');
-    const { data } = await apiClient.post('/api/v1/kyc/start-verification');
-    
-    if (data.success) {
-      toast.success('Verification started!');
-      onNext(); // Move to wallet creation step
+  // 🚨 FIXED: Check data requirements FIRST before any API calls
+  useEffect(() => {
+    if (isNigerianUser && !hasRequiredData) {
+      setVerificationState('needs_data');
     } else {
-      throw new Error(data.message || 'Verification failed');
+      setVerificationState('ready');
     }
-  } catch (error: any) {
-    console.error('KYC error:', error);
-    
-    // If backend says we need more data, show modal
-    if (error.response?.status === 400) {
-      const errorDetail = error.response?.data?.detail;
-      const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
-      
-      if (errorType === 'missing_bvn' || errorType === 'profile_incomplete') {
-        console.log('🔄 Backend requires more data - showing modal');
-        setShowBVNModal(true);
-      } else {
-        toast.error(error.response?.data?.detail || 'Verification failed');
-      }
-    } else {
-      toast.error('Verification failed: ' + (error.response?.data?.detail?.message || error.message));
-    }
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [isNigerianUser, hasRequiredData]);
 
-  // 🚨 FIXED: Handle modal completion properly
+  const startVerification = async () => {
+    // 🚨 FIXED: Show modal immediately if data is missing
+    if (verificationState === 'needs_data') {
+      console.log('🔄 Nigerian user missing data - showing modal immediately');
+      setShowBVNModal(true);
+      return;
+    }
+
+    // Only proceed with API if data is complete
+    setLoading(true);
+    setVerificationState('checking');
+    
+    try {
+      console.log('🔄 Starting verification with complete data');
+      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
+      
+      if (data.success) {
+        toast.success('Verification started!');
+        onNext();
+      } else {
+        throw new Error(data.message || 'Verification failed');
+      }
+    } catch (error: any) {
+      console.error('KYC API error:', error);
+      
+      // 🚨 FIXED: Handle specific backend errors
+      if (error.response?.status === 400) {
+        const errorDetail = error.response?.data?.detail;
+        const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
+        
+        if (errorType === 'missing_bvn' || errorType === 'profile_incomplete') {
+          console.log('🔄 Backend requires additional data - showing modal');
+          setVerificationState('needs_data');
+          setShowBVNModal(true);
+        } else {
+          toast.error(error.response?.data?.detail || 'Please complete your profile information');
+        }
+      } else if (error.response?.status === 500) {
+        toast.error('Verification service temporarily unavailable. Please try again.');
+      } else {
+        toast.error('Verification failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+      setVerificationState('idle');
+    }
+  };
+
+  // 🚨 FIXED: Proper modal completion handler
   const handleModalComplete = async (modalData: any) => {
     setShowBVNModal(false);
     setLoading(true);
     
     try {
-      console.log('🔄 Submitting KYC data from modal:', modalData);
+      console.log('🔄 Submitting KYC data from modal');
       
-      // 1. Submit KYC data to backend
+      // 1. Submit collected data to backend
       const submitResponse = await apiClient.post('/api/v1/kyc/submit-kyc-data', modalData);
       
       if (submitResponse.data.success) {
         toast.success('Information saved!');
         
-        // 2. Now start verification with complete data
-        console.log('🔄 Starting verification after modal data');
+        // 2. Wait a moment for backend to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 3. Now start verification with complete data
+        console.log('🔄 Starting verification after modal data submission');
         const verificationResponse = await apiClient.post('/api/v1/kyc/start-verification');
         
         if (verificationResponse.data.success) {
@@ -130,7 +148,7 @@ const startVerification = async () => {
       }
     } catch (error: any) {
       console.error('Modal completion error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to complete verification');
+      toast.error(error.response?.data?.detail || 'Failed to complete verification. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -141,7 +159,7 @@ const startVerification = async () => {
     onNext();
   };
 
-  // 🚨 FIXED: Render modal when needed
+  // 🚨 FIXED: Render modal when state requires it
   if (showBVNModal) {
     return (
       <BVNCollectionModal
@@ -149,6 +167,7 @@ const startVerification = async () => {
         onCancel={() => {
           setShowBVNModal(false);
           setLoading(false);
+          setVerificationState('idle');
         }}
         userEmail={userProfile?.email || ''}
         countryCode={userProfile?.country_code || 'NG'}
@@ -166,7 +185,28 @@ const startVerification = async () => {
         <p className="text-gray-400">Unlock full platform features with quick verification</p>
       </div>
       
-      {isNigerianUser && !hasRequiredData && (
+      {/* 🚨 FIXED: Dynamic messaging based on verification state */}
+      {verificationState === 'needs_data' && (
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-blue-300 text-sm font-medium mb-1">
+                {isNigerianUser ? '🇳🇬 Additional Information Required' : 'Profile Information Needed'}
+              </p>
+              <p className="text-gray-300 text-xs">
+                {isNigerianUser 
+                  ? "We need your BVN, date of birth, and gender for instant verification."
+                  : "Please complete your profile information to continue with verification."
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Keep the original Nigerian user warning for context */}
+      {isNigerianUser && !hasRequiredData && verificationState !== 'needs_data' && (
         <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
           <div className="flex items-start gap-2">
             <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
@@ -198,12 +238,15 @@ const startVerification = async () => {
       </div>
       
       <div className="space-y-3">
+        {/* 🚨 FIXED: Dynamic button text based on state */}
         <button
           onClick={startVerification}
-          disabled={loading}
+          disabled={loading || verificationState === 'checking'}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          {loading ? 'Checking profile...' : 'Start Verification'}
+          {loading ? 'Checking...' : 
+           verificationState === 'needs_data' ? 'Provide Information' : 
+           'Start Verification'}
         </button>
         
         <button
