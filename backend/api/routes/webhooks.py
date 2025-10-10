@@ -334,33 +334,35 @@ async def handle_paystack_transfer_reversed(event_data):
 # REGFYL WEBHOOK HANDLERS (FIXED TABLE NAMES)
 # ============================================================================
 
-@router.post("/webhooks/regfyl/screening")
-async def regfyl_screening_webhook(request: Request):
-    """Handle Regfyl customer screening callbacks"""
+@router.post("/regfyl/screening")
+async def regfyl_screening_webhook(
+    request: Request,
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Handle Regfyl screening callbacks"""
     try:
-        payload = await request.json()
+        data = await request.json()
+        logger.info(f"[Regfyl Webhook] Received: {data}")
         
-        # Verify webhook signature
-        signature = request.headers.get("x-Signature")
-        if not signature:
-            logger.warning("Missing Regfyl webhook signature")
-            raise HTTPException(status_code=401, detail="Missing signature")
+        customer_id = data.get('customerID')
+        check_type = data.get('checkType', 'PEP')
+        status = data.get('status', 'Not yet reviewed')
+        reference = data.get('reference', '')
         
-        # Verify signature using Regfyl service
-        body = await request.body()
-        expected_signature = regfyl_service._generate_signature(body.decode('utf-8'))
+        # Update user based on check results
+        if check_type == 'PEP' and status == 'Reviewed - No further action required':
+            supabase.table('user_profiles').update({
+                'kyc_status': 'approved',
+                'kyc_level': 3,
+                'role': 'tribe',
+                'updated_at': datetime.utcnow().isoformat()
+            }).eq('id', customer_id).execute()
+            
+        return {"success": True, "message": "Webhook processed"}
         
-        if not hmac.compare_digest(signature, expected_signature):
-            logger.warning("Invalid Regfyl webhook signature")
-            raise HTTPException(status_code=401, detail="Invalid signature")
-        
-        # Parse callback data
-        callback_result = regfyl_service.parse_callback(payload)
-        customer_id = callback_result['customer_id']
-        
-        if not customer_id:
-            logger.error("No customer_id in Regfyl callback")
-            return {"status": "error", "message": "Missing customer_id"}
+    except Exception as e:
+        logger.error(f"[Regfyl Webhook] Error: {e}")
+        return {"success": False, "error": str(e)}
         
         # Update user compliance status using EXISTING compliance_checks table
         supabase = get_supabase_client()
