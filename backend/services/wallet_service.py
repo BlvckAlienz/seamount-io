@@ -96,6 +96,14 @@ class WalletService:
                 "message": "Algorand wallet created successfully"
             }
             
+            update_data = {
+                "algorand_address": address,
+                "wallet_address": address,  # Add this line
+                "updated_at": datetime.utcnow().isoformat()
+            }
+
+            self.db_service.supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
+
         except Exception as e:
             logger.error(f"Failed to create Algorand wallet for user {user_id}: {e}")
             raise Exception(f"Wallet creation failed: {str(e)}")
