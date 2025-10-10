@@ -751,23 +751,14 @@ def _extract_table_name(self, query: str, operation: str) -> str:
             logger.error(f"[DB] Failed to extract table name: {str(e)}")
             raise
 
-async def log_event(self, event_type: str, event_data: Dict[str, Any]) -> bool:
-    """Log system events for audit trail"""
-    try:
-        log_entry = {
-            "id": str(uuid.uuid4()),
-            "event_type": event_type,
-            "details": event_data,
-            "created_at": datetime.utcnow().isoformat()
-        }
-    
-        response = self.supabase.table("system_events").insert(log_entry).execute()
-        
-        return bool(response.data)
-    
-    except Exception as e:
-        logger.error(f"[DB] Failed to log event: {str(e)}")
-        return False
+async def log_event(self, table_name: str, event_data: Dict[str, Any]) -> bool:
+        """Generic event logger"""
+        try:
+            response = self.supabase.table(table_name).insert(event_data).execute()
+            return bool(response.data)
+        except Exception as e:
+            logger.warning(f"[DB] log_event failed: {str(e)}")
+            return False
 
     async def get_wallet_balance(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user wallet balance information"""
