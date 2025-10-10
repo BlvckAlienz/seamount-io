@@ -137,38 +137,28 @@ async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
             logger.error(f"Failed to initialize wallet balances: {e}")
             # Don't fail wallet creation if balance init fails
     
-    async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
-        """Get comprehensive wallet balances for user"""
-        try:
-            # Get user's wallet - FIX: use correct column name
-            response = self.db_service.supabase.table("user_wallets").select("algorand_address").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
-            
-            if not response.data:
-                return {"balances": {}, "total_usd": 0.0, "wallet_exists": False}
-            
-            wallet_address = response.data['algorand_address']
-            
-            # Get live balances from Algorand network
-            live_balances = await self._fetch_live_balances(wallet_address)
-            
-            # Update database with live balances
-            await self._update_cached_balances(user_id, live_balances)
-            
-            # Calculate total portfolio value
-            total_usd = await self._calculate_portfolio_value(live_balances)
-            
+async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
+    """Get user wallet status - FIXED VERSION"""
+    try:
+        # Check if wallet exists in database
+        response = self.db_service.supabase.table("user_wallets").select(
+            "algorand_address"
+        ).eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
+        
+        if response.data:
             return {
-                "wallet_address": wallet_address,
-                "balances": live_balances,
-                "total_usd": total_usd,
                 "wallet_exists": True,
-                "supported_assets": list(self.supported_assets.keys()),
-                "last_updated": datetime.utcnow().isoformat()
+                "wallet_address": response.data["algorand_address"]
+            }
+        else:
+            return {
+                "wallet_exists": False,
+                "wallet_address": None
             }
             
-        except Exception as e:
-            logger.error(f"Failed to get balances for user {user_id}: {e}")
-            return {"balances": {}, "total_usd": 0.0, "wallet_exists": False}
+    except Exception as e:
+        logger.error(f"Error checking wallet existence: {e}")
+        return {"wallet_exists": False, "wallet_address": None}
     
     async def _fetch_live_balances(self, wallet_address: str) -> Dict[str, float]:
         """Fetch actual balances from Algorand blockchain"""

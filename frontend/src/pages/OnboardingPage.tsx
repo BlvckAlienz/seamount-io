@@ -50,28 +50,49 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step - FIXED WITH PROPER MODAL FLOW
+// Identity Verification Step - COMPLETELY FIXED
 const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   const [loading, setLoading] = useState(false);
   const [showBVNModal, setShowBVNModal] = useState(false);
-  const [verificationState, setVerificationState] = useState('idle'); // 'idle', 'checking', 'needs_data', 'ready'
+  const [verificationState, setVerificationState] = useState('idle');
   
+  // 🚨 FIXED: Proper country detection and data requirements
   const isNigerianUser = userProfile?.country_code === 'NG';
-  const hasRequiredData = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
+  const isKenyanUser = userProfile?.country_code === 'KE';
+  const isGhanaianUser = userProfile?.country_code === 'GH';
+  const isSouthAfricanUser = userProfile?.country_code === 'ZA';
+  
+  // 🚨 FIXED: Check for ALL required data including ID numbers
+  const hasRequiredData = React.useMemo(() => {
+    const baseFields = userProfile?.date_of_birth && userProfile?.gender && userProfile?.phone;
+    
+    if (isNigerianUser) {
+      return baseFields && (userProfile?.bvn || userProfile?.id_number);
+    }
+    if (isKenyanUser || isGhanaianUser || isSouthAfricanUser) {
+      return baseFields && userProfile?.id_number;
+    }
+    
+    // For other countries, only base fields are required
+    return baseFields;
+  }, [userProfile, isNigerianUser, isKenyanUser, isGhanaianUser, isSouthAfricanUser]);
 
-  // 🚨 FIXED: Check data requirements FIRST before any API calls
+  // 🚨 FIXED: Immediate modal trigger for users missing data
   useEffect(() => {
-    if (isNigerianUser && !hasRequiredData) {
+    const needsData = !hasRequiredData && (isNigerianUser || isKenyanUser || isGhanaianUser || isSouthAfricanUser);
+    
+    if (needsData) {
+      console.log('🚨 User missing required data - setting needs_data state');
       setVerificationState('needs_data');
     } else {
       setVerificationState('ready');
     }
-  }, [isNigerianUser, hasRequiredData]);
+  }, [hasRequiredData, isNigerianUser, isKenyanUser, isGhanaianUser, isSouthAfricanUser]);
 
   const startVerification = async () => {
     // 🚨 FIXED: Show modal immediately if data is missing
     if (verificationState === 'needs_data') {
-      console.log('🔄 Nigerian user missing data - showing modal immediately');
+      console.log('🔄 User missing data - showing modal immediately');
       setShowBVNModal(true);
       return;
     }
@@ -90,23 +111,21 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       } else {
         throw new Error(data.message || 'Verification failed');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('KYC API error:', error);
       
-      // 🚨 FIXED: Handle specific backend errors
+      // Handle specific backend errors
       if (error.response?.status === 400) {
         const errorDetail = error.response?.data?.detail;
         const errorType = typeof errorDetail === 'object' ? errorDetail.type : null;
         
-        if (errorType === 'missing_bvn' || errorType === 'profile_incomplete') {
+        if (errorType === 'missing_bvn' || errorType === 'profile_incomplete' || errorType === 'missing_id') {
           console.log('🔄 Backend requires additional data - showing modal');
           setVerificationState('needs_data');
           setShowBVNModal(true);
         } else {
           toast.error(error.response?.data?.detail || 'Please complete your profile information');
         }
-      } else if (error.response?.status === 500) {
-        toast.error('Verification service temporarily unavailable. Please try again.');
       } else {
         toast.error('Verification failed. Please try again.');
       }
@@ -117,7 +136,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
   };
 
   // 🚨 FIXED: Proper modal completion handler
-  const handleModalComplete = async (modalData: any) => {
+  const handleModalComplete = async (modalData) => {
     setShowBVNModal(false);
     setLoading(true);
     
@@ -130,7 +149,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       if (submitResponse.data.success) {
         toast.success('Information saved!');
         
-        // 2. Wait a moment for backend to process
+        // 2. Wait for backend to process
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // 3. Now start verification with complete data
@@ -146,7 +165,7 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       } else {
         throw new Error('Failed to save KYC data');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Modal completion error:', error);
       toast.error(error.response?.data?.detail || 'Failed to complete verification. Please try again.');
     } finally {
@@ -192,28 +211,21 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
             <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-blue-300 text-sm font-medium mb-1">
-                {isNigerianUser ? '🇳🇬 Additional Information Required' : 'Profile Information Needed'}
+                {isNigerianUser ? '🇳🇬 Additional Information Required' : 
+                 isKenyanUser ? '🇰🇪 Additional Information Required' :
+                 isGhanaianUser ? '🇬🇭 Additional Information Required' :
+                 isSouthAfricanUser ? '🇿🇦 Additional Information Required' : 'Profile Information Needed'}
               </p>
               <p className="text-gray-300 text-xs">
                 {isNigerianUser 
-                  ? "We need your BVN, date of birth, and gender for instant verification."
-                  : "Please complete your profile information to continue with verification."
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Keep the original Nigerian user warning for context */}
-      {isNigerianUser && !hasRequiredData && verificationState !== 'needs_data' && (
-        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-left">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-blue-300 text-sm font-medium mb-1">🇳🇬 Nigerian User - Fast Track</p>
-              <p className="text-gray-300 text-xs">
-                You'll be prompted for your BVN, date of birth, and gender for instant verification via Regfyl.
+                  ? "We need your BVN/NIN, date of birth, gender, and phone number for instant verification."
+                  : isKenyanUser
+                  ? "We need your National ID, date of birth, gender, and phone number for verification."
+                  : isGhanaianUser
+                  ? "We need your Ghana Card, date of birth, gender, and phone number for verification."
+                  : isSouthAfricanUser
+                  ? "We need your ID Number, date of birth, gender, and phone number for verification."
+                  : "Please complete your profile information to continue with verification."}
               </p>
             </div>
           </div>
