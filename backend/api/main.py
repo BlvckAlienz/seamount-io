@@ -52,7 +52,7 @@ try:
         get_oracle_service
     )
     dependencies_available = True
-    logger.info("✅ Dependencies imported successfully")
+    logger.info("âœ… Dependencies imported successfully")
 except ImportError as e:
     logger.error(f"Critical dependency import error: {e}")
     dependencies_available = False
@@ -114,7 +114,7 @@ try:
     AuditService = ActualAuditService
     KYCService = ActualKYCService
     services_available = True
-    logger.info("✅ Core services imported successfully")
+    logger.info("âœ… Core services imported successfully")
 except ImportError as e:
     logger.error(f"Core service import error: {e}")
     services_available = False
@@ -124,7 +124,7 @@ try:
     from backend.services.oracle_service import OracleService as ActualOracleService
     OracleService = ActualOracleService
     oracle_service_available = True
-    logger.info("✅ Oracle service imported successfully")
+    logger.info("âœ… Oracle service imported successfully")
 except ImportError as e:
     logger.error(f"Oracle service import error: {e}")
     oracle_service_available = False
@@ -177,7 +177,7 @@ except ImportError as e:
 try:
     from backend.api.routes.payments import router as payments_router
     routers_available['payments'] = payments_router
-    logger.info("✅ Payments router imported successfully")
+    logger.info("âœ… Payments router imported successfully")
 except ImportError as payment_e:
     logger.error(f"Payments router import error: {payment_e}")
     from fastapi import APIRouter
@@ -259,7 +259,7 @@ async def lifespan(app: FastAPI):
     try:
         # Check if we can get settings using the GLOBAL variables
         if services_available:
-            logger.info("✅ Core services available - proceeding with initialization")
+            logger.info("âœ… Core services available - proceeding with initialization")
             try:
                 settings = get_settings()
         
@@ -270,12 +270,12 @@ async def lifespan(app: FastAPI):
                             settings.SUPABASE_URL, 
                             settings.SUPABASE_SERVICE_KEY.get_secret_value()
                         )
-                        logger.info("✅ Supabase client created successfully")
+                        logger.info("âœ… Supabase client created successfully")
                     except Exception as e:
-                        logger.error(f"❌ Failed to create Supabase client: {e}")
+                        logger.error(f"âŒ Failed to create Supabase client: {e}")
                         supabase_client = None
                 else:
-                    logger.warning("❌ Supabase credentials validation failed - operating without database")
+                    logger.warning("âŒ Supabase credentials validation failed - operating without database")
                     supabase_client = None
                     
                 # Initialize all services if available
@@ -306,17 +306,17 @@ async def lifespan(app: FastAPI):
                     if oracle_service_available:
                         try:
                             oracle_service = OracleService(database_service)
-                            logger.info("✅ Oracle service initialized successfully")
+                            logger.info("âœ… Oracle service initialized successfully")
                         except Exception as e:
-                            logger.error(f"❌ Failed to initialize Oracle service: {e}")
+                            logger.error(f"âŒ Failed to initialize Oracle service: {e}")
                             oracle_service = None
 
                     # Test KYC service initialization with health check
                     try:
                         kyc_health = await kyc_service.health_check()
-                        logger.info(f"✅ KYC Service health: {kyc_health}")
+                        logger.info(f"âœ… KYC Service health: {kyc_health}")
                     except Exception as e:
-                        logger.error(f"❌ KYC Service health check failed: {e}")
+                        logger.error(f"âŒ KYC Service health check failed: {e}")
 
                     # Initialize dependencies
                     if dependencies_available:
@@ -330,9 +330,9 @@ async def lifespan(app: FastAPI):
                             algorand_service,
                             oracle_service
                         )
-                        logger.info("✅ All dependencies initialized successfully")
+                        logger.info("âœ… All dependencies initialized successfully")
                 else:
-                    logger.warning("❌ Supabase client not available, skipping database-dependent services")
+                    logger.warning("âŒ Supabase client not available, skipping database-dependent services")
                     # Initialize with minimal dependencies
                     if dependencies_available:
                         initialize_dependencies(
@@ -346,19 +346,19 @@ async def lifespan(app: FastAPI):
                 # Business model calculation
                 try:
                     test_calc = settings.business_model.calculate_cross_border_economics(Decimal("1000"))
-                    logger.info(f"💰 Business model initialized. Test $1000 cross-border: ${test_calc['seamount']['total_cost']}")
+                    logger.info(f"ðŸ’° Business model initialized. Test $1000 cross-border: ${test_calc['seamount']['total_cost']}")
                 except Exception as e:
-                    logger.warning(f"⚠️ Business model validation failed: {e}")
+                    logger.warning(f"âš ï¸ Business model validation failed: {e}")
                     
             except Exception as e:
-                logger.error(f"❌ Service initialization error: {e}")
+                logger.error(f"âŒ Service initialization error: {e}")
         else:
-            logger.warning("❌ Core services not available - operating in limited mode")
+            logger.warning("âŒ Core services not available - operating in limited mode")
             
     except Exception as e:
-        logger.critical(f"💥 FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+        logger.critical(f"ðŸ’¥ FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
         # Don't raise the error to allow the app to start in degraded mode
-        logger.info("🔄 Continuing with degraded functionality")
+        logger.info("ðŸ”„ Continuing with degraded functionality")
     
     yield
     
@@ -401,41 +401,41 @@ app.add_middleware(
 # FIXED: Include routers with proper error handling and consistent prefixes
 if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
-    logger.info("✅ Users router registered")
+    logger.info("âœ… Users router registered")
 
 # FIXED: Correct KYC router registration
 if routers_available.get('kyc'):
     from backend.api.routes.kyc import router as kyc_router
     app.include_router(kyc_router, prefix="/api/v1/kyc", tags=["KYC"])
-    logger.info("✅ KYC router registered at /api/v1/kyc")
+    logger.info("âœ… KYC router registered at /api/v1/kyc")
 
 if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
     app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
-    logger.info("✅ Webhooks router registered")
+    logger.info("âœ… Webhooks router registered")
 
 if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
     app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["Portfolio"])
-    logger.info("✅ Portfolio router registered")
+    logger.info("âœ… Portfolio router registered")
 
 if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
     app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])
-    logger.info("✅ Investor router registered")
+    logger.info("âœ… Investor router registered")
 
 if routers_available.get('consent') and hasattr(routers_available['consent'], 'router'):
     app.include_router(routers_available['consent'].router, prefix="/api/v1", tags=["Consent"])
-    logger.info("✅ Consent router registered")
+    logger.info("âœ… Consent router registered")
 
 if routers_available.get('licensing'):
     app.include_router(routers_available['licensing'], prefix="/api/v1", tags=["Licensing"])
-    logger.info("✅ Licensing router registered")
+    logger.info("âœ… Licensing router registered")
 
 if routers_available.get('session'):
     app.include_router(routers_available['session'], prefix="/api/v1/session", tags=["Session"])
-    logger.info("✅ Session router registered")
+    logger.info("âœ… Session router registered")
 
 if routers_available.get('payments'):
     app.include_router(routers_available['payments'], prefix="/api/payments", tags=["Payments"])
-    logger.info("✅ Payments router registered")
+    logger.info("âœ… Payments router registered")
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 
@@ -443,9 +443,9 @@ else:
 try:
     from backend.api.routes import oracle
     app.include_router(oracle.router, prefix="/api", tags=["Oracle"])
-    logger.info("✅ Oracle router registered at /api")
+    logger.info("âœ… Oracle router registered at /api")
 except Exception as e:
-    logger.error(f"❌ Oracle router registration failed: {e}")
+    logger.error(f"âŒ Oracle router registration failed: {e}")
     
     # Create fallback oracle endpoint
     from fastapi import APIRouter
@@ -469,7 +469,7 @@ except Exception as e:
 try:
     from backend.api.routes.transactions import router as transactions_router
     app.include_router(transactions_router, prefix="/api/v1", tags=["Transactions"])
-    logger.info("✅ Transactions router registered")
+    logger.info("âœ… Transactions router registered")
 except ImportError as e:
     logger.error(f"Transactions router import error: {e}")
     
@@ -477,7 +477,7 @@ except ImportError as e:
 try:
     from backend.api.routes.transactions import router as transactions_router
     app.include_router(transactions_router, prefix="/api/v1", tags=["Transactions"])
-    logger.info("✅ Transactions router registered")
+    logger.info("âœ… Transactions router registered")
 except ImportError as e:
     logger.error(f"Transactions router import error: {e}")
     

@@ -48,72 +48,57 @@ class WalletService:
             logger.error("Wallet data decryption failed - invalid token")
             raise HTTPException(status_code=500, detail="Wallet data decryption failed")
     
-async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
-    """
-    FIXED: Create Algorand wallet with PROPER state synchronization
-    """
-    try:
-        logger.info(f"Creating Algorand wallet for user: {user_id}")
-        
-        # Generate new Algorand account
-        private_key, address = account.generate_account()
-        mnemonic_phrase = mnemonic.from_private_key(private_key)
-        encrypted_pk = self._encrypt(private_key)
-        
-        # CRITICAL FIX: Use database transaction-like approach
-        wallet_data = {
-            "user_id": user_id,
-            "algorand_address": address,
-            "algorand_private_key": encrypted_pk,
-            "wallet_type": "managed",
-            "is_active": True,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # 1. Create wallet first
-        wallet_response = self.db_service.supabase.table("user_wallets").upsert(wallet_data).execute()
-        
-        if not wallet_response.data:
-            raise Exception("Failed to create wallet in database")
-        
-        # 2. THEN update user profile - CRITICAL SEQUENCE
-        profile_update = {
-            "algorand_address": address,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        profile_response = self.db_service.supabase.table("user_profiles").update(profile_update).eq("id", user_id).execute()
-        
-        if not profile_response.data:
-            logger.error(f"Wallet created but profile update failed for user: {user_id}")
-            # Don't fail - wallet exists but profile needs manual fix
-        else:
-            logger.info(f"Successfully updated user profile with wallet address: {address}")
-        
-        # Initialize wallet balances
-        await self._initialize_wallet_balances(user_id, address)
-        
-        logger.info(f"Algorand wallet creation COMPLETE: {address}")
-        
-        return {
-            "success": True,
-            "wallet_address": address,
-            "blockchain": "algorand",
-            "mnemonic": mnemonic_phrase,
-            "supported_assets": list(self.supported_assets.keys()),
-            "message": "Algorand wallet created successfully"
-        }
-
-    except Exception as e:
-        logger.error(f"CRITICAL: Failed to create Algorand wallet for user {user_id}: {str(e)}")
-        # Return specific error instead of generic message
-        return {
-            "success": False,
-            "error": f"Wallet creation failed: {str(e)}",
-            "wallet_address": None,
-            "mnemonic": None
-        }
+    async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
+        """
+        FIXED: Create Algorand wallet with correct schema mapping
+        """
+        try:
+            logger.info(f"Creating Algorand wallet for user: {user_id}")
+            
+            # Generate new Algorand account
+            private_key, address = account.generate_account()
+            mnemonic_phrase = mnemonic.from_private_key(private_key)
+            
+            # FIX: private_key is already a STRING from algosdk, don't call .hex()
+            encrypted_pk = self._encrypt(private_key)
+            
+            # FIX: Use correct Supabase column names
+            wallet_data = {
+                "user_id": user_id,
+                "algorand_address": address,  # NOT wallet_address
+                "algorand_private_key": encrypted_pk,  # NOT encrypted_private_key
+                "wallet_type": "managed",  # NOT blockchain
+                "is_active": True,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Use Supabase upsert directly
+            response = self.db_service.supabase.table("user_wallets").upsert(
+                wallet_data, 
+                on_conflict="user_id"
+            ).execute()
+            
+            if not response.data:
+                raise Exception("Failed to create wallet in database")
+            
+            # Initialize wallet balances
+            await self._initialize_wallet_balances(user_id, address)
+            
+            logger.info(f"Algorand wallet created successfully: {address}")
+            
+            return {
+                "success": True,
+                "wallet_address": address,
+                "blockchain": "algorand",
+                "mnemonic": mnemonic_phrase,
+                "supported_assets": list(self.supported_assets.keys()),
+                "message": "Algorand wallet created successfully"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to create Algorand wallet for user {user_id}: {e}")
+            raise Exception(f"Wallet creation failed: {str(e)}")
     
     async def _initialize_wallet_balances(self, user_id: str, wallet_address: str):
         """Initialize balance records for all supported assets"""
@@ -137,28 +122,38 @@ async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
             logger.error(f"Failed to initialize wallet balances: {e}")
             # Don't fail wallet creation if balance init fails
     
-async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
-    """Get user wallet status - FIXED VERSION"""
-    try:
-        # Check if wallet exists in database
-        response = self.db_service.supabase.table("user_wallets").select(
-            "algorand_address"
-        ).eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
-        
-        if response.data:
+    async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive wallet balances for user"""
+        try:
+            # Get user's wallet - FIX: use correct column name
+            response = self.db_service.supabase.table("user_wallets").select("algorand_address").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
+            
+            if not response.data:
+                return {"balances": {}, "total_usd": 0.0, "wallet_exists": False}
+            
+            wallet_address = response.data['algorand_address']
+            
+            # Get live balances from Algorand network
+            live_balances = await self._fetch_live_balances(wallet_address)
+            
+            # Update database with live balances
+            await self._update_cached_balances(user_id, live_balances)
+            
+            # Calculate total portfolio value
+            total_usd = await self._calculate_portfolio_value(live_balances)
+            
             return {
+                "wallet_address": wallet_address,
+                "balances": live_balances,
+                "total_usd": total_usd,
                 "wallet_exists": True,
-                "wallet_address": response.data["algorand_address"]
-            }
-        else:
-            return {
-                "wallet_exists": False,
-                "wallet_address": None
+                "supported_assets": list(self.supported_assets.keys()),
+                "last_updated": datetime.utcnow().isoformat()
             }
             
-    except Exception as e:
-        logger.error(f"Error checking wallet existence: {e}")
-        return {"wallet_exists": False, "wallet_address": None}
+        except Exception as e:
+            logger.error(f"Failed to get balances for user {user_id}: {e}")
+            return {"balances": {}, "total_usd": 0.0, "wallet_exists": False}
     
     async def _fetch_live_balances(self, wallet_address: str) -> Dict[str, float]:
         """Fetch actual balances from Algorand blockchain"""

@@ -169,7 +169,7 @@ class KYCService:
                     "kyc_status": current_status
                 }
             
-            # 3. ðŸš¨ FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
+            # 3. Ã°Å¸Å¡Â¨ FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
             if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
                 return await self._start_regfyl_verification(user_id, user_profile, country_code)
             else:
@@ -183,29 +183,29 @@ class KYCService:
             logger.error(f"Unexpected error in start_verification_session: {e}")
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
-async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-    """Start verification using Regfyl"""
-    
-    try:
-        # Use settings-based callback URL
-        callback_url = self.settings.regfyl_callback_url  # ✅ CHANGED
+    async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
+        """Start verification using Regfyl for ALL users"""
         
-        user_data = {
-            'customer_id': user_id,
-            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
-            'gender': user_profile.get('gender', ''),
-            'country': country_code,
-            'callback_url': callback_url  # ✅ CHANGED
-        }
-        
-        # Only add BVN if it exists
-        if country_code == 'NG' and user_profile.get('bvn'):
-            user_data.update({
-                'id_type': 'BVN',
-                'id_number': user_profile.get('bvn'),
-                'verifyID': 'YES'
-            })
+        try:
+            # Use settings-based callback URL
+            callback_url = getattr(self.settings, 'regfyl_callback_url', f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening")
+            
+            user_data = {
+                'customer_id': user_id,
+                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+                'gender': user_profile.get('gender', ''),
+                'country': country_code,
+                'callback_url': callback_url
+            }
+            
+            # Only add BVN if it exists
+            if country_code == 'NG' and user_profile.get('bvn'):
+                user_data.update({
+                    'id_type': 'BVN',
+                    'id_number': user_profile.get('bvn'),
+                    'verifyID': 'YES'
+                })
             elif country_code in ['KE', 'GH'] and user_profile.get('id_number'):
                 user_data.update({
                     'id_type': 'NATIONAL_ID' if country_code == 'KE' else 'GHANA_CARD',
