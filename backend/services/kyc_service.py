@@ -183,120 +183,120 @@ class KYCService:
             logger.error(f"Unexpected error in start_verification_session: {e}")
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
-async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-    """Start Regfyl verification with stored user data"""
-    
-    try:
-        callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
+    async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
+        """Start Regfyl verification with stored user data"""
         
-        # Build base user data
-        user_data = {
-            'customer_id': user_id,
-            'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-            'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
-            'gender': user_profile.get('gender', ''),
-            'country': country_code,
-            'callback_url': callback_url
-        }
-        
-        # Add ID verification if available
-        id_number = user_profile.get('bvn') or user_profile.get('id_number')
-        if id_number:
-            user_data.update({
-                'id_type': user_profile.get('id_type', 'BVN'),
-                'id_number': id_number,
-                'verifyID': 'YES'
-            })
-            logger.info(f"[Regfyl] ID verification enabled for {user_id}")
-        else:
-            logger.warning(f"[Regfyl] No ID provided for {user_id} - screening only")
-        
-        # Validate
-        if not user_data['full_name']:
-            raise HTTPException(status_code=400, detail="Full name required")
-        
-        # Call Regfyl
-        regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-        
-        # Update status
-        await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-        
-        # Store session
-        if self.supabase:
-            try:
-                session_data = {
-                    "user_id": user_id,
-                    "applicant_id": f"regfyl_{user_id}",
-                    "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
-                    "verification_type": "regfyl_screening",
-                    "status": "pending",
-                    "response_data": regfyl_result,
-                    "created_at": datetime.utcnow().isoformat()
-                }
-                self.supabase.table("kyc_sessions").upsert(session_data).execute()
-            except Exception as e:
-                logger.warning(f"Session save failed: {e}")
-        
-        logger.info(f"Regfyl verification started for {user_id}")
-        
-        return {
-            "success": True,
-            "provider": "regfyl",
-            "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
-            "applicantId": f"regfyl_{user_id}",
-            "message": "Verification submitted successfully",
-            "status": "pending",
-            "next_step": "await_review"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Regfyl verification failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def health_check(self) -> Dict[str, Any]:
-    """Health check for KYC service"""
-    try:
-        status = {
-            "service": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "primary_provider": self.primary_provider,
-            "provider_status": "unknown",
-            "database_status": "unknown"
-        }
-        
-        # Check provider
-        if self.primary_provider and self.primary_provider in self.providers:
-            provider = self.providers[self.primary_provider]
-            if hasattr(provider, 'health_check'):
-                try:
-                    provider_status = await provider.health_check()
-                    status["provider_status"] = provider_status.get("status", "unknown")
-                except Exception as e:
-                    status["provider_status"] = f"error: {str(e)}"
-                    status["service"] = "degraded"
+        try:
+            callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
+            
+            # Build base user data
+            user_data = {
+                'customer_id': user_id,
+                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+                'gender': user_profile.get('gender', ''),
+                'country': country_code,
+                'callback_url': callback_url
+            }
+            
+            # Add ID verification if available
+            id_number = user_profile.get('bvn') or user_profile.get('id_number')
+            if id_number:
+                user_data.update({
+                    'id_type': user_profile.get('id_type', 'BVN'),
+                    'id_number': id_number,
+                    'verifyID': 'YES'
+                })
+                logger.info(f"[Regfyl] ID verification enabled for {user_id}")
             else:
-                status["provider_status"] = "no_health_check"
-        else:
-            status["provider_status"] = "no_provider"
-            status["service"] = "unhealthy"
-        
-        # Check database
-        if self.supabase:
-            try:
-                result = self.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
-                status["database_status"] = "healthy" if result else "unhealthy"
-            except Exception as e:
-                status["database_status"] = f"error: {str(e)}"
+                logger.warning(f"[Regfyl] No ID provided for {user_id} - screening only")
+            
+            # Validate
+            if not user_data['full_name']:
+                raise HTTPException(status_code=400, detail="Full name required")
+            
+            # Call Regfyl
+            regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+            
+            # Update status
+            await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+            
+            # Store session
+            if self.supabase:
+                try:
+                    session_data = {
+                        "user_id": user_id,
+                        "applicant_id": f"regfyl_{user_id}",
+                        "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                        "verification_type": "regfyl_screening",
+                        "status": "pending",
+                        "response_data": regfyl_result,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    self.supabase.table("kyc_sessions").upsert(session_data).execute()
+                except Exception as e:
+                    logger.warning(f"Session save failed: {e}")
+            
+            logger.info(f"Regfyl verification started for {user_id}")
+            
+            return {
+                "success": True,
+                "provider": "regfyl",
+                "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                "applicantId": f"regfyl_{user_id}",
+                "message": "Verification submitted successfully",
+                "status": "pending",
+                "next_step": "await_review"
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Regfyl verification failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Health check for KYC service"""
+        try:
+            status = {
+                "service": "healthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "primary_provider": self.primary_provider,
+                "provider_status": "unknown",
+                "database_status": "unknown"
+            }
+            
+            # Check provider
+            if self.primary_provider and self.primary_provider in self.providers:
+                provider = self.providers[self.primary_provider]
+                if hasattr(provider, 'health_check'):
+                    try:
+                        provider_status = await provider.health_check()
+                        status["provider_status"] = provider_status.get("status", "unknown")
+                    except Exception as e:
+                        status["provider_status"] = f"error: {str(e)}"
+                        status["service"] = "degraded"
+                else:
+                    status["provider_status"] = "no_health_check"
+            else:
+                status["provider_status"] = "no_provider"
                 status["service"] = "unhealthy"
-        
-        return status
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "service": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            
+            # Check database
+            if self.supabase:
+                try:
+                    result = self.supabase.table("user_profiles").select("id", count="exact").limit(1).execute()
+                    status["database_status"] = "healthy" if result else "unhealthy"
+                except Exception as e:
+                    status["database_status"] = f"error: {str(e)}"
+                    status["service"] = "unhealthy"
+            
+            return status
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {
+                "service": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
