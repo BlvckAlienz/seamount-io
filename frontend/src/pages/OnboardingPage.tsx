@@ -322,15 +322,9 @@ const handleIdentityComplete = async () => {
   }
 };
 
-const handleBackupComplete = async () => {
-  // Refresh profile to get wallet address
-  await refreshProfile();
-  
-  // Small delay to ensure state updates
-  setTimeout(() => {
-    navigate('/dashboard');
-  }, 500);
-};
+  const handleBackupComplete = async () => {
+    await completeOnboarding();
+  };
 
   const handleStepBack = () => {
     if (step === 'walletBackup') setStep('identity');
