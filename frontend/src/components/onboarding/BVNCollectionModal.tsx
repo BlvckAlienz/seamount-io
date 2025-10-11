@@ -15,114 +15,108 @@ interface CountryConfig {
 }
 
 const COUNTRIES: CountryConfig[] = [
-  {
-    code: 'NG',
-    name: 'Nigeria',
-    dialCode: '+234',
-    idTypes: [
-      { value: 'BVN', label: 'BVN (Bank Verification Number)', placeholder: '22123456789' },
-      { value: 'NIN', label: 'NIN (National ID)', placeholder: '12345678901' }
-    ]
-  },
-  {
-    code: 'KE',
-    name: 'Kenya',
-    dialCode: '+254',
-    idTypes: [
-      { value: 'NATIONAL_ID', label: 'National ID', placeholder: '12345678' }
-    ]
-  },
-  {
-    code: 'ZA',
-    name: 'South Africa',
-    dialCode: '+27',
-    idTypes: [
-      { value: 'ID_NUMBER', label: 'ID Number', placeholder: '8001015009087' }
-    ]
-  },
-  {
-    code: 'GH',
-    name: 'Ghana',
-    dialCode: '+233',
-    idTypes: [
-      { value: 'GHANA_CARD', label: 'Ghana Card', placeholder: 'GHA-123456789-0' }
-    ]
-  },
-  {
-    code: 'CM',
-    name: 'Cameroon',
-    dialCode: '+237',
-    idTypes: [
-      { value: 'NATIONAL_ID', label: 'National ID Card', placeholder: '123456789' }
-    ]
-  },
-  {
-    code: 'RW',
-    name: 'Rwanda',
-    dialCode: '+250',
-    idTypes: [
-      { value: 'NATIONAL_ID', label: 'National ID', placeholder: '1234567890123456' }
-    ]
-  },
-  {
-    code: 'TZ',
-    name: 'Tanzania',
-    dialCode: '+255',
-    idTypes: [
-      { value: 'NIDA', label: 'NIDA Number', placeholder: '12345678-12345-12345-12' }
-    ]
-  },
-  {
-    code: 'UG',
-    name: 'Uganda',
-    dialCode: '+256',
-    idTypes: [
-      { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'CM12345678ABC123' }
-    ]
-  },
-  {
-    code: 'MW',
-    name: 'Malawi',
-    dialCode: '+265',
-    idTypes: [
-      { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'MNE123456' }
-    ]
-  },
-  {
-    code: 'ZM',
-    name: 'Zambia',
-    dialCode: '+260',
-    idTypes: [
-      { value: 'NRC', label: 'NRC Number', placeholder: '123456/78/9' }
-    ]
-  },
-  {
-    code: 'US',
-    name: 'United States',
-    dialCode: '+1',
-    idTypes: [
-      { value: 'SSN', label: 'Social Security Number', placeholder: '123-45-6789' },
-      { value: 'DRIVERS_LICENSE', label: 'Driver\'s License', placeholder: 'D1234567' }
-    ]
-  },
-  {
-    code: 'GB',
-    name: 'United Kingdom',
-    dialCode: '+44',
-    idTypes: [
-      { value: 'PASSPORT', label: 'Passport Number', placeholder: '123456789' },
-      { value: 'DRIVERS_LICENSE', label: 'Driving Licence', placeholder: 'MORGA753116SM9IJ' }
-    ]
-  },
-  {
-    code: 'IN',
-    name: 'India',
-    dialCode: '+91',
-    idTypes: [
-      { value: 'AADHAAR', label: 'Aadhaar Number', placeholder: '1234 5678 9012' },
-      { value: 'PAN', label: 'PAN Card', placeholder: 'ABCDE1234F' }
-    ]
-  }
+  // Africa
+  { code: 'NG', name: 'Nigeria', dialCode: '+234', idTypes: [
+    { value: 'BVN', label: 'BVN', placeholder: '22123456789' },
+    { value: 'NIN', label: 'NIN', placeholder: '12345678901' }
+  ]},
+  { code: 'KE', name: 'Kenya', dialCode: '+254', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: '12345678' }
+  ]},
+  { code: 'ZA', name: 'South Africa', dialCode: '+27', idTypes: [
+    { value: 'ID_NUMBER', label: 'ID Number', placeholder: '8001015009087' }
+  ]},
+  { code: 'GH', name: 'Ghana', dialCode: '+233', idTypes: [
+    { value: 'GHANA_CARD', label: 'Ghana Card', placeholder: 'GHA-123456789-0' }
+  ]},
+  { code: 'CM', name: 'Cameroon', dialCode: '+237', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: '123456789' }
+  ]},
+  { code: 'RW', name: 'Rwanda', dialCode: '+250', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: '1234567890123456' }
+  ]},
+  { code: 'TZ', name: 'Tanzania', dialCode: '+255', idTypes: [
+    { value: 'NIDA', label: 'NIDA', placeholder: '12345678-12345-12345-12' }
+  ]},
+  { code: 'UG', name: 'Uganda', dialCode: '+256', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'CM12345678ABC123' }
+  ]},
+  { code: 'MW', name: 'Malawi', dialCode: '+265', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'MNE123456' }
+  ]},
+  { code: 'ZM', name: 'Zambia', dialCode: '+260', idTypes: [
+    { value: 'NRC', label: 'NRC', placeholder: '123456/78/9' }
+  ]},
+  
+  // Americas
+  { code: 'US', name: 'United States', dialCode: '+1', idTypes: [
+    { value: 'SSN', label: 'SSN', placeholder: '123-45-6789' },
+    { value: 'DRIVERS_LICENSE', label: 'Driver\'s License', placeholder: 'D1234567' }
+  ]},
+  { code: 'CA', name: 'Canada', dialCode: '+1', idTypes: [
+    { value: 'SIN', label: 'SIN', placeholder: '123-456-789' }
+  ]},
+  { code: 'BR', name: 'Brazil', dialCode: '+55', idTypes: [
+    { value: 'CPF', label: 'CPF', placeholder: '123.456.789-00' }
+  ]},
+  { code: 'MX', name: 'Mexico', dialCode: '+52', idTypes: [
+    { value: 'CURP', label: 'CURP', placeholder: 'ABCD123456HDFABC00' }
+  ]},
+  
+  // Europe
+  { code: 'GB', name: 'United Kingdom', dialCode: '+44', idTypes: [
+    { value: 'PASSPORT', label: 'Passport', placeholder: '123456789' },
+    { value: 'NINO', label: 'National Insurance', placeholder: 'AB123456C' }
+  ]},
+  { code: 'DE', name: 'Germany', dialCode: '+49', idTypes: [
+    { value: 'PERSONALAUSWEIS', label: 'Personalausweis', placeholder: 'L01X00T47' }
+  ]},
+  { code: 'FR', name: 'France', dialCode: '+33', idTypes: [
+    { value: 'CNI', label: 'CNI', placeholder: '123456789012' }
+  ]},
+  { code: 'ES', name: 'Spain', dialCode: '+34', idTypes: [
+    { value: 'DNI', label: 'DNI', placeholder: '12345678A' }
+  ]},
+  { code: 'IT', name: 'Italy', dialCode: '+39', idTypes: [
+    { value: 'CODICE_FISCALE', label: 'Codice Fiscale', placeholder: 'RSSMRA80A01H501U' }
+  ]},
+  
+  // Asia
+  { code: 'IN', name: 'India', dialCode: '+91', idTypes: [
+    { value: 'AADHAAR', label: 'Aadhaar', placeholder: '1234 5678 9012' },
+    { value: 'PAN', label: 'PAN', placeholder: 'ABCDE1234F' }
+  ]},
+  { code: 'CN', name: 'China', dialCode: '+86', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: '110101199001011234' }
+  ]},
+  { code: 'JP', name: 'Japan', dialCode: '+81', idTypes: [
+    { value: 'MY_NUMBER', label: 'My Number', placeholder: '123456789012' }
+  ]},
+  { code: 'SG', name: 'Singapore', dialCode: '+65', idTypes: [
+    { value: 'NRIC', label: 'NRIC', placeholder: 'S1234567D' }
+  ]},
+  { code: 'MY', name: 'Malaysia', dialCode: '+60', idTypes: [
+    { value: 'MYKAD', label: 'MyKad', placeholder: '123456-12-1234' }
+  ]},
+  { code: 'PH', name: 'Philippines', dialCode: '+63', idTypes: [
+    { value: 'UMID', label: 'UMID', placeholder: '1234-1234567-1' }
+  ]},
+  
+  // Middle East
+  { code: 'AE', name: 'UAE', dialCode: '+971', idTypes: [
+    { value: 'EMIRATES_ID', label: 'Emirates ID', placeholder: '784-1234-1234567-1' }
+  ]},
+  { code: 'SA', name: 'Saudi Arabia', dialCode: '+966', idTypes: [
+    { value: 'NATIONAL_ID', label: 'National ID', placeholder: '1234567890' }
+  ]},
+  
+  // Oceania
+  { code: 'AU', name: 'Australia', dialCode: '+61', idTypes: [
+    { value: 'MEDICARE', label: 'Medicare', placeholder: '1234 56789 0' }
+  ]},
+  { code: 'NZ', name: 'New Zealand', dialCode: '+64', idTypes: [
+    { value: 'DRIVERS_LICENSE', label: 'Driver Licence', placeholder: 'AB123456' }
+  ]}
 ];
 
 interface BVNCollectionModalProps {
@@ -195,12 +189,10 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
 
   const handleSubmit = async () => {
     setError('');
-    
     if (!validateForm()) return;
 
     setIsSubmitting(true);
     try {
-      // Format phone with country code
       const fullPhone = formData.phoneNumber.startsWith('+') 
         ? formData.phoneNumber 
         : `${selectedCountry.dialCode}${formData.phoneNumber.replace(/^0+/, '')}`;
@@ -229,11 +221,8 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
         </div>
         
         <div className="space-y-4">
-          {/* Country Selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Country *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Country *</label>
             <div className="relative">
               <select
                 value={selectedCountry.code}
@@ -241,21 +230,16 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
                 className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
               >
                 {COUNTRIES.map(country => (
-                  <option key={country.code} value={country.code}>
-                    {country.name}
-                  </option>
+                  <option key={country.code} value={country.code}>{country.name}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
-          {/* ID Type */}
           {selectedCountry.idTypes.length > 1 && (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                ID Type *
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">ID Type *</label>
               <select
                 value={formData.idType}
                 onChange={(e) => setFormData({...formData, idType: e.target.value, idNumber: ''})}
@@ -269,7 +253,6 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           )}
           
-          {/* ID Number */}
           {(formData.idType || selectedCountry.idTypes.length === 1) && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -285,11 +268,8 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           )}
           
-          {/* Date of Birth */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Date of Birth *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Date of Birth *</label>
             <input
               type="date"
               value={formData.dateOfBirth}
@@ -299,11 +279,8 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             />
           </div>
           
-          {/* Gender */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Gender *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Gender *</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -330,11 +307,8 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           </div>
           
-          {/* Phone Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Phone Number *
-            </label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number *</label>
             <div className="flex gap-2">
               <div className="w-24 px-3 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-center">
                 {selectedCountry.dialCode}
@@ -376,7 +350,7 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
         
         <div className="mt-6 flex items-start gap-2 text-xs text-gray-500">
           <Shield className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <p>Your data is encrypted and used only for regulatory compliance</p>
+          <p>Encrypted & used only for compliance</p>
         </div>
       </div>
     </div>

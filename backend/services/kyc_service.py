@@ -184,12 +184,12 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
 async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-    """Start verification using Regfyl with stored BVN data"""
+    """Start Regfyl verification with stored user data"""
     
     try:
         callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
         
-        # Build user data
+        # Build base user data
         user_data = {
             'customer_id': user_id,
             'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
@@ -200,13 +200,16 @@ async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, cou
         }
         
         # Add ID verification if available
-        if user_profile.get('bvn') or user_profile.get('id_number'):
+        id_number = user_profile.get('bvn') or user_profile.get('id_number')
+        if id_number:
             user_data.update({
                 'id_type': user_profile.get('id_type', 'BVN'),
-                'id_number': user_profile.get('bvn') or user_profile.get('id_number'),
+                'id_number': id_number,
                 'verifyID': 'YES'
             })
-            logger.info(f"[Regfyl] ID verification enabled for user {user_id}")
+            logger.info(f"[Regfyl] ID verification enabled for {user_id}")
+        else:
+            logger.warning(f"[Regfyl] No ID provided for {user_id} - screening only")
         
         # Validate
         if not user_data['full_name']:
@@ -232,9 +235,9 @@ async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, cou
                 }
                 self.supabase.table("kyc_sessions").upsert(session_data).execute()
             except Exception as e:
-                logger.warning(f"Could not save KYC session: {e}")
+                logger.warning(f"Session save failed: {e}")
         
-        logger.info(f"Regfyl verification initiated for user {user_id}")
+        logger.info(f"Regfyl verification started for {user_id}")
         
         return {
             "success": True,
@@ -246,6 +249,8 @@ async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, cou
             "next_step": "await_review"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Regfyl verification failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
