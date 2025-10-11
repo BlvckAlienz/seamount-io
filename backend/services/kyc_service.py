@@ -185,36 +185,41 @@ class KYCService:
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
         """Start Regfyl verification with stored user data"""
-        
+    
         try:
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
-            
-            # Build base user data
+        
+            # ✅ FIX: Read ALL fields from database (stored by submit-kyc-data)
             user_data = {
                 'customer_id': user_id,
                 'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
                 'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
-                'gender': user_profile.get('gender', ''),
+                'gender': user_profile.get('gender', ''),  # ✅ From modal
                 'country': country_code,
                 'callback_url': callback_url
             }
-            
-            # Add ID verification if available
+        
+            # ✅ CRITICAL: Use the STORED BVN/ID from database
             id_number = user_profile.get('bvn') or user_profile.get('id_number')
+            id_type = user_profile.get('id_type', 'BVN')
+            
             if id_number:
                 user_data.update({
-                    'id_type': user_profile.get('id_type', 'BVN'),
+                    'id_type': id_type,
                     'id_number': id_number,
                     'verifyID': 'YES'
                 })
-                logger.info(f"[Regfyl] ID verification enabled for {user_id}")
+                logger.info(f"[Regfyl] Sending ID: {id_type} = {id_number[:3]}*** for user {user_id}")
             else:
-                logger.warning(f"[Regfyl] No ID provided for {user_id} - screening only")
-            
+                logger.warning(f"[Regfyl] NO ID FOUND in database for {user_id}")
+        
             # Validate
             if not user_data['full_name']:
                 raise HTTPException(status_code=400, detail="Full name required")
-            
+        
+            # Log what we're sending
+            logger.info(f"[Regfyl] Payload preview: {json.dumps({k: v for k, v in user_data.items() if k != 'id_number'}, indent=2)}")
+        
             # Call Regfyl
             regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
             

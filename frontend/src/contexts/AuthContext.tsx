@@ -267,52 +267,36 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-const completeOnboarding = async () => {
-  try {
-    if (!user?.id) {
-      throw new Error('No user ID found');
-    }
+  const completeOnboarding = async () => {
+    try {
+      const userId = user?.id || session?.user?.id;
+      if (!userId) throw new Error('No user ID');
 
-    // Fetch fresh profile
-    const { data: profile, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profile) {
-      throw new Error('Failed to fetch profile');
-    }
-
-    const hasWallet = profile.algorand_address || profile.wallet_address;
-    
-    logger.info('[Onboarding Complete]', {
-      kyc_status: profile.kyc_status,
-      role: profile.role,
-      hasWallet: !!hasWallet
-    });
-
-    // Update role if verified/pending
-    if (profile.kyc_status === 'pending' || profile.kyc_status === 'verified') {
-      await supabase
+      const { data: profile } = await supabase
         .from('user_profiles')
-        .update({ 
-          role: 'tribe',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (!profile) throw new Error('Profile not found');
+
+      // Update role if verified/pending
+      if (['pending', 'verified'].includes(profile.kyc_status)) {
+        await supabase
+          .from('user_profiles')
+          .update({ role: 'tribe', updated_at: new Date().toISOString() })
+          .eq('id', userId);
+      }
+
+      await refreshProfile();
+      navigate('/dashboard');
+      toast.success('Welcome to Seamount!');
+    } catch (error) {
+      console.error('Onboarding error:', error);
+      toast.error('Setup incomplete');
     }
-
-    await refreshProfile();
-    navigate('/dashboard');
-    toast.success('Welcome to Seamount!');
-    
-  } catch (error) {
-    console.error('Onboarding completion error:', error);
-    toast.error('Failed to complete onboarding');
-  }
-};
-
+  };
+  
 // Add these functions
 const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
