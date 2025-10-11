@@ -289,40 +289,46 @@ const OnboardingPage = () => {
   };
 
   // ✅ FIX: Called AFTER user submits BVN data
-  const handleBVNSubmit = async (formData) => {
-    const toastId = toast.loading('Starting verification...');
+const handleBVNSubmit = async (formData) => {
+  const toastId = toast.loading('Starting verification...');
+  
+  try {
+    // 1. Store data
+    await apiClient.post('/api/v1/kyc/submit-kyc-data', {
+      bvn: formData.idNumber,
+      id_type: formData.idType,
+      date_of_birth: formData.dateOfBirth,
+      gender: formData.gender,
+      phone: formData.phoneNumber,
+      country_code: formData.country
+    });
+
+    // 2. Start verification
+    await apiClient.post('/api/v1/kyc/start-verification');
+
+    // 3. Show success message
+    toast.success('Verification submitted!', { id: toastId });
+    toast('🎉 Our team will review your information within 24 hours', { 
+      duration: 5000,
+      icon: '⏰' 
+    });
+
+    // 4. Create wallet
+    const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
     
-    try {
-      // 1. Store BVN data in backend
-      await apiClient.post('/api/v1/kyc/submit-kyc-data', {
-        bvn: formData.idNumber,
-        id_type: formData.idType,
-        date_of_birth: formData.dateOfBirth,
-        gender: formData.gender,
-        phone: formData.phoneNumber,
-        country_code: formData.country
-      });
-
-      // 2. Start Regfyl verification with complete data
-      await apiClient.post('/api/v1/kyc/start-verification');
-
-      // 3. Create wallet
-      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-      
-      if (walletResponse.data.success && walletResponse.data.mnemonic) {
-        toast.success('Verification started!', { id: toastId });
-        setMnemonic(walletResponse.data.mnemonic);
-        setShowBVNModal(false);
-        setStep('walletBackup');
-      } else {
-        throw new Error('Wallet creation failed');
-      }
-    } catch (error) {
-      console.error('Verification error:', error);
-      toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
+    if (walletResponse.data.success && walletResponse.data.mnemonic) {
+      setMnemonic(walletResponse.data.mnemonic);
       setShowBVNModal(false);
+      setStep('walletBackup');
+    } else {
+      throw new Error('Wallet creation failed');
     }
-  };
+  } catch (error) {
+    console.error('Verification error:', error);
+    toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
+    setShowBVNModal(false);
+  }
+};
 
   // ✅ FIX: Skip flow - NO Regfyl call
   const handleSkipVerification = async () => {

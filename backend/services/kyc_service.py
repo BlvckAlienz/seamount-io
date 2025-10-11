@@ -184,12 +184,12 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
 async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-    """Start verification using Regfyl - NOW reads BVN from database"""
+    """Start verification using Regfyl with stored BVN data"""
     
     try:
-        callback_url = getattr(self.settings, 'regfyl_callback_url', f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening")
+        callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
         
-        # ✅ FIX: Read BVN from database (should be stored by submit-kyc-data)
+        # Build user data
         user_data = {
             'customer_id': user_id,
             'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
@@ -199,29 +199,23 @@ async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, cou
             'callback_url': callback_url
         }
         
-        # ✅ FIX: Only add BVN if it exists (should be present now)
-        if country_code == 'NG' and user_profile.get('bvn'):
+        # Add ID verification if available
+        if user_profile.get('bvn') or user_profile.get('id_number'):
             user_data.update({
-                'id_type': 'BVN',
-                'id_number': user_profile.get('bvn'),
+                'id_type': user_profile.get('id_type', 'BVN'),
+                'id_number': user_profile.get('bvn') or user_profile.get('id_number'),
                 'verifyID': 'YES'
             })
-            logger.info(f"[Regfyl] BVN found for user {user_id}: {user_profile.get('bvn')[:3]}***")
-        else:
-            logger.warning(f"[Regfyl] No BVN found for user {user_id} - basic screening only")
+            logger.info(f"[Regfyl] ID verification enabled for user {user_id}")
         
-        # Validate required fields
+        # Validate
         if not user_data['full_name']:
-            return {
-                "success": False,
-                "error": "Full name required for verification",
-                "missing_fields": ["first_name", "last_name"]
-            }
+            raise HTTPException(status_code=400, detail="Full name required")
         
-        # Start Regfyl screening
+        # Call Regfyl
         regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
         
-        # Update user status
+        # Update status
         await self.db_service.update_user_kyc_status(user_id, "pending", 1)
         
         # Store session
@@ -237,24 +231,24 @@ async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, cou
                     "created_at": datetime.utcnow().isoformat()
                 }
                 self.supabase.table("kyc_sessions").upsert(session_data).execute()
-            except Exception as session_error:
-                logger.warning(f"Could not save KYC session: {session_error}")
+            except Exception as e:
+                logger.warning(f"Could not save KYC session: {e}")
         
-        logger.info(f"Regfyl verification initiated successfully for user {user_id}")
+        logger.info(f"Regfyl verification initiated for user {user_id}")
         
         return {
             "success": True,
             "provider": "regfyl",
             "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
             "applicantId": f"regfyl_{user_id}",
-            "message": "Regfyl verification started successfully",
+            "message": "Verification submitted successfully",
             "status": "pending",
-            "next_step": "await_webhook"
+            "next_step": "await_review"
         }
         
     except Exception as e:
-        logger.error(f"Regfyl verification failed for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Verification service unavailable")
+        logger.error(f"Regfyl verification failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
     async def health_check(self) -> Dict[str, Any]:
         """

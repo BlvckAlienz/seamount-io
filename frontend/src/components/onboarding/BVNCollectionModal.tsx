@@ -1,50 +1,129 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Shield, Globe } from 'lucide-react';
+import { AlertCircle, Shield, Globe, ChevronDown } from 'lucide-react';
 
-interface CountryConfig {
-  name: string;
-  idTypes: Array<{ value: string; label: string; placeholder: string }>;
-  requiresID: boolean;
+interface IDType {
+  value: string;
+  label: string;
+  placeholder: string;
 }
 
-const COUNTRY_CONFIGS: Record<string, CountryConfig> = {
-  NG: {
+interface CountryConfig {
+  code: string;
+  name: string;
+  dialCode: string;
+  idTypes: IDType[];
+}
+
+const COUNTRIES: CountryConfig[] = [
+  {
+    code: 'NG',
     name: 'Nigeria',
+    dialCode: '+234',
     idTypes: [
       { value: 'BVN', label: 'BVN (Bank Verification Number)', placeholder: '22123456789' },
-      { value: 'NIN', label: 'NIN (National ID Number)', placeholder: '12345678901' }
-    ],
-    requiresID: true
+      { value: 'NIN', label: 'NIN (National ID)', placeholder: '12345678901' }
+    ]
   },
-  KE: {
+  {
+    code: 'KE',
     name: 'Kenya',
+    dialCode: '+254',
     idTypes: [
-      { value: 'NATIONAL_ID', label: 'Kenyan National ID', placeholder: '12345678' }
-    ],
-    requiresID: true
+      { value: 'NATIONAL_ID', label: 'National ID', placeholder: '12345678' }
+    ]
   },
-  GH: {
+  {
+    code: 'ZA',
+    name: 'South Africa',
+    dialCode: '+27',
+    idTypes: [
+      { value: 'ID_NUMBER', label: 'ID Number', placeholder: '8001015009087' }
+    ]
+  },
+  {
+    code: 'GH',
     name: 'Ghana',
+    dialCode: '+233',
     idTypes: [
       { value: 'GHANA_CARD', label: 'Ghana Card', placeholder: 'GHA-123456789-0' }
-    ],
-    requiresID: true
+    ]
   },
-  ZA: {
-    name: 'South Africa',
+  {
+    code: 'CM',
+    name: 'Cameroon',
+    dialCode: '+237',
     idTypes: [
-      { value: 'ID_NUMBER', label: 'SA ID Number', placeholder: '8001015009087' }
-    ],
-    requiresID: true
+      { value: 'NATIONAL_ID', label: 'National ID Card', placeholder: '123456789' }
+    ]
   },
-  DEFAULT: {
-    name: 'Other',
+  {
+    code: 'RW',
+    name: 'Rwanda',
+    dialCode: '+250',
     idTypes: [
-      { value: 'PASSPORT', label: 'Passport Number', placeholder: 'A12345678' }
-    ],
-    requiresID: false
+      { value: 'NATIONAL_ID', label: 'National ID', placeholder: '1234567890123456' }
+    ]
+  },
+  {
+    code: 'TZ',
+    name: 'Tanzania',
+    dialCode: '+255',
+    idTypes: [
+      { value: 'NIDA', label: 'NIDA Number', placeholder: '12345678-12345-12345-12' }
+    ]
+  },
+  {
+    code: 'UG',
+    name: 'Uganda',
+    dialCode: '+256',
+    idTypes: [
+      { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'CM12345678ABC123' }
+    ]
+  },
+  {
+    code: 'MW',
+    name: 'Malawi',
+    dialCode: '+265',
+    idTypes: [
+      { value: 'NATIONAL_ID', label: 'National ID', placeholder: 'MNE123456' }
+    ]
+  },
+  {
+    code: 'ZM',
+    name: 'Zambia',
+    dialCode: '+260',
+    idTypes: [
+      { value: 'NRC', label: 'NRC Number', placeholder: '123456/78/9' }
+    ]
+  },
+  {
+    code: 'US',
+    name: 'United States',
+    dialCode: '+1',
+    idTypes: [
+      { value: 'SSN', label: 'Social Security Number', placeholder: '123-45-6789' },
+      { value: 'DRIVERS_LICENSE', label: 'Driver\'s License', placeholder: 'D1234567' }
+    ]
+  },
+  {
+    code: 'GB',
+    name: 'United Kingdom',
+    dialCode: '+44',
+    idTypes: [
+      { value: 'PASSPORT', label: 'Passport Number', placeholder: '123456789' },
+      { value: 'DRIVERS_LICENSE', label: 'Driving Licence', placeholder: 'MORGA753116SM9IJ' }
+    ]
+  },
+  {
+    code: 'IN',
+    name: 'India',
+    dialCode: '+91',
+    idTypes: [
+      { value: 'AADHAAR', label: 'Aadhaar Number', placeholder: '1234 5678 9012' },
+      { value: 'PAN', label: 'PAN Card', placeholder: 'ABCDE1234F' }
+    ]
   }
-};
+];
 
 interface BVNCollectionModalProps {
   onComplete: (data: any) => void;
@@ -59,6 +138,9 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
   userEmail,
   countryCode = 'NG'
 }) => {
+  const [selectedCountry, setSelectedCountry] = useState<CountryConfig>(
+    COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0]
+  );
   const [formData, setFormData] = useState({
     idType: '',
     idNumber: '',
@@ -70,18 +152,29 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const config = COUNTRY_CONFIGS[countryCode] || COUNTRY_CONFIGS.DEFAULT;
-
   useEffect(() => {
-    if (config.idTypes.length === 1) {
-      setFormData(prev => ({ ...prev, idType: config.idTypes[0].value }));
+    if (selectedCountry.idTypes.length === 1) {
+      setFormData(prev => ({ ...prev, idType: selectedCountry.idTypes[0].value }));
     }
-  }, [config]);
+  }, [selectedCountry]);
 
-  const selectedIDType = config.idTypes.find(id => id.value === formData.idType);
+  const handleCountryChange = (code: string) => {
+    const country = COUNTRIES.find(c => c.code === code);
+    if (country) {
+      setSelectedCountry(country);
+      setFormData(prev => ({ 
+        ...prev, 
+        country: code,
+        idType: country.idTypes.length === 1 ? country.idTypes[0].value : '',
+        idNumber: ''
+      }));
+    }
+  };
+
+  const selectedIDType = selectedCountry.idTypes.find(id => id.value === formData.idType);
 
   const validateForm = () => {
-    if (config.requiresID && !formData.idNumber) {
+    if (!formData.idNumber) {
       setError(`${selectedIDType?.label || 'ID'} is required`);
       return false;
     }
@@ -107,7 +200,15 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onComplete(formData);
+      // Format phone with country code
+      const fullPhone = formData.phoneNumber.startsWith('+') 
+        ? formData.phoneNumber 
+        : `${selectedCountry.dialCode}${formData.phoneNumber.replace(/^0+/, '')}`;
+
+      await onComplete({
+        ...formData,
+        phoneNumber: fullPhone
+      });
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setIsSubmitting(false);
@@ -116,23 +217,41 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700">
+      <div className="bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
             <Globe className="h-6 w-6 text-blue-400" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-white">Identity Verification</h2>
-            <p className="text-gray-400 text-sm">{config.name}</p>
+            <p className="text-gray-400 text-sm">Complete your profile</p>
           </div>
         </div>
         
-        <p className="text-gray-300 mb-6">
-          Complete your profile to unlock full platform access
-        </p>
-        
         <div className="space-y-4">
-          {config.idTypes.length > 1 && (
+          {/* Country Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Country *
+            </label>
+            <div className="relative">
+              <select
+                value={selectedCountry.code}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
+              >
+                {COUNTRIES.map(country => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* ID Type */}
+          {selectedCountry.idTypes.length > 1 && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 ID Type *
@@ -143,28 +262,30 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
                 className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="">Select ID type</option>
-                {config.idTypes.map(id => (
+                {selectedCountry.idTypes.map(id => (
                   <option key={id.value} value={id.value}>{id.label}</option>
                 ))}
               </select>
             </div>
           )}
           
-          {(formData.idType || config.idTypes.length === 1) && (
+          {/* ID Number */}
+          {(formData.idType || selectedCountry.idTypes.length === 1) && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                {selectedIDType?.label || config.idTypes[0].label} {config.requiresID && '*'}
+                {selectedIDType?.label || selectedCountry.idTypes[0].label} *
               </label>
               <input
                 type="text"
                 value={formData.idNumber}
                 onChange={(e) => setFormData({...formData, idNumber: e.target.value})}
-                placeholder={selectedIDType?.placeholder || config.idTypes[0].placeholder}
+                placeholder={selectedIDType?.placeholder || selectedCountry.idTypes[0].placeholder}
                 className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
           )}
           
+          {/* Date of Birth */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Date of Birth *
@@ -178,6 +299,7 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             />
           </div>
           
+          {/* Gender */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Gender *
@@ -208,17 +330,23 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
             </div>
           </div>
           
+          {/* Phone Number */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Phone Number *
             </label>
-            <input
-              type="tel"
-              value={formData.phoneNumber}
-              onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-              placeholder="+234 801 234 5678"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
+            <div className="flex gap-2">
+              <div className="w-24 px-3 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white text-center">
+                {selectedCountry.dialCode}
+              </div>
+              <input
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                placeholder="801 234 5678"
+                className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
           </div>
 
           {error && (
@@ -241,7 +369,7 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
               className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all shadow-lg"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Verifying...' : 'Continue'}
+              {isSubmitting ? 'Submitting...' : 'Continue'}
             </button>
           </div>
         </div>

@@ -269,28 +269,30 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 const completeOnboarding = async () => {
   try {
-    // Fetch fresh profile to get wallet address
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', session?.user?.id)
-      .single();
-
-    if (!profile) {
-      throw new Error('Profile not found');
+    if (!user?.id) {
+      throw new Error('No user ID found');
     }
 
-    // ✅ FIX: Check for actual wallet address, not just wallet_address field
+    // Fetch fresh profile
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) {
+      throw new Error('Failed to fetch profile');
+    }
+
     const hasWallet = profile.algorand_address || profile.wallet_address;
     
-    logger.info('[Onboarding Complete] Profile:', {
+    logger.info('[Onboarding Complete]', {
       kyc_status: profile.kyc_status,
-      kyc_level: profile.kyc_level,
       role: profile.role,
       hasWallet: !!hasWallet
     });
 
-    // ✅ FIX: Set proper role based on KYC status
+    // Update role if verified/pending
     if (profile.kyc_status === 'pending' || profile.kyc_status === 'verified') {
       await supabase
         .from('user_profiles')
@@ -298,13 +300,10 @@ const completeOnboarding = async () => {
           role: 'tribe',
           updated_at: new Date().toISOString()
         })
-        .eq('id', session?.user?.id);
+        .eq('id', user.id);
     }
 
-    // Refresh profile
     await refreshProfile();
-    
-    // Navigate to dashboard
     navigate('/dashboard');
     toast.success('Welcome to Seamount!');
     
