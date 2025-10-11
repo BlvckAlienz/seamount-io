@@ -300,9 +300,16 @@ const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
 useEffect(() => {
   if (state.session && state.user && !state.loading) {
     const kycStatus = state.user.kyc_status || 'not_started';
+    // Check BOTH columns for wallet
     const hasWallet = state.user.algorand_address || state.user.wallet_address;
     
     console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
+    
+    // Users with wallets → dashboard
+    if (hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
     
     // Verified users → dashboard
     if (kycStatus === 'approved' || state.user.role === 'tribe') {
@@ -310,13 +317,7 @@ useEffect(() => {
       return;
     }
     
-    // Users with wallets → dashboard (breaks loop)
-    if (hasWallet) {
-      navigate('/dashboard');
-      return;
-    }
-    
-    // New users → onboarding
+    // Default → onboarding
     navigate('/onboarding');
   }
 }, [state.session, state.user, state.loading, navigate]);

@@ -65,7 +65,8 @@ class WalletService:
             # FIX: Use correct Supabase column names
             wallet_data = {
                 "user_id": user_id,
-                "algorand_address": address,  # NOT wallet_address
+                "algorand_address": address,
+                "wallet_address": address,
                 "algorand_private_key": encrypted_pk,  # NOT encrypted_private_key
                 "wallet_type": "managed",  # NOT blockchain
                 "is_active": True,

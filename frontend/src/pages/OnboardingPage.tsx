@@ -44,7 +44,7 @@ const WelcomeStep = ({ onNext }) => (
       onClick={onNext}
       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
     >
-      Get Started â†’
+      Get Started
     </button>
   </div>
 );
@@ -269,7 +269,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
           disabled={!showMnemonic}
           className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
         >
-          I've Backed It Up â†’
+          I've Backed It Up
         </button>
         
         {onPrev && (
@@ -277,7 +277,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
             onClick={onPrev}
             className="w-full text-gray-500 py-2 text-sm hover:text-gray-400"
           >
-            â† Back
+            Back
           </button>
         )}
       </div>
@@ -322,9 +322,15 @@ const handleIdentityComplete = async () => {
   }
 };
 
-  const handleBackupComplete = async () => {
-    await completeOnboarding();
-  };
+const handleBackupComplete = async () => {
+  // Refresh profile to get wallet address
+  await refreshProfile();
+  
+  // Small delay to ensure state updates
+  setTimeout(() => {
+    navigate('/dashboard');
+  }, 500);
+};
 
   const handleStepBack = () => {
     if (step === 'walletBackup') setStep('identity');
