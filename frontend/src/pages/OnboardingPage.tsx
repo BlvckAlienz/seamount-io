@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, Globe, Lock, Download, Check, AlertCircle } from 'lucide-react';
+import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
 // Welcome Step
 const WelcomeStep = ({ onNext }) => (
@@ -49,27 +50,8 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-// Identity Verification Step
-const IdentityStep = ({ onNext, onPrev, userProfile }) => {
-  const [loading, setLoading] = useState(false);
-
-  const startVerification = async () => {
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post('/api/v1/kyc/start-verification');
-      
-      if (data.success) {
-        toast.success('Verification started!');
-        onNext();
-      }
-    } catch (error: any) {
-      console.error('KYC error:', error);
-      toast.error(error.response?.data?.detail || 'Verification failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+// Identity Verification Step - FIXED
+const IdentityStep = ({ onVerify, onSkip, onPrev }) => {
   return (
     <div className="text-center">
       <div className="mb-6">
@@ -82,15 +64,14 @@ const IdentityStep = ({ onNext, onPrev, userProfile }) => {
       
       <div className="space-y-3">
         <button
-          onClick={startVerification}
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 shadow-lg"
+          onClick={onVerify}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
         >
-          {loading ? 'Starting...' : 'Start Verification'}
+          Start Verification
         </button>
         
         <button
-          onClick={onNext}
+          onClick={onSkip}
           className="w-full text-gray-400 hover:text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
         >
           I'll Do This Later
@@ -185,7 +166,7 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
             onClick={() => setVerifying(false)}
             className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
           >
-            â† Back
+            ← Back
           </button>
           <button
             onClick={verifyWords}
@@ -285,15 +266,15 @@ const WalletBackupStep = ({ onNext, onPrev, mnemonic }) => {
   );
 };
 
-// Main Component
+// Main Component - COMPLETELY FIXED
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
-  const [detectedCountry, setDetectedCountry] = useState(null);
+  const [showBVNModal, setShowBVNModal] = useState(false);
+  const [bvnData, setBvnData] = useState(null);
   const { completeOnboarding, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already verified
   useEffect(() => {
     if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
@@ -302,25 +283,70 @@ const OnboardingPage = () => {
 
   const handleWelcomeComplete = () => setStep('identity');
 
-const handleIdentityComplete = async () => {
-  const toastId = toast.loading('Creating your wallet...');
-  
-  try {
-    // ✅ CRITICAL: Always call provision-wallets
-    const response = await apiClient.post('/api/v1/user/provision-wallets');
+  // ✅ FIX: Show BVN modal instead of immediate API call
+  const handleStartVerification = () => {
+    setShowBVNModal(true);
+  };
+
+  // ✅ FIX: Called AFTER user submits BVN data
+  const handleBVNSubmit = async (formData) => {
+    const toastId = toast.loading('Starting verification...');
     
-    if (response.data.success && response.data.mnemonic) {
-      toast.success('Wallet created!', { id: toastId });
-      setMnemonic(response.data.mnemonic);
-      setStep('walletBackup');
-    } else {
-      throw new Error('Wallet creation failed');
+    try {
+      // 1. Store BVN data in backend
+      await apiClient.post('/api/v1/kyc/submit-kyc-data', {
+        bvn: formData.idNumber,
+        id_type: formData.idType,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        phone: formData.phoneNumber,
+        country_code: formData.country
+      });
+
+      // 2. Start Regfyl verification with complete data
+      await apiClient.post('/api/v1/kyc/start-verification');
+
+      // 3. Create wallet
+      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+      
+      if (walletResponse.data.success && walletResponse.data.mnemonic) {
+        toast.success('Verification started!', { id: toastId });
+        setMnemonic(walletResponse.data.mnemonic);
+        setShowBVNModal(false);
+        setStep('walletBackup');
+      } else {
+        throw new Error('Wallet creation failed');
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
+      setShowBVNModal(false);
     }
-  } catch (error) {
-    console.error('Wallet creation error:', error);
-    toast.error('Wallet creation failed. Please refresh and try again.', { id: toastId });
-  }
-};
+  };
+
+  // ✅ FIX: Skip flow - NO Regfyl call
+  const handleSkipVerification = async () => {
+    const toastId = toast.loading('Setting up your wallet...');
+    
+    try {
+      // Skip KYC
+      await apiClient.post('/api/v1/kyc/skip-verification');
+
+      // Create wallet only
+      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+      
+      if (walletResponse.data.success && walletResponse.data.mnemonic) {
+        toast.success('Wallet created!', { id: toastId });
+        setMnemonic(walletResponse.data.mnemonic);
+        setStep('walletBackup');
+      } else {
+        throw new Error('Wallet creation failed');
+      }
+    } catch (error) {
+      console.error('Skip error:', error);
+      toast.error('Failed to create wallet', { id: toastId });
+    }
+  };
 
   const handleBackupComplete = async () => {
     await completeOnboarding();
@@ -365,20 +391,30 @@ const handleIdentityComplete = async () => {
             <WelcomeStep onNext={handleWelcomeComplete} />
           ) : step === 'identity' ? (
             <IdentityStep 
-              onNext={handleIdentityComplete} 
-              onPrev={handleStepBack} 
-              userProfile={userProfile}
+              onVerify={handleStartVerification}
+              onSkip={handleSkipVerification}
+              onPrev={handleStepBack}
             />
           ) : mnemonic ? (
             <WalletBackupStep onNext={handleBackupComplete} onPrev={handleStepBack} mnemonic={mnemonic} />
           ) : (
             <div className="text-center p-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-400">Creating your wallet...</p>
+              <p className="text-gray-400">Processing...</p>
             </div>
           )}
         </div>
       </div>
+
+      {/* BVN Collection Modal */}
+      {showBVNModal && (
+        <BVNCollectionModal
+          onComplete={handleBVNSubmit}
+          onCancel={() => setShowBVNModal(false)}
+          userEmail={userProfile?.email || ''}
+          countryCode={userProfile?.country_code || 'NG'}
+        />
+      )}
     </div>
   );
 };

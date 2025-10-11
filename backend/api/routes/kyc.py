@@ -76,6 +76,46 @@ async def check_profile_completeness(
             "kyc_status": "not_started"
         }
 
+@router.post("/submit-kyc-data")
+async def submit_kyc_data(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+) -> Dict[str, Any]:
+    """
+    Store user KYC data BEFORE starting verification
+    """
+    try:
+        user_id = current_user.get('id')
+        data = await request.json()
+        
+        logger.info(f"[KYC Data Submit] User: {user_id}, Data: {data}")
+        
+        # Update user profile with KYC data
+        update_data = {
+            'bvn': data.get('bvn'),
+            'id_number': data.get('bvn'),  # Store as id_number too
+            'id_type': data.get('id_type', 'BVN'),
+            'date_of_birth': data.get('date_of_birth'),
+            'gender': data.get('gender'),
+            'phone': data.get('phone'),
+            'country_code': data.get('country_code', 'NG'),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
+        
+        logger.info(f"[KYC Data Submit] Data stored for user {user_id}")
+        
+        return {
+            "success": True,
+            "message": "KYC data stored successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"[KYC Data Submit] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to store KYC data")
+
 @router.post("/start-verification")
 async def start_kyc_verification(
     current_user: dict = Depends(get_current_user),
@@ -325,23 +365,6 @@ class KYCDataSubmission(BaseModel):
     date_of_birth: str
     gender: str
     country_code: str = "US"
-
-@router.post("/submit-kyc-data")
-async def submit_kyc_data(
-    kyc_data: KYCDataSubmission,
-    current_user: dict = Depends(get_current_user),
-    kyc_service: KYCService = Depends(get_kyc_service)
-):
-    """
-    NEW: Progressive KYC data submission
-    Collect BVN/ID information before starting verification
-    """
-    user_id = current_user.get('id')
-    if not user_id:
-        raise HTTPException(status_code=401, detail="User ID not found")
-
-    result = await kyc_service.submit_kyc_data(user_id, kyc_data.dict())
-    return result
 
 @router.get("/detect-country")
 async def detect_country(
