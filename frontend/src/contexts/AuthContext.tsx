@@ -269,26 +269,25 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const completeOnboarding = async () => {
     try {
-      const userId = user?.id || session?.user?.id;
-      if (!userId) throw new Error('No user ID');
+      const currentUser = state.user || state.session?.user;
+      if (!currentUser?.id) throw new Error('No user ID');
 
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', currentUser.id)
         .single();
 
       if (!profile) throw new Error('Profile not found');
 
-      // Update role if verified/pending
       if (['pending', 'verified'].includes(profile.kyc_status)) {
         await supabase
           .from('user_profiles')
           .update({ role: 'tribe', updated_at: new Date().toISOString() })
-          .eq('id', userId);
+          .eq('id', currentUser.id);
       }
 
-      await refreshProfile();
+      await fetchUserProfile();
       navigate('/dashboard');
       toast.success('Welcome to Seamount!');
     } catch (error) {
@@ -297,6 +296,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
   
+  const refreshProfile = useCallback(async () => {
+    const currentUser = state.user || state.session?.user;
+    if (currentUser?.id) {
+      await fetchUserProfile();
+    }
+  }, [state.user, state.session, fetchUserProfile]);
+
 // Add these functions
 const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
   setState(prev => ({ ...prev, role }));
@@ -348,7 +354,8 @@ return (
     signOut,
     enterDemoMode,
     updateOnboardingStep,
-    completeOnboarding
+    completeOnboarding,
+    refreshProfile
   }}>
     {children}
   </AuthContext.Provider>
