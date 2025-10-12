@@ -187,29 +187,32 @@ class KYCService:
         """Start Regfyl verification with stored user data"""
     
         try:
+            # Re-fetch profile to ensure latest data
+            fresh_profile = await self.db_service.get_user_profile_by_id(user_id)
+            if not fresh_profile:
+                raise HTTPException(status_code=404, detail="Profile not found")
+        
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
         
-            # Extract all stored values
-            bvn = user_profile.get('bvn', '').strip()
-            id_number = user_profile.get('id_number', '').strip()
-            id_type = user_profile.get('id_type', 'BVN').strip()
-            gender = user_profile.get('gender', '').strip()
-            
-            # Use whichever ID exists
+            # Extract with defaults
+            bvn = (fresh_profile.get('bvn') or '').strip()
+            id_number = (fresh_profile.get('id_number') or '').strip()
+            id_type = (fresh_profile.get('id_type') or 'BVN').strip()
+            gender = (fresh_profile.get('gender') or '').strip()
+        
             final_id = bvn or id_number
-            
-            logger.info(f"[Regfyl Debug] bvn={bvn}, id_number={id_number}, id_type={id_type}, final_id={final_id}")
-            
+        
+            logger.info(f"[Regfyl] Fresh data: bvn={bool(bvn)}, id_number={bool(id_number)}, gender={gender}")
+        
             user_data = {
                 'customer_id': user_id,
-                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else str(datetime.now().year - 25),
+                'full_name': f"{fresh_profile.get('first_name', '')} {fresh_profile.get('last_name', '')}".strip(),
+                'year_of_birth': fresh_profile.get('date_of_birth', '')[:4] if fresh_profile.get('date_of_birth') else str(datetime.now().year - 25),
                 'gender': gender,
                 'country': country_code,
                 'callback_url': callback_url
             }
         
-            # Add ID if exists
             if final_id:
                 user_data['id_type'] = id_type
                 user_data['id_number'] = final_id
@@ -218,7 +221,7 @@ class KYCService:
             if not user_data['full_name']:
                 raise HTTPException(status_code=400, detail="Full name required")
         
-            # Call Regfyl with complete data
+            # Call Regfyl
             regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
         
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
@@ -235,9 +238,7 @@ class KYCService:
                         "created_at": datetime.utcnow().isoformat()
                     }).execute()
                 except Exception as e:
-                    logger.warning(f"Session save failed: {e}")
-        
-            logger.info(f"Regfyl verification complete for {user_id}")
+                    logger.warning(f"Session save: {e}")
         
             return {
                 "success": True,
@@ -252,7 +253,7 @@ class KYCService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Regfyl verification failed: {e}")
+            logger.error(f"Regfyl failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     async def health_check(self) -> Dict[str, Any]:
