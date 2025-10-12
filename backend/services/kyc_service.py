@@ -169,9 +169,13 @@ class KYCService:
                     "kyc_status": current_status
                 }
             
-            # 3. Ã°Å¸Å¡Â¨ FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
+            # 3. FORCE REGFYL FOR ALL USERS - COMPLETELY REMOVE COMPLYCUBE FALLBACK
             if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
-                return await self._start_regfyl_verification(user_id, user_profile, country_code)
+                # CRITICAL: Refresh profile from DB to get modal data
+                fresh_profile = await self.db_service.get_user_profile_by_id(user_id)
+                if not fresh_profile:
+                    raise HTTPException(status_code=404, detail="Profile not found")
+                return await self._start_regfyl_verification(user_id, fresh_profile, country_code)
             else:
                 logger.error("REGFYL PROVIDER NOT CONFIGURED - NO FALLBACK TO COMPLYCUBE")
                 raise HTTPException(status_code=503, detail="Verification service unavailable")
@@ -184,46 +188,35 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-        """Start Regfyl verification with stored user data"""
-    
         try:
-            # Re-fetch profile to ensure latest data
-            fresh_profile = await self.db_service.get_user_profile_by_id(user_id)
-            if not fresh_profile:
-                raise HTTPException(status_code=404, detail="Profile not found")
-        
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
-        
-            # Extract with defaults
-            bvn = (fresh_profile.get('bvn') or '').strip()
-            id_number = (fresh_profile.get('id_number') or '').strip()
-            id_type = (fresh_profile.get('id_type') or 'BVN').strip()
-            gender = (fresh_profile.get('gender') or '').strip()
-        
+            
+            # Use passed profile (already fresh from line 154 fix)
+            bvn = (user_profile.get('bvn') or '').strip()
+            id_number = (user_profile.get('id_number') or '').strip()
             final_id = bvn or id_number
-        
-            logger.info(f"[Regfyl] Fresh data: bvn={bool(bvn)}, id_number={bool(id_number)}, gender={gender}")
         
             user_data = {
                 'customer_id': user_id,
-                'full_name': f"{fresh_profile.get('first_name', '')} {fresh_profile.get('last_name', '')}".strip(),
-                'year_of_birth': fresh_profile.get('date_of_birth', '')[:4] if fresh_profile.get('date_of_birth') else str(datetime.now().year - 25),
-                'gender': gender,
+                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
+                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '2000',
+                'gender': (user_profile.get('gender') or '').strip(),
                 'country': country_code,
                 'callback_url': callback_url
             }
         
             if final_id:
-                user_data['id_type'] = id_type
+                user_data['id_type'] = user_profile.get('id_type', 'BVN')
                 user_data['id_number'] = final_id
-                logger.info(f"[Regfyl] Sending {id_type}: {final_id[:3]}***")
+                logger.info(f"[Regfyl] ✅ ID attached: {user_data['id_type']} = {final_id[:3]}***")
+            else:
+                logger.warning(f"[Regfyl] ⚠️ NO ID for {user_id}")
         
-            if not user_data['full_name']:
-                raise HTTPException(status_code=400, detail="Full name required")
+            # Log sanitized payload
+            safe_payload = {k: v for k, v in user_data.items() if k != 'id_number'}
+            logger.info(f"[Regfyl] Payload: {json.dumps(safe_payload)}")
         
-            # Call Regfyl
             regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
-        
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
         
             if self.supabase:

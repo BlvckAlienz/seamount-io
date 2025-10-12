@@ -82,20 +82,18 @@ async def submit_kyc_data(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """
-    Store user KYC data BEFORE starting verification
-    """
     try:
         user_id = current_user.get('id')
         data = await request.json()
         
-        logger.info(f"[KYC Data Submit] User: {user_id}, Data: {data}")
+        # Smart ID type handling
+        id_type = data.get('id_type', 'BVN')
+        id_number = data.get('bvn') or data.get('id_number', '')
         
-        # Update user profile with KYC data
         update_data = {
-            'bvn': data.get('bvn'),
-            'id_number': data.get('bvn'),  # Store as id_number too
-            'id_type': data.get('id_type', 'BVN'),
+            'bvn': id_number if id_type == 'BVN' else None,  # Only set if BVN
+            'id_number': id_number,  # Always set
+            'id_type': id_type,  # Use submitted type
             'date_of_birth': data.get('date_of_birth'),
             'gender': data.get('gender'),
             'phone': data.get('phone'),
@@ -105,12 +103,9 @@ async def submit_kyc_data(
         
         supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
         
-        logger.info(f"[KYC Data Submit] Data stored for user {user_id}")
+        logger.info(f"[KYC Data] Stored {id_type}: {id_number[:3]}*** for {user_id}")
         
-        return {
-            "success": True,
-            "message": "KYC data stored successfully"
-        }
+        return {"success": True, "message": "KYC data stored successfully"}
         
     except Exception as e:
         logger.error(f"[KYC Data Submit] Error: {str(e)}")
