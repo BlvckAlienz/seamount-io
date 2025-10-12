@@ -173,6 +173,8 @@ class KYCService:
             if self.primary_provider == 'regfyl' and 'regfyl' in self.providers:
                 # CRITICAL: Refresh profile from DB to get modal data
                 fresh_profile = await self.db_service.get_user_profile_by_id(user_id)
+                logger.info(f"[DEBUG] Fresh profile keys: {fresh_profile.keys() if fresh_profile else 'None'}")
+                logger.info(f"[DEBUG] Fresh profile id_number: {fresh_profile.get('id_number') if fresh_profile else 'None'}")
                 if not fresh_profile:
                     raise HTTPException(status_code=404, detail="Profile not found")
                 return await self._start_regfyl_verification(user_id, fresh_profile, country_code)
