@@ -188,37 +188,41 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
+        """Use the PASSED profile - don't re-fetch"""
         try:
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
             
-            # Use passed profile (already fresh from line 154 fix)
+            # DON'T fetch again - use what was passed
             bvn = (user_profile.get('bvn') or '').strip()
             id_number = (user_profile.get('id_number') or '').strip()
+            id_type = (user_profile.get('id_type') or 'NATIONAL_ID').strip()
+            gender = (user_profile.get('gender') or '').strip()
+            
             final_id = bvn or id_number
-        
+            
+            logger.info(f"[Regfyl DEBUG] Received profile: bvn={bvn}, id_number={id_number}, gender={gender}")
+            
             user_data = {
                 'customer_id': user_id,
                 'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
                 'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '2000',
-                'gender': (user_profile.get('gender') or '').strip(),
+                'gender': gender,
                 'country': country_code,
                 'callback_url': callback_url
             }
-        
+            
             if final_id:
-                user_data['id_type'] = user_profile.get('id_type', 'BVN')
+                user_data['id_type'] = id_type
                 user_data['id_number'] = final_id
-                logger.info(f"[Regfyl] ✅ ID attached: {user_data['id_type']} = {final_id[:3]}***")
+                logger.info(f"[Regfyl] ✅ Sending {id_type}: {final_id[:3]}***")
             else:
                 logger.warning(f"[Regfyl] ⚠️ NO ID for {user_id}")
-        
-            # Log sanitized payload
-            safe_payload = {k: v for k, v in user_data.items() if k != 'id_number'}
-            logger.info(f"[Regfyl] Payload: {json.dumps(safe_payload)}")
-        
+            
+            logger.info(f"[Regfyl] Final payload preview: {json.dumps({k:v for k,v in user_data.items() if k!='id_number'})}")
+            
             regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-        
+            
             if self.supabase:
                 try:
                     self.supabase.table("kyc_sessions").upsert({
@@ -232,7 +236,7 @@ class KYCService:
                     }).execute()
                 except Exception as e:
                     logger.warning(f"Session save: {e}")
-        
+            
             return {
                 "success": True,
                 "provider": "regfyl",
@@ -242,7 +246,7 @@ class KYCService:
                 "status": "pending",
                 "next_step": "await_review"
             }
-        
+            
         except HTTPException:
             raise
         except Exception as e:
