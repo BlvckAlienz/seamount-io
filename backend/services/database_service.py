@@ -162,7 +162,7 @@ class DatabaseService:
             raise HTTPException(status_code=500, detail=f"Failed to update user profile: {str(e)}")
 
     def _format_user_profile(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format raw database user profile data - RETURN ALL FIELDS"""
+        """Format raw database user profile data"""
         return {
             "id": str(raw_data["id"]),
             "email": raw_data.get("email"),
@@ -179,12 +179,6 @@ class DatabaseService:
             "verification_skipped": raw_data.get("verification_skipped", False),
             "algorand_address": raw_data.get("algorand_address"),
             "wallet_address": raw_data.get("wallet_address"),
-            # ADD MISSING FIELDS
-            "bvn": raw_data.get("bvn"),
-            "id_number": raw_data.get("id_number"),
-            "id_type": raw_data.get("id_type"),
-            "gender": raw_data.get("gender"),
-            "date_of_birth": raw_data.get("date_of_birth"),
             "created_at": raw_data.get("created_at"),
             "updated_at": raw_data.get("updated_at")
         }
