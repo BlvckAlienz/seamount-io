@@ -227,10 +227,11 @@ class KYCService:
             }
             
             logger.info(f"[Regfyl] ✅ Sending {id_type}: {final_id[:3]}*** for user {user_id}")
-            logger.info(f"[Regfyl] Payload keys: {list(user_data.keys())}")
+            logger.info(f"[Regfyl] FULL user_data DICT:\n{json.dumps(user_data, indent=2)}")
             
-            # Submit to Regfyl
-            regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+            # Submit to Regfyl - bypass wrapper, call provider directly
+            regfyl_provider = self.providers['regfyl']
+            screening_result = await regfyl_provider.onboard_seamount_user(user_data)
             
             # Update KYC status
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
