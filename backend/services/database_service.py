@@ -120,6 +120,35 @@ class DatabaseService:
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail="Failed to fetch user profile")
 
+    async def get_user_profile_raw(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get UNFILTERED user profile for internal operations (KYC, compliance)
+        Returns all columns from user_profiles table without formatting
+        """
+        try:
+            logger.debug(f"[DB] Fetching RAW user profile: {user_id}")
+        
+            try:
+                user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+            except ValueError:
+                logger.error(f"[DB] Invalid UUID format: {user_id}")
+                return None
+            
+            response = self.supabase.table("user_profiles").select("*").eq("id", str(user_uuid)).maybe_single().execute()
+            
+            if response.data:
+                logger.debug(f"[DB] Raw profile found with {len(response.data)} fields")
+                # Return raw data with NO formatting
+                return response.data
+            else:
+                logger.warning(f"[DB] User profile not found: {user_id}")
+                return None
+                    
+        except Exception as e:
+            logger.error(f"[DB] Error fetching raw profile {user_id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail="Failed to fetch user profile")
+    
     async def update_user_profile(self, user_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update user profile with transaction safety"""
         try:

@@ -190,41 +190,52 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-        """Use the PASSED profile - don't re-fetch"""
+        """Use RAW profile - don't re-fetch with formatter"""
         try:
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
             
-            # DON'T fetch again - use what was passed
-            bvn = (user_profile.get('bvn') or '').strip()
-            id_number = (user_profile.get('id_number') or '').strip()
-            id_type = (user_profile.get('id_type') or 'NATIONAL_ID').strip()
-            gender = (user_profile.get('gender') or '').strip()
+            # ✅ FIX: Fetch UNFILTERED profile with ALL fields
+            raw_profile = await self.db_service.get_user_profile_raw(user_id)
+            if not raw_profile:
+                raise HTTPException(status_code=404, detail="Profile not found")
+            
+            # Extract fields from raw profile
+            bvn = (raw_profile.get('bvn') or '').strip()
+            id_number = (raw_profile.get('id_number') or '').strip()
+            id_type = (raw_profile.get('id_type') or 'NATIONAL_ID').strip()
+            gender = (raw_profile.get('gender') or '').strip()
+            dob = raw_profile.get('date_of_birth') or ''
             
             final_id = bvn or id_number
             
-            logger.info(f"[Regfyl DEBUG] Received profile: bvn={bvn}, id_number={id_number}, gender={gender}")
+            logger.info(f"[Regfyl DEBUG] Raw profile: bvn={bool(bvn)}, id_number={bool(id_number)}, gender={gender}, dob={dob[:10] if dob else 'N/A'}")
             
+            if not final_id:
+                logger.error(f"[Regfyl] NO ID found for user {user_id}")
+                raise HTTPException(status_code=400, detail="ID number required for verification")
+            
+            # Build payload
             user_data = {
                 'customer_id': user_id,
-                'full_name': f"{user_profile.get('first_name', '')} {user_profile.get('last_name', '')}".strip(),
-                'year_of_birth': user_profile.get('date_of_birth', '')[:4] if user_profile.get('date_of_birth') else '2000',
+                'full_name': f"{raw_profile.get('first_name', '')} {raw_profile.get('last_name', '')}".strip(),
+                'year_of_birth': dob[:4] if dob else '2000',
                 'gender': gender,
                 'country': country_code,
+                'id_type': id_type,
+                'id_number': final_id,
                 'callback_url': callback_url
             }
             
-            if final_id:
-                user_data['id_type'] = id_type
-                user_data['id_number'] = final_id
-                logger.info(f"[Regfyl] ✅ Sending {id_type}: {final_id[:3]}***")
-            else:
-                logger.warning(f"[Regfyl] ⚠️ NO ID for {user_id}")
+            logger.info(f"[Regfyl] ✅ Sending {id_type}: {final_id[:3]}*** for user {user_id}")
+            logger.info(f"[Regfyl] Payload keys: {list(user_data.keys())}")
             
-            logger.info(f"[Regfyl] Final payload preview: {json.dumps({k:v for k,v in user_data.items() if k!='id_number'})}")
-            
+            # Submit to Regfyl
             regfyl_result = await self.screen_user_with_regfyl(user_id, user_data)
+            
+            # Update KYC status
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
             
+            # Log session
             if self.supabase:
                 try:
                     self.supabase.table("kyc_sessions").upsert({
