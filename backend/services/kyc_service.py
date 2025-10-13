@@ -242,10 +242,10 @@ class KYCService:
                     self.supabase.table("kyc_sessions").upsert({
                         "user_id": user_id,
                         "applicant_id": f"regfyl_{user_id}",
-                        "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                        "session_id": screening_result.get('screening', {}).get('reference'),
                         "verification_type": "regfyl_screening",
                         "status": "pending",
-                        "response_data": regfyl_result,
+                        "response_data": screening_result,
                         "created_at": datetime.utcnow().isoformat()
                     }).execute()
                 except Exception as e:
@@ -254,7 +254,7 @@ class KYCService:
             return {
                 "success": True,
                 "provider": "regfyl",
-                "session_id": regfyl_result.get('screening_result', {}).get('screening', {}).get('reference'),
+                "session_id": screening_result.get('screening', {}).get('reference'),
                 "applicantId": f"regfyl_{user_id}",
                 "message": "Verification submitted successfully",
                 "status": "pending",
