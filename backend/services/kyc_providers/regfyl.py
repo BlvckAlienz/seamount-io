@@ -162,6 +162,8 @@ class RegfylVerifier:
             'callbackURL': callback_url
         }
         
+        logger.info(f"[Regfyl] Basic screening payload:\n{json.dumps(payload, indent=2)}")
+        
         try:
             result = await self._make_request('postCustomerScreening', payload)
             logger.info(f"Customer screening initiated for {customer_id}")
@@ -340,7 +342,7 @@ class RegfylVerifier:
             
             # ID verification if ID exists (ANY country)
             if id_number:
-                # Build universal payload
+                # ✅ FIX: Use data from user_data directly
                 payload = {
                     'companyName': self.company_name,
                     'rcNumber': self.rc_number,
@@ -358,6 +360,8 @@ class RegfylVerifier:
                 }
                 
                 logger.info(f"[Regfyl] Sending ID verification: {id_type} for {country}")
+                logger.info(f"[Regfyl] ID verification payload:\n{json.dumps(payload, indent=2)}")
+                
                 id_result = await self._make_request('postCustomerScreening', payload)
                 results['id_verification'] = id_result
             else:
