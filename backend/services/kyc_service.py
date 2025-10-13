@@ -233,23 +233,6 @@ class KYCService:
             regfyl_provider = self.providers['regfyl']
             screening_result = await regfyl_provider.onboard_seamount_user(user_data)
             
-            # Check if country not supported yet
-            id_verification = screening_result.get('id_verification', {})
-            if id_verification.get('status') == 'pending_country_support':
-                # Allow user to proceed without full verification
-                logger.warning(f"[KYC] Country {country_code} not yet supported - granting limited access")
-                await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-                
-                return {
-                    "success": True,
-                    "provider": "regfyl",
-                    "status": "pending_country_support",
-                    "message": id_verification.get('message', 'ID verification will be available soon'),
-                    "country": country_code,
-                    "can_proceed": True,
-                    "next_step": "wallet_creation"
-                }
-            
             # Update KYC status
             await self.db_service.update_user_kyc_status(user_id, "pending", 1)
             
@@ -283,7 +266,6 @@ class KYCService:
         except Exception as e:
             logger.error(f"Regfyl failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-
 
     async def health_check(self) -> Dict[str, Any]:
         """Health check for KYC service"""
