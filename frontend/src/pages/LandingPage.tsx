@@ -227,7 +227,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </h1>
             
             <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-2">
-              <strong className="text-green-400">Built for African resilience.</strong> While inflation erodes local currencies, Seamount delivers <span className="text-green-400 font-semibold">9-12% APY</span> in USD-equivalent stablecoins. Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth, send money instantly across borders, and protect your family's future—all on one platform.
+              <strong className="text-green-400">Built for African resilience.</strong> Seamount delivers <span className="text-green-400 font-semibold">9-12% APY</span> in USD-equivalent stablecoins. Convert fiat → USDT/USDCa → P2P send → local off-ramp. Build wealth and send money instantly across borders—all on one platform.
             </p>
             
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 px-2">
@@ -347,32 +347,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   </div>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-8 sm:mt-12 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-2xl p-4 sm:p-6 border border-blue-700/30 fade-in">
-              <div className="flex items-start gap-3 sm:gap-4">
-                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-400 flex-shrink-0 mt-1" />
-                <div>
-                  <h4 className="text-lg sm:text-2xl font-bold mb-2 sm:mb-3 text-green-400">When USDS Launches</h4>
-                  <p className="text-gray-300 text-sm sm:text-lg leading-relaxed mb-3 sm:mb-4">
-                    Users who choose to hold USDS will gain exposure to our delta-neutral BTC-gold strategy, earning 9-12% APY with monthly liquidity. Your stablecoins work for you—no lock-ups longer than 30 days, with full transparency on backing and yields.
-                  </p>
-                  <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm">
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-gray-400">90% BTC + 10% Gold</span>
-                    </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      <span className="text-gray-400">160% Overcollateralized</span>
-                    </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                      <span className="text-gray-400">Quarterly Audits</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </section>
