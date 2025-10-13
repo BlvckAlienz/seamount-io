@@ -330,45 +330,43 @@ class RegfylVerifier:
             id_type = user_data.get('id_type', 'NATIONAL_ID')
             country = user_data.get('country', 'NG')
             
-            # Always do basic screening
-            screening_result = await self.screen_individual_customer(
-                customer_id=customer_id,
-                customer_name=user_data['full_name'],
-                year_of_birth=user_data.get('year_of_birth', str(datetime.now().year - 25)),
-                gender=user_data.get('gender', ''),
-                callback_url=user_data.get('callback_url')
-            )
-            results['screening'] = screening_result
+            # ✅ SINGLE PAYLOAD - Build once with ALL fields
+            payload = {
+                'companyName': self.company_name,
+                'rcNumber': self.rc_number,
+                'customerID': customer_id,
+                'customerType': 'INDIVIDUAL',
+                'customerName': user_data['full_name'],
+                'YOB': user_data.get('year_of_birth', str(datetime.now().year - 25)),
+                'gender': user_data.get('gender', ''),
+                'recurringCheck': 'NO',
+                'environment': self.environment,
+                'callbackURL': user_data.get('callback_url')
+            }
             
-            # ID verification if ID exists (ANY country)
+            # Add ID verification if ID exists
             if id_number:
-                # ✅ FIX: Use data from user_data directly
-                payload = {
-                    'companyName': self.company_name,
-                    'rcNumber': self.rc_number,
-                    'customerID': customer_id,
-                    'customerType': 'INDIVIDUAL',
-                    'customerName': user_data['full_name'],
-                    'YOB': user_data.get('year_of_birth', str(datetime.now().year - 25)),
+                payload.update({
                     'verifyID': 'YES',
                     'country': country,
                     'idType': id_type,
-                    'idNumber': id_number,
-                    'gender': user_data.get('gender', ''),
-                    'environment': self.environment,
-                    'callbackURL': user_data.get('callback_url')
-                }
-                
-                logger.info(f"[Regfyl] Sending ID verification: {id_type} for {country}")
-                logger.info(f"[Regfyl] ID verification payload:\n{json.dumps(payload, indent=2)}")
-                
-                id_result = await self._make_request('postCustomerScreening', payload)
-                results['id_verification'] = id_result
+                    'idNumber': id_number
+                })
+                logger.info(f"[Regfyl] ✅ Sending {id_type}: {id_number[:3]}*** for {country}")
             else:
                 logger.warning(f"No ID provided for {customer_id}")
-                results['id_verification'] = {'status': 'skipped', 'reason': 'no_id'}
             
-            return results
+            # Log FINAL payload
+            logger.info(f"[Regfyl] FINAL PAYLOAD:\n{json.dumps(payload, indent=2)}")
+            
+            # Single API call
+            result = await self._make_request('postCustomerScreening', payload)
+            
+            logger.info(f"Verification initiated for {customer_id}")
+            return {
+                'screening': result,
+                'id_verification': result if id_number else {'status': 'skipped', 'reason': 'no_id'}
+            }
             
         except Exception as e:
             logger.error(f"Onboarding failed for {customer_id}: {e}")
