@@ -291,6 +291,7 @@ const OnboardingPage = () => {
   // ✅ FIX: Called AFTER user submits BVN data
 const handleBVNSubmit = async (formData) => {
   const toastId = toast.loading('Starting verification...');
+  const isNigerian = formData.country === 'NG';
   
   try {
     // 1. Store data
@@ -305,15 +306,11 @@ const handleBVNSubmit = async (formData) => {
 
     // 2. Start verification
     await apiClient.post('/api/v1/kyc/start-verification');
-
-    // 3. Show success message
+    
     toast.success('Verification submitted!', { id: toastId });
-    toast('🎉 Our team will review your information within 24 hours', { 
-      duration: 5000,
-      icon: '⏰' 
-    });
+    toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
 
-    // 4. Create wallet
+    // 3. Create wallet
     const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
     
     if (walletResponse.data.success && walletResponse.data.mnemonic) {
@@ -323,10 +320,38 @@ const handleBVNSubmit = async (formData) => {
     } else {
       throw new Error('Wallet creation failed');
     }
+    
   } catch (error) {
     console.error('Verification error:', error);
-    toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
-    setShowBVNModal(false);
+    
+    // Non-Nigerian verification not yet supported
+    if (!isNigerian && error.response?.status === 500) {
+      toast.dismiss(toastId);
+      toast('⏳ ID verification for your country is coming soon (within 1 week)', { 
+        duration: 6000,
+        icon: '🌍'
+      });
+      toast('✨ You can still create your wallet and access the dashboard now', { 
+        duration: 5000
+      });
+      
+      // Proceed to wallet creation
+      try {
+        const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+        if (walletResponse.data.success && walletResponse.data.mnemonic) {
+          setMnemonic(walletResponse.data.mnemonic);
+          setShowBVNModal(false);
+          setStep('walletBackup');
+        }
+      } catch (walletError) {
+        toast.error('Wallet creation failed. Please contact support.');
+        setShowBVNModal(false);
+      }
+    } else {
+      // Nigerian or other error
+      toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
+      setShowBVNModal(false);
+    }
   }
 };
 
