@@ -390,13 +390,21 @@ const DashboardPage = () => {
           wallet_address: data.wallet_address
         });
         setWalletAddress(data.wallet_address);
+      } else if (userProfile?.algorand_address) {
+        // ✅ FIX: Sync wallet from profile if portfolio doesn't have it
+        setWalletAddress(userProfile.algorand_address);
       } else {
         await createWallet();
       }
     } catch (error: any) {
       console.error('Portfolio fetch error:', error);
       if (error.response?.status === 404) {
-        await createWallet();
+        // ✅ FIX: Try syncing from profile before creating new wallet
+        if (userProfile?.algorand_address) {
+          setWalletAddress(userProfile.algorand_address);
+        } else {
+          await createWallet();
+        }
       } else {
         toast.error('Failed to load portfolio');
       }

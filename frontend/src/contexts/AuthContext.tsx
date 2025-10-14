@@ -362,6 +362,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <AuthContext.Provider value={{
       ...state,
+      userProfile: state.user,
       updateUserRole,
       triggerWalletCreation,
       signUp,

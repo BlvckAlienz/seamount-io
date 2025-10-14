@@ -191,7 +191,7 @@ class DatabaseService:
             raise HTTPException(status_code=500, detail=f"Failed to update user profile: {str(e)}")
 
     def _format_user_profile(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format raw database user profile data"""
+        """Format raw database user profile data - FIXED to preserve actual values"""
         return {
             "id": str(raw_data["id"]),
             "email": raw_data.get("email"),
@@ -200,14 +200,22 @@ class DatabaseService:
             "phone": raw_data.get("phone"),
             "country": raw_data.get("country", "USA"),
             "country_code": raw_data.get("country_code"),
-            "kyc_status": raw_data.get("kyc_status", "not_started"),
-            "kyc_level": raw_data.get("kyc_level", 0),
+            # ✅ FIX: Remove defaults - use actual DB values
+            "kyc_status": raw_data.get("kyc_status"),
+            "kyc_level": raw_data.get("kyc_level"),
+            "role": raw_data.get("role"),
             "kyc_provider": raw_data.get("kyc_provider"),
-            "role": raw_data.get("role", "alien"),
             "is_admin": raw_data.get("is_admin", False),
             "verification_skipped": raw_data.get("verification_skipped", False),
+            # ✅ FIX: Add missing fields
             "algorand_address": raw_data.get("algorand_address"),
             "wallet_address": raw_data.get("wallet_address"),
+            "bvn": raw_data.get("bvn"),
+            "id_number": raw_data.get("id_number"),
+            "id_type": raw_data.get("id_type"),
+            "kyc_session_id": raw_data.get("kyc_session_id"),
+            "kyc_started_at": raw_data.get("kyc_started_at"),
+            "kyc_completed_at": raw_data.get("kyc_completed_at"),
             "created_at": raw_data.get("created_at"),
             "updated_at": raw_data.get("updated_at")
         }

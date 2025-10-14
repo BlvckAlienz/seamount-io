@@ -31,7 +31,6 @@ export interface UserProfile {
   avatar_url?: string;
   created_at: string;
   updated_at?: string;
-  // Add these fields to match backend response
   wallet_address?: string | null;
   phone_number?: string | null;
   occupation?: string | null;
@@ -53,6 +52,14 @@ export interface UserProfile {
   last_login_at?: string | null;
   failed_login_attempts?: number;
   account_locked_until?: string | null;
+  // ✅ ADD THESE MISSING FIELDS
+  algorand_address?: string | null;
+  bvn?: string | null;
+  id_number?: string | null;
+  id_type?: string | null;
+  verification_skipped?: boolean;
+  kyc_started_at?: string | null;
+  kyc_completed_at?: string | null;
 }
 
 export interface Portfolio {
