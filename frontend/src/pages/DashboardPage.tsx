@@ -486,7 +486,14 @@ const DashboardPage = () => {
   const userRole = userProfile?.role || 'alien';
 
   // CRITICAL: Show KYC banner only if NOT verified AND role is alien
-  const shouldShowKYCBanner = kycStatus !== 'verified' && userRole !== 'tribe';
+  // Check multiple verified states: 'verified', 'approved', level 3
+  const isVerified = 
+    kycStatus === 'verified' || 
+    kycStatus === 'approved' || 
+    userRole === 'tribe' || 
+    kycLevel >= 3;
+  
+  const shouldShowKYCBanner = !isVerified;
 
   if (loading) {
     return (

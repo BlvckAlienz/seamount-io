@@ -142,6 +142,46 @@ async def update_user_profile(
         logger.error(f"[Profile Update] Error [Error ID: {error_id}]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update profile. Error ID: {error_id}")
 
+@router.post("/change-password")
+async def change_password(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Change user password"""
+    try:
+        data = await request.json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            raise HTTPException(status_code=400, detail="Both passwords required")
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be 8+ characters")
+        
+        user_id = current_user.get('id')
+        email = current_user.get('email')
+        
+        # Verify current password
+        sign_in = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": current_password
+        })
+        if not sign_in:
+            raise HTTPException(status_code=400, detail="Current password incorrect")
+        
+        # Update password
+        supabase.auth.admin.update_user_by_id(user_id, {"password": new_password})
+        
+        logger.info(f"[Password Change] Success: {user_id}")
+        return {"success": True, "message": "Password updated"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Password Change] Error: {str(e)}")
+        raise HTTPException(status_code=400, detail="Password change failed")
+
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
