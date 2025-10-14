@@ -333,7 +333,7 @@ const WalletAddressCard = ({ address }: { address: string }) => {
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          >
+          <a>
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
