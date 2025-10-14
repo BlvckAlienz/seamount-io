@@ -91,7 +91,7 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-        >
+        <a>
           <ExternalLink className="h-4 w-4" />
           View on Explorer
         </a>
