@@ -1,3 +1,6 @@
+// File: frontend/src/contexts/AuthContext.tsx
+// CRITICAL FIX: Line 223-237 - Bulletproof logout with full session clear
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
@@ -28,8 +31,9 @@ interface AuthContextType extends AuthState {
   onboardingStep?: number;
   updateOnboardingStep: (step: number, data: any) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-   updateUserRole: (role: 'tribe' | 'alien') => void;
+  updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,38 +51,37 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading: true,
     error: null,
     isDemoMode: false,
-	role: 'alien', // Default role
+    role: 'alien',
   });
    
   const navigate = useNavigate();
 
-	const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
-	  try {
-		const { data } = await retryWithBackoff(
-		  () => apiClient.get<{ success: boolean; profile: UserProfile }>('/api/v1/user/profile'),
-		  maxRetries,
-		  delayMs
-		);
-		// FIX: Extract profile from response data
-		setState((prev) => ({ ...prev, user: data.profile, error: null }));
-		return data.profile;
-	  } catch (error: any) {
-		console.error('AuthContext: Failed to fetch user profile after retries:', error);
-		
-		if (error?.response?.status === 401) {
-		  toast.error('Your session has expired. Please sign in again.');
-		  await supabase.auth.signOut();
-		} else if (error?.response?.status === 404) {
-		  toast.error('Failed to load user profile. Please try again later.');
-		  setState((prev) => ({ ...prev, error: 'Profile not found.' }));
-		} else {
-		  toast.error('Could not connect to the server. Some features may be unavailable.');
-		  setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
-		}
-		
-		return null;
-	  }
-	}, []);
+  const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
+    try {
+      const { data } = await retryWithBackoff(
+        () => apiClient.get<{ success: boolean; profile: UserProfile }>('/api/v1/user/profile'),
+        maxRetries,
+        delayMs
+      );
+      setState((prev) => ({ ...prev, user: data.profile, error: null }));
+      return data.profile;
+    } catch (error: any) {
+      console.error('AuthContext: Failed to fetch user profile after retries:', error);
+      
+      if (error?.response?.status === 401) {
+        toast.error('Your session has expired. Please sign in again.');
+        await supabase.auth.signOut();
+      } else if (error?.response?.status === 404) {
+        toast.error('Failed to load user profile. Please try again later.');
+        setState((prev) => ({ ...prev, error: 'Profile not found.' }));
+      } else {
+        toast.error('Could not connect to the server. Some features may be unavailable.');
+        setState((prev) => ({ ...prev, error: error.message || 'Profile fetch failed' }));
+      }
+      
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -99,7 +102,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       setState((prev) => ({ ...prev, session, loading: true }));
       
       if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
-        // Add a small delay to ensure tokens are properly processed
         setTimeout(async () => {
           await fetchUserProfile(5, 2000);
         }, 1000);
@@ -149,7 +151,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         toast.success('Please check your email to confirm your account');
       }
       
-      console.log('Sign up successful, profile will be created automatically');
       return { success: true };
       
     } catch (err: any) {
@@ -187,7 +188,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (error) throw error;
       
-      // Profile will be fetched by the auth state change listener
       return { success: true };
       
     } catch (err: any) {
@@ -208,29 +208,44 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // ✅ BULLETPROOF LOGOUT FIX
   const signOut = async () => {
     try {
-      // Clear Supabase session
-      await supabase.auth.signOut();
+      // 1. Clear Supabase session (server + client)
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Supabase signOut error:', error);
+      }
       
-      // Clear all local storage
+      // 2. Clear all browser storage
       localStorage.clear();
       sessionStorage.clear();
       
-      // Clear state
-      setState((prev) => ({ 
-        ...prev, 
-        session: null, 
-        user: null, 
-        error: null, 
-        isDemoMode: false 
-      }));
+      // 3. Clear cookies (if any auth cookies exist)
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
       
-      // Force reload to clear memory cache
+      // 4. Clear state
+      setState({
+        session: null,
+        user: null,
+        loading: false,
+        error: null,
+        isDemoMode: false,
+        role: 'alien',
+      });
+      
+      // 5. Force hard navigation to clear memory cache
       window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);
-      toast.error('Sign out failed');
+      // Even if error, force logout
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/';
     }
   };
 
@@ -251,13 +266,12 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       loading: false,
       error: null,
       isDemoMode: true,
-	  role: 'alien',
+      role: 'alien',
     });
     navigate('/dashboard');
   };
 
   const updateOnboardingStep = async (step: number, data: any) => {
-    console.log('Updating onboarding step:', step, data);
     try {
       if (state.user) {
         const { error } = await supabase
@@ -267,7 +281,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           
         if (error) throw error;
         
-        // Fetch updated profile
         await fetchUserProfile(3, 1000);
       }
     } catch (err: any) {
@@ -312,63 +325,55 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [state.user, state.session, fetchUserProfile]);
 
-// Add these functions
-const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
-  setState(prev => ({ ...prev, role }));
-}, []);
+  const updateUserRole = useCallback((role: 'tribe' | 'alien') => {
+    setState(prev => ({ ...prev, role }));
+  }, []);
 
-// Replace the problematic useEffect with this corrected version
-useEffect(() => {
-  if (state.session && state.user && !state.loading) {
-    const kycStatus = state.user.kyc_status || 'not_started';
-    const hasWallet = state.user.algorand_address || state.user.wallet_address;
-    
-    console.log('Routing check:', { kycStatus, hasWallet, role: state.user.role });
-    
-    // Verified users → dashboard
-    if (kycStatus === 'approved' || state.user.role === 'tribe') {
-      navigate('/dashboard');
-      return;
+  useEffect(() => {
+    if (state.session && state.user && !state.loading) {
+      const kycStatus = state.user.kyc_status || 'not_started';
+      const hasWallet = state.user.algorand_address || state.user.wallet_address;
+      
+      if (kycStatus === 'approved' || state.user.role === 'tribe') {
+        navigate('/dashboard');
+        return;
+      }
+      
+      if (hasWallet) {
+        navigate('/dashboard');
+        return;
+      }
+      
+      navigate('/onboarding');
     }
-    
-    // Users with wallets → dashboard (breaks loop)
-    if (hasWallet) {
-      navigate('/dashboard');
-      return;
+  }, [state.session, state.user, state.loading, navigate]);
+
+  const triggerWalletCreation = useCallback(async () => {
+    try {
+      const response = await apiClient.post('/api/wallet/create');
+      return response.data.success;
+    } catch (error) {
+      console.error('Wallet creation failed:', error);
+      return false;
     }
-    
-    // New users → onboarding
-    navigate('/onboarding');
-  }
-}, [state.session, state.user, state.loading, navigate]);
+  }, []);
 
-const triggerWalletCreation = useCallback(async () => {
-  try {
-    const response = await apiClient.post('/api/wallet/create');
-    return response.data.success;
-  } catch (error) {
-    console.error('Wallet creation failed:', error);
-    return false;
-  }
-}, []);
-
-// Add the return statement for the component
-return (
-  <AuthContext.Provider value={{
-    ...state,
-	updateUserRole,
-	triggerWalletCreation,
-    signUp,
-    signIn,
-    signOut,
-    enterDemoMode,
-    updateOnboardingStep,
-    completeOnboarding,
-    refreshProfile
-  }}>
-    {children}
-  </AuthContext.Provider>
-);
+  return (
+    <AuthContext.Provider value={{
+      ...state,
+      updateUserRole,
+      triggerWalletCreation,
+      signUp,
+      signIn,
+      signOut,
+      enterDemoMode,
+      updateOnboardingStep,
+      completeOnboarding,
+      refreshProfile
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export { AuthProviderContent as AuthProvider };

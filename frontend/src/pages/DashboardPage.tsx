@@ -1,9 +1,9 @@
-// File Location: frontend/src/pages/DashboardPage.tsx
+// File: frontend/src/pages/DashboardPage.tsx
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, DollarSign, Activity, RefreshCw, Shield, AlertTriangle,
   Bitcoin, Coins, Copy, Check, Eye, EyeOff, Download, Lock,
-  ExternalLink, ArrowUpRight, ArrowDownLeft
+  ExternalLink, ArrowUpRight, ArrowDownLeft, Settings, LogOut, User
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -299,9 +299,14 @@ const MnemonicBackupModal = ({
   );
 };
 
-// Wallet Address Display
+// Premium Wallet Address Display
 const WalletAddressCard = ({ address }: { address: string }) => {
   const [copied, setCopied] = useState(false);
+  
+  const shortenAddress = (addr: string) => {
+    if (!addr) return '';
+    return `${addr.slice(0, 7)}...${addr.slice(-5)}`;
+  };
 
   const copyAddress = () => {
     navigator.clipboard.writeText(address);
@@ -311,32 +316,32 @@ const WalletAddressCard = ({ address }: { address: string }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6">
+    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="text-sm text-gray-400 mb-1">Your Algorand Address</div>
-          <div className="text-white font-mono text-sm break-all">{address}</div>
+          <div className="flex items-center gap-3">
+            <span className="text-white font-mono text-lg">{shortenAddress(address)}</span>
+            <button
+              onClick={copyAddress}
+              className={`p-2 rounded-lg transition-all ${
+                copied
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
+              }`}
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2 ml-4">
-          <button
-            onClick={copyAddress}
-            className={`p-2 rounded-lg transition-colors ${
-              copied
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
-            }`}
-          >
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          </button>
-          
-            href={`https://explorer.perawallet.app/address/${address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          <a>
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
+        <a
+          href={`https://explorer.perawallet.app/address/${address}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
+        >
+          <ExternalLink className="h-5 w-5" />
+        </a>
       </div>
     </div>
   );
@@ -344,7 +349,7 @@ const WalletAddressCard = ({ address }: { address: string }) => {
 
 // Main Dashboard Component
 const DashboardPage = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
   const [portfolioData, setPortfolioData] = useState<any>(null);
   const [showMnemonicModal, setShowMnemonicModal] = useState(false);
@@ -452,10 +457,11 @@ const DashboardPage = () => {
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('token');
-      window.location.href = '/';
+      await signOut();
+      toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout error:', error);
+      toast.error('Logout failed');
     }
   };
 
@@ -477,6 +483,10 @@ const DashboardPage = () => {
 
   const kycStatus = userProfile?.kyc_status || 'not_started';
   const kycLevel = userProfile?.kyc_level || 0;
+  const userRole = userProfile?.role || 'alien';
+
+  // CRITICAL: Show KYC banner only if NOT verified AND role is alien
+  const shouldShowKYCBanner = kycStatus !== 'verified' && userRole !== 'tribe';
 
   if (loading) {
     return (
@@ -490,12 +500,13 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
+        {/* Header */}
+        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Portfolio</h1>
-            <p className="text-gray-400">Manage your multi-asset Algorand wallet</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
+            <p className="text-gray-400 text-sm md:text-base">Manage your multi-asset Algorand wallet</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -512,24 +523,35 @@ const DashboardPage = () => {
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
               >
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
                   {userProfile?.first_name?.[0]?.toUpperCase() || 'U'}
                 </div>
-                <span className="text-sm">{userProfile?.first_name || 'User'}</span>
+                <span className="text-sm hidden md:inline">{userProfile?.first_name || 'User'}</span>
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                  <a href="/settings" className="block px-4 py-3 hover:bg-gray-700 text-gray-300">
-                    Profile Settings
-                  </a>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-700 text-red-400"
-                  >
-                    Logout
-                  </button>
-                </div>
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowProfileMenu(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <a 
+                      href="/settings" 
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </a>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -537,9 +559,10 @@ const DashboardPage = () => {
 
         <NigerianUserBanner />
 
-        {kycStatus !== 'verified' && (
-          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-6 mb-6">
-            <div className="flex items-start justify-between">
+        {/* CONDITIONAL KYC BANNER */}
+        {shouldShowKYCBanner && (
+          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-4 md:p-6 mb-6">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
               <div className="flex items-start gap-4">
                 <AlertTriangle className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
                 <div>
@@ -547,7 +570,7 @@ const DashboardPage = () => {
                   <p className="text-gray-300 text-sm mb-3">
                     Complete KYC to unlock full platform features and higher transaction limits
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
                     <span className="flex items-center gap-1">
                       <Shield className="h-3 w-3" />
                       Current Tier: {kycLevel}/3
@@ -567,18 +590,20 @@ const DashboardPage = () => {
           </div>
         )}
 
+        {/* Wallet Address */}
         {walletAddress && (
           <div className="mb-6">
             <WalletAddressCard address={walletAddress} />
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Balance Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <div className="text-sm text-gray-400 mb-1">Total Balance</div>
-                <div className="text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
               </div>
               <button
                 onClick={fetchPortfolioData}
@@ -603,12 +628,13 @@ const DashboardPage = () => {
           </div>
         </div>
 
+        {/* Assets Grid */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Your Assets</h2>
             <span className="text-sm text-gray-400">{SUPPORTED_ASSETS.length} supported</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {assetCards.map(asset => (
               <AssetCard
                 key={asset.symbol}
@@ -620,7 +646,8 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-8">
+        {/* Quick Actions */}
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
@@ -642,14 +669,15 @@ const DashboardPage = () => {
           </div>
         </div>
 
+        {/* Cross-Border CTA */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
               <p className="text-blue-100 text-sm mb-3">
                 Send money globally at 2.9% fee vs 8% traditional (5.1% savings!)
               </p>
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex flex-wrap items-center gap-4 text-xs">
                 <span className="flex items-center gap-1">
                   <Activity className="h-3 w-3" />
                   Sub-5s settlement
@@ -667,6 +695,7 @@ const DashboardPage = () => {
         </div>
       </div>
 
+      {/* Modals */}
       {showMnemonicModal && pendingMnemonic && (
         <MnemonicBackupModal
           mnemonic={pendingMnemonic}
