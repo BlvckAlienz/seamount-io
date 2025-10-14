@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { portfolioAPI, userAPI } from '../config/api'; 
 import { portfolioService } from '../services/portfolio';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
+import ReceiveModal from '../components/payments/ReceiveModal';
 
 // Asset Card Component with 0-balance visibility 
 const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; onSend: () => void }) => { 
@@ -690,14 +691,13 @@ const DashboardPage = () => {
         /> 
       )} 
 
-      {/* Receive Modal */} 
-      {showReceiveModal && walletAddress && ( 
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"> 
-          <div className="bg-gray-900 rounded-2xl max-w-md w-full p-8 border border-blue-500/30"> 
-            <div className="text-center mb-6"> 
-              <h2 className="text-2xl font-bold text-white mb-2">Receive Assets</h2> 
-              <p className="text-gray-400">Share this address to receive payments</p> 
-            </div> 
+      {/* Receive Modal */}
+      {showReceiveModal && walletAddress && (
+        <ReceiveModal 
+          walletAddress={walletAddress} 
+          onClose={() => setShowReceiveModal(false)} 
+        />
+      )}
             
             {/* QR Code Placeholder */} 
             <div className="bg-white p-6 rounded-xl mb-4"> 

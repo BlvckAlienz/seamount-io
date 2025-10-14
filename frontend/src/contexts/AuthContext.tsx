@@ -210,7 +210,14 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signOut = async () => {
     try {
+      // Clear Supabase session
       await supabase.auth.signOut();
+      
+      // Clear all local storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear state
       setState((prev) => ({ 
         ...prev, 
         session: null, 
@@ -218,7 +225,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         error: null, 
         isDemoMode: false 
       }));
-      navigate('/');
+      
+      // Force reload to clear memory cache
+      window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);
       toast.error('Sign out failed');
