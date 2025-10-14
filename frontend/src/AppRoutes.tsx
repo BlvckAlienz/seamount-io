@@ -40,7 +40,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/portfolio" element={<ProtectedRoute minKycLevel={1}><PortfolioPage /></ProtectedRoute>} />
         <Route path="/trading" element={<ProtectedRoute minKycLevel={2}><TradingPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute minKycLevel={2}><PaymentsPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute minKycLevel={1}><SettingsPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute minKycLevel={0}><SettingsPage /></ProtectedRoute>} />
         <Route path="/help" element={<Help />} />
         <Route path="/debug" element={<AuthDebugPage />} />
         <Route path="/wallet-setup" element={<ProtectedRoute minKycLevel={1}><WalletSetupPage /></ProtectedRoute>} />

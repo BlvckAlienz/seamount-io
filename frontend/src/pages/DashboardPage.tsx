@@ -485,6 +485,13 @@ const DashboardPage = () => {
   const kycLevel = userProfile?.kyc_level || 0;
   const userRole = userProfile?.role || 'alien';
 
+  console.log('🔍 KYC DEBUG:', {
+    kyc_status: kycStatus,
+    role: userRole,
+    kyc_level: kycLevel,
+    raw_profile: userProfile
+  });
+
   // CRITICAL: Show KYC banner only if NOT verified AND role is alien
   // Check multiple verified states: 'verified', 'approved', level 3
   const isVerified = 
@@ -543,13 +550,13 @@ const DashboardPage = () => {
                     onClick={() => setShowProfileMenu(false)}
                   />
                   <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <a 
-                      href="/settings" 
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
+                    <button
+                      onClick={() => window.location.href = '/settings'}  // Force navigation
+                      className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors"
                     >
                       <Settings className="h-4 w-4" />
                       <span>Settings</span>
-                    </a>
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg"
