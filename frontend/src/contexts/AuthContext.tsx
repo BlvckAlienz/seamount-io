@@ -20,6 +20,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
+  userProfile: UserProfile | null; // ADD THIS
   signUp: (
     email: string,
     password: string,

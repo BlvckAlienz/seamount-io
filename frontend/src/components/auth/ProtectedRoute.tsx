@@ -22,8 +22,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  return <Navigate to="/" replace />;
+}
 
   // Check if user meets KYC requirements
   const meetsKycRequirement = user.kyc_level >= minKycLevel;
