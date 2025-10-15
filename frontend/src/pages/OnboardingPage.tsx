@@ -420,7 +420,17 @@ const OnboardingPage = () => {
   };
 
   const handleBackupComplete = async () => {
-    await completeOnboarding();
+    try {
+      await completeOnboarding();
+      // 🔥 REMOVED: Don't rely on completeOnboarding to navigate
+      // Instead, force navigation after short delay to allow state update
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
+    } catch (error) {
+      console.error('Backup completion error:', error);
+      toast.error('Failed to complete setup');
+    }
   };
 
   const handleStepBack = () => {
