@@ -272,7 +272,7 @@ const OnboardingPage = () => {
   const [mnemonic, setMnemonic] = useState(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
   const [bvnData, setBvnData] = useState(null);
-  const { completeOnboarding, userProfile } = useAuth();
+  const { completeOnboarding, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
