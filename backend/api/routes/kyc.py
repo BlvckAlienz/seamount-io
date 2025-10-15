@@ -331,16 +331,21 @@ async def skip_kyc_verification(
             'kyc_status': 'skipped',
             'kyc_level': 1,
             'verification_skipped': True,
+            'role': 'alien',  # 🔥 NEW: Explicitly set alien role
             'updated_at': datetime.utcnow().isoformat()
         }
         
         supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
         
+        logger.info(f"[KYC Skip] User {user_id} skipped verification - alien mode enabled")
+        
         return {
             "success": True,
             "message": "Verification skipped. Limited access granted.",
             "kyc_status": "skipped",
-            "kyc_level": 1
+            "kyc_level": 1,
+            "alien_mode": True,  # 🔥 NEW: Flag for frontend
+            "next_step": "create_wallet"  # 🔥 NEW: Explicit instruction
         }
         
     except Exception as e:

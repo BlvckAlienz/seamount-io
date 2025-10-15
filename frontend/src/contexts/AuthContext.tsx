@@ -330,24 +330,43 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, role }));
   }, []);
 
-  useEffect(() => {
-    if (state.session && state.user && !state.loading) {
-      const kycStatus = state.user.kyc_status || 'not_started';
-      const hasWallet = state.user.algorand_address || state.user.wallet_address;
-      
-      if (kycStatus === 'approved' || state.user.role === 'tribe') {
-        navigate('/dashboard');
-        return;
-      }
-      
-      if (hasWallet) {
-        navigate('/dashboard');
-        return;
-      }
-      
+useEffect(() => {
+  if (state.session && state.user && !state.loading) {
+    const kycStatus = state.user.kyc_status || 'not_started';
+    const hasWallet = state.user.algorand_address || state.user.wallet_address;
+    const isAlien = state.user.role === 'alien';
+    const hasSkipped = state.user.verification_skipped === true;
+    
+    // ✅ Tribe users (verified) → Dashboard
+    if (kycStatus === 'approved' || kycStatus === 'verified' || state.user.role === 'tribe') {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // 🔥 NEW: Alien users with wallets → Dashboard (regardless of KYC status)
+    if (isAlien && hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // 🔥 NEW: Users who skipped verification with wallet → Dashboard
+    if (hasSkipped && hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // 🔥 NEW: Users with pending_support status (non-NG) → Dashboard if wallet exists
+    if (kycStatus === 'pending_support' && hasWallet) {
+      navigate('/dashboard');
+      return;
+    }
+    
+    // ✅ All other cases → Onboarding
+    if (!hasWallet || (kycStatus === 'not_started' && !hasSkipped)) {
       navigate('/onboarding');
     }
-  }, [state.session, state.user, state.loading, navigate]);
+  }
+}, [state.session, state.user, state.loading, navigate]);
 
   const triggerWalletCreation = useCallback(async () => {
     try {

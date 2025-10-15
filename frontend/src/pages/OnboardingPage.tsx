@@ -289,81 +289,121 @@ const OnboardingPage = () => {
   };
 
   // ✅ FIX: Called AFTER user submits BVN data
-const handleBVNSubmit = async (formData) => {
-  const toastId = toast.loading('Starting verification...');
-  const isNigerian = formData.country === 'NG';
-  
-  try {
-    // 1. Store data
-    await apiClient.post('/api/v1/kyc/submit-kyc-data', {
-      bvn: formData.idNumber,
-      id_type: formData.idType,
-      date_of_birth: formData.dateOfBirth,
-      gender: formData.gender,
-      phone: formData.phoneNumber,
-      country_code: formData.country
-    });
-
-    // 2. Start verification
-    await apiClient.post('/api/v1/kyc/start-verification');
+  const handleBVNSubmit = async (formData) => {
+    const toastId = toast.loading('Starting verification...');
+    const isNigerian = formData.country === 'NG';
     
-    toast.success('Verification submitted!', { id: toastId });
-    toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
-
-    // 3. Create wallet
-    const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-    
-    if (walletResponse.data.success && walletResponse.data.mnemonic) {
-      setMnemonic(walletResponse.data.mnemonic);
-      setShowBVNModal(false);
-      setStep('walletBackup');
-    } else {
-      throw new Error('Wallet creation failed');
-    }
-    
-  } catch (error) {
-    console.error('Verification error:', error);
-    
-    // Non-Nigerian verification not yet supported
-    if (!isNigerian && error.response?.status === 500) {
-      toast.dismiss(toastId);
-      toast('⏳ ID verification for your country is coming soon (within 1 week)', { 
-        duration: 6000,
-        icon: '🌍'
+    try {
+      // 1. Store KYC data
+      await apiClient.post('/api/v1/kyc/submit-kyc-data', {
+        bvn: formData.idNumber,
+        id_type: formData.idType,
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        phone: formData.phoneNumber,
+        country_code: formData.country
       });
-      toast('✨ You can still create your wallet and access the dashboard now', { 
-        duration: 5000
-      });
-      
-      // Proceed to wallet creation
+
+      // 2. Attempt verification
       try {
+        const verifyResponse = await apiClient.post('/api/v1/kyc/start-verification');
+        
+        // 🔥 NEW: Check for alien pathway flag
+        if (verifyResponse.data.alien_pathway || verifyResponse.data.status === 'pending_support') {
+          toast.dismiss(toastId);
+          toast('⏳ ID verification for your country is coming soon', { 
+            duration: 6000,
+            icon: '🌍'
+          });
+          toast('✨ Creating your wallet now...', { duration: 3000 });
+          
+          // Proceed to wallet creation
+          const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+          
+          if (walletResponse.data.success && walletResponse.data.mnemonic) {
+            toast.success('Wallet created!', { id: toastId });
+            setMnemonic(walletResponse.data.mnemonic);
+            setShowBVNModal(false);
+            setStep('walletBackup');
+            return;
+          }
+        }
+        
+        // Nigerian users - normal flow
+        toast.success('Verification submitted!', { id: toastId });
+        toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
+
+        // Create wallet
         const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+        
         if (walletResponse.data.success && walletResponse.data.mnemonic) {
           setMnemonic(walletResponse.data.mnemonic);
           setShowBVNModal(false);
           setStep('walletBackup');
+        } else {
+          throw new Error('Wallet creation failed');
         }
-      } catch (walletError) {
-        toast.error('Wallet creation failed. Please contact support.');
+        
+      } catch (verifyError) {
+        // 🔥 IMPROVED: Better error handling for non-NG users
+        console.error('Verification error:', verifyError);
+        
+        // Check if this is expected non-NG failure
+        const is500Error = verifyError.response?.status === 500;
+        const errorDetail = verifyError.response?.data?.detail || '';
+        const isRegfylError = errorDetail.includes('Regfyl') || errorDetail.includes('service unavailable');
+        
+        if (!isNigerian && is500Error && isRegfylError) {
+          toast.dismiss(toastId);
+          toast('⏳ ID verification for your country is coming soon (within 1 week)', { 
+            duration: 6000,
+            icon: '🌍'
+          });
+          toast('✨ Creating your wallet now...', { duration: 3000 });
+          
+          // Proceed to wallet creation
+          try {
+            const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+            if (walletResponse.data.success && walletResponse.data.mnemonic) {
+              toast.success('Wallet created!');
+              setMnemonic(walletResponse.data.mnemonic);
+              setShowBVNModal(false);
+              setStep('walletBackup');
+              return;
+            }
+          } catch (walletError) {
+            console.error('Wallet creation failed:', walletError);
+            toast.error('Wallet creation failed. Please contact support.');
+            setShowBVNModal(false);
+            return;
+          }
+        }
+        
+        // Nigerian or other unexpected errors
+        toast.error(errorDetail || 'Verification failed', { id: toastId });
         setShowBVNModal(false);
       }
-    } else {
-      // Nigerian or other error
-      toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
+      
+    } catch (error) {
+      console.error('KYC submission error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to submit KYC data', { id: toastId });
       setShowBVNModal(false);
     }
-  }
-};
+  };
 
   // ✅ FIX: Skip flow - NO Regfyl call
   const handleSkipVerification = async () => {
     const toastId = toast.loading('Setting up your wallet...');
     
     try {
-      // Skip KYC
-      await apiClient.post('/api/v1/kyc/skip-verification');
+      // 🔥 IMPROVED: Skip KYC with better response handling
+      const skipResponse = await apiClient.post('/api/v1/kyc/skip-verification');
+      
+      if (!skipResponse.data.success) {
+        throw new Error('Failed to skip verification');
+      }
 
-      // Create wallet only
+      // Create wallet
       const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
       
       if (walletResponse.data.success && walletResponse.data.mnemonic) {
@@ -375,7 +415,7 @@ const handleBVNSubmit = async (formData) => {
       }
     } catch (error) {
       console.error('Skip error:', error);
-      toast.error('Failed to create wallet', { id: toastId });
+      toast.error(error.response?.data?.detail || 'Failed to create wallet', { id: toastId });
     }
   };
 

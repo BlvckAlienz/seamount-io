@@ -190,7 +190,7 @@ class KYCService:
             raise HTTPException(status_code=500, detail="KYC service unavailable")
 
     async def _start_regfyl_verification(self, user_id: str, user_profile: Dict, country_code: str) -> Dict[str, Any]:
-        """Use RAW profile - don't re-fetch with formatter"""
+        """Use RAW profile - graceful degradation for non-NG users"""
         try:
             callback_url = f"{self.settings.API_BASE_URL}/webhooks/regfyl/screening"
             
@@ -229,38 +229,65 @@ class KYCService:
             logger.info(f"[Regfyl] ✅ Sending {id_type}: {final_id[:3]}*** for user {user_id}")
             logger.info(f"[Regfyl] FULL user_data DICT:\n{json.dumps(user_data, indent=2)}")
             
-            # Submit to Regfyl - bypass wrapper, call provider directly
+            # 🔥 NEW: Wrap Regfyl call with graceful degradation
             regfyl_provider = self.providers['regfyl']
-            screening_result = await regfyl_provider.onboard_seamount_user(user_data)
             
-            # Update KYC status
-            await self.db_service.update_user_kyc_status(user_id, "pending", 1)
-            
-            # Log session
-            if self.supabase:
-                try:
-                    self.supabase.table("kyc_sessions").upsert({
-                        "user_id": user_id,
-                        "applicant_id": f"regfyl_{user_id}",
-                        "session_id": screening_result.get('screening', {}).get('reference'),
-                        "verification_type": "regfyl_screening",
-                        "status": "pending",
-                        "response_data": screening_result,
-                        "created_at": datetime.utcnow().isoformat()
-                    }).execute()
-                except Exception as e:
-                    logger.warning(f"Session save: {e}")
-            
-            return {
-                "success": True,
-                "provider": "regfyl",
-                "session_id": screening_result.get('screening', {}).get('reference'),
-                "applicantId": f"regfyl_{user_id}",
-                "message": "Verification submitted successfully",
-                "status": "pending",
-                "next_step": "await_review"
-            }
-            
+            try:
+                screening_result = await regfyl_provider.onboard_seamount_user(user_data)
+                
+                # Update KYC status
+                await self.db_service.update_user_kyc_status(user_id, "pending", 1)
+                
+                # Log session
+                if self.supabase:
+                    try:
+                        self.supabase.table("kyc_sessions").upsert({
+                            "user_id": user_id,
+                            "applicant_id": f"regfyl_{user_id}",
+                            "session_id": screening_result.get('screening', {}).get('reference'),
+                            "verification_type": "regfyl_screening",
+                            "status": "pending",
+                            "response_data": screening_result,
+                            "created_at": datetime.utcnow().isoformat()
+                        }).execute()
+                    except Exception as e:
+                        logger.warning(f"Session save: {e}")
+                
+                return {
+                    "success": True,
+                    "provider": "regfyl",
+                    "session_id": screening_result.get('screening', {}).get('reference'),
+                    "applicantId": f"regfyl_{user_id}",
+                    "message": "Verification submitted successfully",
+                    "status": "pending",
+                    "next_step": "await_review"
+                }
+                
+            except HTTPException as regfyl_error:
+                # 🔥 NEW: Check if it's a non-Nigerian user hitting unsupported country
+                is_non_nigerian = country_code != 'NG'
+                is_service_error = '400' in str(regfyl_error.detail) or '500' in str(regfyl_error.detail)
+                
+                if is_non_nigerian and is_service_error:
+                    logger.warning(f"[Regfyl] Non-NG user {user_id} hit unsupported country - enabling alien pathway")
+                    
+                    # Update status to allow wallet creation
+                    await self.db_service.update_user_kyc_status(user_id, "pending_support", 1)
+                    
+                    # Return success with alien pathway flag
+                    return {
+                        "success": True,
+                        "provider": "regfyl",
+                        "status": "pending_support",
+                        "alien_pathway": True,
+                        "country_code": country_code,
+                        "message": f"ID verification for {country_code} is coming soon. You can proceed with limited access.",
+                        "next_step": "create_wallet"
+                    }
+                else:
+                    # Re-raise for Nigerian users or unexpected errors
+                    raise
+                
         except HTTPException:
             raise
         except Exception as e:
