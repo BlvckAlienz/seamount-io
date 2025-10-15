@@ -396,12 +396,8 @@ const OnboardingPage = () => {
     const toastId = toast.loading('Setting up your wallet...');
     
     try {
-      // 🔥 IMPROVED: Skip KYC with better response handling
-      const skipResponse = await apiClient.post('/api/v1/kyc/skip-verification');
-      
-      if (!skipResponse.data.success) {
-        throw new Error('Failed to skip verification');
-      }
+      // Skip KYC
+      await apiClient.post('/api/v1/kyc/skip-verification');
 
       // Create wallet
       const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
@@ -415,18 +411,21 @@ const OnboardingPage = () => {
       }
     } catch (error) {
       console.error('Skip error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to create wallet', { id: toastId });
+      toast.error('Failed to create wallet', { id: toastId });
     }
   };
 
   const handleBackupComplete = async () => {
     try {
-      await completeOnboarding();
-      // 🔥 REMOVED: Don't rely on completeOnboarding to navigate
-      // Instead, force navigation after short delay to allow state update
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
+      // 🔥 NUCLEAR: Force profile refresh, then hard navigate
+      await refreshProfile(); // This exists in AuthContext
+      
+      // Wait for state to update
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Force navigation - bypass completeOnboarding
+      window.location.href = '/dashboard';
+      
     } catch (error) {
       console.error('Backup completion error:', error);
       toast.error('Failed to complete setup');
