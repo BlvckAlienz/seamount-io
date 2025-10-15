@@ -136,11 +136,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     { 
       question: "What happens if crypto markets crash?", 
-      answer: "Your principal is protected across all tiers. STABLE tier (7.5%) uses pure lending—no crypto price exposure. GROWTH tier (9%) uses stablecoin liquidity pools—minimal volatility risk. ALPHA tier (11%, Q2 2025) uses delta-neutral hedging: when BTC drops 30%, our short position gains 30%, netting zero price exposure. However, yields can drop in bear markets (to 8-9% range) if funding rates turn negative. Our 160% overcollateralization and 20% stablecoin reserve ensure USDS remains redeemable even in black swan events."
+      answer: "Your principal is protected across all tiers. STABLE tier (7.5%) uses pure lending—no crypto price exposure. GROWTH tier (9%) uses stablecoin liquidity pools—minimal volatility risk. ALPHA tier (11%, Q2 2026) uses delta-neutral hedging: when BTC drops 30%, our short position gains 30%, netting zero price exposure. However, yields can drop in bear markets (to 8-9% range) if funding rates turn negative. Our 160% overcollateralization and 20% stablecoin reserve ensure liquidity even in black swan events."
     },
     {
       question: "Is this regulated and safe?",
-      answer: "Yes—compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Quarterly reserve audits, real-time collateralization dashboard, embedded KYC/AML via Regfyl. Not NDIC-insured but protected by 160% overcollateralization and independent custody (Fireblocks). We publish all reserve compositions monthly—full transparency vs traditional banks. Your wallet, your keys—we never have custody of your funds."
+      answer: "Yes—compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU. Quarterly reserve audits, real-time collateralization dashboard, embedded KYC/AML via Regfyl. Not NDIC-insured but protected by 160% overcollateralization and independent custody (Fireblocks). We publish all reserve compositions monthly—full transparency vs traditional banks. Your wallet, your keys—we never have custody of your funds."
     }
   ];
 
@@ -290,7 +290,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <FileCheck className="h-10 w-10 text-green-600" />,
                   step: "02",
                   title: "Complete KYC Verification",
-                  description: "Quick identity verification via Regfyl. Document upload takes ~3 minutes, approval within 24 hours.",
+                  description: "Quick identity verification. Data upload takes ~3 minutes, approval within 24 hours.",
                   color: "border-green-200 bg-green-50"
                 },
                 {
@@ -311,14 +311,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <CreditCard className="h-10 w-10 text-rose-600" />,
                   step: "05",
                   title: "Fund Your Account",
-                  description: "Deposit fiat (USD/GBP/EUR/NGN/KES/ZAR) via Paystack or Cashramp. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH on Algorand.",
+                  description: "Deposit local currency via Paystack, Cashramp, etc. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH on Algorand.",
                   color: "border-rose-200 bg-rose-50"
                 },
                 {
                   icon: <ArrowRightLeft className="h-10 w-10 text-teal-600" />,
                   step: "06",
                   title: "Send P2P & Off-Ramp",
-                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency. When USDS launches, hold for 7.5-11% APY yields.",
+                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency. Invest funds for 7.5-11% APY yields.",
                   color: "border-teal-200 bg-teal-50"
                 }
               ].map((step, idx) => (
@@ -361,17 +361,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 {
                   icon: <DollarSign className="h-8 w-8 text-green-500" />,
                   title: "47% Cheaper Than Western Union",
-                  description: "2.9% fees vs WU's 5.5% + hidden FX markups. Save $27.50 per $500 transaction—$330/year on monthly remittances."
+                  description: "2.9% fees vs WU's 5.5% + hidden FX markups. Save $27.50 per $500 transaction."
                 },
                 {
                   icon: <TrendingUp className="h-8 w-8 text-indigo-500" />,
                   title: "7.5-11% APY on Idle Funds",
-                  description: "Earn while you wait. Stable (7.5%), Growth (9%), Alpha (11% - Q2 2025). Choose your risk tier, we handle execution."
+                  description: "Earn while you wait. Stable (7.5%), Growth (9%), Alpha (11% - Q2 2026). Choose your risk tier, we handle execution."
                 },
                 {
                   icon: <Globe className="h-8 w-8 text-blue-500" />,
                   title: "Multi-Currency Support",
-                  description: "Trade USDT, USDCa, USDS with seamless swaps. Support for NGN, KES, ZAR, ETB, RWF, TZS, GHS, USD, GBP, EUR."
+                  description: "Trade USDT, USDCa, Algo with seamless swaps. Support for NGN, KES, ZAR, GHS, USD, GBP, EUR."
                 },
                 {
                   icon: <Shield className="h-8 w-8 text-red-500" />,
@@ -401,7 +401,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-16 fade-in">
               <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-900">Live Yield Calculator</h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Choose your risk appetite. Stable (7.5%) and Growth (9%) available now. Alpha (11%) launches Q2 2025.
+                Choose your risk appetite. Stable (7.5%) and Growth (9%) available now. Alpha (11%) launches Q2 2026.
               </p>
             </div>
 
@@ -433,7 +433,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     >
                       <option value="30">Stable Tier - 7.5% APY (30-day lock)</option>
                       <option value="90">Growth Tier - 9.0% APY (90-day lock)</option>
-                      <option value="365">Alpha Tier - 11.0% APY (365-day lock) - Q2 2025</option>
+                      <option value="365">Alpha Tier - 11.0% APY (365-day lock) - Q2 2026</option>
                     </select>
                   </div>
 
@@ -467,7 +467,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         ) : calc.period === '90' ? (
                           <><strong>Growth Tier:</strong> Combines Folks Finance lending (6-8%) + liquidity pool rewards (2-3%) for consistent 9% APY. Medium risk—stablecoin pools have minimal volatility exposure.</>
                         ) : (
-                          <><strong>Stable Tier:</strong> Pure lending via Folks Finance. Your USDS is lent to verified borrowers at 8-9%, we pay you 7.5%, pocket 0.5-1% spread. Low risk, predictable returns.</>
+                          <><strong>Stable Tier:</strong> Pure lending via Folks Finance. Your investment is lent to verified borrowers at 8-9%, we pay you 7.5%, pocket 0.5-1% spread. Low risk, predictable returns.</>
                         )}
                       </div>
                     )}
@@ -620,7 +620,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <div className="text-xs text-gray-700">
                       <strong className="text-amber-700">Risk Disclosure:</strong> {
                         calc.period === '365' 
-                          ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured. Q2 2025 launch pending $100K TVL.`
+                          ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured. Q2 2026 launch pending $100K TVL.`
                           : calc.period === '90'
                           ? 'Growth tier uses stablecoin liquidity pools with minimal volatility exposure. Yields are more stable than Alpha but higher than Stable. 160% overcollateralization protects principal. Not NDIC-insured.'
                           : 'Stable tier uses pure lending with no crypto price exposure. Yields are consistent and predictable. 160% overcollateralization protects principal. Not NDIC-insured.'
