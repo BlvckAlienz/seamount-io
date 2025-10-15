@@ -295,51 +295,24 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       const currentUser = state.user || state.session?.user;
       if (!currentUser?.id) throw new Error('No user ID');
 
-      // 🔥 CRITICAL: Force profile refresh to get wallet address
-      await fetchUserProfile();
-      
-      // Get fresh profile after wallet creation
-      const { data: freshProfile } = await supabase
+      const { data: profile } = await supabase
         .from('user_profiles')
-        .select('*, user_wallets!inner(algorand_address)')
+        .select('*')
         .eq('id', currentUser.id)
         .single();
 
-      if (!freshProfile) throw new Error('Profile not found');
+      if (!profile) throw new Error('Profile not found');
 
-      const hasWallet = freshProfile.algorand_address || freshProfile.user_wallets?.algorand_address;
-      const isAlien = freshProfile.role === 'alien';
-      const hasSkipped = freshProfile.verification_skipped === true;
-
-      // Update role for verified users only
-      if (['pending', 'verified'].includes(freshProfile.kyc_status) && !isAlien) {
+      if (['pending', 'verified'].includes(profile.kyc_status)) {
         await supabase
           .from('user_profiles')
           .update({ role: 'tribe', updated_at: new Date().toISOString() })
           .eq('id', currentUser.id);
       }
 
-      // 🔥 NEW: Force state update with fresh profile
-      setState(prev => ({
-        ...prev,
-        user: {
-          ...freshProfile,
-          algorand_address: hasWallet ? (freshProfile.algorand_address || freshProfile.user_wallets?.algorand_address) : null
-        }
-      }));
-
-      // Navigate based on status
-      if (isAlien || hasSkipped) {
-        toast('⚠️ Complete verification to unlock all features', { 
-          duration: 5000,
-          icon: '🔐'
-        });
-      } else {
-        toast.success('Welcome to Seamount!');
-      }
-      
+      await fetchUserProfile();
       navigate('/dashboard');
-      
+      toast.success('Welcome to Seamount!');
     } catch (error) {
       console.error('Onboarding error:', error);
       toast.error('Setup incomplete');
@@ -361,41 +334,18 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (state.session && state.user && !state.loading) {
       const kycStatus = state.user.kyc_status || 'not_started';
       const hasWallet = state.user.algorand_address || state.user.wallet_address;
-      const isAlien = state.user.role === 'alien';
-      const hasSkipped = state.user.verification_skipped === true;
       
-      // 🔥 NEW: Check if we're currently in onboarding flow
-      const currentPath = window.location.pathname;
-      const isOnboardingPage = currentPath === '/onboarding';
-      
-      // ✅ Tribe users (verified) → Dashboard
-      if (kycStatus === 'approved' || kycStatus === 'verified' || state.user.role === 'tribe') {
-        if (!isOnboardingPage) {
-          navigate('/dashboard');
-        }
+      if (kycStatus === 'approved' || state.user.role === 'tribe') {
+        navigate('/dashboard');
         return;
       }
       
-      // 🔥 NEW: Alien users OR users who skipped → Dashboard if they have wallet
-      if ((isAlien || hasSkipped) && hasWallet) {
-        if (!isOnboardingPage) {
-          navigate('/dashboard');
-        }
+      if (hasWallet) {
+        navigate('/dashboard');
         return;
       }
       
-      // 🔥 NEW: Pending support (non-NG) with wallet → Dashboard
-      if (kycStatus === 'pending_support' && hasWallet) {
-        if (!isOnboardingPage) {
-          navigate('/dashboard');
-        }
-        return;
-      }
-      
-      // ✅ No wallet → Onboarding
-      if (!hasWallet && kycStatus === 'not_started' && !hasSkipped && !isOnboardingPage) {
-        navigate('/onboarding');
-      }
+      navigate('/onboarding');
     }
   }, [state.session, state.user, state.loading, navigate]);
 
