@@ -417,12 +417,12 @@ const OnboardingPage = () => {
 
   const handleBackupComplete = async () => {
     try {
-      await completeOnboarding();
-      // 🔥 REMOVED: Don't rely on completeOnboarding to navigate
-      // Instead, force navigation after short delay to allow state update
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 500);
+      // Wait for DB write
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Hard navigate
+      window.location.href = '/dashboard';
+      
     } catch (error) {
       console.error('Backup completion error:', error);
       toast.error('Failed to complete setup');
