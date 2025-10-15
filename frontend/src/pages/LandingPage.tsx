@@ -278,7 +278,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })} 
                   className="px-6 sm:px-8 py-3 sm:py-4 glass-card text-gray-900 rounded-xl font-semibold text-base sm:text-lg hover:shadow-lg transition"
                 >
-                  Calculate Savings
+                  Calculate Yield
                 </button>
               </div>
 
