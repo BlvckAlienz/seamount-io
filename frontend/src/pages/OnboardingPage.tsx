@@ -272,9 +272,34 @@ const OnboardingPage = () => {
   const [mnemonic, setMnemonic] = useState(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
   const [bvnData, setBvnData] = useState(null);
+  const [existingWallet, setExistingWallet] = useState(null); // NEW
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  // NEW: Check for existing wallet on mount
+  useEffect(() => {
+    const checkExistingWallet = async () => {
+      if (!userProfile?.id) return;
+      
+      try {
+        const response = await apiClient.get('/api/v1/user/wallet-info');
+        if (response.data.wallet_exists) {
+          setExistingWallet(response.data.wallet_address);
+          
+          // If user has wallet and skipped KYC, offer direct dashboard access
+          if (userProfile.kyc_status === 'skipped') {
+            setStep('existingWallet'); // NEW step
+          }
+        }
+      } catch (error) {
+        console.error('Wallet check error:', error);
+      }
+    };
+    
+    checkExistingWallet();
+  }, [userProfile]);
+
+  // Existing useEffect...
   useEffect(() => {
     if (userProfile?.kyc_status === 'verified') {
       navigate('/dashboard');
@@ -283,6 +308,45 @@ const OnboardingPage = () => {
 
   const handleWelcomeComplete = () => setStep('identity');
 
+  // NEW: Existing Wallet Step - for returning 'skipped' users
+  const ExistingWalletStep = ({ onGoToDashboard, onVerify }) => (
+    <div className="text-center">
+      <div className="mb-8">
+        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <CheckCircle className="h-10 w-10 text-white" />
+        </div>
+        <h3 className="text-2xl font-bold mb-3 text-white">
+          Welcome Back!
+        </h3>
+        <p className="text-gray-400 text-lg">
+          You already have a wallet set up
+        </p>
+      </div>
+      
+      <div className="bg-blue-900/20 rounded-xl p-6 mb-8 border border-blue-500/30">
+        <p className="text-gray-300 mb-4">
+          Your wallet is ready to use. You can access the dashboard now or complete identity verification for full features.
+        </p>
+      </div>
+      
+      <div className="space-y-3">
+        <button
+          onClick={onGoToDashboard}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all shadow-lg"
+        >
+          Go to Dashboard
+        </button>
+        
+        <button
+          onClick={onVerify}
+          className="w-full border border-gray-600 text-gray-300 py-3 rounded-xl hover:bg-gray-800/50 transition-colors"
+        >
+          Complete Verification
+        </button>
+      </div>
+    </div>
+  );
+
   // ✅ FIX: Show BVN modal instead of immediate API call
   const handleStartVerification = () => {
     setShowBVNModal(true);
@@ -290,11 +354,11 @@ const OnboardingPage = () => {
 
   // ✅ FIX: Called AFTER user submits BVN data
   const handleBVNSubmit = async (formData) => {
+  // NEW: If wallet exists, just start verification
+  if (existingWallet) {
     const toastId = toast.loading('Starting verification...');
-    const isNigerian = formData.country === 'NG';
     
     try {
-      // 1. Store KYC data
       await apiClient.post('/api/v1/kyc/submit-kyc-data', {
         bvn: formData.idNumber,
         id_type: formData.idType,
@@ -304,116 +368,144 @@ const OnboardingPage = () => {
         country_code: formData.country
       });
 
-      // 2. Attempt verification
-      try {
-        const verifyResponse = await apiClient.post('/api/v1/kyc/start-verification');
+      await apiClient.post('/api/v1/kyc/start-verification');
+      
+      toast.success('Verification submitted!', { id: toastId });
+      toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
+      
+      setShowBVNModal(false);
+      navigate('/dashboard');
+      return;
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast.error('Verification failed', { id: toastId });
+      setShowBVNModal(false);
+      return;
+    }
+  }
+  
+  // EXISTING: Wallet creation flow for new users
+  const toastId = toast.loading('Starting verification...');
+  const isNigerian = formData.country === 'NG';
+  
+  try {
+    // 1. Store KYC data
+    await apiClient.post('/api/v1/kyc/submit-kyc-data', {
+      bvn: formData.idNumber,
+      id_type: formData.idType,
+      date_of_birth: formData.dateOfBirth,
+      gender: formData.gender,
+      phone: formData.phoneNumber,
+      country_code: formData.country
+    });
+
+    // 2. Attempt verification
+    try {
+      const verifyResponse = await apiClient.post('/api/v1/kyc/start-verification');
+      
+      if (verifyResponse.data.alien_pathway || verifyResponse.data.status === 'pending_support') {
+        toast.dismiss(toastId);
+        toast('⏳ ID verification for your country is coming soon', { 
+          duration: 6000,
+          icon: '🌍'
+        });
+        toast('✨ Creating your wallet now...', { duration: 3000 });
         
-        // 🔥 NEW: Check for alien pathway flag
-        if (verifyResponse.data.alien_pathway || verifyResponse.data.status === 'pending_support') {
-          toast.dismiss(toastId);
-          toast('⏳ ID verification for your country is coming soon', { 
-            duration: 6000,
-            icon: '🌍'
-          });
-          toast('✨ Creating your wallet now...', { duration: 3000 });
-          
-          // Proceed to wallet creation
+        const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+        
+        if (walletResponse.data.success && walletResponse.data.mnemonic) {
+          toast.success('Wallet created!', { id: toastId });
+          setMnemonic(walletResponse.data.mnemonic);
+          setShowBVNModal(false);
+          setStep('walletBackup');
+          return;
+        }
+      }
+      
+      toast.success('Verification submitted!', { id: toastId });
+      toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
+
+      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+      
+      if (walletResponse.data.success && walletResponse.data.mnemonic) {
+        setMnemonic(walletResponse.data.mnemonic);
+        setShowBVNModal(false);
+        setStep('walletBackup');
+      } else {
+        throw new Error('Wallet creation failed');
+      }
+      
+    } catch (verifyError) {
+      console.error('Verification error:', verifyError);
+      
+      const is500Error = verifyError.response?.status === 500;
+      const errorDetail = verifyError.response?.data?.detail || '';
+      const isRegfylError = errorDetail.includes('Regfyl') || errorDetail.includes('service unavailable');
+      
+      if (!isNigerian && is500Error && isRegfylError) {
+        toast.dismiss(toastId);
+        toast('⏳ ID verification for your country is coming soon (within 1 week)', { 
+          duration: 6000,
+          icon: '🌍'
+        });
+        toast('✨ Creating your wallet now...', { duration: 3000 });
+        
+        try {
           const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-          
           if (walletResponse.data.success && walletResponse.data.mnemonic) {
-            toast.success('Wallet created!', { id: toastId });
+            toast.success('Wallet created!');
             setMnemonic(walletResponse.data.mnemonic);
             setShowBVNModal(false);
             setStep('walletBackup');
             return;
           }
-        }
-        
-        // Nigerian users - normal flow
-        toast.success('Verification submitted!', { id: toastId });
-        toast('🎉 Our team will review within 24 hours', { duration: 5000, icon: '⏰' });
-
-        // Create wallet
-        const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-        
-        if (walletResponse.data.success && walletResponse.data.mnemonic) {
-          setMnemonic(walletResponse.data.mnemonic);
+        } catch (walletError) {
+          console.error('Wallet creation failed:', walletError);
+          toast.error('Wallet creation failed. Please contact support.');
           setShowBVNModal(false);
-          setStep('walletBackup');
-        } else {
-          throw new Error('Wallet creation failed');
+          return;
         }
-        
-      } catch (verifyError) {
-        // 🔥 IMPROVED: Better error handling for non-NG users
-        console.error('Verification error:', verifyError);
-        
-        // Check if this is expected non-NG failure
-        const is500Error = verifyError.response?.status === 500;
-        const errorDetail = verifyError.response?.data?.detail || '';
-        const isRegfylError = errorDetail.includes('Regfyl') || errorDetail.includes('service unavailable');
-        
-        if (!isNigerian && is500Error && isRegfylError) {
-          toast.dismiss(toastId);
-          toast('⏳ ID verification for your country is coming soon (within 1 week)', { 
-            duration: 6000,
-            icon: '🌍'
-          });
-          toast('✨ Creating your wallet now...', { duration: 3000 });
-          
-          // Proceed to wallet creation
-          try {
-            const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-            if (walletResponse.data.success && walletResponse.data.mnemonic) {
-              toast.success('Wallet created!');
-              setMnemonic(walletResponse.data.mnemonic);
-              setShowBVNModal(false);
-              setStep('walletBackup');
-              return;
-            }
-          } catch (walletError) {
-            console.error('Wallet creation failed:', walletError);
-            toast.error('Wallet creation failed. Please contact support.');
-            setShowBVNModal(false);
-            return;
-          }
-        }
-        
-        // Nigerian or other unexpected errors
-        toast.error(errorDetail || 'Verification failed', { id: toastId });
-        setShowBVNModal(false);
       }
       
-    } catch (error) {
-      console.error('KYC submission error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to submit KYC data', { id: toastId });
+      toast.error(errorDetail || 'Verification failed', { id: toastId });
       setShowBVNModal(false);
     }
-  };
+    
+  } catch (error) {
+    console.error('KYC submission error:', error);
+    toast.error(error.response?.data?.detail || 'Failed to submit KYC data', { id: toastId });
+    setShowBVNModal(false);
+  }
+};
 
   // ✅ FIX: Skip flow - NO Regfyl call
   const handleSkipVerification = async () => {
-    const toastId = toast.loading('Setting up your wallet...');
-    
-    try {
-      // Skip KYC
-      await apiClient.post('/api/v1/kyc/skip-verification');
+  // NEW: If wallet exists, just navigate
+  if (existingWallet) {
+    toast.success('Redirecting to dashboard...');
+    navigate('/dashboard');
+    return;
+  }
+  
+  const toastId = toast.loading('Setting up your wallet...');
+  
+  try {
+    await apiClient.post('/api/v1/kyc/skip-verification');
 
-      // Create wallet
-      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-      
-      if (walletResponse.data.success && walletResponse.data.mnemonic) {
-        toast.success('Wallet created!', { id: toastId });
-        setMnemonic(walletResponse.data.mnemonic);
-        setStep('walletBackup');
-      } else {
-        throw new Error('Wallet creation failed');
-      }
-    } catch (error) {
-      console.error('Skip error:', error);
-      toast.error('Failed to create wallet', { id: toastId });
+    const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+    
+    if (walletResponse.data.success && walletResponse.data.mnemonic) {
+      toast.success('Wallet created!', { id: toastId });
+      setMnemonic(walletResponse.data.mnemonic);
+      setStep('walletBackup');
+    } else {
+      throw new Error('Wallet creation failed');
     }
-  };
+  } catch (error) {
+    console.error('Skip error:', error);
+    toast.error('Failed to create wallet', { id: toastId });
+  }
+};
 
   const handleBackupComplete = async () => {
     const toastId = toast.loading('Completing setup...');
@@ -455,28 +547,39 @@ const OnboardingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
-        <div className="bg-gray-900/50 border-b border-gray-700 p-6">
-          <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
-            <h2 className="font-semibold text-lg text-white">{stepTitles[step]}</h2>
-            <span>
-              {step === 'welcome' ? '1 of 3' : 
-               step === 'identity' ? '2 of 3' : '3 of 3'}
-            </span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
-              style={{ width: progressPercentage }}
-            />
-          </div>
+  <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+      <div className="bg-gray-900/50 border-b border-gray-700 p-6">
+        <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
+          <h2 className="font-semibold text-lg text-white">
+            {step === 'existingWallet' ? 'Welcome Back' : stepTitles[step]}
+          </h2>
+          <span>
+            {step === 'welcome' ? '1 of 3' : 
+             step === 'identity' ? '2 of 3' : 
+             step === 'existingWallet' ? 'Ready' : '3 of 3'}
+          </span>
         </div>
-        
-        <div className="p-8">
-          {step === 'welcome' ? (
-            <WelcomeStep onNext={handleWelcomeComplete} />
-          ) : step === 'identity' ? (
+        <div className="w-full bg-gray-700 rounded-full h-2">
+          <div 
+            className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
+            style={{ width: step === 'existingWallet' ? '100%' : progressPercentage }}
+          />
+        </div>
+      </div>
+      
+      <div className="p-8">
+        {step === 'existingWallet' ? (
+          <ExistingWalletStep 
+            onGoToDashboard={() => navigate('/dashboard')}
+            onVerify={() => {
+              setStep('identity');
+              setShowBVNModal(true);
+            }}
+          />
+        ) : step === 'welcome' ? (
+          <WelcomeStep onNext={handleWelcomeComplete} />
+        ) : step === 'identity' ? (
             <IdentityStep 
               onVerify={handleStartVerification}
               onSkip={handleSkipVerification}

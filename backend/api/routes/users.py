@@ -236,3 +236,23 @@ async def log_client_error(
     except Exception as e:
         logger.error(f"Error logging failed: {e}")
         return {"success": False}, 500
+    
+@router.get("/wallet-info")
+async def get_wallet_info(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    wallet_service: WalletService = Depends(get_wallet_service)
+):
+    """Get wallet info without creating one"""
+    try:
+        user_id = current_user.get('id')
+        wallet_info = await wallet_service.get_wallet_info(user_id)
+        
+        return {
+            "success": True,
+            "wallet_exists": wallet_info.get("wallet_exists", False),
+            "wallet_address": wallet_info.get("wallet_address"),
+            "blockchain": wallet_info.get("blockchain", "algorand")
+        }
+    except Exception as e:
+        logger.error(f"[Wallet Info] Error: {str(e)}")
+        return {"success": True, "wallet_exists": False}
