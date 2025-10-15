@@ -417,10 +417,16 @@ const OnboardingPage = () => {
 
   const handleBackupComplete = async () => {
     try {
-      // Wait for DB write
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const toastId = toast.loading('Completing setup...');
       
-      // Hard navigate
+      // Update user profile to mark onboarding complete
+      await apiClient.put('/api/v1/user/profile', {
+        kyc_level: 1, // Ensure minimum level for dashboard access
+      });
+      
+      toast.success('Setup complete!', { id: toastId });
+      
+      // Force hard navigation - bypasses AuthContext logic
       window.location.href = '/dashboard';
       
     } catch (error) {

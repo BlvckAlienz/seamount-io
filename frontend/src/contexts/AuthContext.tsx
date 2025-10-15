@@ -335,6 +335,11 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       const kycStatus = state.user.kyc_status || 'not_started';
       const hasWallet = state.user.algorand_address || state.user.wallet_address;
       
+      // ✅ FIX: Allow skipped users with wallets to access dashboard
+      if (kycStatus === 'skipped' && hasWallet) {
+        return; // Don't redirect - let them stay on current page
+      }
+      
       if (kycStatus === 'approved' || state.user.role === 'tribe') {
         navigate('/dashboard');
         return;
