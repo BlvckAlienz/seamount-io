@@ -416,22 +416,26 @@ const OnboardingPage = () => {
   };
 
   const handleBackupComplete = async () => {
+    const toastId = toast.loading('Completing setup...');
+    
     try {
-      const toastId = toast.loading('Completing setup...');
-      
-      // Update user profile to mark onboarding complete
+      // Mark onboarding done in DB
       await apiClient.put('/api/v1/user/profile', {
-        kyc_level: 1, // Ensure minimum level for dashboard access
+        kyc_level: 1,
+        onboarding_complete: true
       });
       
-      toast.success('Setup complete!', { id: toastId });
+      // Force AuthContext to fetch fresh profile
+      await refreshProfile();
       
-      // Force hard navigation - bypasses AuthContext logic
-      window.location.href = '/dashboard';
+      toast.success('Welcome to Seamount!', { id: toastId });
+      
+      // Navigate with fresh state
+      navigate('/dashboard');
       
     } catch (error) {
-      console.error('Backup completion error:', error);
-      toast.error('Failed to complete setup');
+      console.error('Backup error:', error);
+      toast.error('Setup failed', { id: toastId });
     }
   };
 
