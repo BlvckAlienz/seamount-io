@@ -417,15 +417,12 @@ const OnboardingPage = () => {
 
   const handleBackupComplete = async () => {
     try {
-      // 🔥 NUCLEAR: Force profile refresh, then hard navigate
-      await refreshProfile(); // This exists in AuthContext
-      
-      // Wait for state to update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Force navigation - bypass completeOnboarding
-      window.location.href = '/dashboard';
-      
+      await completeOnboarding();
+      // 🔥 REMOVED: Don't rely on completeOnboarding to navigate
+      // Instead, force navigation after short delay to allow state update
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
     } catch (error) {
       console.error('Backup completion error:', error);
       toast.error('Failed to complete setup');
