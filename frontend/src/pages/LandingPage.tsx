@@ -157,28 +157,60 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        
         .fade-in {
           opacity: 0;
           animation: fadeIn 0.6s ease-out forwards;
         }
+        
         .fade-in.visible {
           opacity: 1;
         }
+        
         .gradient-text {
           background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
         }
+        
+        .glass-card {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .glass-dark {
+          background: rgba(0, 0, 0, 0.02);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+        
+        .hover-lift {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .hover-lift:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .step-number {
+          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
       `}</style>
 
-      <header className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-gray-200 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+      <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/50 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex justify-between items-center">
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <img src="/seamount-logo.jpeg" alt="Seamount" className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-lg" />
-            <span className="text-xl sm:text-2xl font-bold text-gray-900">Seamount</span>
+            <img src="/seamount-logo.jpeg" alt="Seamount" className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg" />
+            <span className="text-lg sm:text-xl font-bold text-gray-900">Seamount</span>
           </div>
-          <nav className="hidden md:flex space-x-8 text-sm font-medium">
+          <nav className="hidden md:flex space-x-6 lg:space-x-8 text-sm font-medium">
             <a href="#how-it-works" className="text-gray-700 hover:text-indigo-600 transition">How It Works</a>
             <a href="#features" className="text-gray-700 hover:text-indigo-600 transition">Features</a>
             <a href="#calculator" className="text-gray-700 hover:text-indigo-600 transition">Calculator</a>
@@ -187,13 +219,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="flex items-center space-x-2 sm:space-x-3">
             <button 
               onClick={() => onOpenAuth('login')} 
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-indigo-600 transition"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 hover:text-indigo-600 transition"
             >
               Sign In
             </button>
             <button 
               onClick={() => onOpenAuth('register')} 
-              className="px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm"
             >
               Get Started
             </button>
@@ -201,140 +233,140 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </header>
 
-      <main className="pt-20">
-        <section id="hero" className="py-16 sm:py-24 bg-gradient-to-b from-indigo-50 to-white">
+      <main className="pt-16 sm:pt-20">
+        <section id="hero" className="py-12 sm:py-16 md:py-20 bg-gradient-to-b from-indigo-50 to-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <div className="max-w-4xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full text-sm font-medium text-green-700 mb-6">
-                <Shield className="h-4 w-4" />
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
+                <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                 160% Overcollateralized • Audited Reserves
               </div>
               
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold mb-6 leading-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
                 <span className="gradient-text">Africa's Liquidity</span>
                 <br />
                 <span className="text-gray-900">Superhighway</span>
               </h1>
               
-              <p className="text-lg sm:text-xl md:text-2xl text-gray-600 mb-4 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-4">
                 Send money at <strong className="text-indigo-600">47% less cost</strong> than Western Union. Settlement in <strong className="text-indigo-600">&lt;5 seconds</strong> instead of 2 days. Plus earn <strong className="text-indigo-600">7.5-11% APY</strong> on idle stablecoins.
               </p>
               
-              <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600 mb-8">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-yellow-500" />
+              <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-600 mb-6 sm:mb-8 px-4">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                   <span>&lt;5s Cross-Border</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-green-500" />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                   <span>47% Cheaper Than WU</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-indigo-500" />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" />
                   <span>7.5-11% APY Yields</span>
                 </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row justify-center gap-4 mb-12">
+              <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-8 sm:mb-12 px-4">
                 <button 
                   onClick={() => onOpenAuth('register')} 
-                  className="px-8 py-4 bg-indigo-600 text-white rounded-lg font-semibold text-lg hover:bg-indigo-700 transform hover:scale-105 transition shadow-lg flex items-center justify-center"
+                  className="px-6 sm:px-8 py-3 sm:py-4 bg-indigo-600 text-white rounded-xl font-semibold text-base sm:text-lg hover:bg-indigo-700 transform hover:scale-105 transition shadow-lg flex items-center justify-center"
                 >
-                  Start Earning Now <ArrowRight className="ml-2 h-5 w-5" />
+                  Start Earning Now <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
                 <button 
                   onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })} 
-                  className="px-8 py-4 bg-white border-2 border-gray-300 text-gray-900 rounded-lg font-semibold text-lg hover:border-indigo-600 hover:text-indigo-600 transition shadow-sm"
+                  className="px-6 sm:px-8 py-3 sm:py-4 glass-card text-gray-900 rounded-xl font-semibold text-base sm:text-lg hover:shadow-lg transition"
                 >
                   Calculate Savings
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                  <div className="text-4xl font-bold text-yellow-500 mb-2">&lt;5 sec</div>
-                  <div className="text-sm text-gray-600">Settlement Speed</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto px-4">
+                <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
+                  <div className="text-3xl sm:text-4xl font-bold text-yellow-500 mb-1 sm:mb-2">&lt;5 sec</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Settlement Speed</div>
                 </div>
-                <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                  <div className="text-4xl font-bold text-green-500 mb-2">47%</div>
-                  <div className="text-sm text-gray-600">Cheaper vs Western Union</div>
+                <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
+                  <div className="text-3xl sm:text-4xl font-bold text-green-500 mb-1 sm:mb-2">47%</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Cheaper vs Western Union</div>
                 </div>
-                <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                  <div className="text-4xl font-bold text-indigo-600 mb-2">7.5-11%</div>
-                  <div className="text-sm text-gray-600">APY on Idle Funds</div>
+                <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
+                  <div className="text-3xl sm:text-4xl font-bold text-indigo-600 mb-1 sm:mb-2">7.5-11%</div>
+                  <div className="text-xs sm:text-sm text-gray-600">APY on Idle Funds</div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="how-it-works" className="py-20 bg-white">
+        <section id="how-it-works" className="py-12 sm:py-16 md:py-20 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-16 fade-in">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-900">How It Works</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <div className="text-center mb-10 sm:mb-16 fade-in">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">How It Works</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
                 From signup to earning yields—your complete journey in 6 simple steps.
               </p>
             </div>
 
-            <div className="space-y-8">
+            <div className="space-y-4 sm:space-y-6">
               {[
                 {
-                  icon: <UserPlus className="h-10 w-10 text-indigo-600" />,
+                  icon: <UserPlus className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-600" />,
                   step: "01",
                   title: "Sign Up in Minutes",
                   description: "Create your account with email. No lengthy forms—just essential info to get started.",
-                  color: "border-indigo-200 bg-indigo-50"
+                  color: "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white"
                 },
                 {
-                  icon: <FileCheck className="h-10 w-10 text-green-600" />,
+                  icon: <FileCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
                   step: "02",
                   title: "Complete KYC Verification",
                   description: "Quick identity verification. Data upload takes ~3 minutes, approval within 24 hours.",
-                  color: "border-green-200 bg-green-50"
+                  color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
                 {
-                  icon: <Wallet className="h-10 w-10 text-purple-600" />,
+                  icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />,
                   step: "03",
                   title: "Algorand Wallet Creation",
                   description: "We generate your non-custodial Algorand wallet automatically. You get full control—download your private key and store it securely.",
-                  color: "border-purple-200 bg-purple-50"
+                  color: "border-purple-200 bg-gradient-to-br from-purple-50 to-white"
                 },
                 {
-                  icon: <Lock className="h-10 w-10 text-amber-600" />,
+                  icon: <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" />,
                   step: "04",
                   title: "Secure Your Private Key",
                   description: "Download and backup your 25-word seed phrase. Store offline in multiple secure locations. This is your only recovery method.",
-                  color: "border-amber-200 bg-amber-50"
+                  color: "border-amber-200 bg-gradient-to-br from-amber-50 to-white"
                 },
                 {
-                  icon: <CreditCard className="h-10 w-10 text-rose-600" />,
+                  icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-rose-600" />,
                   step: "05",
                   title: "Fund Your Account",
                   description: "Deposit local currency via Paystack, Cashramp, etc. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH on Algorand.",
-                  color: "border-rose-200 bg-rose-50"
+                  color: "border-rose-200 bg-gradient-to-br from-rose-50 to-white"
                 },
                 {
-                  icon: <ArrowRightLeft className="h-10 w-10 text-teal-600" />,
+                  icon: <ArrowRightLeft className="h-8 w-8 sm:h-10 sm:w-10 text-teal-600" />,
                   step: "06",
                   title: "Send P2P & Off-Ramp",
                   description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency. Invest funds for 7.5-11% APY yields.",
-                  color: "border-teal-200 bg-teal-50"
+                  color: "border-teal-200 bg-gradient-to-br from-teal-50 to-white"
                 }
               ].map((step, idx) => (
-                <div key={idx} className={`${step.color} rounded-2xl p-6 border-2 flex gap-6 items-start fade-in hover:shadow-lg transition-all duration-300`}>
-                  <div className="flex-shrink-0">
-                    <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200 mb-2 shadow-sm">
+                <div key={idx} className={`${step.color} rounded-2xl p-4 sm:p-6 border-2 flex flex-col sm:flex-row gap-4 sm:gap-6 items-start fade-in hover-lift`}>
+                  <div className="flex-shrink-0 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 w-full sm:w-auto">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200 sm:mb-2 shadow-sm">
                       {step.icon}
                     </div>
-                    <div className="text-3xl font-bold text-gray-300 text-center">{step.step}</div>
+                    <div className="text-2xl sm:text-3xl font-extrabold step-number sm:text-center flex-1 sm:flex-none">{step.step}</div>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-2xl font-bold mb-3 flex items-center gap-3 text-gray-900">
+                    <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 flex flex-wrap items-center gap-2 sm:gap-3 text-gray-900">
                       {step.title}
-                      {idx === 5 && <span className="text-sm px-3 py-1 bg-green-100 border border-green-300 rounded-full text-green-700">USDS Coming Soon</span>}
+                      {idx === 5 && <span className="text-xs px-2 sm:px-3 py-1 bg-green-100 border border-green-300 rounded-full text-green-700">USDS Coming Soon</span>}
                     </h3>
-                    <p className="text-gray-700 text-lg leading-relaxed">{step.description}</p>
+                    <p className="text-sm sm:text-base lg:text-lg text-gray-700 leading-relaxed">{step.description}</p>
                   </div>
                 </div>
               ))}
@@ -342,84 +374,84 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        <section id="features" className="py-20 bg-gray-50">
+        <section id="features" className="py-12 sm:py-16 md:py-20 bg-gray-50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-16 fade-in">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-900">Platform Features</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <div className="text-center mb-10 sm:mb-16 fade-in">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Platform Features</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
                 Everything you need for secure, fast, and profitable cross-border transactions.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
               {[
                 {
-                  icon: <Zap className="h-8 w-8 text-yellow-500" />,
+                  icon: <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500" />,
                   title: "Lightning-Fast Settlements",
                   description: "Cross-border payments in <5 seconds via Algorand blockchain. No more 24-48 hour waits—money moves at internet speed."
                 },
                 {
-                  icon: <DollarSign className="h-8 w-8 text-green-500" />,
+                  icon: <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />,
                   title: "47% Cheaper Than Western Union",
                   description: "2.9% fees vs WU's 5.5% + hidden FX markups. Save $27.50 per $500 transaction."
                 },
                 {
-                  icon: <TrendingUp className="h-8 w-8 text-indigo-500" />,
+                  icon: <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-500" />,
                   title: "7.5-11% APY on Idle Funds",
                   description: "Earn while you wait. Stable (7.5%), Growth (9%), Alpha (11% - Q2 2026). Choose your risk tier, we handle execution."
                 },
                 {
-                  icon: <Globe className="h-8 w-8 text-blue-500" />,
+                  icon: <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />,
                   title: "Multi-Currency Support",
                   description: "Trade USDT, USDCa, Algo with seamless swaps. Support for NGN, KES, ZAR, GHS, USD, GBP, EUR."
                 },
                 {
-                  icon: <Shield className="h-8 w-8 text-red-500" />,
+                  icon: <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />,
                   title: "160% Overcollateralized",
                   description: "Your funds backed by audited reserves with transparent collateralization. Real-time dashboard monitoring + quarterly audits."
                 },
                 {
-                  icon: <Lock className="h-8 w-8 text-teal-500" />,
+                  icon: <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-teal-500" />,
                   title: "Self-Custody Wallets",
                   description: "Full control of your private keys. Non-custodial Algorand wallets with military-grade encryption. Your keys, your crypto."
                 }
               ].map((feature, idx) => (
-                <div key={idx} className="bg-white rounded-2xl p-6 border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all duration-300 fade-in">
-                  <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center mb-4 border border-gray-200">
+                <div key={idx} className="glass-card rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-300 fade-in hover-lift">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 glass-dark rounded-xl flex items-center justify-center mb-3 sm:mb-4 border border-gray-200">
                     {feature.icon}
                   </div>
-                  <h3 className="text-xl font-bold mb-3 text-gray-900">{feature.title}</h3>
-                  <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-gray-900">{feature.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="calculator" className="py-20 bg-white">
+        <section id="calculator" className="py-12 sm:py-16 md:py-20 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-16 fade-in">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-900">Live Yield Calculator</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <div className="text-center mb-10 sm:mb-16 fade-in">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Live Yield Calculator</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
                 Choose your risk appetite. Stable (7.5%) and Growth (9%) available now. Alpha (11%) launches Q2 2026.
               </p>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-2xl p-8 border-2 border-gray-200 fade-in shadow-sm">
-                <h3 className="text-2xl font-bold mb-6 flex items-center text-gray-900">
-                  <DollarSign className="h-6 w-6 text-green-500 mr-2" />
+            <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
+              <div className="glass-card rounded-2xl p-6 sm:p-8 fade-in shadow-sm">
+                <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center text-gray-900">
+                  <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 mr-2" />
                   Your Investment
                 </h3>
                 
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Investment Amount (USD)</label>
                     <input 
                       type="number" 
                       value={calc.amount}
                       onChange={(e) => setCalc({...calc, amount: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 text-lg focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
                       placeholder="10000"
                     />
                   </div>
@@ -429,7 +461,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <select 
                       value={calc.period}
                       onChange={(e) => setCalc({...calc, period: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 text-lg focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
                     >
                       <option value="30">Stable Tier - 7.5% APY (30-day lock)</option>
                       <option value="90">Growth Tier - 9.0% APY (90-day lock)</option>
@@ -437,9 +469,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </select>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+                  <div className="glass-dark rounded-xl p-4 border-2 border-gray-200">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm text-gray-600 flex items-center font-medium">
+                      <span className="text-xs sm:text-sm text-gray-600 flex items-center font-medium">
                         {calc.period === '365' ? 'Live Market Data (Alpha Tier)' : 'Fixed Rate Strategy'}
                         <button onClick={() => setShowFundingInfo(!showFundingInfo)} className="ml-1">
                           <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
@@ -461,7 +493,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       )}
                     </div>
                     {showFundingInfo && (
-                      <div className="mb-3 p-3 bg-indigo-50 rounded text-xs text-gray-700 border border-indigo-200">
+                      <div className="mb-3 p-3 bg-indigo-50 rounded-lg text-xs text-gray-700 border border-indigo-200">
                         {calc.period === '365' ? (
                           <><strong>Alpha Tier:</strong> Uses delta-neutral BTC hedging. When BTC funding rates are high (currently {oracleData.fundingRate.toFixed(1)}%), we earn more. When low, yields compress to 9% minimum. Your principal is protected via 160% overcollateralization.</>
                         ) : calc.period === '90' ? (
@@ -472,11 +504,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       </div>
                     )}
                     {calc.period === '365' ? (
-                      <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
                         <div>
                           <div className="text-gray-500 text-xs font-medium mb-1">BTC Price</div>
                           <div className="font-semibold text-gray-900" suppressHydrationWarning>
-                            {oracleData.loading ? '...' : `$${oracleData.btcPrice.toLocaleString(undefined, {maximumFractionDigits: 0})}`}
+                            {oracleData.loading ? '...' : `${oracleData.btcPrice.toLocaleString(undefined, {maximumFractionDigits: 0})}`}
                           </div>
                         </div>
                         <div>
@@ -497,7 +529,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-center py-4">
+                      <div className="text-xs sm:text-sm text-center py-4">
                         <div className="text-gray-400 mb-2">Fixed Strategy Components</div>
                         <div className="space-y-2">
                           {calc.period === '90' ? (
@@ -543,44 +575,44 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 border-2 border-indigo-200 fade-in shadow-sm">
-                <h3 className="text-2xl font-bold mb-6 flex items-center text-gray-900">
-                  <TrendingUp className="h-6 w-6 text-green-500 mr-2" />
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 sm:p-8 border-2 border-indigo-200 fade-in shadow-sm">
+                <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center text-gray-900">
+                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-500 mr-2" />
                   Estimated Returns
                 </h3>
 
-                <div className="bg-white rounded-xl p-6 mb-6 border-2 border-green-200 shadow-sm">
+                <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-green-200 shadow-sm">
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-2 font-medium">Estimated Annual Yield</div>
-                    <div className="text-4xl sm:text-5xl font-bold text-green-600 mb-2" suppressHydrationWarning>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Estimated Annual Yield</div>
+                    <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-green-600 mb-2" suppressHydrationWarning>
                       ${yieldData.annualYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                    <div className="text-lg text-gray-700 font-medium" suppressHydrationWarning>
+                    <div className="text-base sm:text-lg text-gray-700 font-medium" suppressHydrationWarning>
                       ({(yieldData.adjustedAPY * 100).toFixed(1)}% APY)
                     </div>
-                    <div className="mt-4 pt-4 border-t border-green-200">
-                      <div className="text-sm text-gray-600 font-medium">Period Return ({calc.period} days)</div>
-                      <div className="text-2xl font-semibold text-green-700 mt-1" suppressHydrationWarning>
+                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-green-200">
+                      <div className="text-xs sm:text-sm text-gray-600 font-medium">Period Return ({calc.period} days)</div>
+                      <div className="text-xl sm:text-2xl font-semibold text-green-700 mt-1" suppressHydrationWarning>
                         ${yieldData.periodYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center text-sm">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
                     <span className="text-gray-700 font-medium">Strategy</span>
                     <span className="font-semibold text-indigo-600">
                       {calc.period === '365' ? 'Delta-Neutral' : calc.period === '90' ? 'Hybrid DeFi' : 'Pure Lending'}
                     </span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
                     <span className="text-gray-700 font-medium">Collateralization</span>
                     <span className="font-semibold text-green-600">160%</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
                     <span className="text-gray-700 font-medium flex items-center">
                       Risk Score
                       <button onClick={() => setShowRiskDetails(!showRiskDetails)} className="ml-1">
@@ -614,9 +646,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   )}
                 </div>
 
-                <div className="mt-6 p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-amber-50 rounded-xl border-2 border-amber-200">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-xs text-gray-700">
                       <strong className="text-amber-700">Risk Disclosure:</strong> {
                         calc.period === '365' 
@@ -633,20 +665,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        <section id="business" className="py-20 bg-gray-50">
+        <section id="business" className="py-12 sm:py-16 md:py-20 bg-gray-50">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-16 fade-in">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-4 text-gray-900">For Business</h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <div className="text-center mb-10 sm:mb-16 fade-in">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">For Business</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
                 Transform your business treasury and cross-border operations with institutional-grade stablecoin infrastructure.
               </p>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8 mb-12">
-              <div className="bg-white rounded-2xl p-8 border-2 border-gray-200 fade-in shadow-sm">
-                <Briefcase className="h-12 w-12 text-indigo-600 mb-4" />
-                <h3 className="text-2xl font-bold mb-4 text-gray-900">Business Solutions</h3>
-                <ul className="space-y-3 text-gray-700">
+            <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
+              <div className="glass-card rounded-2xl p-6 sm:p-8 fade-in shadow-sm hover-lift">
+                <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 mb-4" />
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-gray-900">Business Solutions</h3>
+                <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-700">
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-indigo-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
                     <span><strong className="text-gray-900">Global Payroll:</strong> Pay international teams instantly with multi-currency support</span>
@@ -666,16 +698,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </ul>
               </div>
 
-              <div className="bg-white rounded-2xl p-8 border-2 border-gray-200 fade-in shadow-sm">
-                <h3 className="text-2xl font-bold mb-6 text-gray-900">Get in Touch</h3>
-                <div className="space-y-4">
+              <div className="glass-card rounded-2xl p-6 sm:p-8 fade-in shadow-sm">
+                <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-gray-900">Get in Touch</h3>
+                <div className="space-y-3 sm:space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
                     <input 
                       type="text"
                       value={formState.name}
                       onChange={(e) => setFormState({...formState, name: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="John Doe"
                       required
                     />
@@ -686,7 +718,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="text"
                       value={formState.businessName}
                       onChange={(e) => setFormState({...formState, businessName: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="Your Company Ltd."
                       required
                     />
@@ -697,7 +729,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="email"
                       value={formState.email}
                       onChange={(e) => setFormState({...formState, email: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="john@company.com"
                       required
                     />
@@ -707,7 +739,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <textarea
                       value={formState.message}
                       onChange={(e) => setFormState({...formState, message: e.target.value})}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-900 focus:border-indigo-600 focus:outline-none transition resize-none"
+                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition resize-none"
                       rows={4}
                       placeholder="Tell us about your business needs..."
                       required
@@ -716,7 +748,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <button
                     onClick={handleContactSubmit}
                     disabled={formStatus === 'sending'}
-                    className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm"
+                    className="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm text-sm sm:text-base"
                   >
                     {formStatus === 'sending' ? 'Sending...' : formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}
                   </button>
@@ -724,50 +756,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-8 fade-in">
-              <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 text-center shadow-sm">
-                <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-indigo-200">
-                  <MapPin className="h-7 w-7 text-indigo-600" />
+            <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 fade-in">
+              <div className="glass-card rounded-2xl p-4 sm:p-6 text-center shadow-sm hover-lift">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border-2 border-indigo-200">
+                  <MapPin className="h-6 w-6 sm:h-7 sm:w-7 text-indigo-600" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">Our Office</h3>
-                <p className="text-gray-600">Wood Avenue, Kilimani<br />Nairobi, Kenya</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 text-gray-900">Our Office</h3>
+                <p className="text-sm sm:text-base text-gray-600">Wood Avenue, Kilimani<br />Nairobi, Kenya</p>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 text-center shadow-sm">
-                <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-green-200">
-                  <Mail className="h-7 w-7 text-green-600" />
+              <div className="glass-card rounded-2xl p-4 sm:p-6 text-center shadow-sm hover-lift">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border-2 border-green-200">
+                  <Mail className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">Email Us</h3>
-                <p className="text-gray-600">support@seamount.io</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 text-gray-900">Email Us</h3>
+                <p className="text-sm sm:text-base text-gray-600">support@seamount.io</p>
               </div>
 
-              <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 text-center shadow-sm">
-                <div className="w-14 h-14 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-purple-200">
-                  <Phone className="h-7 w-7 text-purple-600" />
+              <div className="glass-card rounded-2xl p-4 sm:p-6 text-center shadow-sm hover-lift">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 border-2 border-purple-200">
+                  <Phone className="h-6 w-6 sm:h-7 sm:w-7 text-purple-600" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-gray-900">Call Us</h3>
-                <p className="text-gray-600">+254 751 875 374</p>
+                <h3 className="text-lg sm:text-xl font-bold mb-2 text-gray-900">Call Us</h3>
+                <p className="text-sm sm:text-base text-gray-600">+254 751 875 374</p>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="py-16 bg-white">
+        <section className="py-12 sm:py-16 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="text-center mb-12 fade-in">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">Frequently Asked Questions</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">Get answers to common questions about Seamount's platform.</p>
+            <div className="text-center mb-8 sm:mb-12 fade-in">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-gray-900">Frequently Asked Questions</h2>
+              <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto px-4">Get answers to common questions about Seamount's platform.</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {faqs.map((faq, index) => (
-                <div key={index} className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden fade-in shadow-sm hover:shadow-md transition-all">
-                  <button onClick={() => setExpandedFaqs(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index])} className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <h3 className="font-semibold text-lg text-gray-900 pr-4">{faq.question}</h3>
+                <div key={index} className="glass-card rounded-xl border-2 border-gray-200 overflow-hidden fade-in hover:shadow-md transition-all">
+                  <button onClick={() => setExpandedFaqs(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index])} className="w-full px-4 sm:px-6 py-3 sm:py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+                    <h3 className="font-semibold text-sm sm:text-base lg:text-lg text-gray-900 pr-4">{faq.question}</h3>
                     {expandedFaqs.includes(index) ? <ChevronUp className="h-5 w-5 text-indigo-600 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 text-indigo-600 flex-shrink-0" />}
                   </button>
                   {expandedFaqs.includes(index) && (
-                    <div className="px-6 pb-4 border-t-2 border-gray-100">
-                      <p className="text-gray-700 pt-4 leading-relaxed">{faq.answer}</p>
+                    <div className="px-4 sm:px-6 pb-3 sm:pb-4 border-t-2 border-gray-100">
+                      <p className="text-xs sm:text-sm lg:text-base text-gray-700 pt-3 sm:pt-4 leading-relaxed">{faq.answer}</p>
                     </div>
                   )}
                 </div>
@@ -776,58 +808,58 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
         </section>
 
-        <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600">
+        <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-indigo-600 to-purple-600">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-white">Ready to Take Control of Your Financial Future?</h2>
-              <p className="text-xl text-indigo-100 mb-8">Join thousands saving money on remittances and earning yields on stablecoins.</p>
-              <button onClick={() => onOpenAuth('register')} className="px-8 py-4 bg-white text-indigo-600 hover:bg-gray-100 text-lg font-semibold rounded-lg transform hover:scale-105 transition shadow-lg">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 text-white">Ready to Take Control of Your Financial Future?</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">Join thousands saving money on remittances and earning yields on stablecoins.</p>
+              <button onClick={() => onOpenAuth('register')} className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-indigo-600 hover:bg-gray-100 text-base sm:text-lg font-semibold rounded-xl transform hover:scale-105 transition shadow-lg">
                 Sign Up for Free
               </button>
-              <p className="mt-4 text-sm text-indigo-100">Already have an account? <button onClick={() => onOpenAuth('login')} className="text-white hover:underline font-semibold">Sign In</button></p>
+              <p className="mt-3 sm:mt-4 text-xs sm:text-sm text-indigo-100">Already have an account? <button onClick={() => onOpenAuth('login')} className="text-white hover:underline font-semibold">Sign In</button></p>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="bg-gray-900 text-gray-300 py-12">
+      <footer className="bg-gray-900 text-gray-300 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center space-x-3 mb-4">
                 <img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-8 h-8 object-contain rounded-lg" />
-                <span className="text-xl font-bold text-white">Seamount</span>
+                <span className="text-lg sm:text-xl font-bold text-white">Seamount</span>
               </div>
-              <p className="text-gray-400 text-sm">The future of cross-border payments for emerging markets</p>
+              <p className="text-gray-400 text-xs sm:text-sm">The future of cross-border payments for emerging markets</p>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li><a href="#features" className="hover:text-white transition">Features</a></li>
                 <li><a href="#calculator" className="hover:text-white transition">Calculator</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Company</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li><a href="#how-it-works" className="hover:text-white transition">How It Works</a></li>
                 <li><a href="#business" className="hover:text-white transition">Business</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm">
+              <h4 className="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Legal</h4>
+              <ul className="space-y-2 text-xs sm:text-sm">
                 <li><a href="/legal/privacy-policy.html" className="hover:text-white transition">Privacy Policy</a></li>
                 <li><a href="/legal/terms-of-service.html" className="hover:text-white transition">Terms of Service</a></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="border-t border-gray-800 pt-6 sm:pt-8 text-center text-xs sm:text-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
               <p>© {new Date().getFullYear()} Seamount Technologies Ltd. All rights reserved.</p>
-              <div className="flex gap-4">
-                <div className="flex items-center text-xs"><Shield className="h-4 w-4 mr-1 text-green-400" /><span>GDPR Compliant</span></div>
-                <div className="flex items-center text-xs"><Shield className="h-4 w-4 mr-1 text-blue-400" /><span>160% Backed</span></div>
+              <div className="flex gap-3 sm:gap-4">
+                <div className="flex items-center text-xs"><Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-green-400" /><span>GDPR Compliant</span></div>
+                <div className="flex items-center text-xs"><Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-blue-400" /><span>160% Backed</span></div>
               </div>
             </div>
           </div>
