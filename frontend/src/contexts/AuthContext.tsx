@@ -335,22 +335,26 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       const kycStatus = state.user.kyc_status || 'not_started';
       const hasWallet = state.user.algorand_address || state.user.wallet_address;
       
-      // ✅ FIX: Allow skipped users with wallets to access dashboard
-      if (kycStatus === 'skipped' && hasWallet) {
-        return; // Don't redirect - let them stay on current page
-      }
-      
+      // Tribe members always go to dashboard
       if (kycStatus === 'approved' || state.user.role === 'tribe') {
-        navigate('/dashboard');
+        if (window.location.pathname !== '/dashboard') {
+          navigate('/dashboard');
+        }
         return;
       }
       
+      // Users with wallets can access dashboard
       if (hasWallet) {
-        navigate('/dashboard');
+        if (window.location.pathname !== '/dashboard' && window.location.pathname !== '/onboarding') {
+          navigate('/dashboard');
+        }
         return;
       }
       
-      navigate('/onboarding');
+      // Only redirect to onboarding if on root/landing page
+      if (window.location.pathname === '/' || window.location.pathname === '/landing') {
+        navigate('/onboarding');
+      }
     }
   }, [state.session, state.user, state.loading, navigate]);
 
