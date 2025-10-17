@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS onramp_transactions (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES user_profiles(id),
+    user_id UUID NOT NULL REFERENCES auth.users(id),  -- Changed to UUID
     type TEXT NOT NULL DEFAULT 'onramp',
     status TEXT NOT NULL,
     provider TEXT NOT NULL,
@@ -27,8 +27,7 @@ CREATE INDEX idx_onramp_user ON onramp_transactions(user_id);
 CREATE INDEX idx_onramp_status ON onramp_transactions(status);
 CREATE INDEX idx_onramp_created ON onramp_transactions(created_at DESC);
 
--- Enable RLS
 ALTER TABLE onramp_transactions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY onramp_user_policy ON onramp_transactions
-    FOR ALL USING (auth.uid()::text = user_id);
+    FOR ALL USING (auth.uid() = user_id);

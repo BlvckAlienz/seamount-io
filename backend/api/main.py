@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from supabase import create_client, Client
 from pydantic import BaseModel, EmailStr
+from backend.services.wallet_connect_service import WalletConnectService
 from typing import Optional, Dict, Any, List
 from uuid import uuid4
 from datetime import datetime, timedelta
@@ -21,6 +22,7 @@ import aiohttp
 import sys
 from pathlib import Path
 from decimal import Decimal
+
 # REMOVED: import oracle here - we'll handle it properly later
 
 # Add the project root to the Python path for clean imports
@@ -192,6 +194,28 @@ limiter = Limiter(key_func=get_remote_address)
 
 # SECURITY: Suspicious activity tracker
 suspicious_activity: Dict[str, list] = {}
+
+@app.on_event("startup")
+async def startup_event():
+    """Start transaction monitoring on app startup"""
+    
+    # Initialize services
+    db_service = DatabaseService()
+    audit_service = AuditService(db_service)
+    
+    algod_client = algod.AlgodClient("", settings.ALGORAND_NODE_URL)
+    indexer_client = indexer.IndexerClient("", settings.ALGORAND_INDEXER_URL)
+    
+    wallet_service = WalletConnectService(
+        db_service, 
+        audit_service, 
+        algod_client, 
+        indexer_client
+    )
+    
+    # Start monitoring
+    await wallet_service.start_transaction_monitor()
+    logger.info("✅ Transaction monitor started")
 
 class SecurityValidator:
     """Enhanced security validation for wallet and payment operations"""
