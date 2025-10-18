@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowRight, Globe, Shield, Zap, DollarSign, Briefcase, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Lock, UserPlus, FileCheck, Wallet, CreditCard, ArrowRightLeft } from 'lucide-react';
+import { ArrowRight, Globe, Shield, Zap, DollarSign, Briefcase, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Lock, Wallet, CreditCard, Layers, Coins, LineChart } from 'lucide-react';
 
 interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
@@ -127,16 +127,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const faqs = [
     { 
-      question: "How do you offer 7.5-11% APY with different risk tiers?", 
-      answer: "We offer 3 tiers: STABLE (7.5% APY, 30-day lock) uses Folks Finance lending—low risk, consistent returns. GROWTH (9% APY, 90-day lock) adds liquidity pool rewards—medium risk, higher upside. ALPHA (11% APY, 365-day lock, launching Q2 2025) uses delta-neutral BTC hedging + DeFi composability—highest returns, requires sophisticated risk management. All tiers backed by 160% overcollateralized reserves. You choose your risk appetite—we handle the execution."
+      question: "How do I get started with crypto investing?", 
+      answer: "Connect or create a wallet on Seamount supporting 7+ blockchains. Fund it via local payment channels (Paystack, M-Pesa, bank transfers). Choose an investment tier—Stable (7.5%), Growth (9%), or Alpha (11%)—and stake your funds. We handle everything. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn. Compounding rewards early movers."
     },
     { 
-      question: "How is this cheaper than Western Union?", 
-      answer: "Western Union charges 5.5% average fees + 2-3% FX markup (total ~8%) and takes 24-48 hours to settle. Seamount charges 2.9% fees with transparent FX rates and settles in <5 seconds via Algorand blockchain. That's 47% cheaper and 17,280x faster. For a $500 remittance, you save $27.50 per transaction—$330/year if sending monthly. Plus, earn 7.5-11% APY while funds sit in your wallet between transactions."
+      question: "How do you offer 7.5-11% APY with different risk tiers?", 
+      answer: "We offer 3 tiers: STABLE (7.5% APY, 30-day lock) uses Folks Finance lending—low risk, consistent returns. GROWTH (9% APY, 90-day lock) adds liquidity pool rewards—medium risk, higher upside. ALPHA (11% APY, 365-day lock) uses delta-neutral BTC hedging + DeFi composability—highest returns, requires sophisticated risk management. All tiers backed by 160% overcollateralized reserves. You choose your risk appetite—we handle the execution."
     },
     { 
       question: "What happens if crypto markets crash?", 
-      answer: "Your principal is protected across all tiers. STABLE tier (7.5%) uses pure lending—no crypto price exposure. GROWTH tier (9%) uses stablecoin liquidity pools—minimal volatility risk. ALPHA tier (11%, Q2 2026) uses delta-neutral hedging: when BTC drops 30%, our short position gains 30%, netting zero price exposure. However, yields can drop in bear markets (to 8-9% range) if funding rates turn negative. Our 160% overcollateralization and 20% stablecoin reserve ensure liquidity even in black swan events."
+      answer: "Your principal is protected across all tiers. STABLE tier (7.5%) uses pure lending—no crypto price exposure. GROWTH tier (9%) uses stablecoin liquidity pools—minimal volatility risk. ALPHA tier (11%) uses delta-neutral hedging: when BTC drops 30%, our short position gains 30%, netting zero price exposure. However, yields can drop in bear markets (to 8-9% range) if funding rates turn negative. Our 160% overcollateralization and 20% stablecoin reserve ensure liquidity even in black swan events."
     },
     {
       question: "Is this regulated and safe?",
@@ -157,50 +157,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        
         .fade-in {
           opacity: 0;
           animation: fadeIn 0.6s ease-out forwards;
         }
-        
         .fade-in.visible {
           opacity: 1;
         }
-        
         .gradient-text {
           background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
         }
-        
         .glass-card {
           background: rgba(255, 255, 255, 0.7);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border: 1px solid rgba(255, 255, 255, 0.3);
         }
-        
-        .glass-dark {
-          background: rgba(0, 0, 0, 0.02);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-        }
-        
         .hover-lift {
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
         .hover-lift:hover {
           transform: translateY(-4px);
           box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        
-        .step-number {
-          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
         }
       `}</style>
 
@@ -239,31 +220,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                160% Overcollateralized • Audited Reserves
+                Self-Custody • Multi-Chain • Secure
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
-                <span className="gradient-text">Africa's Liquidity</span>
+                <span className="gradient-text">The Future is Freedom</span>
                 <br />
-                <span className="text-gray-900">Superhighway</span>
+                <span className="text-gray-900">Crypto for Everyone</span>
               </h1>
               
               <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-4">
-                Send money at <strong className="text-indigo-600">47% less cost</strong> than Western Union. Settlement in <strong className="text-indigo-600">&lt;5 seconds</strong> instead of 2 days. Plus earn <strong className="text-indigo-600">7.5-11% APY</strong> on idle stablecoins.
+                Build real wealth with digital currencies no government can devalue. <strong className="text-indigo-600">Earn 7.5-11% yearly returns</strong> on your crypto savings—automatically. Send money instantly anywhere in the world, no banks needed.
               </p>
               
               <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-600 mb-6 sm:mb-8 px-4">
                 <div className="flex items-center gap-1.5 sm:gap-2">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
+                  <span>Up to 11%/Year Returns</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                  <span>&lt;5s Cross-Border</span>
+                  <span>&lt;5s Global Transfers</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                  <span>47% Cheaper Than WU</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" />
-                  <span>7.5-11% APY Yields</span>
+                  <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" />
+                  <span>7+ Blockchain Networks</span>
                 </div>
               </div>
               
@@ -272,28 +253,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   onClick={() => onOpenAuth('register')} 
                   className="px-6 sm:px-8 py-3 sm:py-4 bg-indigo-600 text-white rounded-xl font-semibold text-base sm:text-lg hover:bg-indigo-700 transform hover:scale-105 transition shadow-lg flex items-center justify-center"
                 >
-                  Start Earning Now <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                  Start Building Wealth <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
                 <button 
                   onClick={() => document.getElementById('calculator')?.scrollIntoView({ behavior: 'smooth' })} 
                   className="px-6 sm:px-8 py-3 sm:py-4 glass-card text-gray-900 rounded-xl font-semibold text-base sm:text-lg hover:shadow-lg transition"
                 >
-                  Calculate Yield
+                  Calculate Returns
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto px-4">
                 <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
+                  <div className="text-3xl sm:text-4xl font-bold text-green-500 mb-1 sm:mb-2">Up to 11%</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Annual Returns</div>
+                </div>
+                <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
                   <div className="text-3xl sm:text-4xl font-bold text-yellow-500 mb-1 sm:mb-2">&lt;5 sec</div>
-                  <div className="text-xs sm:text-sm text-gray-600">Settlement Speed</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Global Transfers</div>
                 </div>
                 <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
-                  <div className="text-3xl sm:text-4xl font-bold text-green-500 mb-1 sm:mb-2">47%</div>
-                  <div className="text-xs sm:text-sm text-gray-600">Cheaper vs Western Union</div>
-                </div>
-                <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
-                  <div className="text-3xl sm:text-4xl font-bold text-indigo-600 mb-1 sm:mb-2">7.5-11%</div>
-                  <div className="text-xs sm:text-sm text-gray-600">APY on Idle Funds</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-indigo-600 mb-1 sm:mb-2">Multi-Chain</div>
+                  <div className="text-xs sm:text-sm text-gray-600">7+ Networks</div>
                 </div>
               </div>
             </div>
@@ -305,69 +286,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-10 sm:mb-16 fade-in">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">How It Works</h2>
               <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-                From signup to earning yields—your complete journey in 6 simple steps.
+                Your complete journey from crypto beginner to wealth builder in 4 simple steps.
               </p>
             </div>
 
-            <div className="space-y-4 sm:space-y-6">
+            <div className="grid md:grid-cols-2 gap-6 sm:gap-8">
               {[
                 {
-                  icon: <UserPlus className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-600" />,
-                  step: "01",
-                  title: "Sign Up in Minutes",
-                  description: "Create your account with email. No lengthy forms—just essential info to get started.",
+                  icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-600" />,
+                  number: "01",
+                  title: "Connect or Create Your Wallet",
+                  description: "Link existing wallets or create new multi-chain wallets supporting 7+ blockchains. Buy Bitcoin, Ethereum, or any crypto you want. You control your keys—we never touch your funds.",
                   color: "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white"
                 },
                 {
-                  icon: <FileCheck className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
-                  step: "02",
-                  title: "Complete KYC Verification",
-                  description: "Quick identity verification. Data upload takes ~3 minutes, approval within 24 hours.",
+                  icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
+                  number: "02",
+                  title: "Fund Your Wallet Easily",
+                  description: "Deposit via local payment channels (Paystack, M-Pesa, bank transfer). Withdraw anytime the same way. We make crypto accessible—no complexity, just results.",
                   color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
                 {
-                  icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />,
-                  step: "03",
-                  title: "Algorand Wallet Creation",
-                  description: "We generate your non-custodial Algorand wallet automatically. You get full control—download your private key and store it securely.",
+                  icon: <LineChart className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />,
+                  number: "03",
+                  title: "Invest on Autopilot",
+                  description: "Choose your plan: Stable (7.5%) for safety, Growth (9%) for balance, Alpha (11%) for maximum returns. Stake your funds, we handle everything—just watch it grow. Your crypto works for you 24/7.",
                   color: "border-purple-200 bg-gradient-to-br from-purple-50 to-white"
                 },
                 {
-                  icon: <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" />,
-                  step: "04",
-                  title: "Secure Your Private Key",
-                  description: "Download and backup your 25-word seed phrase. Store offline in multiple secure locations. This is your only recovery method.",
+                  icon: <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600" />,
+                  number: "04",
+                  title: "KYC When You're Ready",
+                  description: "Start exploring immediately. Verify later to unlock full platform features (higher limits, all investment tiers). We prioritize compliance while respecting your comfort level.",
                   color: "border-amber-200 bg-gradient-to-br from-amber-50 to-white"
-                },
-                {
-                  icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-rose-600" />,
-                  step: "05",
-                  title: "Fund Your Account",
-                  description: "Deposit local currency via Paystack, Cashramp, etc. Funds convert to USDT/USDCa instantly. Buy goBTC, goETH on Algorand.",
-                  color: "border-rose-200 bg-gradient-to-br from-rose-50 to-white"
-                },
-                {
-                  icon: <ArrowRightLeft className="h-8 w-8 sm:h-10 sm:w-10 text-teal-600" />,
-                  step: "06",
-                  title: "Send P2P & Off-Ramp",
-                  description: "Send stablecoins peer-to-peer globally in <5 seconds. Recipients off-ramp to local currency. Invest funds for 7.5-11% APY yields.",
-                  color: "border-teal-200 bg-gradient-to-br from-teal-50 to-white"
                 }
               ].map((step, idx) => (
-                <div key={idx} className={`${step.color} rounded-2xl p-4 sm:p-6 border-2 flex flex-col sm:flex-row gap-4 sm:gap-6 items-start fade-in hover-lift`}>
-                  <div className="flex-shrink-0 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 w-full sm:w-auto">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200 sm:mb-2 shadow-sm">
+                <div key={idx} className={`${step.color} rounded-2xl p-6 border-2 fade-in hover-lift`}>
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center border-2 border-gray-200 shadow-sm flex-shrink-0">
                       {step.icon}
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold step-number sm:text-center flex-1 sm:flex-none">{step.step}</div>
+                    <div className="text-3xl font-extrabold text-gray-300">{step.number}</div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 flex flex-wrap items-center gap-2 sm:gap-3 text-gray-900">
-                      {step.title}
-                      {idx === 5 && <span className="text-xs px-2 sm:px-3 py-1 bg-green-100 border border-green-300 rounded-full text-green-700">USDS Coming Soon</span>}
-                    </h3>
-                    <p className="text-sm sm:text-base lg:text-lg text-gray-700 leading-relaxed">{step.description}</p>
-                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold mb-3 text-gray-900">{step.title}</h3>
+                  <p className="text-sm sm:text-base text-gray-700 leading-relaxed">{step.description}</p>
                 </div>
               ))}
             </div>
@@ -379,48 +341,38 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-10 sm:mb-16 fade-in">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Platform Features</h2>
               <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-                Everything you need for secure, fast, and profitable cross-border transactions.
+                Everything you need for secure, fast, and profitable crypto investing.
               </p>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
               {[
                 {
-                  icon: <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500" />,
+                  icon: <Zap className="h-8 w-8 text-yellow-500" />,
                   title: "Lightning-Fast Settlements",
-                  description: "Cross-border payments in <5 seconds via Algorand blockchain. No more 24-48 hour waits—money moves at internet speed."
+                  description: "Send crypto globally in <5 seconds via optimized blockchain rails. No more 24-48 hour waits—money moves at internet speed, no banks needed."
                 },
                 {
-                  icon: <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />,
-                  title: "47% Cheaper Than Western Union",
-                  description: "2.9% fees vs WU's 5.5% + hidden FX markups. Save $27.50 per $500 transaction."
+                  icon: <TrendingUp className="h-8 w-8 text-green-500" />,
+                  title: "Invest on Autopilot, Earn Up to 11%/Year",
+                  description: "Stable (7.5%), Growth (9%), Alpha (11%) tiers. Choose your risk, we execute the strategy. Your crypto compounds daily while you sleep."
                 },
                 {
-                  icon: <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-500" />,
-                  title: "7.5-11% APY on Idle Funds",
-                  description: "Earn while you wait. Stable (7.5%), Growth (9%), Alpha (11% - Q2 2026). Choose your risk tier, we handle execution."
+                  icon: <Lock className="h-8 w-8 text-indigo-500" />,
+                  title: "Self-Custody Multi-Chain Wallets",
+                  description: "Support for 7+ blockchains with account abstraction for gasless USDT transactions. Your keys, your control, zero custody risk—true financial sovereignty."
                 },
                 {
-                  icon: <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500" />,
-                  title: "Multi-Currency Support",
-                  description: "Trade USDT, USDCa, Algo with seamless swaps. Support for NGN, KES, ZAR, GHS, USD, GBP, EUR."
-                },
-                {
-                  icon: <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-red-500" />,
-                  title: "160% Overcollateralized",
-                  description: "Your funds backed by audited reserves with transparent collateralization. Real-time dashboard monitoring + quarterly audits."
-                },
-                {
-                  icon: <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-teal-500" />,
-                  title: "Self-Custody Wallets",
-                  description: "Full control of your private keys. Non-custodial Algorand wallets with military-grade encryption. Your keys, your crypto."
+                  icon: <Coins className="h-8 w-8 text-purple-500" />,
+                  title: "Digital Credit (Coming Soon)",
+                  description: "Borrow against your crypto holdings without selling. Unlock liquidity while maintaining asset exposure—the future of decentralized finance is here."
                 }
               ].map((feature, idx) => (
-                <div key={idx} className="glass-card rounded-2xl p-4 sm:p-6 hover:shadow-lg transition-all duration-300 fade-in hover-lift">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 glass-dark rounded-xl flex items-center justify-center mb-3 sm:mb-4 border border-gray-200">
+                <div key={idx} className="glass-card rounded-2xl p-6 hover:shadow-lg transition-all duration-300 fade-in hover-lift">
+                  <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center mb-4 border border-gray-200">
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-gray-900">{feature.title}</h3>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900">{feature.title}</h3>
                   <p className="text-sm sm:text-base text-gray-600 leading-relaxed">{feature.description}</p>
                 </div>
               ))}
@@ -431,9 +383,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <section id="calculator" className="py-12 sm:py-16 md:py-20 bg-white">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-16 fade-in">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Live Yield Calculator</h2>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Calculate Your Returns</h2>
               <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-                Choose your risk appetite. Stable (7.5%) and Growth (9%) available now. Alpha (11%) launches Q2 2026.
+                See how much your crypto can earn. Stable (7.5%), Growth (9%), and Alpha (11%) tiers available now.
               </p>
             </div>
 
@@ -451,25 +403,25 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="number" 
                       value={calc.amount}
                       onChange={(e) => setCalc({...calc, amount: e.target.value})}
-                      className="w-full px-4 py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
                       placeholder="10000"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Yield Tier</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Investment Tier</label>
                     <select 
                       value={calc.period}
                       onChange={(e) => setCalc({...calc, period: e.target.value})}
-                      className="w-full px-4 py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
                     >
                       <option value="30">Stable Tier - 7.5% APY (30-day lock)</option>
                       <option value="90">Growth Tier - 9.0% APY (90-day lock)</option>
-                      <option value="365">Alpha Tier - 11.0% APY (365-day lock) - Q2 2026</option>
+                      <option value="365">Alpha Tier - 11.0% APY (365-day lock)</option>
                     </select>
                   </div>
 
-                  <div className="glass-dark rounded-xl p-4 border-2 border-gray-200">
+                  <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs sm:text-sm text-gray-600 flex items-center font-medium">
                         {calc.period === '365' ? 'Live Market Data (Alpha Tier)' : 'Fixed Rate Strategy'}
@@ -652,7 +604,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <div className="text-xs text-gray-700">
                       <strong className="text-amber-700">Risk Disclosure:</strong> {
                         calc.period === '365' 
-                          ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured. Q2 2026 launch pending $100K TVL.`
+                          ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured.`
                           : calc.period === '90'
                           ? 'Growth tier uses stablecoin liquidity pools with minimal volatility exposure. Yields are more stable than Alpha but higher than Stable. 160% overcollateralization protects principal. Not NDIC-insured.'
                           : 'Stable tier uses pure lending with no crypto price exposure. Yields are consistent and predictable. 160% overcollateralization protects principal. Not NDIC-insured.'
@@ -670,7 +622,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-10 sm:mb-16 fade-in">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">For Business</h2>
               <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-                Transform your business treasury and cross-border operations with institutional-grade stablecoin infrastructure.
+                Transform your business treasury with institutional-grade crypto infrastructure.
               </p>
             </div>
 
@@ -707,7 +659,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="text"
                       value={formState.name}
                       onChange={(e) => setFormState({...formState, name: e.target.value})}
-                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="John Doe"
                       required
                     />
@@ -718,7 +670,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="text"
                       value={formState.businessName}
                       onChange={(e) => setFormState({...formState, businessName: e.target.value})}
-                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="Your Company Ltd."
                       required
                     />
@@ -729,7 +681,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       type="email"
                       value={formState.email}
                       onChange={(e) => setFormState({...formState, email: e.target.value})}
-                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
+                      className="w-full px-4 py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition"
                       placeholder="john@company.com"
                       required
                     />
@@ -739,7 +691,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <textarea
                       value={formState.message}
                       onChange={(e) => setFormState({...formState, message: e.target.value})}
-                      className="w-full px-4 py-2.5 sm:py-3 glass-dark border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition resize-none"
+                      className="w-full px-4 py-2.5 sm:py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm sm:text-base focus:border-indigo-600 focus:outline-none transition resize-none"
                       rows={4}
                       placeholder="Tell us about your business needs..."
                       required
@@ -788,7 +740,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             <div className="text-center mb-8 sm:mb-12 fade-in">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-gray-900">Frequently Asked Questions</h2>
-              <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto px-4">Get answers to common questions about Seamount's platform.</p>
+              <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto px-4">Get answers to common questions about crypto investing and Seamount.</p>
             </div>
             <div className="space-y-3 sm:space-y-4">
               {faqs.map((faq, index) => (
@@ -811,10 +763,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-indigo-600 to-purple-600">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 text-white">Ready to Take Control of Your Financial Future?</h2>
-              <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">Join thousands saving money on remittances and earning yields on stablecoins.</p>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 text-white">Don't Miss the Next Wealth Revolution</h2>
+              <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">Join thousands building real wealth with crypto. Start with any amount, earn up to 11% yearly.</p>
               <button onClick={() => onOpenAuth('register')} className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-indigo-600 hover:bg-gray-100 text-base sm:text-lg font-semibold rounded-xl transform hover:scale-105 transition shadow-lg">
-                Sign Up for Free
+                Start Building Wealth Now
               </button>
               <p className="mt-3 sm:mt-4 text-xs sm:text-sm text-indigo-100">Already have an account? <button onClick={() => onOpenAuth('login')} className="text-white hover:underline font-semibold">Sign In</button></p>
             </div>
@@ -830,7 +782,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-8 h-8 object-contain rounded-lg" />
                 <span className="text-lg sm:text-xl font-bold text-white">Seamount</span>
               </div>
-              <p className="text-gray-400 text-xs sm:text-sm">The future of cross-border payments for emerging markets</p>
+              <p className="text-gray-400 text-xs sm:text-sm">The future of crypto investing for everyone</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Product</h4>
@@ -858,8 +810,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
               <p>© {new Date().getFullYear()} Seamount Technologies Ltd. All rights reserved.</p>
               <div className="flex gap-3 sm:gap-4">
-                <div className="flex items-center text-xs"><Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-green-400" /><span>GDPR Compliant</span></div>
-                <div className="flex items-center text-xs"><Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-blue-400" /><span>160% Backed</span></div>
+                <div className="flex items-center text-xs"><Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-green-400" /><span>Regulated</span></div>
+                <div className="flex items-center text-xs"><Lock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-blue-400" /><span>Self-Custody</span></div>
               </div>
             </div>
           </div>
