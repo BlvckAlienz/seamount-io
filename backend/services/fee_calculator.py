@@ -227,7 +227,7 @@ class FeeCalculatorService:
         self,
         transaction_type: TransactionType,
         amount: Decimal,
-        user_tier: LicenseTier = LicenseTier.STARTER
+        user_tier: LicenseTier = LicenseTier.BUILDER
     ) -> Dict[str, Any]:
         """
         Quick fee estimate without database calls
@@ -303,11 +303,11 @@ class FeeCalculatorService:
             if result and result[0]["license_tier"]:
                 return LicenseTier(result[0]["license_tier"])
             
-            return LicenseTier.STARTER  # Default tier
+            return LicenseTier.BUILDER  # Default tier
             
         except Exception as e:
             logger.warning(f"Could not determine user tier: {e}")
-            return LicenseTier.STARTER
+            return LicenseTier.BUILDER
     
     async def _store_fee_calculation(self, user_id: str, fee_calculation: Dict):
         """Store fee calculation for audit and quote validation"""
