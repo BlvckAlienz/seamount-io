@@ -366,7 +366,7 @@ async def lifespan(app: FastAPI):
 # ===== CREATE APP INSTANCE HERE (BEFORE ANY @app DECORATORS) =====
 app = FastAPI(
     title="Seamount.io API",
-    version="3.1.5",
+    version="3.1.6",
     description="The core API for Seamount's cross-border payment and treasury platform.",
     lifespan=lifespan
 )
@@ -650,7 +650,7 @@ async def debug_oracle_test(asset_name: str):
 async def health_check(request: Request):
     return {
         "status": "healthy", 
-        "version": "3.1.5",
+        "version": "3.1.6",
         "services_available": services_available,
         "oracle_service_available": oracle_service_available,
         "dependencies_available": dependencies_available

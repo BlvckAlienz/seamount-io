@@ -1,7 +1,3 @@
-File: supabase/migrations/create_multi_chain_tables.sql
--- Multi-Chain Wallet Infrastructure
--- Supports: Algorand + Bitcoin + Ethereum + TON + Lightning Network (via WDK)
-
 -- ============================================================================
 -- 1. MULTI-CHAIN ADDRESSES TABLE
 -- ============================================================================
@@ -314,10 +310,9 @@ ALTER TABLE user_wallets ADD COLUMN IF NOT EXISTS chains_enabled JSONB DEFAULT '
 ALTER TABLE user_wallets ADD COLUMN IF NOT EXISTS is_multi_chain BOOLEAN DEFAULT FALSE;
 
 -- ============================================================================
--- 12. FUNCTIONS & TRIGGERS
+-- SEAMOUNT MULTI-CHAIN INFRASTRUCTURE - FUNCTIONS & TRIGGERS
 -- ============================================================================
 
--- Function: Update timestamp on row update
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -326,7 +321,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply triggers to all tables
 CREATE TRIGGER update_multi_chain_addresses_updated_at
     BEFORE UPDATE ON multi_chain_addresses
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -339,47 +333,30 @@ CREATE TRIGGER update_bridge_transactions_updated_at
     BEFORE UPDATE ON bridge_transactions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Function: Calculate total balance in USD
 CREATE OR REPLACE FUNCTION get_user_total_balance_usd(p_user_id UUID)
 RETURNS DECIMAL(18, 2) AS $$
 DECLARE
     total DECIMAL(18, 2);
 BEGIN
-    SELECT COALESCE(SUM(usd_value), 0)
-    INTO total
-    FROM multi_chain_balances
-    WHERE user_id = p_user_id;
-    
+    SELECT COALESCE(SUM(usd_value), 0) INTO total
+    FROM multi_chain_balances WHERE user_id = p_user_id;
     RETURN total;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function: Get monthly API usage
 CREATE OR REPLACE FUNCTION get_monthly_api_usage(p_license_id TEXT)
-RETURNS TABLE (
-    total_calls BIGINT,
-    total_volume_usd DECIMAL(18, 2)
-) AS $$
+RETURNS TABLE (total_calls BIGINT, total_volume_usd DECIMAL(18, 2)) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
-        COUNT(*)::BIGINT,
-        COALESCE(SUM(transaction_volume_usd), 0)
+    SELECT COUNT(*)::BIGINT, COALESCE(SUM(transaction_volume_usd), 0)
     FROM api_usage_logs
     WHERE license_id = p_license_id
     AND created_at >= DATE_TRUNC('month', CURRENT_DATE);
 END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================================
--- 13. VIEWS FOR ANALYTICS
--- ============================================================================
-
--- View: User Portfolio Summary
 CREATE OR REPLACE VIEW v_user_portfolio AS
-SELECT 
-    u.id AS user_id,
-    u.email,
+SELECT u.id AS user_id, u.email,
     COUNT(DISTINCT mca.blockchain) AS chains_active,
     COALESCE(SUM(mcb.usd_value), 0) AS total_balance_usd,
     COUNT(DISTINCT mcb.asset) AS assets_owned,
@@ -390,36 +367,22 @@ LEFT JOIN multi_chain_balances mcb ON u.id = mcb.user_id
 LEFT JOIN multi_chain_transactions mct ON u.id = mct.user_id
 GROUP BY u.id, u.email;
 
--- View: Daily Revenue by Chain
 CREATE OR REPLACE VIEW v_daily_revenue_by_chain AS
-SELECT 
-    DATE(created_at) AS date,
-    blockchain,
-    revenue_type,
-    COUNT(*) AS transaction_count,
-    SUM(amount_usd) AS total_revenue_usd
+SELECT DATE(created_at) AS date, blockchain, revenue_type,
+    COUNT(*) AS transaction_count, SUM(amount_usd) AS total_revenue_usd
 FROM multi_chain_revenue
 GROUP BY DATE(created_at), blockchain, revenue_type
 ORDER BY date DESC, total_revenue_usd DESC;
 
--- View: Active API Licenses
 CREATE OR REPLACE VIEW v_active_api_licenses AS
-SELECT 
-    al.*,
-    u.email,
-    u.first_name,
-    u.last_name,
+SELECT al.*, u.email, up.first_name, up.last_name,
     (SELECT COUNT(*) FROM api_usage_logs WHERE license_id = al.id AND created_at >= DATE_TRUNC('month', CURRENT_DATE)) AS monthly_api_calls,
     (SELECT COALESCE(SUM(transaction_volume_usd), 0) FROM api_usage_logs WHERE license_id = al.id AND created_at >= DATE_TRUNC('month', CURRENT_DATE)) AS monthly_volume_usd
 FROM api_licenses al
 JOIN auth.users u ON al.user_id = u.id
+LEFT JOIN user_profiles up ON u.id = up.id
 WHERE al.status = 'active';
 
--- ============================================================================
--- 14. GRANT PERMISSIONS (Service Role)
--- ============================================================================
-
--- Grant service role access to all tables
 GRANT ALL ON multi_chain_addresses TO service_role;
 GRANT ALL ON multi_chain_transactions TO service_role;
 GRANT ALL ON bridge_transactions TO service_role;
@@ -430,324 +393,180 @@ GRANT ALL ON api_licenses TO service_role;
 GRANT ALL ON api_usage_logs TO service_role;
 GRANT ALL ON blockchain_status TO service_role;
 GRANT ALL ON multi_chain_revenue TO service_role;
-
--- Grant authenticated users read access where appropriate
 GRANT SELECT ON blockchain_status TO authenticated;
 
--- ============================================================================
--- 15. MATERIALIZED VIEWS FOR PERFORMANCE
--- ============================================================================
-
--- Materialized View: User Balance Summary (Refreshed hourly)
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_user_balance_summary AS
-SELECT 
-    user_id,
-    SUM(usd_value) AS total_balance_usd,
+SELECT user_id, SUM(usd_value) AS total_balance_usd,
     COUNT(DISTINCT blockchain) AS active_chains,
     COUNT(DISTINCT asset) AS unique_assets,
     MAX(last_updated) AS last_balance_update
-FROM multi_chain_balances
-WHERE balance > 0
+FROM multi_chain_balances WHERE balance > 0
 GROUP BY user_id;
 
 CREATE UNIQUE INDEX idx_mv_balance_user ON mv_user_balance_summary(user_id);
 
--- Refresh function
 CREATE OR REPLACE FUNCTION refresh_balance_summary()
-RETURNS void AS $
+RETURNS void AS $$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_user_balance_summary;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
--- ============================================================================
--- 16. AUTOMATED REVENUE CALCULATION TRIGGERS
--- ============================================================================
-
--- Function: Record revenue on transaction completion
 CREATE OR REPLACE FUNCTION record_transaction_revenue()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'confirmed' AND OLD.status != 'confirmed' THEN
-        INSERT INTO multi_chain_revenue (
-            user_id,
-            revenue_type,
-            blockchain,
-            asset,
-            amount_usd,
-            transaction_id,
-            created_at
-        ) VALUES (
-            NEW.user_id,
-            'transaction_fee',
-            NEW.blockchain,
-            NEW.asset,
-            NEW.fee * 0.70, -- 70% of fee is revenue (30% is actual cost)
-            NEW.id,
-            NOW()
-        );
+        INSERT INTO multi_chain_revenue (user_id, revenue_type, blockchain, asset, amount_usd, transaction_id, created_at)
+        VALUES (NEW.user_id, 'transaction_fee', NEW.blockchain, NEW.asset, NEW.fee * 0.70, NEW.id, NOW());
     END IF;
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER transaction_revenue_trigger
     AFTER UPDATE ON multi_chain_transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION record_transaction_revenue();
+    FOR EACH ROW EXECUTE FUNCTION record_transaction_revenue();
 
--- Function: Record bridge revenue
 CREATE OR REPLACE FUNCTION record_bridge_revenue()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
-        INSERT INTO multi_chain_revenue (
-            user_id,
-            revenue_type,
-            blockchain,
-            asset,
-            amount_usd,
-            transaction_id,
-            created_at
-        ) VALUES (
-            NEW.user_id,
-            'bridge_fee',
-            NEW.from_chain,
-            NEW.asset,
-            NEW.fee * 0.80, -- 80% of bridge fee is revenue
-            NEW.id,
-            NOW()
-        );
+        INSERT INTO multi_chain_revenue (user_id, revenue_type, blockchain, asset, amount_usd, transaction_id, created_at)
+        VALUES (NEW.user_id, 'bridge_fee', NEW.from_chain, NEW.asset, NEW.fee * 0.80, NEW.id, NOW());
     END IF;
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER bridge_revenue_trigger
     AFTER UPDATE ON bridge_transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION record_bridge_revenue();
+    FOR EACH ROW EXECUTE FUNCTION record_bridge_revenue();
 
--- Function: Record swap revenue
 CREATE OR REPLACE FUNCTION record_swap_revenue()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
-        INSERT INTO multi_chain_revenue (
-            user_id,
-            revenue_type,
-            blockchain,
-            asset,
-            amount_usd,
-            transaction_id,
-            created_at
-        ) VALUES (
-            NEW.user_id,
-            'swap_fee',
-            NEW.blockchain,
-            NEW.from_asset,
-            NEW.fee * 0.75, -- 75% of swap fee is revenue
-            NEW.id,
-            NOW()
-        );
+        INSERT INTO multi_chain_revenue (user_id, revenue_type, blockchain, asset, amount_usd, transaction_id, created_at)
+        VALUES (NEW.user_id, 'swap_fee', NEW.blockchain, NEW.from_asset, NEW.fee * 0.75, NEW.id, NOW());
     END IF;
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER swap_revenue_trigger
     AFTER UPDATE ON asset_swaps
-    FOR EACH ROW
-    EXECUTE FUNCTION record_swap_revenue();
+    FOR EACH ROW EXECUTE FUNCTION record_swap_revenue();
 
--- ============================================================================
--- 17. PERFORMANCE OPTIMIZATION INDEXES
--- ============================================================================
-
--- Composite indexes for common queries
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_multi_tx_user_status_date 
+CREATE INDEX IF NOT EXISTS idx_multi_tx_user_status_date 
     ON multi_chain_transactions(user_id, status, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_multi_tx_blockchain_status 
+CREATE INDEX IF NOT EXISTS idx_multi_tx_blockchain_status 
     ON multi_chain_transactions(blockchain, status);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_bridge_user_status 
+CREATE INDEX IF NOT EXISTS idx_bridge_user_status 
     ON bridge_transactions(user_id, status);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_revenue_user_type_date 
+CREATE INDEX IF NOT EXISTS idx_revenue_user_type_date 
     ON multi_chain_revenue(user_id, revenue_type, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_api_usage_license_date 
+CREATE INDEX IF NOT EXISTS idx_api_usage_license_date 
     ON api_usage_logs(license_id, created_at DESC);
 
--- ============================================================================
--- 18. DATA RETENTION POLICIES
--- ============================================================================
-
--- Function: Archive old transactions (keep 2 years, archive older)
-CREATE OR REPLACE FUNCTION archive_old_transactions()
-RETURNS void AS $
-BEGIN
-    -- Archive transactions older than 2 years to separate table
-    INSERT INTO multi_chain_transactions_archive
-    SELECT * FROM multi_chain_transactions
-    WHERE created_at < NOW() - INTERVAL '2 years';
-    
-    -- Delete archived records from main table
-    DELETE FROM multi_chain_transactions
-    WHERE created_at < NOW() - INTERVAL '2 years';
-    
-    RAISE NOTICE 'Archived old transactions';
-END;
-$ LANGUAGE plpgsql;
-
--- Create archive table
 CREATE TABLE IF NOT EXISTS multi_chain_transactions_archive (
     LIKE multi_chain_transactions INCLUDING ALL
 );
 
--- ============================================================================
--- 19. MONITORING & ALERTING FUNCTIONS
--- ============================================================================
-
--- Function: Check for stuck transactions
-CREATE OR REPLACE FUNCTION check_stuck_transactions()
-RETURNS TABLE (
-    transaction_id TEXT,
-    user_id UUID,
-    blockchain TEXT,
-    age_hours INTEGER
-) AS $
+CREATE OR REPLACE FUNCTION archive_old_transactions()
+RETURNS void AS $$
 BEGIN
-    RETURN QUERY
-    SELECT 
-        id,
-        user_id,
-        blockchain,
-        EXTRACT(EPOCH FROM (NOW() - created_at))/3600 AS age_hours
-    FROM multi_chain_transactions
-    WHERE status = 'pending'
-    AND created_at < NOW() - INTERVAL '1 hour';
+    INSERT INTO multi_chain_transactions_archive
+    SELECT * FROM multi_chain_transactions
+    WHERE created_at < NOW() - INTERVAL '2 years';
+    
+    DELETE FROM multi_chain_transactions
+    WHERE created_at < NOW() - INTERVAL '2 years';
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
--- Function: Calculate daily transaction volume
-CREATE OR REPLACE FUNCTION get_daily_volume(p_date DATE DEFAULT CURRENT_DATE)
-RETURNS TABLE (
-    blockchain TEXT,
-    total_transactions BIGINT,
-    total_volume_usd DECIMAL(18, 2)
-) AS $
+CREATE OR REPLACE FUNCTION check_stuck_transactions()
+RETURNS TABLE (transaction_id TEXT, user_id UUID, blockchain TEXT, age_hours INTEGER) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
-        mct.blockchain,
-        COUNT(*)::BIGINT,
-        SUM(mct.amount * 
-            CASE 
-                WHEN mct.asset IN ('USDT', 'USDC', 'USDS') THEN 1
-                WHEN mct.asset = 'BTC' THEN 60000
-                WHEN mct.asset = 'ETH' THEN 2500
-                ELSE 1
-            END
-        )
+    SELECT id, mct.user_id, mct.blockchain, EXTRACT(EPOCH FROM (NOW() - created_at))/3600 AS age_hours
     FROM multi_chain_transactions mct
-    WHERE DATE(mct.created_at) = p_date
-    AND mct.status = 'confirmed'
+    WHERE status = 'pending' AND created_at < NOW() - INTERVAL '1 hour';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_daily_volume(p_date DATE DEFAULT CURRENT_DATE)
+RETURNS TABLE (blockchain TEXT, total_transactions BIGINT, total_volume_usd DECIMAL(18, 2)) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT mct.blockchain, COUNT(*)::BIGINT,
+        SUM(mct.amount * CASE 
+            WHEN mct.asset IN ('USDT', 'USDC', 'USDS') THEN 1
+            WHEN mct.asset = 'BTC' THEN 60000
+            WHEN mct.asset = 'ETH' THEN 2500
+            ELSE 1 END)
+    FROM multi_chain_transactions mct
+    WHERE DATE(mct.created_at) = p_date AND mct.status = 'confirmed'
     GROUP BY mct.blockchain;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
--- Function: Get API license utilization
 CREATE OR REPLACE FUNCTION get_license_utilization(p_license_id TEXT)
-RETURNS JSON AS $
+RETURNS JSON AS $$
 DECLARE
     license_data api_licenses%ROWTYPE;
     current_calls BIGINT;
     current_volume DECIMAL(18, 2);
-    result JSON;
 BEGIN
     SELECT * INTO license_data FROM api_licenses WHERE id = p_license_id;
     
     SELECT COUNT(*), COALESCE(SUM(transaction_volume_usd), 0)
     INTO current_calls, current_volume
     FROM api_usage_logs
-    WHERE license_id = p_license_id
-    AND created_at >= DATE_TRUNC('month', CURRENT_DATE);
+    WHERE license_id = p_license_id AND created_at >= DATE_TRUNC('month', CURRENT_DATE);
     
-    result := json_build_object(
+    RETURN json_build_object(
         'license_id', p_license_id,
         'tier', license_data.license_tier,
         'current_calls', current_calls,
         'call_limit', license_data.api_call_limit,
         'utilization_percent', 
-            CASE 
-                WHEN license_data.api_call_limit IS NULL THEN 0
-                ELSE (current_calls::FLOAT / license_data.api_call_limit * 100)
-            END,
+            CASE WHEN license_data.api_call_limit IS NULL THEN 0
+            ELSE (current_calls::FLOAT / license_data.api_call_limit * 100) END,
         'current_volume_usd', current_volume,
         'volume_cap_usd', license_data.volume_cap_usd,
         'approaching_limit', 
-            CASE 
-                WHEN license_data.api_call_limit IS NOT NULL 
-                AND current_calls > (license_data.api_call_limit * 0.8) 
-                THEN TRUE
-                ELSE FALSE
-            END
+            CASE WHEN license_data.api_call_limit IS NOT NULL 
+            AND current_calls > (license_data.api_call_limit * 0.8) THEN TRUE ELSE FALSE END
     );
-    
-    RETURN result;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
--- ============================================================================
--- 20. SECURITY ENHANCEMENTS
--- ============================================================================
-
--- Function: Log sensitive operations
 CREATE OR REPLACE FUNCTION log_sensitive_operation()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND (
         OLD.encrypted_private_key IS DISTINCT FROM NEW.encrypted_private_key OR
         OLD.api_secret IS DISTINCT FROM NEW.api_secret
     ) THEN
-        INSERT INTO audit_logs (
-            table_name,
-            operation,
-            user_id,
-            old_data,
-            new_data,
-            created_at
-        ) VALUES (
-            TG_TABLE_NAME,
-            TG_OP,
-            NEW.user_id,
-            row_to_json(OLD),
-            row_to_json(NEW),
-            NOW()
-        );
+        INSERT INTO audit_logs (table_name, operation, user_id, old_data, new_data, created_at)
+        VALUES (TG_TABLE_NAME, TG_OP, NEW.user_id, row_to_json(OLD), row_to_json(NEW), NOW());
     END IF;
     RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
--- Apply security logging to sensitive tables
 CREATE TRIGGER log_address_changes
     AFTER UPDATE ON multi_chain_addresses
-    FOR EACH ROW
-    EXECUTE FUNCTION log_sensitive_operation();
+    FOR EACH ROW EXECUTE FUNCTION log_sensitive_operation();
 
 CREATE TRIGGER log_license_changes
     AFTER UPDATE ON api_licenses
-    FOR EACH ROW
-    EXECUTE FUNCTION log_sensitive_operation();
+    FOR EACH ROW EXECUTE FUNCTION log_sensitive_operation();
 
--- ============================================================================
--- 21. INITIAL DATA SEEDING
--- ============================================================================
-
--- Insert supported assets reference data
 CREATE TABLE IF NOT EXISTS supported_assets (
     symbol TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -772,15 +591,333 @@ INSERT INTO supported_assets (symbol, name, blockchain, asset_id, decimals, is_s
     ('ALGO', 'Algorand', 'algorand', 0, 6, FALSE)
 ON CONFLICT (symbol) DO NOTHING;
 
--- ============================================================================
--- 22. BACKUP & RECOVERY PROCEDURES
--- ============================================================================
+CREATE TABLE IF NOT EXISTS webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type TEXT NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    payload JSONB NOT NULL,
+    status TEXT DEFAULT 'pending',
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    next_retry_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    error_message TEXT
+);
 
--- Function: Create point-in-time backup reference
-CREATE OR REPLACE FUNCTION create_backup_reference()
-RETURNS TEXT AS $
+CREATE INDEX idx_webhook_status ON webhook_events(status, next_retry_at);
+
+CREATE OR REPLACE FUNCTION queue_webhook_event(p_event_type TEXT, p_user_id UUID, p_payload JSONB)
+RETURNS UUID AS $$
+DECLARE event_id UUID;
+BEGIN
+    INSERT INTO webhook_events (event_type, user_id, payload)
+    VALUES (p_event_type, p_user_id, p_payload) RETURNING id INTO event_id;
+    RETURN event_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS asset_prices (
+    asset TEXT PRIMARY KEY,
+    price_usd DECIMAL(18, 8) NOT NULL,
+    source TEXT,
+    last_updated TIMESTAMP DEFAULT NOW(),
+    is_stale BOOLEAN DEFAULT FALSE
+);
+
+INSERT INTO asset_prices (asset, price_usd, source) VALUES
+    ('USDT', 1.00, 'fixed'), ('USDC', 1.00, 'fixed'), ('USDS', 1.00, 'fixed'),
+    ('BTC', 60000.00, 'coingecko'), ('ETH', 2500.00, 'coingecko'), ('ALGO', 0.18, 'coingecko')
+ON CONFLICT (asset) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION update_asset_price(p_asset TEXT, p_price DECIMAL(18, 8), p_source TEXT DEFAULT 'api')
+RETURNS void AS $$
+BEGIN
+    INSERT INTO asset_prices (asset, price_usd, source, last_updated)
+    VALUES (p_asset, p_price, p_source, NOW())
+    ON CONFLICT (asset) DO UPDATE SET price_usd = EXCLUDED.price_usd, source = EXCLUDED.source, last_updated = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_asset_price_usd(p_asset TEXT)
+RETURNS DECIMAL(18, 8) AS $$
+DECLARE price DECIMAL(18, 8);
+BEGIN
+    SELECT price_usd INTO price FROM asset_prices WHERE asset = p_asset;
+    IF price IS NULL THEN
+        price := CASE p_asset
+            WHEN 'BTC' THEN 60000.00 WHEN 'ETH' THEN 2500.00
+            WHEN 'ALGO' THEN 0.18 ELSE 1.00 END;
+    END IF;
+    RETURN price;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS compliance_checks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    check_type TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    risk_score INTEGER,
+    provider TEXT,
+    provider_reference TEXT,
+    details JSONB,
+    checked_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP,
+    reviewed_by UUID REFERENCES auth.users(id)
+);
+
+CREATE INDEX idx_compliance_user ON compliance_checks(user_id);
+CREATE INDEX idx_compliance_status ON compliance_checks(status);
+
+CREATE OR REPLACE FUNCTION is_user_compliant(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE has_valid_kyc BOOLEAN; has_passed_aml BOOLEAN;
+BEGIN
+    SELECT EXISTS (SELECT 1 FROM compliance_checks WHERE user_id = p_user_id
+        AND check_type = 'kyc' AND status = 'passed'
+        AND (expires_at IS NULL OR expires_at > NOW())) INTO has_valid_kyc;
+    
+    SELECT EXISTS (SELECT 1 FROM compliance_checks WHERE user_id = p_user_id
+        AND check_type = 'aml' AND status = 'passed'
+        AND checked_at >= NOW() - INTERVAL '30 days') INTO has_passed_aml;
+    
+    RETURN has_valid_kyc AND has_passed_aml;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION detect_suspicious_patterns(p_user_id UUID)
+RETURNS JSON AS $$
 DECLARE
-    backup_id TEXT;
+    recent_tx_count BIGINT; recent_volume DECIMAL(18, 2);
+    avg_tx_amount DECIMAL(18, 2); different_addresses BIGINT; flags TEXT[];
+BEGIN
+    SELECT COUNT(*), SUM(amount), AVG(amount)
+    INTO recent_tx_count, recent_volume, avg_tx_amount
+    FROM multi_chain_transactions
+    WHERE user_id = p_user_id AND created_at >= NOW() - INTERVAL '1 hour';
+    
+    SELECT COUNT(DISTINCT to_address) INTO different_addresses
+    FROM multi_chain_transactions
+    WHERE user_id = p_user_id AND created_at >= NOW() - INTERVAL '1 hour';
+    
+    flags := ARRAY[]::TEXT[];
+    IF recent_tx_count > 50 THEN flags := array_append(flags, 'high_frequency'); END IF;
+    IF recent_volume > 100000 THEN flags := array_append(flags, 'high_volume'); END IF;
+    IF different_addresses > 20 THEN flags := array_append(flags, 'multiple_recipients'); END IF;
+    IF avg_tx_amount < 1 AND recent_tx_count > 10 THEN flags := array_append(flags, 'micro_transaction_spam'); END IF;
+    
+    RETURN json_build_object(
+        'user_id', p_user_id, 'risk_flags', flags,
+        'risk_level', CASE 
+            WHEN array_length(flags, 1) >= 3 THEN 'high'
+            WHEN array_length(flags, 1) >= 2 THEN 'medium'
+            WHEN array_length(flags, 1) >= 1 THEN 'low' ELSE 'normal' END,
+        'recent_tx_count', recent_tx_count, 'recent_volume', recent_volume,
+        'requires_review', array_length(flags, 1) >= 2
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION check_rate_limit(p_user_id UUID, p_action TEXT, p_limit INTEGER, p_window_minutes INTEGER)
+RETURNS BOOLEAN AS $$
+DECLARE action_count INTEGER;
+BEGIN
+    CREATE TABLE IF NOT EXISTS rate_limit_tracker (
+        user_id UUID NOT NULL, action TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
+    );
+    
+    SELECT COUNT(*) INTO action_count FROM rate_limit_tracker
+    WHERE user_id = p_user_id AND action = p_action
+    AND created_at >= NOW() - (p_window_minutes || ' minutes')::INTERVAL;
+    
+    RETURN action_count < p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_revenue_breakdown(
+    p_start_date DATE DEFAULT CURRENT_DATE - INTERVAL '30 days',
+    p_end_date DATE DEFAULT CURRENT_DATE
+)
+RETURNS TABLE (revenue_source TEXT, total_amount DECIMAL(18, 2), transaction_count BIGINT, avg_per_transaction DECIMAL(18, 2)) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT revenue_type, SUM(amount_usd), COUNT(*)::BIGINT, AVG(amount_usd)
+    FROM multi_chain_revenue
+    WHERE created_at BETWEEN p_start_date AND p_end_date
+    GROUP BY revenue_type ORDER BY SUM(amount_usd) DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_user_growth_metrics()
+RETURNS JSON AS $$
+DECLARE result JSON;
+BEGIN
+    SELECT json_build_object(
+        'total_users', COUNT(DISTINCT user_id),
+        'users_with_wallets', COUNT(DISTINCT CASE WHEN chains_active > 0 THEN user_id END),
+        'multi_chain_users', COUNT(DISTINCT CASE WHEN chains_active > 1 THEN user_id END),
+        'avg_chains_per_user', AVG(chains_active),
+        'total_wallet_balance_usd', SUM(total_balance_usd)
+    ) INTO result FROM v_user_portfolio;
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_top_assets_by_volume(p_limit INTEGER DEFAULT 10, p_days INTEGER DEFAULT 30)
+RETURNS TABLE (asset TEXT, total_volume_usd DECIMAL(18, 2), transaction_count BIGINT, unique_users BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT mct.asset,
+        SUM(mct.amount * CASE 
+            WHEN mct.asset IN ('USDT', 'USDC', 'USDS') THEN 1
+            WHEN mct.asset = 'BTC' THEN 60000
+            WHEN mct.asset = 'ETH' THEN 2500 ELSE 1 END)::DECIMAL(18, 2) AS total_volume,
+        COUNT(*)::BIGINT, COUNT(DISTINCT mct.user_id)::BIGINT
+    FROM multi_chain_transactions mct
+    WHERE mct.created_at >= CURRENT_DATE - (p_days || ' days')::INTERVAL AND mct.status = 'confirmed'
+    GROUP BY mct.asset ORDER BY total_volume DESC LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION calculate_user_ltv(p_user_id UUID)
+RETURNS JSON AS $$
+DECLARE
+    result JSON; total_revenue DECIMAL(18, 2); transaction_count BIGINT;
+    first_transaction TIMESTAMP; days_active INTEGER;
+BEGIN
+    SELECT SUM(amount_usd), COUNT(*), MIN(created_at)
+    INTO total_revenue, transaction_count, first_transaction
+    FROM multi_chain_revenue WHERE user_id = p_user_id;
+    
+    days_active := EXTRACT(DAY FROM (NOW() - first_transaction))::INTEGER;
+    
+    RETURN json_build_object(
+        'user_id', p_user_id,
+        'total_revenue', COALESCE(total_revenue, 0),
+        'transaction_count', COALESCE(transaction_count, 0),
+        'days_active', COALESCE(days_active, 0),
+        'avg_revenue_per_day', CASE WHEN days_active > 0 THEN total_revenue / days_active ELSE 0 END,
+        'projected_annual_ltv', CASE WHEN days_active > 0 THEN (total_revenue / days_active) * 365 ELSE 0 END
+    );
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE VIEW v_admin_dashboard AS
+SELECT 
+    (SELECT COUNT(*) FROM auth.users) AS total_users,
+    (SELECT COUNT(*) FROM multi_chain_addresses WHERE is_active = TRUE) AS active_wallets,
+    (SELECT COUNT(DISTINCT user_id) FROM multi_chain_transactions WHERE created_at >= CURRENT_DATE) AS daily_active_users,
+    (SELECT COALESCE(SUM(amount_usd), 0) FROM multi_chain_revenue WHERE created_at >= CURRENT_DATE) AS today_revenue,
+    (SELECT COALESCE(SUM(amount_usd), 0) FROM multi_chain_revenue WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) AS month_revenue,
+    (SELECT COUNT(*) FROM api_licenses WHERE status = 'active') AS active_api_licenses,
+    (SELECT COUNT(*) FROM multi_chain_transactions WHERE status = 'pending' AND created_at < NOW() - INTERVAL '1 hour') AS stuck_transactions;
+
+CREATE OR REPLACE FUNCTION validate_schema()
+RETURNS TEXT AS $$
+DECLARE result TEXT;
+BEGIN
+    result := 'Schema Validation:' || E'\n';
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'multi_chain_addresses') THEN
+        result := result || '✓ multi_chain_addresses' || E'\n';
+    ELSE result := result || '✗ multi_chain_addresses MISSING' || E'\n'; END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'multi_chain_transactions') THEN
+        result := result || '✓ multi_chain_transactions' || E'\n';
+    ELSE result := result || '✗ multi_chain_transactions MISSING' || E'\n'; END IF;
+    
+    result := result || E'\n' || 'Indexes: ' || (SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public')::TEXT || E'\n';
+    result := result || 'Functions: ' || (SELECT COUNT(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace)::TEXT || E'\n';
+    result := result || E'\n' || '✅ Validation Complete!';
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION cleanup_expired_lightning_invoices()
+RETURNS INTEGER AS $$
+DECLARE deleted_count INTEGER;
+BEGIN
+    WITH deleted AS (
+        DELETE FROM lightning_invoices
+        WHERE status = 'pending' AND expires_at < NOW() RETURNING id
+    )
+    SELECT COUNT(*) INTO deleted_count FROM deleted;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_blockchain_status(
+    p_blockchain TEXT, p_is_operational BOOLEAN,
+    p_last_block_number BIGINT DEFAULT NULL, p_status_message TEXT DEFAULT NULL
+)
+RETURNS void AS $$
+BEGIN
+    UPDATE blockchain_status SET 
+        is_operational = p_is_operational,
+        last_block_number = COALESCE(p_last_block_number, last_block_number),
+        status_message = COALESCE(p_status_message, status_message),
+        last_checked = NOW()
+    WHERE blockchain = p_blockchain;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION cleanup_old_api_logs(p_days_to_keep INTEGER DEFAULT 90)
+RETURNS INTEGER AS $$
+DECLARE deleted_count INTEGER;
+BEGIN
+    WITH deleted AS (
+        DELETE FROM api_usage_logs
+        WHERE created_at < NOW() - (p_days_to_keep || ' days')::INTERVAL RETURNING id
+    )
+    SELECT COUNT(*) INTO deleted_count FROM deleted;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION notify_large_transaction()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.amount > 10000 THEN
+        PERFORM pg_notify('large_transaction',
+            json_build_object('transaction_id', NEW.id, 'user_id', NEW.user_id,
+                'amount', NEW.amount, 'asset', NEW.asset, 'blockchain', NEW.blockchain)::TEXT);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER large_transaction_notification
+    AFTER INSERT ON multi_chain_transactions
+    FOR EACH ROW EXECUTE FUNCTION notify_large_transaction();
+
+CREATE OR REPLACE FUNCTION notify_api_limit_warning()
+RETURNS TRIGGER AS $$
+DECLARE license_info api_licenses%ROWTYPE; current_usage BIGINT;
+BEGIN
+    SELECT * INTO license_info FROM api_licenses WHERE id = NEW.license_id;
+    
+    IF license_info.api_call_limit IS NOT NULL THEN
+        SELECT COUNT(*) INTO current_usage FROM api_usage_logs
+        WHERE license_id = NEW.license_id AND created_at >= DATE_TRUNC('month', CURRENT_DATE);
+        
+        IF current_usage >= (license_info.api_call_limit * 0.9) THEN
+            PERFORM pg_notify('api_limit_warning',
+                json_build_object('license_id', NEW.license_id,
+                    'user_id', license_info.user_id, 'current_usage', current_usage,
+                    'limit', license_info.api_call_limit, 'tier', license_info.license_tier)::TEXT);
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER api_limit_warning_trigger
+    AFTER INSERT ON api_usage_logs
+    FOR EACH ROW EXECUTE FUNCTION notify_api_limit_warning();
+
+CREATE OR REPLACE FUNCTION create_backup_reference()
+RETURNS TEXT AS $$
+DECLARE backup_id TEXT;
 BEGIN
     backup_id := 'backup_' || TO_CHAR(NOW(), 'YYYYMMDD_HH24MISS');
     
@@ -792,611 +929,7 @@ BEGIN
         status TEXT
     );
     
-    INSERT INTO backup_metadata (backup_id, status) 
-    VALUES (backup_id, 'initiated');
-    
+    INSERT INTO backup_metadata (backup_id, status) VALUES (backup_id, 'initiated');
     RETURN backup_id;
 END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 23. NOTIFICATION TRIGGERS
--- ============================================================================
-
--- Function: Notify on large transactions
-CREATE OR REPLACE FUNCTION notify_large_transaction()
-RETURNS TRIGGER AS $
-BEGIN
-    IF NEW.amount > 10000 THEN -- $10k+ transactions
-        PERFORM pg_notify(
-            'large_transaction',
-            json_build_object(
-                'transaction_id', NEW.id,
-                'user_id', NEW.user_id,
-                'amount', NEW.amount,
-                'asset', NEW.asset,
-                'blockchain', NEW.blockchain
-            )::TEXT
-        );
-    END IF;
-    RETURN NEW;
-END;
-$ LANGUAGE plpgsql;
-
-CREATE TRIGGER large_transaction_notification
-    AFTER INSERT ON multi_chain_transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_large_transaction();
-
--- Function: Notify on API limit approaching
-CREATE OR REPLACE FUNCTION notify_api_limit_warning()
-RETURNS TRIGGER AS $
-DECLARE
-    license_info api_licenses%ROWTYPE;
-    current_usage BIGINT;
-BEGIN
-    SELECT * INTO license_info FROM api_licenses WHERE id = NEW.license_id;
-    
-    IF license_info.api_call_limit IS NOT NULL THEN
-        SELECT COUNT(*) INTO current_usage
-        FROM api_usage_logs
-        WHERE license_id = NEW.license_id
-        AND created_at >= DATE_TRUNC('month', CURRENT_DATE);
-        
-        IF current_usage >= (license_info.api_call_limit * 0.9) THEN
-            PERFORM pg_notify(
-                'api_limit_warning',
-                json_build_object(
-                    'license_id', NEW.license_id,
-                    'user_id', NEW.user_id,
-                    'current_usage', current_usage,
-                    'limit', license_info.api_call_limit,
-                    'tier', license_info.license_tier
-                )::TEXT
-            );
-        END IF;
-    END IF;
-    
-    RETURN NEW;
-END;
-$ LANGUAGE plpgsql;
-
-CREATE TRIGGER api_limit_warning_trigger
-    AFTER INSERT ON api_usage_logs
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_api_limit_warning();
-
--- ============================================================================
--- 24. ANALYTICS HELPER FUNCTIONS
--- ============================================================================
-
--- Function: Get revenue breakdown by source
-CREATE OR REPLACE FUNCTION get_revenue_breakdown(
-    p_start_date DATE DEFAULT CURRENT_DATE - INTERVAL '30 days',
-    p_end_date DATE DEFAULT CURRENT_DATE
-)
-RETURNS TABLE (
-    revenue_source TEXT,
-    total_amount DECIMAL(18, 2),
-    transaction_count BIGINT,
-    avg_per_transaction DECIMAL(18, 2)
-) AS $
-BEGIN
-    RETURN QUERY
-    SELECT 
-        revenue_type,
-        SUM(amount_usd),
-        COUNT(*)::BIGINT,
-        AVG(amount_usd)
-    FROM multi_chain_revenue
-    WHERE created_at BETWEEN p_start_date AND p_end_date
-    GROUP BY revenue_type
-    ORDER BY SUM(amount_usd) DESC;
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Get user growth metrics
-CREATE OR REPLACE FUNCTION get_user_growth_metrics()
-RETURNS JSON AS $
-DECLARE
-    result JSON;
-BEGIN
-    SELECT json_build_object(
-        'total_users', COUNT(DISTINCT user_id),
-        'users_with_wallets', COUNT(DISTINCT CASE WHEN chains_active > 0 THEN user_id END),
-        'multi_chain_users', COUNT(DISTINCT CASE WHEN chains_active > 1 THEN user_id END),
-        'avg_chains_per_user', AVG(chains_active),
-        'total_wallet_balance_usd', SUM(total_balance_usd)
-    ) INTO result
-    FROM v_user_portfolio;
-    
-    RETURN result;
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Get top assets by volume
-CREATE OR REPLACE FUNCTION get_top_assets_by_volume(
-    p_limit INTEGER DEFAULT 10,
-    p_days INTEGER DEFAULT 30
-)
-RETURNS TABLE (
-    asset TEXT,
-    total_volume_usd DECIMAL(18, 2),
-    transaction_count BIGINT,
-    unique_users BIGINT
-) AS $
-BEGIN
-    RETURN QUERY
-    SELECT 
-        mct.asset,
-        SUM(mct.amount * 
-            CASE 
-                WHEN mct.asset IN ('USDT', 'USDC', 'USDS') THEN 1
-                WHEN mct.asset = 'BTC' THEN 60000
-                WHEN mct.asset = 'ETH' THEN 2500
-                ELSE 1
-            END
-        ) AS total_volume,
-        COUNT(*)::BIGINT,
-        COUNT(DISTINCT mct.user_id)::BIGINT
-    FROM multi_chain_transactions mct
-    WHERE mct.created_at >= CURRENT_DATE - (p_days || ' days')::INTERVAL
-    AND mct.status = 'confirmed'
-    GROUP BY mct.asset
-    ORDER BY total_volume DESC
-    LIMIT p_limit;
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Calculate customer lifetime value
-CREATE OR REPLACE FUNCTION calculate_user_ltv(p_user_id UUID)
-RETURNS JSON AS $
-DECLARE
-    result JSON;
-    total_revenue DECIMAL(18, 2);
-    transaction_count BIGINT;
-    first_transaction TIMESTAMP;
-    days_active INTEGER;
-BEGIN
-    SELECT 
-        SUM(amount_usd),
-        COUNT(*),
-        MIN(created_at)
-    INTO total_revenue, transaction_count, first_transaction
-    FROM multi_chain_revenue
-    WHERE user_id = p_user_id;
-    
-    days_active := EXTRACT(DAY FROM (NOW() - first_transaction));
-    
-    result := json_build_object(
-        'user_id', p_user_id,
-        'total_revenue', COALESCE(total_revenue, 0),
-        'transaction_count', COALESCE(transaction_count, 0),
-        'days_active', COALESCE(days_active, 0),
-        'avg_revenue_per_day', 
-            CASE 
-                WHEN days_active > 0 THEN total_revenue / days_active
-                ELSE 0
-            END,
-        'projected_annual_ltv', 
-            CASE 
-                WHEN days_active > 0 THEN (total_revenue / days_active) * 365
-                ELSE 0
-            END
-    );
-    
-    RETURN result;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 25. AUTOMATED MAINTENANCE JOBS
--- ============================================================================
-
--- Function: Cleanup expired Lightning invoices
-CREATE OR REPLACE FUNCTION cleanup_expired_lightning_invoices()
-RETURNS INTEGER AS $
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    WITH deleted AS (
-        DELETE FROM lightning_invoices
-        WHERE status = 'pending'
-        AND expires_at < NOW()
-        RETURNING id
-    )
-    SELECT COUNT(*) INTO deleted_count FROM deleted;
-    
-    RETURN deleted_count;
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Update blockchain status
-CREATE OR REPLACE FUNCTION update_blockchain_status(
-    p_blockchain TEXT,
-    p_is_operational BOOLEAN,
-    p_last_block_number BIGINT DEFAULT NULL,
-    p_status_message TEXT DEFAULT NULL
-)
-RETURNS void AS $
-BEGIN
-    UPDATE blockchain_status
-    SET 
-        is_operational = p_is_operational,
-        last_block_number = COALESCE(p_last_block_number, last_block_number),
-        status_message = COALESCE(p_status_message, status_message),
-        last_checked = NOW()
-    WHERE blockchain = p_blockchain;
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Refresh cached balances
-CREATE OR REPLACE FUNCTION refresh_user_balances(p_user_id UUID)
-RETURNS void AS $
-BEGIN
-    -- This would be called by backend service after querying actual blockchain balances
-    -- For now, just update the timestamp
-    UPDATE multi_chain_balances
-    SET last_updated = NOW()
-    WHERE user_id = p_user_id;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 26. ANTI-FRAUD & SECURITY FUNCTIONS
--- ============================================================================
-
--- Function: Detect suspicious transaction patterns
-CREATE OR REPLACE FUNCTION detect_suspicious_patterns(p_user_id UUID)
-RETURNS JSON AS $
-DECLARE
-    recent_tx_count BIGINT;
-    recent_volume DECIMAL(18, 2);
-    avg_tx_amount DECIMAL(18, 2);
-    different_addresses BIGINT;
-    flags TEXT[];
-BEGIN
-    -- Count transactions in last hour
-    SELECT COUNT(*), SUM(amount), AVG(amount)
-    INTO recent_tx_count, recent_volume, avg_tx_amount
-    FROM multi_chain_transactions
-    WHERE user_id = p_user_id
-    AND created_at >= NOW() - INTERVAL '1 hour';
-    
-    -- Count unique recipient addresses
-    SELECT COUNT(DISTINCT to_address)
-    INTO different_addresses
-    FROM multi_chain_transactions
-    WHERE user_id = p_user_id
-    AND created_at >= NOW() - INTERVAL '1 hour';
-    
-    flags := ARRAY[]::TEXT[];
-    
-    -- Check for suspicious patterns
-    IF recent_tx_count > 50 THEN
-        flags := array_append(flags, 'high_frequency');
-    END IF;
-    
-    IF recent_volume > 100000 THEN
-        flags := array_append(flags, 'high_volume');
-    END IF;
-    
-    IF different_addresses > 20 THEN
-        flags := array_append(flags, 'multiple_recipients');
-    END IF;
-    
-    IF avg_tx_amount < 1 AND recent_tx_count > 10 THEN
-        flags := array_append(flags, 'micro_transaction_spam');
-    END IF;
-    
-    RETURN json_build_object(
-        'user_id', p_user_id,
-        'risk_flags', flags,
-        'risk_level', 
-            CASE 
-                WHEN array_length(flags, 1) >= 3 THEN 'high'
-                WHEN array_length(flags, 1) >= 2 THEN 'medium'
-                WHEN array_length(flags, 1) >= 1 THEN 'low'
-                ELSE 'normal'
-            END,
-        'recent_tx_count', recent_tx_count,
-        'recent_volume', recent_volume,
-        'requires_review', array_length(flags, 1) >= 2
-    );
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Rate limiting check
-CREATE OR REPLACE FUNCTION check_rate_limit(
-    p_user_id UUID,
-    p_action TEXT,
-    p_limit INTEGER,
-    p_window_minutes INTEGER
-)
-RETURNS BOOLEAN AS $
-DECLARE
-    action_count INTEGER;
-BEGIN
-    CREATE TABLE IF NOT EXISTS rate_limit_tracker (
-        user_id UUID NOT NULL,
-        action TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-    );
-    
-    -- Count actions in time window
-    SELECT COUNT(*)
-    INTO action_count
-    FROM rate_limit_tracker
-    WHERE user_id = p_user_id
-    AND action = p_action
-    AND created_at >= NOW() - (p_window_minutes || ' minutes')::INTERVAL;
-    
-    -- Return TRUE if under limit
-    RETURN action_count < p_limit;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 27. WEBHOOK EVENT QUEUE
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS webhook_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_type TEXT NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    payload JSONB NOT NULL,
-    status TEXT DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
-    next_retry_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    error_message TEXT
-);
-
-CREATE INDEX idx_webhook_status ON webhook_events(status, next_retry_at);
-
--- Function: Queue webhook event
-CREATE OR REPLACE FUNCTION queue_webhook_event(
-    p_event_type TEXT,
-    p_user_id UUID,
-    p_payload JSONB
-)
-RETURNS UUID AS $
-DECLARE
-    event_id UUID;
-BEGIN
-    INSERT INTO webhook_events (event_type, user_id, payload)
-    VALUES (p_event_type, p_user_id, p_payload)
-    RETURNING id INTO event_id;
-    
-    RETURN event_id;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 28. REAL-TIME PRICE CACHE
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS asset_prices (
-    asset TEXT PRIMARY KEY,
-    price_usd DECIMAL(18, 8) NOT NULL,
-    source TEXT, -- 'coingecko', 'binance', 'chainlink'
-    last_updated TIMESTAMP DEFAULT NOW(),
-    is_stale BOOLEAN GENERATED ALWAYS AS (last_updated < NOW() - INTERVAL '5 minutes') STORED
-);
-
--- Insert initial prices
-INSERT INTO asset_prices (asset, price_usd, source) VALUES
-    ('USDT', 1.00, 'fixed'),
-    ('USDC', 1.00, 'fixed'),
-    ('USDS', 1.00, 'fixed'),
-    ('BTC', 60000.00, 'coingecko'),
-    ('ETH', 2500.00, 'coingecko'),
-    ('ALGO', 0.18, 'coingecko')
-ON CONFLICT (asset) DO NOTHING;
-
--- Function: Update asset price
-CREATE OR REPLACE FUNCTION update_asset_price(
-    p_asset TEXT,
-    p_price DECIMAL(18, 8),
-    p_source TEXT DEFAULT 'api'
-)
-RETURNS void AS $
-BEGIN
-    INSERT INTO asset_prices (asset, price_usd, source, last_updated)
-    VALUES (p_asset, p_price, p_source, NOW())
-    ON CONFLICT (asset) 
-    DO UPDATE SET 
-        price_usd = EXCLUDED.price_usd,
-        source = EXCLUDED.source,
-        last_updated = NOW();
-END;
-$ LANGUAGE plpgsql;
-
--- Function: Get asset price with fallback
-CREATE OR REPLACE FUNCTION get_asset_price_usd(p_asset TEXT)
-RETURNS DECIMAL(18, 8) AS $
-DECLARE
-    price DECIMAL(18, 8);
-BEGIN
-    SELECT price_usd INTO price
-    FROM asset_prices
-    WHERE asset = p_asset;
-    
-    IF price IS NULL THEN
-        -- Fallback to hardcoded prices
-        price := CASE p_asset
-            WHEN 'BTC' THEN 60000.00
-            WHEN 'ETH' THEN 2500.00
-            WHEN 'ALGO' THEN 0.18
-            ELSE 1.00
-        END;
-    END IF;
-    
-    RETURN price;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 29. COMPLIANCE & KYC TRACKING
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS compliance_checks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    check_type TEXT NOT NULL, -- 'kyc', 'aml', 'sanctions', 'pep'
-    status TEXT DEFAULT 'pending', -- 'pending', 'passed', 'failed', 'review_required'
-    risk_score INTEGER, -- 0-100
-    provider TEXT, -- 'regfyl', 'chainalysis', etc.
-    provider_reference TEXT,
-    details JSONB,
-    checked_at TIMESTAMP DEFAULT NOW(),
-    expires_at TIMESTAMP,
-    reviewed_by UUID REFERENCES auth.users(id)
-);
-
-CREATE INDEX idx_compliance_user ON compliance_checks(user_id);
-CREATE INDEX idx_compliance_status ON compliance_checks(status);
-
--- Function: Check if user is compliant
-CREATE OR REPLACE FUNCTION is_user_compliant(p_user_id UUID)
-RETURNS BOOLEAN AS $
-DECLARE
-    has_valid_kyc BOOLEAN;
-    has_passed_aml BOOLEAN;
-BEGIN
-    -- Check for valid KYC
-    SELECT EXISTS (
-        SELECT 1 FROM compliance_checks
-        WHERE user_id = p_user_id
-        AND check_type = 'kyc'
-        AND status = 'passed'
-        AND (expires_at IS NULL OR expires_at > NOW())
-    ) INTO has_valid_kyc;
-    
-    -- Check for AML clearance
-    SELECT EXISTS (
-        SELECT 1 FROM compliance_checks
-        WHERE user_id = p_user_id
-        AND check_type = 'aml'
-        AND status = 'passed'
-        AND checked_at >= NOW() - INTERVAL '30 days'
-    ) INTO has_passed_aml;
-    
-    RETURN has_valid_kyc AND has_passed_aml;
-END;
-$ LANGUAGE plpgsql;
-
--- ============================================================================
--- 30. FINAL SETUP & VALIDATION
--- ============================================================================
-
--- Create admin dashboard view
-CREATE OR REPLACE VIEW v_admin_dashboard AS
-SELECT 
-    (SELECT COUNT(*) FROM auth.users) AS total_users,
-    (SELECT COUNT(*) FROM multi_chain_addresses WHERE is_active = TRUE) AS active_wallets,
-    (SELECT COUNT(DISTINCT user_id) FROM multi_chain_transactions WHERE created_at >= CURRENT_DATE) AS daily_active_users,
-    (SELECT SUM(amount_usd) FROM multi_chain_revenue WHERE created_at >= CURRENT_DATE) AS today_revenue,
-    (SELECT SUM(amount_usd) FROM multi_chain_revenue WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) AS month_revenue,
-    (SELECT COUNT(*) FROM api_licenses WHERE status = 'active') AS active_api_licenses,
-    (SELECT COUNT(*) FROM multi_chain_transactions WHERE status = 'pending' AND created_at < NOW() - INTERVAL '1 hour') AS stuck_transactions;
-
--- Validation function
-CREATE OR REPLACE FUNCTION validate_schema()
-RETURNS TEXT AS $
-DECLARE
-    result TEXT;
-BEGIN
-    result := 'Schema Validation Results:' || E'\n';
-    
-    -- Check all critical tables exist
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'multi_chain_addresses') THEN
-        result := result || '✓ multi_chain_addresses table exists' || E'\n';
-    ELSE
-        result := result || '✗ multi_chain_addresses table MISSING' || E'\n';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'multi_chain_transactions') THEN
-        result := result || '✓ multi_chain_transactions table exists' || E'\n';
-    ELSE
-        result := result || '✗ multi_chain_transactions table MISSING' || E'\n';
-    END IF;
-    
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'api_licenses') THEN
-        result := result || '✓ api_licenses table exists' || E'\n';
-    ELSE
-        result := result || '✗ api_licenses table MISSING' || E'\n';
-    END IF;
-    
-    -- Check RLS is enabled
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'multi_chain_addresses' AND rowsecurity = true) THEN
-        result := result || '✓ RLS enabled on multi_chain_addresses' || E'\n';
-    ELSE
-        result := result || '⚠ RLS NOT enabled on multi_chain_addresses' || E'\n';
-    END IF;
-    
-    -- Check indexes
-    result := result || E'\n' || 'Total Indexes: ' || (SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public')::TEXT || E'\n';
-    
-    -- Check functions
-    result := result || 'Total Functions: ' || (SELECT COUNT(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace)::TEXT || E'\n';
-    
-    result := result || E'\n' || '✅ Multi-Chain Infrastructure Validation Complete!';
-    
-    RETURN result;
-END;
-$ LANGUAGE plpgsql;
-
--- Run validation
-SELECT validate_schema();
-
--- ============================================================================
--- MIGRATION COMPLETE! 🎉
--- ============================================================================
-
-COMMENT ON SCHEMA public IS 'Seamount Multi-Chain Wallet Infrastructure - Algorand + Bitcoin + Ethereum + TON + Lightning Network';
-
--- Log completion
-DO $
-BEGIN
-    RAISE NOTICE '
-    ╔════════════════════════════════════════════════════════════════╗
-    ║                                                                ║
-    ║   🚀 SEAMOUNT MULTI-CHAIN INFRASTRUCTURE DEPLOYED! 🚀         ║
-    ║                                                                ║
-    ║   Supported Blockchains:                                       ║
-    ║   • Algorand (USDS Native)                                     ║
-    ║   • Bitcoin + Lightning Network                                ║
-    ║   • Ethereum + Polygon + Arbitrum                              ║
-    ║   • TON Blockchain                                             ║
-    ║                                                                ║
-    ║   Features Enabled:                                            ║
-    ║   ✓ Multi-chain wallet management                              ║
-    ║   ✓ Cross-chain asset bridges                                  ║
-    ║   ✓ Lightning Network micropayments                            ║
-    ║   ✓ B2B API licensing ($3.5k-$15k/month)                       ║
-    ║   ✓ Automated revenue tracking                                 ║
-    ║   ✓ Real-time balance aggregation                              ║
-    ║   ✓ Compliance & KYC tracking                                  ║
-    ║   ✓ Anti-fraud monitoring                                      ║
-    ║   ✓ Performance optimization                                   ║
-    ║                                                                ║
-    ║   Database Objects Created:                                    ║
-    ║   • 15 Tables                                                  ║
-    ║   • 30+ Functions                                              ║
-    ║   • 25+ Indexes                                                ║
-    ║   • 10+ Triggers                                               ║
-    ║   • 5 Views                                                    ║
-    ║   • Row Level Security on all tables                           ║
-    ║                                                                ║
-    ║   Next Steps:                                                  ║
-    ║   1. Deploy WDK service                                        ║
-    ║   2. Configure WDK API credentials                             ║
-    ║   3. Test wallet creation flow                                 ║
-    ║   4. Launch multi-chain transactions                           ║
-    ║                                                                ║
-    ╚════════════════════════════════════════════════════════════════╝
-    ';
-END $;
+$$ LANGUAGE plpgsql;

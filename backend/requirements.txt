@@ -1,56 +1,48 @@
-# ==============================================================================
 # Seamount.io API - Production Dependencies
-# Version: 1.4.0 (Compatible versions only)
-# ==============================================================================
+# Version: 3.1.6 (Multi-Chain Ready)
 
-# Core FastAPI framework
-fastapi
+# Core FastAPI
+fastapi==0.109.0
+gunicorn==21.2.0
+uvicorn[standard]==0.27.0
 
-# Production-grade ASGI Server (Required by Render's start command)
-gunicorn
-
-# ASGI Server Implementation for FastAPI
-uvicorn[standard]
-
-# Supabase client and its dependencies
-supabase
-
-# Asynchronous HTTP requests
-aiohttp
-
-# Email services
-fastapi-mail
-
-# Authentication and security
-passlib[bcrypt]
-python-jose[cryptography]
-python-multipart
-
-# Environment variable management
-python-dotenv
-
-# Data validation
-pydantic
-pydantic-settings
-
-# Robust retry logic
-tenacity
-
-# One-time password generation for MFA
-pyotp
-
-# Algorand SDK for blockchain interactions
-py-algorand-sdk
-
-# Cryptography
-cryptography
-
-# HTTP client
-httpx
-
-# Additional dependencies
-pyjwt
-requests
+# Supabase & Database
+supabase==2.3.0
 asyncpg>=0.25.0
+
+# HTTP & Async
+aiohttp==3.9.1
+httpx==0.26.0
+
+# Email (with fallback support)
+fastapi-mail==1.4.1
+
+# Auth & Security
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
+pyjwt==2.8.0
+cryptography==41.0.7
+pyotp==2.9.0
+
+# Data Validation
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Utilities
+tenacity==8.2.3
+requests==2.31.0
 slowapi>=0.1.9
 redis>=4.5.0
+
+# Blockchain
+py-algorand-sdk==2.6.0
+
+# Multi-Chain Support (WDK dependencies)
+# Note: Tether WDK integration requires these
+web3==6.15.0  # For Ethereum interaction
+bitcoinlib==0.6.14  # For Bitcoin
+ton==0.1.0  # For TON blockchain
