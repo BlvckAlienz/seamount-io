@@ -224,9 +224,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
-                <span className="gradient-text">The Future is Freedom</span>
+                <span className="gradient-text">The Future is Crypto</span>
                 <br />
-                <span className="text-gray-900">Crypto for Everyone</span>
+                <span className="text-gray-900">Freedom for Everyone</span>
               </h1>
               
               <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-4">

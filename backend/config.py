@@ -674,6 +674,8 @@ except Exception as e:
 def get_settings() -> Settings:
     return settings
 
+BusinessModelConfig = MultiChainBusinessModel  # Backward compatibility
+
 __all__ = [
     'get_settings', 
     'settings', 
