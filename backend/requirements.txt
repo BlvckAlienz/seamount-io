@@ -1,5 +1,5 @@
 # Seamount.io API - Production Dependencies
-# Version: 3.1.6 (Multi-Chain Ready)
+# Version: 3.1.7 (Render-compatible)
 
 # Core FastAPI
 fastapi==0.109.0
@@ -21,10 +21,10 @@ fastapi-mail==1.4.1
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 pyjwt==2.8.0
-cryptography==41.0.7
+cryptography==42.0.5  # FIXED: Uses pre-built wheels, no Rust needed
 pyotp==2.9.0
 
-# Data Validation (Compatible versions)
+# Data Validation
 pydantic==2.5.3
 pydantic-settings==2.1.0
 
@@ -39,6 +39,4 @@ redis>=4.5.0
 
 # Blockchain
 py-algorand-sdk==2.6.0
-
-# Multi-Chain (for WDK integration later)
 web3==6.15.0
