@@ -1,5 +1,5 @@
 # Seamount.io API - Production Dependencies
-# Version: 3.1.8 (Python 3.11 locked)
+# Version: 3.1.9 (Python 3.11, wheel-only)
 
 # Core FastAPI
 fastapi==0.109.0
@@ -14,14 +14,14 @@ asyncpg==0.29.0
 aiohttp==3.9.1
 httpx==0.26.0
 
-# Email (with fallback)
+# Email
 fastapi-mail==1.4.1
 
-# Auth & Security - NO RUST BUILDS
+# Auth & Security
 passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
 pyjwt==2.8.0
-cryptography==41.0.8  # Last version with py311 wheels
+cryptography==42.0.8  # Has manylinux wheels for py311
+python-jose==3.3.0  # Without [cryptography] extra to avoid version conflicts
 pyotp==2.9.0
 
 # Data Validation
@@ -40,6 +40,3 @@ redis==5.0.1
 # Blockchain
 py-algorand-sdk==2.6.0
 web3==6.15.0
-
-# Explicit wheel-only install strategy
---prefer-binary
