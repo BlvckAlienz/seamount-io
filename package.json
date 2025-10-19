@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "@tetherto/wdk": "^1.0.0-beta.3",
     "dotenv": "^17.2.2",
-    "vercel": "^48.2.9"
+    "vercel": "^28.18.5"
   }
 }
