@@ -11,8 +11,8 @@ from backend.config import settings
 router = APIRouter(prefix="/wallet", tags=["Wallet Connect"])
 
 # Initialize Algorand clients
-algod_client = algod.AlgodClient("", settings.ALGORAND_NODE_URL)
-indexer_client = indexer.IndexerClient("", settings.ALGORAND_INDEXER_URL)
+algod_client = algod.AlgodClient("", settings.ALGORAND_ALGOD_ADDRESS)
+indexer_client = indexer.IndexerClient("", settings.ALGORAND_INDEXER_ADDRESS)
 
 class DepositAddressRequest(BaseModel):
     asset: str = "USDT"
