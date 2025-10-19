@@ -409,6 +409,57 @@ class MultiChainBusinessModel:
         }
     
     @staticmethod
+    def calculate_cross_border_economics(
+        amount: Decimal,
+        from_currency: str,
+        to_currency: str,
+        from_country: str,
+        to_country: str
+    ) -> Dict[str, Any]:
+        """
+        Calculate cross-border payment economics
+        Used for business model validation during startup
+        """
+        
+        # Base cross-border fee
+        fee_rate = MultiChainBusinessModel.TRANSACTION_FEES[TransactionType.CROSS_BORDER]
+        platform_fee = amount * fee_rate
+        
+        # Apply minimum fee
+        min_fee = MultiChainBusinessModel.MINIMUM_FEES[TransactionType.CROSS_BORDER]
+        if platform_fee < min_fee:
+            platform_fee = min_fee
+        
+        # FX spread (hidden revenue)
+        fx_spread = amount * MultiChainBusinessModel.FX_SPREAD_MARKUP
+        
+        # Network fee (with markup)
+        network_fee_actual = Decimal("0.001")  # Algorand default
+        network_fee_charged = network_fee_actual * Decimal("1.50")  # 50% markup
+        
+        # Total to user
+        total_fee = platform_fee + network_fee_charged + fx_spread
+        
+        # Revenue breakdown
+        gross_revenue = platform_fee + fx_spread + (network_fee_charged - network_fee_actual)
+        provider_cost = amount * Decimal("0.012")  # Cashramp P2P cost
+        net_revenue = gross_revenue - provider_cost - network_fee_actual
+        
+        return {
+            "amount": float(amount),
+            "platform_fee": float(platform_fee),
+            "fx_spread": float(fx_spread),
+            "network_fee": float(network_fee_charged),
+            "total_fee": float(total_fee),
+            "gross_revenue": float(gross_revenue),
+            "net_revenue": float(net_revenue),
+            "profit_margin": float((net_revenue / total_fee * 100)) if total_fee > 0 else 0,
+            "route": "Algorand",
+            "from_country": from_country,
+            "to_country": to_country
+        }
+
+    @staticmethod
     def _estimate_provider_cost(transaction_type: TransactionType, amount: Decimal) -> Decimal:
         """Estimate provider costs for profitability tracking"""
         
@@ -521,9 +572,10 @@ class Settings(BaseSettings):
     # ========================================================================
     # ALGORAND CONFIGURATION (Existing - Keep)
     # ========================================================================
-    ALGORAND_NODE_URL: str = Field(default="https://mainnet-api.algonode.cloud")
-    ALGORAND_INDEXER_URL: str = Field(default="https://mainnet-idx.algonode.cloud")
-    ALGORAND_API_KEY: Optional[SecretStr] = None
+    ALGORAND_ALGOD_ADDRESS: str = Field(default="https://mainnet-api.algonode.cloud")
+    ALGORAND_INDEXER_ADDRESS: str = Field(default="https://mainnet-idx.algonode.cloud")
+    ALGORAND_ALGOD_TOKEN: Optional[SecretStr] = Field(default=None)
+    ALGORAND_API_KEY: Optional[SecretStr] = Field(default=None)
     ALGORAND_CREATOR_MNEMONIC: Optional[SecretStr] = None
     ALGORAND_NETWORK: str = Field(default="mainnet")
 
