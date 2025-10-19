@@ -12,7 +12,7 @@ asyncpg==0.29.0
 
 # HTTP & Async
 aiohttp==3.9.1
-httpx==0.26.0
+httpx==0.24.1  # Locked for supabase 2.3.0 compatibility
 
 # Email
 fastapi-mail==1.4.1
