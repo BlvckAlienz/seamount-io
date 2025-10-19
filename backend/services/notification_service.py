@@ -26,7 +26,7 @@ class NotificationService:
         # In a real app, you would also inject SMS and Push notification services here.
         logger.info("NotificationService initialized successfully.")
         
-    async def send_deposit_confirmation(self, user_email: str, amount: Decimal, usds_balance: Decimal) -> None:
+    async def send_deposit_confirmation(self, user_email: str, amount: Decimal, balance: Decimal) -> None:
         """Sends a deposit confirmation email to the user."""
         try:
             subject = f"Deposit Confirmed: Your Seamount.io Wallet has been Funded"
@@ -35,8 +35,7 @@ class NotificationService:
                 <body>
                     <p>Dear Seamount User,</p>
                     <p>We are pleased to inform you that your deposit of <strong>{amount:.2f} USD</strong> has been successfully processed.</p>
-                    <p>An equivalent amount of <strong>{amount:.2f} USDS</strong> has been minted to your wallet.</p>
-                    <p>Your new USDS balance is: <strong>{usds_balance:.6f} USDS</strong>.</p>
+                    <p>Your new balance is: <strong>{balance:.6f}</strong>.</p>
                     <p>Thank you for using Seamount.io.</p>
                 </body>
             </html>
@@ -52,13 +51,13 @@ class NotificationService:
         """Sends transfer notification emails to both the sender and recipient."""
         try:
             # Sender notification
-            sender_subject = f"Transfer Sent: You sent {amount:.2f} USDS"
+            sender_subject = f"Transfer Sent: You sent {amount:.2f}"
             sender_body = f"""
             <html>
                 <body>
                     <p>Dear Seamount User,</p>
-                    <p>You have successfully sent <strong>{amount:.2f} USDS</strong>.</p>
-                    <p>A transaction fee of <strong>{fee:.2f} USDS</strong> was applied.</p>
+                    <p>You have successfully sent <strong>{amount:.2f}</strong>.</p>
+                    <p>A transaction fee of <strong>{fee:.2f}</strong> was applied.</p>
                     <p>Thank you for using Seamount.io.</p>
                 </body>
             </html>
@@ -66,12 +65,12 @@ class NotificationService:
             await self.email_service.send_email(sender_subject, [sender_email], sender_body)
 
             # Recipient notification
-            recipient_subject = f"Transfer Received: You have received {amount:.2f} USDS"
+            recipient_subject = f"Transfer Received: You have received {amount:.2f}"
             recipient_body = f"""
             <html>
                 <body>
                     <p>Dear Seamount User,</p>
-                    <p>You have received a new payment of <strong>{amount:.2f} USDS</strong>.</p>
+                    <p>You have received a new payment of <strong>{amount:.2f}</strong>.</p>
                     <p>The funds are now available in your Seamount.io wallet.</p>
                     <p>Thank you for using Seamount.io.</p>
                 </body>
@@ -79,7 +78,7 @@ class NotificationService:
             """
             await self.email_service.send_email(recipient_subject, [recipient_email], recipient_body)
             
-            logger.info(f"Transfer notifications sent: {sender_email} -> {recipient_email}, {amount} USDS")
+            logger.info(f"Transfer notifications sent: {sender_email} -> {recipient_email}, {amount}")
             
         except Exception as e:
             logger.error(f"Failed to send transfer notifications: {e}")

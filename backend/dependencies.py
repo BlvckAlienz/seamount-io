@@ -75,7 +75,7 @@ def initialize_dependencies(
     kyc_service: Optional["KYCService"] = None,
     database_service: Optional["DatabaseService"] = None,
     algorand_service: Optional["AlgorandService"] = None,
-    oracle_service: Optional["OracleService"] = None  # Add this parameter
+    oracle_service: Optional["OracleService"] = None
 ):
     """Initialize dependency services - used in main.py startup"""
     global _supabase_client, _wallet_service, _notification_service
@@ -88,7 +88,7 @@ def initialize_dependencies(
     _kyc_service = kyc_service
     _database_service = database_service
     _algorand_service = algorand_service
-    _oracle_service = oracle_service  # Set the oracle service
+    _oracle_service = oracle_service
     
     logger.info("✅ Dependencies initialized successfully")
 
@@ -109,11 +109,31 @@ def get_supabase_client() -> Client:
             
         except Exception as e:
             logger.error(f"❌ CRITICAL: Supabase client initialization failed: {e}")
-            # Create a mock client for development
             _supabase_client = None
             logger.warning("Using mock Supabase client - some features may not work")
     
     return _supabase_client
+
+def get_database_service() -> "DatabaseService":
+    """Get database service instance - FIXED to initialize if None"""
+    global _database_service
+    
+    if _database_service is None:
+        try:
+            from backend.services.database_service import DatabaseService
+            
+            supabase = get_supabase_client()
+            if supabase is None:
+                logger.error("❌ Cannot initialize DatabaseService: Supabase client is None")
+                raise HTTPException(status_code=503, detail="Database service unavailable")
+            
+            _database_service = DatabaseService(supabase)
+            logger.info("✅ DatabaseService initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize DatabaseService: {e}")
+            raise HTTPException(status_code=503, detail="Database service unavailable")
+    
+    return _database_service
     
 def get_kyc_service() -> "KYCService":
     """Get KYC service instance"""
@@ -121,10 +141,8 @@ def get_kyc_service() -> "KYCService":
     
     if _kyc_service is None:
         try:
-            # Try to initialize KYC service if not already initialized
             from backend.services.kyc_service import KYCService
             
-            # Initialize with default provider
             _kyc_service = KYCService(
                 get_settings_cached(), 
                 get_supabase_client(), 
@@ -144,10 +162,8 @@ def get_algorand_service() -> "AlgorandService":
     
     if _algorand_service is None:
         try:
-            # Try to initialize Algorand service if not already initialized
             from backend.services.algorand_service import AlgorandService
             
-            # Initialize with settings
             _algorand_service = AlgorandService(get_settings_cached())
             logger.info("✅ Algorand service initialized successfully")
         except Exception as e:
@@ -157,36 +173,28 @@ def get_algorand_service() -> "AlgorandService":
     return _algorand_service
 
 def get_oracle_service() -> "OracleService":
-    """Get Oracle service instance - CRITICAL for real-time conversion rates"""
+    """Get Oracle service instance - FIXED to pass DatabaseService properly"""
     global _oracle_service
     
     if _oracle_service is None:
         try:
             from backend.services.oracle_service import OracleService
             
-            # Get the database service instance first
+            # Get database service FIRST
             db_service = get_database_service()
-            if db_service is None:
-                logger.error("Database service not available for Oracle service")
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Database service not available - required for Oracle service"
-                )
             
-            # Initialize with both settings and database service
+            # Pass it to OracleService
             _oracle_service = OracleService(db_service)
             logger.info("✅ Oracle service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Oracle service: {e}")
-            # For production, we can't run without Oracle service
             raise HTTPException(
                 status_code=500, 
                 detail="Oracle service initialization failed - critical for conversion rates"
             )
     
     return _oracle_service
-    
-# Add this function to handle missing payment providers gracefully
+
 def get_payment_service():
     """Get payment service instance with graceful fallback"""
     try:
@@ -194,7 +202,7 @@ def get_payment_service():
         return PaymentService()
     except ImportError as e:
         logger.error(f"Payment service not available: {e}")
-        # Return a mock service that raises appropriate errors
+        
         class MockPaymentService:
             async def initialize_payment(self, *args, **kwargs):
                 raise HTTPException(status_code=503, detail="Payment service unavailable")
@@ -222,10 +230,6 @@ def get_audit_service() -> Optional["AuditService"]:
     """Get audit service instance (optional)"""
     return _audit_service
 
-def get_database_service() -> Optional["DatabaseService"]:
-    """Get database service instance (optional)"""
-    return _database_service
-
 # CRITICAL FIX: Add OptionalAuth class at the top level
 class OptionalAuth:
     """Optional authentication container"""
@@ -238,14 +242,11 @@ async def get_optional_auth(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     settings: Any = Depends(get_settings_cached)
 ) -> OptionalAuth:
-    """
-    Optional authentication dependency that returns OptionalAuth object
-    """
+    """Optional authentication dependency that returns OptionalAuth object"""
     if not credentials:
         return OptionalAuth()
     
     try:
-        # Verify token using existing logic
         token = credentials.credentials
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
@@ -272,7 +273,6 @@ async def get_optional_auth(
             options={"verify_aud": True, "verify_exp": True, "verify_iss": True}
         )
         
-        # Get user profile
         supabase = get_supabase_client()
         user_id = payload.get('sub')
         if user_id:
@@ -287,13 +287,9 @@ async def get_optional_auth(
         return OptionalAuth()
 
 async def fetch_jwks(settings: Any = Depends(get_settings_cached)) -> Dict[str, Any]:
-    """
-    Fetch and cache Supabase JWKS for JWT verification
-    Includes retry logic and proper error handling
-    """
+    """Fetch and cache Supabase JWKS for JWT verification"""
     global jwks_cache, jwks_cache_expiry
     
-    # Return cached JWKS if still valid
     if jwks_cache and jwks_cache_expiry and datetime.utcnow() < jwks_cache_expiry: 
         logger.debug("📊 Using cached JWKS")
         return jwks_cache
@@ -307,7 +303,6 @@ async def fetch_jwks(settings: Any = Depends(get_settings_cached)) -> Dict[str, 
                     response.raise_for_status()
                     jwks_data = await response.json()
                     
-                    # Cache for 1 hour
                     jwks_cache = jwks_data
                     jwks_cache_expiry = datetime.utcnow() + timedelta(hours=1)
                     
@@ -327,10 +322,7 @@ async def verify_supabase_token(
     credentials: HTTPAuthorizationCredentials = Depends(security_required),
     settings: Any = Depends(get_settings_cached)
 ) -> Dict[str, Any]:
-    """
-    Advanced JWT verification using Supabase JWKS
-    Includes proper error handling and logging for debugging
-    """
+    """Advanced JWT verification using Supabase JWKS"""
     if not credentials:
         logger.error("❌ No authorization credentials provided")
         raise HTTPException(
@@ -341,9 +333,8 @@ async def verify_supabase_token(
     
     try:
         token = credentials.credentials
-        logger.debug(f"🔍 Verifying JWT token: {token[:20]}...")
+        logger.debug(f"🔐 Verifying JWT token: {token[:20]}...")
         
-        # Get unverified header for key ID
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get('kid')
         alg = unverified_header.get('alg', 'RS256')
@@ -354,7 +345,6 @@ async def verify_supabase_token(
         
         logger.debug(f"🔑 Token KID: {kid}, Algorithm: {alg}")
         
-        # Fetch JWKS and find matching key
         jwks = await fetch_jwks(settings)
         
         key = None
@@ -369,7 +359,6 @@ async def verify_supabase_token(
         
         logger.debug(f"✅ Found matching key for KID: {kid}")
         
-        # Verify and decode token
         payload = jwt.decode(
             token,
             key,
@@ -401,10 +390,7 @@ async def get_current_user(
     payload: Dict[str, Any] = Depends(verify_supabase_token),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
-    """
-    Get current user profile with self-healing capabilities
-    Creates profile if it doesn't exist (handles new user edge cases)
-    """
+    """Get current user profile with self-healing capabilities"""
     user_id = payload.get("sub")
     if not user_id:
         logger.error("❌ Invalid token payload: user ID missing")
@@ -418,17 +404,14 @@ async def get_current_user(
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # CRITICAL FIX: Query user_profiles table properly - FIXED RLS RECURSION
             profile_response = supabase.from_("user_profiles").select("*").eq("id", user_id).limit(1).execute()
             
             if profile_response.data and len(profile_response.data) > 0:
                 logger.info(f"✅ User profile found for: {user_id}")
                 return profile_response.data[0]
             
-            # SELF-HEALING: Profile doesn't exist, create it from token data
             logger.warning(f"⚠️ Profile not found for user {user_id}. Attempting self-healing profile creation...")
             
-            # Extract email from token (if available)
             email = payload.get('email')
             if not email:
                 logger.error(f"❌ Cannot create profile: no email in token for user {user_id}")
@@ -437,7 +420,6 @@ async def get_current_user(
                     detail="User profile not found and cannot be auto-created without email"
                 )
             
-            # Create minimal profile from token data
             now = datetime.utcnow().isoformat()
             profile_data = {
                 "id": user_id,
@@ -446,8 +428,8 @@ async def get_current_user(
                 "first_name": payload.get('user_metadata', {}).get('first_name', ''),
                 "last_name": payload.get('user_metadata', {}).get('last_name', ''),
                 "country_code": payload.get('user_metadata', {}).get('country_code', 'US').upper(),
-                "kyc_status": "pending",  # Default KYC status
-                "kyc_level": 0,           # Default KYC level
+                "kyc_status": "pending",
+                "kyc_level": 0,
                 "role": "alien",
                 "is_admin": False,
                 "created_at": now,
@@ -456,7 +438,6 @@ async def get_current_user(
             
             logger.info(f"🛠️ Self-healing: Creating profile for user {user_id}")
             
-            # Create profile with upsert to handle race conditions
             create_response = supabase.from_("user_profiles").upsert(
                 profile_data, 
                 on_conflict="id"
@@ -464,9 +445,8 @@ async def get_current_user(
             
             if not create_response.data:
                 logger.error("❌ Profile creation returned no data")
-                continue  # Retry
+                continue
                 
-            # Fetch the created profile - FIXED RLS RECURSION
             fetch_response = supabase.from_("user_profiles").select("*").eq("id", user_id).limit(1).execute()
             
             if fetch_response.data and len(fetch_response.data) > 0:
@@ -474,10 +454,9 @@ async def get_current_user(
                 return fetch_response.data[0]
             else:
                 logger.error("❌ Could not fetch newly created profile")
-                continue  # Retry
+                continue
                 
         except HTTPException:
-            # Re-raise HTTP exceptions as-is
             raise
         except Exception as db_error:
             logger.warning(f"⚠️ Database operation failed (attempt {attempt + 1}): {str(db_error)}")
@@ -489,21 +468,16 @@ async def get_current_user(
                     detail="Could not retrieve or create user profile"
                 )
             
-            # Exponential backoff for retries
             import asyncio
             await asyncio.sleep(2 ** attempt)
     
-    # This should never be reached, but added for completeness
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Unexpected error in user profile retrieval"
     )
 
 def require_role(required_role: Union[UserRole, str]):
-    """
-    Dependency factory for role-based access control
-    Usage: @app.get("/admin", dependencies=[Depends(require_role("tribe"))])
-    """
+    """Dependency factory for role-based access control"""
     async def role_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         user_role = current_user.get("role", "alien")
         
@@ -524,10 +498,7 @@ def require_role(required_role: Union[UserRole, str]):
     return role_checker
 
 def require_kyc_level(min_level: int):
-    """
-    Dependency factory for KYC level-based access control
-    Usage: @app.get("/premium", dependencies=[Depends(require_kyc_level(2))])
-    """
+    """Dependency factory for KYC level-based access control"""
     async def kyc_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
         user_kyc_level = current_user.get("kyc_level", 0)
         
@@ -542,21 +513,17 @@ def require_kyc_level(min_level: int):
     
     return kyc_checker
 
-# Enhanced security dependencies for high-value operations
 async def require_fresh_auth(
     credentials: HTTPAuthorizationCredentials = Depends(security_required),
     settings: Any = Depends(get_settings_cached)
 ) -> Dict[str, Any]:
-    """
-    Requires a token issued within the last 10 minutes for sensitive operations
-    """
+    """Requires a token issued within the last 10 minutes for sensitive operations"""
     payload = await verify_supabase_token(credentials, settings)
     
-    # Check token age
     issued_at = payload.get('iat')
     if issued_at:
         token_age = datetime.utcnow().timestamp() - issued_at
-        max_age = 600  # 10 minutes
+        max_age = 600
         if token_age > max_age:
             logger.warning(f"⚠️ Token too old for sensitive operation: {token_age}s (max: {max_age}s)")
             raise HTTPException(
@@ -565,14 +532,10 @@ async def require_fresh_auth(
             )
     return payload
 
-# Rate limiting dependencies (simplified - would use Redis in production)
 _rate_limit_cache: Dict[str, Dict] = {}
 
 def rate_limit(requests_per_minute: int = 60):
-    """
-    Basic rate limiting dependency
-    In production, this would use Redis for distributed rate limiting
-    """
+    """Basic rate limiting dependency"""
     async def rate_limiter(request, current_user: Dict[str, Any] = Depends(get_current_user)):
         user_id = current_user.get("id")
         now = datetime.utcnow()
@@ -582,18 +545,15 @@ def rate_limit(requests_per_minute: int = 60):
         
         user_limits = _rate_limit_cache[user_id]
         
-        # Check if user is temporarily blocked
         if user_limits["blocked_until"] and now < user_limits["blocked_until"]:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded. Please try again later."
             )
         
-        # Clean old requests (older than 1 minute)
         minute_ago = now - timedelta(minutes=1)
         user_limits["requests"] = [req_time for req_time in user_limits["requests"] if req_time > minute_ago]
         
-        # Check current rate
         if len(user_limits["requests"]) >= requests_per_minute:
             user_limits["blocked_until"] = now + timedelta(minutes=1)
             logger.warning(f"⚠️ Rate limit exceeded for user {user_id}: {len(user_limits['requests'])} requests/minute")
@@ -602,13 +562,11 @@ def rate_limit(requests_per_minute: int = 60):
                 detail=f"Rate limit exceeded: {requests_per_minute} requests per minute maximum"
             )
         
-        # Record this request
         user_limits["requests"].append(now)
         return current_user
     
     return rate_limiter
 
-# FIXED: Proper indentation for these functions
 def require_tribe_member(current_user: dict = Depends(get_current_user)):
     """Require user to be a Tribe member (verified)"""
     if current_user.get('kyc_status') != 'verified' and not current_user.get('is_demo', False):

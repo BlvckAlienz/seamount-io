@@ -42,7 +42,7 @@ class EmailService:
             self.enabled = True
             logger.info("✅ Email service initialized successfully")
             
-        except ImportError as e:
+        except (ImportError, NameError, AttributeError) as e:
             logger.error(f"❌ fastapi-mail import failed: {e}")
             logger.warning("📧 Email service running in MOCK mode - emails will be logged only")
             self.enabled = False
