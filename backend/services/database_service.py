@@ -29,11 +29,11 @@ class DatabaseService:
         if supabase_client:
             self.supabase = supabase_client
         else:
-            if not self.settings.VITE_SUPABASE_URL or not self.settings.SUPABASE_SERVICE_KEY:
+            if not self.settings.SUPABASE_URL or not self.settings.SUPABASE_SERVICE_KEY:
                 raise ValueError("Supabase URL and Service Key must be configured")
             
             self.supabase: Client = create_client(
-                self.settings.VITE_SUPABASE_URL, 
+                self.settings.SUPABASE_URL,  # ✅ FIX: Use SUPABASE_URL not VITE_SUPABASE_URL
                 self.settings.SUPABASE_SERVICE_KEY.get_secret_value()
             )
         
