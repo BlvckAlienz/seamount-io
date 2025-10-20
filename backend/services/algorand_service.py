@@ -20,7 +20,7 @@ class AlgorandService:
         # Use free AlgoNode - no API key needed
         self.algod_client = algod.AlgodClient(
             algod_token="",
-            algod_address=settings.ALGORAND_NODE_URL,  # Now works
+            algod_address=settings.ALGORAND_ALGOD_ADDRESS,  # Now works
             headers={"User-Agent": "Seamount/1.0"}
         )
     
