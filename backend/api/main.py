@@ -344,7 +344,13 @@ async def lifespan(app: FastAPI):
                 
                 # Business model calculation
                 try:
-                    test_calc = settings.business_model.calculate_cross_border_economics(Decimal("1000"))
+                    test_calc = settings.business_model.calculate_cross_border_economics(
+                        amount=Decimal("1000"),
+                        from_currency="NGN",
+                        to_currency="USD", 
+                        from_country="nigeria",
+                        to_country="kenya"
+                    )
                     logger.info(f"💰 Business model initialized. Test $1000 cross-border: ${test_calc['seamount']['total_cost']}")
                 except Exception as e:
                     logger.warning(f"⚠️ Business model validation failed: {e}")

@@ -24,9 +24,9 @@ cryptography==42.0.8  # Has manylinux wheels for py311
 python-jose==3.3.0  # Without [cryptography] extra to avoid version conflicts
 pyotp==2.9.0
 
-# Data Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# Data Validation (Python 3.13 compatible)
+pydantic==2.10.3
+pydantic-settings==2.6.1
 
 # Environment
 python-dotenv==1.0.0
