@@ -684,6 +684,26 @@ class Settings(BaseSettings):
     ENABLE_DYNAMIC_PRICING: bool = True
     TRACK_REVENUE_METRICS: bool = True
     
+    def validate_supabase_credentials(self) -> bool:
+        """Validate Supabase credentials are present and properly formatted"""
+        if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_KEY:
+            logger.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+            return False
+        
+        # Check URL format
+        if not self.SUPABASE_URL.startswith("https://"):
+            logger.error("Invalid SUPABASE_URL format")
+            return False
+        
+        # Check key is not default
+        key_value = self.SUPABASE_SERVICE_KEY.get_secret_value()
+        if key_value == "your-supabase-service-key" or len(key_value) < 20:
+            logger.error("Invalid SUPABASE_SERVICE_KEY")
+            return False
+        
+        logger.info("✅ Supabase credentials validated")
+        return True
+
     @computed_field
     @property
     def business_model(self) -> MultiChainBusinessModel:
