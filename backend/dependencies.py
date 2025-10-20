@@ -104,6 +104,7 @@ def get_supabase_client() -> Client:
             supabase_url = settings.SUPABASE_URL
             supabase_key = settings.SUPABASE_SERVICE_KEY.get_secret_value()
             
+            # ✅ FIX: Remove proxy parameter for compatibility
             _supabase_client = create_client(supabase_url, supabase_key)
             logger.info("✅ Supabase client initialized successfully")
             

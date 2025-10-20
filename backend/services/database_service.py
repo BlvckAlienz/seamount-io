@@ -32,8 +32,9 @@ class DatabaseService:
             if not self.settings.SUPABASE_URL or not self.settings.SUPABASE_SERVICE_KEY:
                 raise ValueError("Supabase URL and Service Key must be configured")
             
+            # ✅ FIX: Remove proxy parameter
             self.supabase: Client = create_client(
-                self.settings.SUPABASE_URL,  # ✅ FIX: Use SUPABASE_URL not VITE_SUPABASE_URL
+                self.settings.SUPABASE_URL,
                 self.settings.SUPABASE_SERVICE_KEY.get_secret_value()
             )
         
