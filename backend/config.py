@@ -410,11 +410,11 @@ class MultiChainBusinessModel:
     
     @staticmethod
     def calculate_cross_border_economics(
-        amount: Decimal,
-        from_currency: str,
-        to_currency: str,
-        from_country: str,
-        to_country: str
+        amount: Decimal = Decimal("1000.00"),
+        from_currency: str = "NGN",
+        to_currency: str = "USD",
+        from_country: str = "nigeria",
+        to_country: str = "kenya"
     ) -> Dict[str, Any]:
         """
         Calculate cross-border payment economics
