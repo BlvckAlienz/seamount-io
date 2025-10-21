@@ -562,11 +562,47 @@ class Settings(BaseSettings):
     # ========================================================================
     # TETHER WDK CONFIGURATION (NEW)
     # ========================================================================
-    WDK_API_KEY: Optional[SecretStr] = None
-    WDK_API_URL: str = Field(default="https://api.wallet.tether.to")  # TBD
+    # Your deployed WDK microservice (handles wallet creation, signing)
+    WDK_SERVICE_URL: str = Field(
+        default="https://seamount-wdk.onrender.com",
+        description="Your deployed WDK microservice (Node.js)"
+    )
+
+    # Official Tether WDK Indexer API (balances, transfers, history)
+    WDK_API_URL: str = Field(
+        default="https://wdk-api.tether.io",
+        description="Official Tether WDK Indexer API for blockchain queries"
+    )
+
+    # WDK API Key - Get from: https://wdk-api.tether.io/register
+    WDK_API_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Tether WDK API Key from https://wdk-api.tether.io"
+    )
+
+    # Supported chains via WDK
     WDK_ENABLED_CHAINS: List[str] = Field(default=[
-        "ethereum", "bitcoin", "polygon", "arbitrum", "ton", "lightning"
+        "bitcoin", "lightning", "ethereum", "polygon", 
+        "arbitrum", "ton", "tron", "solana"
     ])
+
+    # Alchemy Configuration (for Ethereum, Polygon, Arbitrum)
+    ALCHEMY_API_KEY_ETHEREUM: Optional[SecretStr] = Field(
+        default=None,
+        description="Alchemy API key for Ethereum mainnet"
+    )
+
+    ALCHEMY_API_KEY_POLYGON: Optional[SecretStr] = Field(
+        default=None,
+        description="Alchemy API key for Polygon"
+    )
+
+    ALCHEMY_API_KEY_ARBITRUM: Optional[SecretStr] = Field(
+        default=None,
+        description="Alchemy API key for Arbitrum"
+    )
+
+    # Default chain for new wallets
     WDK_DEFAULT_CHAIN: str = Field(default="ethereum")
     
     # ========================================================================

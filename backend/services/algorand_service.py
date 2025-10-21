@@ -2,6 +2,7 @@
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional
+from datetime import datetime
 
 from algosdk import account, mnemonic, transaction, encoding
 from algosdk.v2client import algod
@@ -35,6 +36,44 @@ class AlgorandService:
         except Exception as e:
             logger.critical(f"Failed to initialize treasury: {e}")
             raise
+
+    async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
+        """Create new Algorand wallet for user"""
+        try:
+            from cryptography.fernet import Fernet
+            import os
+            
+            # Generate keypair
+            private_key, address = account.generate_account()
+            mnemonic_phrase = mnemonic.from_private_key(private_key)
+            
+            logger.info(f"Generated Algorand wallet: {address[:10]}...")
+            
+            # Fund with minimum balance (0.1 ALGO)
+            try:
+                await self.fund_account_for_opt_in(address)
+                logger.info(f"✅ Funded wallet {address[:10]}...")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not fund (testnet down?): {e}")
+            
+            # Encrypt keys
+            encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
+            fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            
+            encrypted_private_key = fernet.encrypt(private_key.encode()).decode()
+            encrypted_mnemonic = fernet.encrypt(mnemonic_phrase.encode()).decode()
+            
+            return {
+                'wallet_address': address,
+                'encrypted_private_key': encrypted_private_key,
+                'encrypted_mnemonic': encrypted_mnemonic,
+                'blockchain': 'algorand',
+                'created_at': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Algorand wallet creation failed: {e}")
+            raise Exception(f"Failed to create Algorand wallet: {str(e)}")
 
     async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:
         """Get account information from Algorand blockchain"""

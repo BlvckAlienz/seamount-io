@@ -1,8 +1,7 @@
 # File: backend/services/wdk_client.py
 """
-Enhanced WDK Client - Full Tether WDK Integration
-Supports: Bitcoin, Lightning, Ethereum, Polygon, Arbitrum, TON, TRON, Solana
-Features: Gasless transactions, WDK Indexer, Account Abstraction
+ROCK SOLID WDK Client - Follows Tether's Official Patterns
+Based on: https://docs.wallet.tether.io/start-building/react-native-quickstart
 """
 
 import logging
@@ -17,19 +16,19 @@ logger = logging.getLogger(__name__)
 
 class WDKClient:
     """
-    Production-ready Tether WDK client with full multi-chain support
+    Production-ready Tether WDK client
+    Implements patterns from official React Native starter
     """
     
-    # All supported chains (production ready)
+    # Supported chains (from Tether docs)
     SUPPORTED_CHAINS = [
         'bitcoin',      # SegWit native transfers
-        'lightning',    # Instant BTC micropayments (Spark)
-        'ethereum',     # EVM + Account Abstraction
-        'polygon',      # Gasless transactions
-        'arbitrum',     # Gasless L2
-        'ton',          # High-performance
-        'tron',         # USDT native chain
-        'solana'        # High-speed transactions
+        'ethereum',     # Gasless with sponsored gas
+        'polygon',      # Gasless with sponsored gas
+        'arbitrum',     # Gasless with sponsored gas
+        'ton',          # Native transfers
+        'tron',         # USDT native
+        'solana'        # High-speed
     ]
     
     # Gasless-enabled chains (Account Abstraction)
@@ -37,14 +36,21 @@ class WDKClient:
     
     def __init__(self):
         self.settings = get_settings()
+        
+        # Your WDK microservice (handles wallet ops)
         self.base_url = self.settings.WDK_SERVICE_URL or "http://localhost:3001"
+        
+        # ✅ SINGLE API KEY (for Indexer queries)
         self.api_key = self.settings.WDK_API_KEY.get_secret_value() if self.settings.WDK_API_KEY else None
         
-        # Optional: WDK Indexer API for faster balance queries
-        self.indexer_api_key = getattr(self.settings, 'WDK_INDEXER_API_KEY', None)
-        self.indexer_url = "https://indexer-api.tether.io" if self.indexer_api_key else None
+        # WDK Indexer API (balance queries, tx history)
+        self.indexer_url = "https://indexer-api.tether.io" if self.api_key else None
         
-        logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: {'ON' if self.indexer_url else 'OFF'}")
+        if self.indexer_url:
+            logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: ON")
+        else:
+            logger.warning(f"⚠️ WDK Client initialized WITHOUT Indexer API key")
+            logger.warning(f"   Get key from: https://wdk-api.tether.io")
     
     async def _make_request(
         self, 
@@ -53,14 +59,21 @@ class WDKClient:
         data: Optional[Dict] = None,
         use_indexer: bool = False
     ) -> Dict[str, Any]:
-        """Make authenticated HTTP request to WDK service or Indexer"""
+        """Make authenticated HTTP request"""
         
-        base = self.indexer_url if use_indexer else self.base_url
+        # Choose base URL
+        if use_indexer:
+            if not self.indexer_url:
+                raise Exception("WDK Indexer API key not configured")
+            base = self.indexer_url
+        else:
+            base = self.base_url
+        
         url = f"{base}{endpoint}"
         
         headers = {
             'Content-Type': 'application/json',
-            'X-API-Key': self.indexer_api_key if use_indexer else self.api_key
+            'X-API-Key': self.api_key if use_indexer else 'smnt_wdk_local'
         }
         
         try:
@@ -77,14 +90,11 @@ class WDKClient:
         except aiohttp.ClientError as e:
             logger.error(f"❌ WDK request failed ({method} {endpoint}): {e}")
             raise Exception(f"WDK service unavailable: {str(e)}")
-        except Exception as e:
-            logger.error(f"❌ Unexpected error in WDK request: {e}")
-            raise
     
-    # ========== WALLET CREATION ==========
+    # ========== WALLET CREATION (Tether Pattern) ==========
     
     async def generate_seed(self) -> Dict[str, Any]:
-        """Generate new mnemonic seed phrase (encrypted)"""
+        """Generate encrypted mnemonic seed phrase"""
         result = await self._make_request('POST', '/wallet/generate-seed')
         
         if not result.get('success'):
@@ -103,15 +113,12 @@ class WDKClient:
     ) -> Dict[str, Any]:
         """
         Create wallets on specified chains
-        
-        Args:
-            encrypted_seed: Encrypted mnemonic from generate_seed()
-            chains: List of chains to create wallets on (default: all)
-            enable_gasless: Enable Account Abstraction on supported chains
+        Follows Tether's multi-chain wallet pattern
         """
         
         if chains is None:
-            chains = self.SUPPORTED_CHAINS
+            # Default: Essential chains from Tether docs
+            chains = ['bitcoin', 'ethereum', 'polygon', 'ton']
         
         # Validate chains
         invalid_chains = [c for c in chains if c not in self.SUPPORTED_CHAINS]
@@ -132,7 +139,7 @@ class WDKClient:
         logger.info(f"✅ Wallets created on {len(result['wallets'])} chains")
         return result
     
-    # ========== BALANCE QUERIES ==========
+    # ========== BALANCE QUERIES (Using Indexer API) ==========
     
     async def get_balance(
         self, 
@@ -140,34 +147,28 @@ class WDKClient:
         chain: str,
         use_indexer: bool = True
     ) -> Decimal:
-        """
-        Get balance for address on specific chain
-        
-        Args:
-            address: Wallet address
-            chain: Blockchain identifier
-            use_indexer: Use WDK Indexer API for faster queries (if available)
-        """
+        """Get balance for address on specific chain"""
         
         if chain not in self.SUPPORTED_CHAINS:
             raise ValueError(f"Unsupported chain: {chain}")
         
-        # Try WDK Indexer first (faster)
+        # Try Indexer first (if available)
         if use_indexer and self.indexer_url:
             try:
                 result = await self._make_request(
                     'GET', 
-                    f'/balance/{chain}/{address}',
+                    f'/v1/balance/{chain}/{address}',
                     use_indexer=True
                 )
                 return Decimal(str(result.get('balance', '0')))
             except Exception as e:
-                logger.warning(f"⚠️ Indexer failed, falling back to direct query: {e}")
+                logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
         
         # Fallback: Direct WDK service query
         result = await self._make_request(
-            'GET', 
-            f'/wallet/balance?address={address}&chain={chain}'
+            'POST', 
+            '/wallet/balance',
+            data={'address': address, 'chain': chain}
         )
         
         return Decimal(str(result.get('balance', '0')))
@@ -176,24 +177,16 @@ class WDKClient:
         self, 
         addresses: Dict[str, str]
     ) -> Dict[str, Dict[str, Any]]:
-        """
-        Get balances across multiple chains efficiently
-        
-        Args:
-            addresses: Dict of {chain: address}
-        
-        Returns:
-            {chain: {balance: Decimal, usd_value: Decimal}}
-        """
+        """Get balances across multiple chains efficiently"""
         
         balances = {}
         
-        # Use WDK Indexer for batch query if available
+        # Try batch query via Indexer
         if self.indexer_url:
             try:
                 result = await self._make_request(
                     'POST',
-                    '/balances/batch',
+                    '/v1/balances/batch',
                     data={'addresses': addresses},
                     use_indexer=True
                 )
@@ -216,31 +209,6 @@ class WDKClient:
         
         return balances
     
-    # ========== TRANSACTION HISTORY ==========
-    
-    async def get_transaction_history(
-        self,
-        address: str,
-        chain: str,
-        limit: int = 50
-    ) -> List[Dict[str, Any]]:
-        """Get transaction history for address (requires WDK Indexer)"""
-        
-        if not self.indexer_url:
-            logger.warning("⚠️ Transaction history requires WDK Indexer API key")
-            return []
-        
-        try:
-            result = await self._make_request(
-                'GET',
-                f'/transactions/{chain}/{address}?limit={limit}',
-                use_indexer=True
-            )
-            return result.get('transactions', [])
-        except Exception as e:
-            logger.error(f"❌ Transaction history query failed: {e}")
-            return []
-    
     # ========== TRANSACTIONS ==========
     
     async def send_transaction(
@@ -253,18 +221,7 @@ class WDKClient:
         encrypted_seed: str,
         enable_gasless: bool = True
     ) -> Dict[str, Any]:
-        """
-        Send transaction on specified chain
-        
-        Args:
-            from_address: Sender address
-            to_address: Recipient address
-            amount: Amount to send
-            asset: Asset identifier (e.g., 'USDT', 'BTC', 'ETH')
-            chain: Blockchain to use
-            encrypted_seed: Encrypted wallet seed for signing
-            enable_gasless: Use Account Abstraction if available
-        """
+        """Send transaction on specified chain"""
         
         if chain not in self.SUPPORTED_CHAINS:
             raise ValueError(f"Unsupported chain: {chain}")
@@ -287,106 +244,11 @@ class WDKClient:
         if not result.get('success'):
             raise Exception(f"Transaction failed: {result.get('error', 'Unknown error')}")
         
-        # Add metadata for revenue tracking
         result['gasless_used'] = use_gasless
         result['chain_used'] = chain
         
         logger.info(f"✅ Transaction sent on {chain} ({'gasless' if use_gasless else 'standard'})")
         return result
-    
-    # ========== LIGHTNING NETWORK ==========
-    
-    async def create_lightning_invoice(
-        self,
-        amount_sats: int,
-        description: str = "Seamount payment",
-        expiry_seconds: int = 3600
-    ) -> Dict[str, Any]:
-        """
-        Create Lightning Network invoice for receiving BTC
-        
-        Args:
-            amount_sats: Amount in satoshis
-            description: Invoice description
-            expiry_seconds: Invoice expiry time
-        """
-        
-        payload = {
-            'amount_sats': amount_sats,
-            'description': description,
-            'expiry': expiry_seconds
-        }
-        
-        result = await self._make_request('POST', '/lightning/invoice', data=payload)
-        
-        if not result.get('success'):
-            raise Exception("Lightning invoice creation failed")
-        
-        return {
-            'invoice': result['invoice'],
-            'payment_hash': result['payment_hash'],
-            'expires_at': result['expires_at'],
-            'amount_sats': amount_sats
-        }
-    
-    async def pay_lightning_invoice(
-        self,
-        invoice: str,
-        encrypted_seed: str
-    ) -> Dict[str, Any]:
-        """
-        Pay Lightning Network invoice
-        
-        Args:
-            invoice: BOLT11 invoice string
-            encrypted_seed: Encrypted wallet seed
-        """
-        
-        payload = {
-            'invoice': invoice,
-            'encrypted_seed': encrypted_seed
-        }
-        
-        result = await self._make_request('POST', '/lightning/pay', data=payload)
-        
-        if not result.get('success'):
-            raise Exception(f"Lightning payment failed: {result.get('error', 'Unknown')}")
-        
-        logger.info(f"✅ Lightning payment sent: {result.get('amount_sats')} sats")
-        return result
-    
-    # ========== GASLESS TRANSACTIONS ==========
-    
-    async def estimate_gasless_fee(
-        self,
-        chain: str,
-        asset: str,
-        amount: Decimal
-    ) -> Dict[str, Any]:
-        """
-        Estimate fee for gasless transaction (paid in USDT)
-        
-        Returns fee breakdown with markup opportunities
-        """
-        
-        if chain not in self.GASLESS_CHAINS:
-            raise ValueError(f"Gasless not supported on {chain}")
-        
-        payload = {
-            'chain': chain,
-            'asset': asset,
-            'amount': str(amount)
-        }
-        
-        result = await self._make_request('POST', '/gasless/estimate', data=payload)
-        
-        return {
-            'gas_cost_native': Decimal(result.get('gas_cost_native', '0')),  # ETH/MATIC
-            'gas_cost_usdt': Decimal(result.get('gas_cost_usdt', '0')),  # USDT equivalent
-            'platform_fee': Decimal(result.get('platform_fee', '0')),
-            'total_usdt': Decimal(result.get('total_usdt', '0')),
-            'savings_percent': result.get('savings_percent', 0)
-        }
     
     # ========== UTILITY METHODS ==========
     
@@ -395,7 +257,7 @@ class WDKClient:
         return chain.lower() in self.SUPPORTED_CHAINS
     
     def is_gasless_available(self, chain: str) -> bool:
-        """Check if gasless transactions available on chain"""
+        """Check if gasless transactions available"""
         return chain.lower() in self.GASLESS_CHAINS
     
     async def health_check(self) -> Dict[str, Any]:
