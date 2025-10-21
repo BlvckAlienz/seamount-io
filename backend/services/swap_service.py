@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from config import Settings, get_settings
 from .algorand_service import AlgorandService
 from .database_service import DatabaseService
-from .wallet_service import WalletService
+from .multi_chain_wallet_service import MultiChainWalletService as WalletService
 
 logger = logging.getLogger(__name__)
 

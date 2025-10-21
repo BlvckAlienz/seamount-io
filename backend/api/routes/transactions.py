@@ -12,7 +12,7 @@ import logging
 
 from backend.dependencies import get_current_user, get_db_service
 from backend.services.fee_calculator import FeeCalculatorService, TransactionType
-from backend.services.wallet_service import WalletService
+from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.services.cashramp_service import CashrampService
 from backend.services.oracle_service import EnhancedOracleService
 from backend.config import settings, BusinessModelConfig

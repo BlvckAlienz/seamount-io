@@ -43,7 +43,7 @@ try:
         initialize_dependencies, 
         get_supabase_client, 
         get_current_user, 
-        get_wallet_service, 
+        get_multi_chain_wallet_service, 
         get_notification_service, 
         get_audit_service,
         get_kyc_service,
@@ -63,7 +63,7 @@ except ImportError as e:
     def get_current_user():
         raise HTTPException(status_code=503, detail="Authentication service not available")
     
-    def get_wallet_service():
+    def get_multi_chain_wallet_service():
         raise HTTPException(status_code=503, detail="Wallet service not available")
     
     def get_notification_service():
@@ -102,7 +102,7 @@ try:
     from backend.config import Settings, get_settings, BusinessModelConfig, LicenseTier, PricingRegion
     from backend.services.email_service import EmailService
     from backend.services.notification_service import NotificationService
-    from backend.services.wallet_service import WalletService as ActualWalletService
+    from backend.services.multi_chain_wallet_service import MultiChainWalletService as ActualWalletService
     from backend.services.kyc_service import KYCService as ActualKYCService
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService as ActualAuditService
@@ -291,7 +291,7 @@ async def lifespan(app: FastAPI):
                     algorand_service = AlgorandService(settings)
     
                     # Initialize WalletService with correct dependencies
-                    wallet_service = WalletService(database_service, algorand_service)
+                    wallet_service = MultiChainWalletService(database_service, algorand_service, fee_calculator_service, oracle_service)
     
                     kyc_service = KYCService(
                         settings, 
@@ -445,6 +445,14 @@ if routers_available.get('payments'):
 else:
     logger.warning("Payments router not available - payment endpoints disabled")
 
+# ========== MULTI-CHAIN WALLET ROUTES ==========
+try:
+    from backend.api.routes import wallet
+    app.include_router(wallet.router, prefix="/api/v1", tags=["Multi-Chain Wallet"])
+    logger.info("✅ Multi-chain wallet router registered at /api/v1/wallet")
+except ImportError as e:
+    logger.error(f"❌ Multi-chain wallet router import failed: {e}")
+
 # FIXED: Include oracle router with error handling
 try:
     from backend.api.routes import oracle
@@ -511,25 +519,6 @@ except ImportError as e:
 # ===== NOW SAFE TO USE @app.on_event =====
 # (Removed from here - now using lifespan context manager above)
 
-# KYC Webhook endpoint (for ComplyCube callbacks)
-@app.post("/api/kyc/webhook", tags=["KYC Webhook"])
-async def kyc_webhook(request: Request, background_tasks: BackgroundTasks):
-    """
-    Handle KYC webhook events from ComplyCube
-    """
-    try:
-        payload = await request.json()
-        event_type = payload.get("type")
-        logger.info(f"Received KYC webhook event: {event_type}")
-        
-        # Process webhook asynchronously
-        background_tasks.add_task(process_kyc_webhook, payload)
-        
-        return {"status": "received"}
-    except Exception as e:
-        logger.error(f"Error processing KYC webhook: {e}")
-        raise HTTPException(status_code=400, detail="Invalid webhook payload")
-
 async def process_kyc_webhook(payload: Dict[str, Any]):
     """Background task to process KYC webhook events"""
     try:
@@ -564,7 +553,7 @@ async def debug_db_test(supabase: Client = Depends(get_supabase_client)):
 @app.get("/api/debug/wallet-test/{user_id}", tags=["Debug"])
 async def debug_wallet_test(
     user_id: str,
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """Test wallet service functionality"""
     try:
@@ -654,13 +643,58 @@ async def debug_oracle_test(asset_name: str):
 @app.get("/api/v1/health", tags=["System"])
 @limiter.limit("10/minute")
 async def health_check(request: Request):
-    return {
-        "status": "healthy", 
+    """Enhanced health check with multi-chain status"""
+    
+    health_status = {
+        "status": "healthy",
         "version": "3.1.6",
-        "services_available": services_available,
-        "oracle_service_available": oracle_service_available,
-        "dependencies_available": dependencies_available
+        "services": {
+            "database": "connected" if dependencies_available else "unavailable",
+            "oracle": "operational" if oracle_service_available else "unavailable",
+            "algorand": "operational",
+            "wdk": "checking...",
+            "email": "mock_mode"
+        },
+        "chains": {
+            "algorand": True,
+            "bitcoin": False,
+            "lightning": False,
+            "ethereum": False,
+            "polygon": False,
+            "arbitrum": False,
+            "ton": False,
+            "tron": False,
+            "solana": False
+        }
     }
+    
+    # Check WDK service health
+    try:
+        from backend.services.wdk_client import WDKClient
+        wdk = WDKClient()
+        wdk_health = await wdk.health_check()
+        
+        if wdk_health.get("status") == "healthy":
+            health_status["services"]["wdk"] = "operational"
+            # Update chain availability
+            for chain in wdk_health.get("supported_chains", []):
+                if chain in health_status["chains"]:
+                    health_status["chains"][chain] = True
+        else:
+            health_status["services"]["wdk"] = "degraded"
+            
+    except Exception as e:
+        logger.warning(f"WDK health check failed: {e}")
+        health_status["services"]["wdk"] = "unavailable"
+    
+    # Determine overall status
+    critical_services = ["database", "algorand"]
+    if all(health_status["services"].get(s) != "unavailable" for s in critical_services):
+        health_status["status"] = "healthy"
+    else:
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -727,7 +761,7 @@ async def initialize_session(
 async def create_wallet(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """Create a wallet for the user with proper error handling"""
     try:
@@ -760,11 +794,11 @@ async def business_contact(request: Request, payload: BusinessLeadPayload):
         
         asyncio.create_task(notifier.email_service.send_email(
             subject, 
-            ["support@seamount.io"], 
+            ["business@seamount.io"], 
             body
         ))
         
-        return {"message": "Your request has been submitted successfully."}
+        return {"message": "Your request has been submitted successfully. We'll get in-touch."}
     except Exception as e:
         logger.error(f"Business contact submission failed: {e}")
         raise HTTPException(status_code=500, detail="Could not process your request.")

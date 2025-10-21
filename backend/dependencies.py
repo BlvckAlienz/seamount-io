@@ -17,7 +17,7 @@ from backend.config import get_settings
 from backend.models import UserRole
 
 if TYPE_CHECKING:
-    from backend.services.wallet_service import WalletService
+    from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
     from backend.services.notification_service import NotificationService
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 else:
     # Runtime imports for actual service instantiation
     try:
-        from backend.services.wallet_service import WalletService
+        from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
         from backend.services.notification_service import NotificationService
         from backend.services.audit_service import AuditService
         from backend.services.kyc_service import KYCService
@@ -36,7 +36,7 @@ else:
         from backend.services.oracle_service import OracleService
     except ImportError as e:
         logging.warning(f"Service import failed: {e}")
-        WalletService = None
+        MultiChainWalletService = None
         NotificationService = None
         AuditService = None
         KYCService = None
@@ -48,15 +48,70 @@ logger = logging.getLogger(__name__)
 
 # Global service instances
 _supabase_client: Optional[Client] = None
-_wallet_service: Optional["WalletService"] = None
 _notification_service: Optional["NotificationService"] = None
 _audit_service: Optional["AuditService"] = None
 _kyc_service: Optional["KYCService"] = None
 _database_service: Optional["DatabaseService"] = None
 _algorand_service: Optional["AlgorandService"] = None
 _oracle_service: Optional["OracleService"] = None
+_multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
+_fee_calculator_service: Optional["FeeCalculatorService"] = None
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
+
+# ========== MULTI-CHAIN WALLET SERVICE ==========
+
+_multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
+
+def get_multi_chain_wallet_service() -> "MultiChainWalletService":
+    """Get multi-chain wallet service instance"""
+    global _multi_chain_wallet_service
+    
+    if _multi_chain_wallet_service is None:
+        try:
+            from backend.services.multi_chain_wallet_service import MultiChainWalletService
+            
+            # Initialize with dependencies
+            _multi_chain_wallet_service = MultiChainWalletService(
+                db_service=get_database_service(),
+                algorand_service=get_algorand_service(),
+                fee_calculator=get_fee_calculator_service(),
+                oracle_service=get_oracle_service()
+            )
+            
+            logger.info("✅ MultiChainWalletService initialized")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize MultiChainWalletService: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Multi-chain wallet service unavailable"
+            )
+    
+    return _multi_chain_wallet_service
+
+def get_fee_calculator_service() -> "FeeCalculatorService":
+    """Get fee calculator service instance"""
+    global _fee_calculator_service
+    
+    if _fee_calculator_service is None:
+        try:
+            from backend.services.fee_calculator import FeeCalculatorService
+            
+            _fee_calculator_service = FeeCalculatorService(
+                db_service=get_database_service()
+            )
+            
+            logger.info("✅ FeeCalculatorService initialized")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize FeeCalculatorService: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Fee calculator service unavailable"
+            )
+    
+    return _fee_calculator_service
 
 # Security schemes
 security = HTTPBearer(auto_error=False)  # For optional auth
@@ -69,7 +124,7 @@ def get_settings_cached():
 
 def initialize_dependencies(
     supabase_client: Client, 
-    wallet_service: "WalletService", 
+    multi_chain_wallet_service: "MultiChainWalletService", 
     notification_service: "NotificationService", 
     audit_service: Optional["AuditService"] = None,
     kyc_service: Optional["KYCService"] = None,
@@ -78,11 +133,11 @@ def initialize_dependencies(
     oracle_service: Optional["OracleService"] = None
 ):
     """Initialize dependency services - used in main.py startup"""
-    global _supabase_client, _wallet_service, _notification_service
+    global _supabase_client, _multi_chain_wallet_service, _notification_service
     global _audit_service, _kyc_service, _database_service, _algorand_service, _oracle_service
     
     _supabase_client = supabase_client
-    _wallet_service = wallet_service
+    _multi_chain_wallet_service = multi_chain_wallet_service
     _notification_service = notification_service
     _audit_service = audit_service
     _kyc_service = kyc_service
@@ -212,13 +267,6 @@ def get_payment_service():
                 raise HTTPException(status_code=503, detail="Payment service unavailable")
         
         return MockPaymentService()
-        
-def get_wallet_service() -> "WalletService":
-    """Get wallet service instance"""
-    if _wallet_service is None: 
-        logger.error("❌ Wallet service not initialized")
-        raise HTTPException(status_code=503, detail="Wallet service unavailable")
-    return _wallet_service
 
 def get_notification_service() -> "NotificationService":
     """Get notification service instance"""

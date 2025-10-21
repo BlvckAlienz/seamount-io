@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 # --- Core Dependencies ---
 from config import Settings
-from .wallet_service import WalletService  
+from .multi_chain_wallet_service import MultiChainWalletService as WalletService  
 from .kyc_service import KYCService
 from .database_service import DatabaseService
 from .email_service import EmailService

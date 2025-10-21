@@ -7,8 +7,8 @@ import logging
 from datetime import datetime, timezone
 import uuid
 
-from backend.dependencies import get_supabase_client, get_current_user, get_wallet_service
-from backend.services.wallet_service import WalletService
+from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service
+from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -185,7 +185,7 @@ async def change_password(
 @router.post("/provision-wallets")
 async def provision_wallets(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
     CRITICAL FIX: Provision Algorand wallet with mnemonic return
@@ -240,7 +240,7 @@ async def log_client_error(
 @router.get("/wallet-info")
 async def get_wallet_info(
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: WalletService = Depends(get_wallet_service)
+    wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """Get wallet info without creating one"""
     try:

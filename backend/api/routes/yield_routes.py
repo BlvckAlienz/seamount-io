@@ -43,7 +43,7 @@ class StakeRequest(BaseModel):
     tier: YieldTier = Field(..., description="Yield tier: stable, growth, or alpha")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "asset": "USDT",
                 "amount": 100.0,
@@ -57,7 +57,7 @@ class UnstakeRequest(BaseModel):
     partial_amount: Optional[float] = Field(None, gt=0, description="Optional partial unstake amount")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "stake_id": "STAKE_ABC123",
                 "partial_amount": 50.0

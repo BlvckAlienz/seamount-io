@@ -11,7 +11,7 @@ from datetime import datetime
 
 from backend.dependencies import get_supabase_client
 from backend.config import get_settings, Settings
-from backend.services.wallet_service import WalletService
+from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.services.kyc_providers.regfyl import regfyl_service
 from backend.services.database_service import DatabaseService
 from backend.services.algorand_service import AlgorandService

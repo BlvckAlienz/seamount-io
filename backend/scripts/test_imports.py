@@ -12,7 +12,7 @@ print(f"Current Python path: {sys.path}")
 try:
     # Test the imports
     from backend.config import Settings, get_settings
-    from backend.services.wallet_service import WalletService
+    from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
     from backend.services.notification_service import NotificationService
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
