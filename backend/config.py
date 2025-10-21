@@ -26,12 +26,6 @@ class LicenseTier(str, Enum):
     SCALE = "scale"          # $7,500/month  
     ENTERPRISE = "enterprise" # $15,000+/month (custom)
 
-class UserTier(str, Enum):
-    """B2C User Tiers - Transaction Fee Optimization"""
-    STANDARD = "standard"    # 0% discount
-    PREMIUM = "premium"      # 10% discount (paid subscription)
-    BUSINESS = "business"    # 15% discount (high volume)
-
 class BlockchainNetwork(str, Enum):
     """Supported Blockchain Networks (Post-WDK Integration)"""
     ALGORAND = "algorand"
@@ -101,13 +95,6 @@ class MultiChainBusinessModel:
         TransactionType.ASSET_SWAP: Decimal("0.75"),
         TransactionType.LIGHTNING_PAYMENT: Decimal("0.10"),
         TransactionType.MULTI_CHAIN_BRIDGE: Decimal("1.00")
-    }
-    
-    # User Tier Discounts (Loyalty rewards)
-    USER_TIER_DISCOUNTS = {
-        UserTier.STANDARD: Decimal("0.00"),   # 0% discount
-        UserTier.PREMIUM: Decimal("0.10"),    # 10% discount ($9.99/month subscription)
-        UserTier.BUSINESS: Decimal("0.15")    # 15% discount (>$50k monthly volume)
     }
     
     # ========================================================================
@@ -252,89 +239,25 @@ class MultiChainBusinessModel:
     # ========================================================================
     
     @staticmethod
-    def calculate_optimal_chain(
-        transaction_type: TransactionType,
-        amount: Decimal,
-        from_asset: Optional[str] = None,
-        to_asset: Optional[str] = None,
-        destination_country: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Smart routing: Select optimal blockchain for transaction
-        
-        PRIORITY:
-        1. Lightning Network for BTC micropayments (<$100)
-        2. Polygon for Ethereum-based stablecoins (low gas)
-        3. Algorand for USDS/USDCa transfers (native)
-        4. Bitcoin for large BTC transfers (>$10k)
-        5. Ethereum for DeFi integrations
-        """
-        
-        # Lightning for small Bitcoin payments
-        if from_asset == "BTC" and amount < Decimal("100"):
-            return {
-                "chain": BlockchainNetwork.LIGHTNING,
-                "estimated_fee": MultiChainBusinessModel.BASE_GAS_COSTS[BlockchainNetwork.LIGHTNING],
-                "estimated_time": "instant (<1 second)",
-                "reason": "Lightning Network optimal for Bitcoin micropayments"
-            }
-        
-        # Algorand for USDS native operations
-        if from_asset in ["USDS", "USDCa"] or to_asset in ["USDS", "USDCa"]:
-            return {
-                "chain": BlockchainNetwork.ALGORAND,
-                "estimated_fee": MultiChainBusinessModel.BASE_GAS_COSTS[BlockchainNetwork.ALGORAND],
-                "estimated_time": "4.5 seconds",
-                "reason": "Algorand native for USDS/USDCa"
-            }
-        
-        # Polygon for Ethereum stablecoins (cheap gas)
-        if from_asset in ["USDT", "USDC"] and transaction_type != TransactionType.MULTI_CHAIN_BRIDGE:
-            return {
-                "chain": BlockchainNetwork.POLYGON,
-                "estimated_fee": MultiChainBusinessModel.BASE_GAS_COSTS[BlockchainNetwork.POLYGON],
-                "estimated_time": "2 seconds",
-                "reason": "Polygon L2 for low-cost stablecoin transfers"
-            }
-        
-        # Bitcoin for large BTC transfers
-        if from_asset == "BTC" and amount >= Decimal("10000"):
-            return {
-                "chain": BlockchainNetwork.BITCOIN,
-                "estimated_fee": MultiChainBusinessModel.BASE_GAS_COSTS[BlockchainNetwork.BITCOIN],
-                "estimated_time": "10 minutes (1 confirmation)",
-                "reason": "Bitcoin mainnet for large, secure transfers"
-            }
-        
-        # Default to Algorand (our moat)
-        return {
-            "chain": BlockchainNetwork.ALGORAND,
-            "estimated_fee": MultiChainBusinessModel.BASE_GAS_COSTS[BlockchainNetwork.ALGORAND],
-            "estimated_time": "4.5 seconds",
-            "reason": "Algorand default - fast, cheap, reliable"
-        }
-    
-    # ========================================================================
-    # FEE CALCULATION ENGINE (CRITICAL - Used by all services)
-    # ========================================================================
-    
-    @staticmethod
     def calculate_total_fee(
         transaction_type: TransactionType,
         amount: Decimal,
-        user_tier: UserTier = UserTier.STANDARD,
+        # ❌ REMOVED: user_tier: UserTier = UserTier.STANDARD,
         from_asset: Optional[str] = None,
         to_asset: Optional[str] = None,
         blockchain: Optional[BlockchainNetwork] = None
     ) -> Dict[str, Decimal]:
         """
-        Calculate complete fee breakdown (ABSTRACT FROM USERS)
+        Calculate complete fee breakdown
+        
+        ✅ B2C users pay standard rates (NO TIERS, NO DISCOUNTS)
+        ✅ B2B API users handled separately via licensing_service
         
         Returns:
         - platform_fee: User-visible transaction fee
-        - network_fee: User-visible "blockchain fee" (includes our markup)
+        - network_fee: User-visible "blockchain fee" (includes markup)
         - total_fee: Total charged to user
-        - hidden_markup: Our profit margin (NEVER shown to user)
+        - hidden_markup: Our profit margin (NEVER shown)
         - net_revenue: Actual profit after provider costs
         """
         
@@ -355,10 +278,9 @@ class MultiChainBusinessModel:
         if platform_fee < minimum_fee:
             platform_fee = minimum_fee
         
-        # Apply user tier discount
-        discount_rate = MultiChainBusinessModel.USER_TIER_DISCOUNTS[user_tier]
-        discount_amount = platform_fee * discount_rate
-        platform_fee_discounted = platform_fee - discount_amount
+        # ❌ REMOVED: All user tier discount logic
+        # B2C users pay standard rates - NO DISCOUNTS
+        platform_fee_final = platform_fee
         
         # Determine blockchain (if not specified)
         if not blockchain:
@@ -382,7 +304,7 @@ class MultiChainBusinessModel:
         hidden_gas_markup = network_fee_charged - network_fee_actual
         
         # Total fee shown to user
-        total_fee_user = platform_fee_discounted + network_fee_charged
+        total_fee_user = platform_fee_final + network_fee_charged
         
         # Calculate provider costs
         provider_cost = MultiChainBusinessModel._estimate_provider_cost(
@@ -390,13 +312,13 @@ class MultiChainBusinessModel:
         )
         
         # Net revenue (our actual profit)
-        net_revenue = platform_fee_discounted + hidden_gas_markup - provider_cost - network_fee_actual
+        net_revenue = platform_fee_final + hidden_gas_markup - provider_cost - network_fee_actual
         
         return {
-            "platform_fee": float(platform_fee_discounted),
+            "platform_fee": float(platform_fee_final),
             "network_fee": float(network_fee_charged),
             "total_fee": float(total_fee_user),
-            "discount_applied": float(discount_amount),
+            "discount_applied": 0.0,  # ✅ Always 0 for B2C
             "hidden_markup": float(hidden_gas_markup),
             "net_revenue": float(net_revenue),
             "profit_margin_percent": float((net_revenue / total_fee_user * 100)) if total_fee_user > 0 else 0,
@@ -408,6 +330,42 @@ class MultiChainBusinessModel:
             }
         }
     
+    # ✅ ADD: Separate method for B2B API customers (if needed):
+    @staticmethod
+    def calculate_api_customer_fee(
+        transaction_type: str,
+        amount: Decimal,
+        license_tier: "LicenseTier",
+        from_asset: Optional[str] = None,
+        to_asset: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate fees for B2B API customers (different rates)
+        """
+        tier_config = MultiChainBusinessModel.API_LICENSE_PRICING[license_tier]
+        transaction_fee_rate = tier_config["transaction_fee_rate"]
+        
+        platform_fee = amount * transaction_fee_rate
+        
+        # Minimum fee
+        minimum_fee = Decimal("0.25")  # Lower for API customers
+        if platform_fee < minimum_fee:
+            platform_fee = minimum_fee
+        
+        # Network fees same as B2C
+        base_gas = Decimal("0.01")
+        network_fee = base_gas * Decimal("1.35")
+        
+        total_fee = platform_fee + network_fee
+        
+        return {
+            "platform_fee": float(platform_fee),
+            "network_fee": float(network_fee),
+            "total_fee": float(total_fee),
+            "license_tier": license_tier.value,
+            "effective_rate": float(transaction_fee_rate)
+        }
+        
     @staticmethod
     def calculate_cross_border_economics(
         amount: Decimal = Decimal("1000.00"),

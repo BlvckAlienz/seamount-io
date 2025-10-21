@@ -1,28 +1,23 @@
 # File: backend/services/fee_calculator.py
 """
-FIXED: Removed execute_query dependency, fixed BusinessModelConfig calls
+FIXED: Removed all B2C user tier logic
+✅ B2C users pay standard transaction fees - NO SUBSCRIPTION TIERS
+✅ B2B API customers have license tiers (Builder/Scale/Enterprise)
+✅ Revenue = transaction fees (B2C) + API subscriptions (B2B)
 """
 
 import logging
 from decimal import Decimal, ROUND_UP
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional
 from datetime import datetime
-from enum import Enum
 
-from backend.config import settings, MultiChainBusinessModel, LicenseTier
+from backend.config import settings, MultiChainBusinessModel, TransactionType
 from backend.services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
-class TransactionType(str, Enum):
-    CROSS_BORDER = "cross_border"
-    ON_RAMP = "on_ramp" 
-    P2P_LOCAL = "p2p"
-    ASSET_SWAP = "swap"
-    WITHDRAWAL = "withdrawal"
-
 class FeeCalculatorService:
-    """Production-ready fee calculator for all Seamount transactions"""
+    """Production-ready fee calculator - B2C users have NO tiers"""
     
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
@@ -32,7 +27,7 @@ class FeeCalculatorService:
         self.rate_cache = {}
         self.cache_ttl = 60
         
-        logger.info("FeeCalculatorService initialized with optimized 2.9% cross-border model")
+        logger.info("FeeCalculatorService initialized - B2C standard pricing, B2B API licensing")
     
     async def calculate_transaction_fee(
         self,
@@ -44,19 +39,34 @@ class FeeCalculatorService:
         destination_country: Optional[str] = None,
         payment_method: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Calculate comprehensive fee breakdown for any transaction"""
+        """
+        Calculate comprehensive fee breakdown for any transaction
+        
+        ✅ FIX: B2C users = standard pricing (no tiers)
+        ✅ FIX: B2B API users = check license tier (separate system)
+        """
         try:
-            # Get user tier for discounts
-            user_tier = await self._get_user_tier(user_id)
+            # ✅ Check if user is B2B API customer (optional)
+            is_api_customer = await self._is_api_customer(user_id)
             
-            # ✅ FIX: Use calculate_total_fee() instead of non-existent method
-            fee_calculation = self.business_model.calculate_total_fee(
-                transaction_type=transaction_type.value,
-                amount=amount,
-                user_tier=user_tier,
-                from_asset=from_asset,
-                to_asset=to_asset
-            )
+            if is_api_customer:
+                # B2B API customer - check license tier
+                api_tier = await self._get_api_license_tier(user_id)
+                fee_calculation = self.business_model.calculate_api_customer_fee(
+                    transaction_type=transaction_type.value,
+                    amount=amount,
+                    license_tier=api_tier,
+                    from_asset=from_asset,
+                    to_asset=to_asset
+                )
+            else:
+                # ✅ B2C user - standard pricing (NO TIERS)
+                fee_calculation = self.business_model.calculate_total_fee(
+                    transaction_type=transaction_type.value,
+                    amount=amount,
+                    from_asset=from_asset,
+                    to_asset=to_asset
+                )
             
             # Add transaction-specific enhancements
             if transaction_type == TransactionType.CROSS_BORDER:
@@ -77,9 +87,9 @@ class FeeCalculatorService:
             # Add timestamp and metadata
             fee_calculation.update({
                 "calculated_at": datetime.utcnow().isoformat(),
-                "calculator_version": "2.9_optimized",
+                "calculator_version": "2.0_b2c_standard",
                 "expires_at": (datetime.utcnow().timestamp() + 300),
-                "user_tier": user_tier.value
+                "user_type": "api_customer" if is_api_customer else "standard"
             })
             
             logger.info(f"Fee calculated: {transaction_type.value} ${float(amount)} = ${fee_calculation['total_fee']:.4f}")
@@ -88,6 +98,44 @@ class FeeCalculatorService:
         except Exception as e:
             logger.error(f"Fee calculation failed for {transaction_type.value}: {e}")
             raise ValueError(f"Could not calculate fees: {str(e)}")
+    
+    async def _is_api_customer(self, user_id: str) -> bool:
+        """Check if user is a B2B API customer (has active license)"""
+        try:
+            result = await self.db_service.supabase.table('api_licenses')\
+                .select('id')\
+                .eq('user_id', user_id)\
+                .eq('status', 'active')\
+                .maybe_single()\
+                .execute()
+            
+            return result.data is not None
+            
+        except Exception as e:
+            logger.warning(f"Could not check API customer status: {e}")
+            return False
+    
+    async def _get_api_license_tier(self, user_id: str):
+        """Get API license tier for B2B customers"""
+        try:
+            from backend.config import LicenseTier
+            
+            result = await self.db_service.supabase.table('api_licenses')\
+                .select('tier')\
+                .eq('user_id', user_id)\
+                .eq('status', 'active')\
+                .maybe_single()\
+                .execute()
+            
+            if result.data and result.data.get('tier'):
+                return LicenseTier(result.data['tier'])
+            
+            return LicenseTier.BUILDER  # Default for API customers
+            
+        except Exception as e:
+            logger.warning(f"Could not determine API license tier: {e}")
+            from backend.config import LicenseTier
+            return LicenseTier.BUILDER
     
     async def _enhance_cross_border_calculation(
         self, 
@@ -101,7 +149,7 @@ class FeeCalculatorService:
                 "settlement_time": "< 5 seconds",
                 "corridor": f"Algorand → {destination_country or 'Global'}",
                 "supported_assets": ["USDT", "USDCa"],
-                "provider": "Cashramp P2P Network"
+                "provider": "Multi-chain P2P Network"
             }
         }
         
@@ -124,30 +172,11 @@ class FeeCalculatorService:
                 "payment_method": payment_method or "paystack",
                 "processing_time": "Instant",
                 "supported_currencies": ["NGN", "KES", "GHS", "ZAR"],
-                "provider": "Paystack → Algorand"
+                "provider": "Paystack → Multi-chain"
             }
         }
         
         return enhanced
-    
-    async def _get_user_tier(self, user_id: str) -> LicenseTier:
-        """Get user's license tier for discount calculation"""
-        try:
-            # ✅ FIX: Use Supabase directly instead of execute_query
-            result = await self.db_service.supabase.table('user_profiles')\
-                .select('license_tier')\
-                .eq('id', user_id)\
-                .maybe_single()\
-                .execute()
-            
-            if result.data and result.data.get('license_tier'):
-                return LicenseTier(result.data['license_tier'])
-            
-            return LicenseTier.BUILDER  # Default tier
-            
-        except Exception as e:
-            logger.warning(f"Could not determine user tier: {e}")
-            return LicenseTier.BUILDER
     
     async def _store_fee_calculation(self, user_id: str, fee_calculation: Dict):
         """Store fee calculation for audit"""
