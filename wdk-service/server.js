@@ -14,7 +14,16 @@ const ecc = require('tiny-secp256k1');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const WDK_API_KEY = process.env.WDK_API_KEY || '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7';
+
+// ✅ ONLY use environment variable (no hardcoded fallback)
+const WDK_API_KEY = process.env.WDK_API_KEY;
+
+// Validate API key is configured
+if (!WDK_API_KEY) {
+    console.error('❌ FATAL: WDK_API_KEY environment variable not set!');
+    console.error('   Set it in Render dashboard or .env file');
+    process.exit(1); // Exit if no API key
+}
 
 console.log('🚀 Starting WDK Service...');
 console.log(`🔐 API Key configured: ${WDK_API_KEY.slice(0, 10)}...`);

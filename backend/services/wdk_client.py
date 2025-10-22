@@ -40,14 +40,20 @@ class WDKClient:
         # Your WDK microservice (handles wallet ops)
         self.base_url = self.settings.WDK_SERVICE_URL or "http://localhost:3001"
         
-        # ✅ SINGLE API KEY (for Indexer queries)
-        self.api_key = self.settings.WDK_API_KEY.get_secret_value() if self.settings.WDK_API_KEY else None
+        # ✅ CRITICAL: Get API key from environment (no fallback)
+        if not self.settings.WDK_API_KEY:
+            logger.error("❌ FATAL: WDK_API_KEY not configured in environment!")
+            logger.error("   Add WDK_API_KEY to backend/.env or Render environment")
+            raise ValueError("WDK_API_KEY environment variable required")
+        
+        self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
         # WDK Indexer API (balance queries, tx history)
         self.indexer_url = "https://indexer-api.tether.io" if self.api_key else None
         
         if self.indexer_url:
             logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: ON")
+            logger.info(f"   Using API Key: {self.api_key[:10]}...")
         else:
             logger.warning(f"⚠️ WDK Client initialized WITHOUT Indexer API key")
             logger.warning(f"   Get key from: https://wdk-api.tether.io")
@@ -73,7 +79,7 @@ class WDKClient:
         
         headers = {
             'Content-Type': 'application/json',
-            'X-API-Key': self.api_key if use_indexer else 'smnt_wdk_local'
+            'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
         }
         
         try:
