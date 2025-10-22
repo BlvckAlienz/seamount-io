@@ -319,39 +319,48 @@ app.post('/wallet/create', validateApiKey, async (req, res) => {
     }
 });
 
-app.post('/wallet/balance', validateApiKey, async (req, res) => {
-    try {
-        const { encrypted_seed, chain, index = 0 } = req.body;
+// ============================================================================
+// BALANCE QUERY - Support both GET (query params) and POST (body)
+// ============================================================================
 
-        if (!encrypted_seed || !chain) {
+app.get('/wallet/balance', validateApiKey, async (req, res) => {
+    try {
+        // ✅ GET request: Extract from query params
+        const { chain, address } = req.query;
+
+        if (!chain || !address) {
             return res.status(400).json({ 
                 success: false,
-                error: 'encrypted_seed and chain required' 
+                error: 'chain and address required as query parameters' 
             });
         }
 
-        const mnemonic = decrypt(encrypted_seed);
-        let address, balance = '0';
+        console.log(`📊 Balance query: ${chain} - ${address.slice(0, 10)}...`);
+
+        let balance = '0';
 
         if (chain === 'bitcoin') {
-            const btcWallet = await createBitcoinWallet(mnemonic, index);
-            address = btcWallet.address;
-            balance = '0'; // Requires external API
+            // Bitcoin balance requires external API
+            // For now, return 0 (add blockchain.info API later)
+            balance = '0';
+            console.log('⚠️  Bitcoin balance requires external API integration');
             
         } else if (chain === 'tron') {
-            const tronWallet = await createTronWallet(mnemonic, index);
-            address = tronWallet.address;
-            balance = '0'; // Requires TronGrid API
+            // TRON balance requires TronGrid API
+            balance = '0';
+            console.log('⚠️  TRON balance requires TronGrid API integration');
             
         } else if (['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
-            const evmWallet = await createEVMWallet(mnemonic, index);
-            address = evmWallet.address;
-            
             try {
                 const provider = providers[chain];
+                if (!provider) {
+                    throw new Error(`Provider not configured for ${chain}`);
+                }
+                
                 const balanceWei = await provider.getBalance(address);
                 balance = ethers.formatEther(balanceWei);
-                console.log(`✅ ${chain} balance: ${balance}`);
+                console.log(`✅ ${chain.toUpperCase()} balance: ${balance}`);
+                
             } catch (providerError) {
                 console.warn(`⚠️  Provider error for ${chain}:`, providerError.message);
                 balance = '0';
@@ -368,6 +377,85 @@ app.post('/wallet/balance', validateApiKey, async (req, res) => {
             success: true,
             chain,
             address,
+            balance,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Balance query failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ✅ ALSO support POST for backward compatibility
+app.post('/wallet/balance', validateApiKey, async (req, res) => {
+    try {
+        const { encrypted_seed, chain, index = 0, address } = req.body;
+
+        if (!chain) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'chain required' 
+            });
+        }
+
+        // If address provided directly, use it
+        let walletAddress = address;
+
+        // Otherwise, derive from seed
+        if (!walletAddress && encrypted_seed) {
+            console.log('🔓 Decrypting seed to derive address...');
+            const mnemonic = decrypt(encrypted_seed);
+
+            if (chain === 'bitcoin') {
+                const btcWallet = await createBitcoinWallet(mnemonic, index);
+                walletAddress = btcWallet.address;
+            } else if (chain === 'tron') {
+                const tronWallet = await createTronWallet(mnemonic, index);
+                walletAddress = tronWallet.address;
+            } else if (['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+                const evmWallet = await createEVMWallet(mnemonic, index);
+                walletAddress = evmWallet.address;
+            }
+        }
+
+        if (!walletAddress) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'address or encrypted_seed required' 
+            });
+        }
+
+        // Now query balance using the address
+        let balance = '0';
+
+        if (chain === 'bitcoin') {
+            balance = '0';
+            console.log('⚠️  Bitcoin balance requires external API');
+            
+        } else if (chain === 'tron') {
+            balance = '0';
+            console.log('⚠️  TRON balance requires TronGrid API');
+            
+        } else if (['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+            try {
+                const provider = providers[chain];
+                const balanceWei = await provider.getBalance(walletAddress);
+                balance = ethers.formatEther(balanceWei);
+                console.log(`✅ ${chain.toUpperCase()} balance: ${balance}`);
+            } catch (providerError) {
+                console.warn(`⚠️  Provider error for ${chain}:`, providerError.message);
+                balance = '0';
+            }
+        }
+
+        res.json({
+            success: true,
+            chain,
+            address: walletAddress,
             balance,
             timestamp: new Date().toISOString()
         });
