@@ -469,6 +469,172 @@ app.post('/wallet/balance', validateApiKey, async (req, res) => {
     }
 });
 
+// ============================================================================
+// SEND TRANSACTION - Following Tether WDK Node.js Quickstart Pattern
+// ============================================================================
+
+app.post('/wallet/send', validateApiKey, async (req, res) => {
+    try {
+        const { encrypted_seed, chain, to, amount, gasless } = req.body;
+
+        // Validate required fields
+        if (!encrypted_seed || !chain || !to || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Missing required fields: encrypted_seed, chain, to, amount' 
+            });
+        }
+
+        console.log(`💸 Initiating ${amount} ${chain.toUpperCase()} transfer to ${to.slice(0, 10)}...`);
+
+        // Decrypt seed phrase
+        const mnemonic = decrypt(encrypted_seed);
+        
+        if (!validateSeedPhrase(mnemonic)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid seed phrase' 
+            });
+        }
+
+        // ========== EVM CHAINS (Ethereum, Polygon, Arbitrum) ==========
+        if (['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+            try {
+                console.log(`⚙️  Processing ${chain} EVM transaction...`);
+                
+                // Create wallet from seed (WDK pattern)
+                const evmWallet = await createEVMWallet(mnemonic);
+                const provider = providers[chain];
+                
+                if (!provider) {
+                    throw new Error(`Provider not configured for ${chain}`);
+                }
+                
+                // Connect wallet to provider
+                const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+                
+                console.log(`📝 Sending from: ${wallet.address.slice(0, 10)}...`);
+                console.log(`📝 Sending to: ${to.slice(0, 10)}...`);
+                console.log(`📝 Amount: ${amount} ETH/MATIC`);
+                
+                // Build and send transaction (WDK pattern)
+                const tx = await wallet.sendTransaction({
+                    to: to,
+                    value: ethers.parseEther(amount.toString()),
+                    // Gasless handled by provider configuration
+                });
+
+                console.log(`⏳ Transaction submitted: ${tx.hash}`);
+                console.log(`⏳ Waiting for confirmation...`);
+
+                // Wait for confirmation (1 block)
+                const receipt = await tx.wait(1);
+
+                console.log(`✅ Transaction confirmed!`);
+                console.log(`   Block: ${receipt.blockNumber}`);
+                console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+                console.log(`   Status: ${receipt.status === 1 ? 'Success' : 'Failed'}`);
+
+                // Calculate actual costs
+                const gasPrice = receipt.gasPrice || tx.gasPrice;
+                const gasCostWei = receipt.gasUsed * gasPrice;
+                const gasCostEth = ethers.formatEther(gasCostWei);
+
+                return res.json({
+                    success: true,
+                    tx_hash: receipt.hash,
+                    tx_id: receipt.hash,
+                    chain: chain,
+                    block_number: receipt.blockNumber,
+                    gas_used: receipt.gasUsed.toString(),
+                    gas_price: gasPrice.toString(),
+                    gas_cost_eth: gasCostEth,
+                    status: receipt.status === 1 ? 'confirmed' : 'failed',
+                    gasless_used: gasless || false,
+                    timestamp: new Date().toISOString(),
+                    explorer_url: getExplorerUrl(chain, receipt.hash)
+                });
+                
+            } catch (evmError) {
+                console.error(`❌ ${chain} transaction failed:`, evmError.message);
+                
+                // Parse ethers.js error
+                let errorMessage = evmError.message;
+                if (evmError.code === 'INSUFFICIENT_FUNDS') {
+                    errorMessage = `Insufficient ${chain.toUpperCase()} balance. Please fund your wallet.`;
+                } else if (evmError.code === 'NONCE_EXPIRED') {
+                    errorMessage = 'Transaction nonce expired. Please retry.';
+                } else if (evmError.code === 'REPLACEMENT_UNDERPRICED') {
+                    errorMessage = 'Gas price too low. Please increase gas price.';
+                }
+                
+                return res.status(400).json({ 
+                    success: false,
+                    error: errorMessage,
+                    error_code: evmError.code,
+                    chain: chain
+                });
+            }
+        }
+
+        // ========== BITCOIN (DEFERRED - UTXO Complexity) ==========
+        else if (chain === 'bitcoin') {
+            console.log('⚠️  Bitcoin transactions require UTXO management');
+            return res.status(501).json({ 
+                success: false,
+                error: 'Bitcoin send transactions coming in Phase 2',
+                message: 'Bitcoin requires UTXO selection and transaction building. Use Algorand or EVM chains for now.',
+                alternative_chains: ['ethereum', 'polygon', 'arbitrum']
+            });
+        }
+        
+        // ========== TRON (DEFERRED - Different SDK) ==========
+        else if (chain === 'tron') {
+            console.log('⚠️  TRON transactions require TronWeb SDK');
+            return res.status(501).json({ 
+                success: false,
+                error: 'TRON send transactions coming in Phase 2',
+                message: 'TRON requires TronWeb SDK integration. Use EVM chains for now.',
+                alternative_chains: ['ethereum', 'polygon', 'arbitrum']
+            });
+        }
+        
+        // ========== UNSUPPORTED CHAIN ==========
+        else {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}`,
+                supported_chains: ['ethereum', 'polygon', 'arbitrum'],
+                message: 'Only EVM chains supported in Phase 1'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Send transaction failed:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// ============================================================================
+// HELPER: Get Blockchain Explorer URL
+// ============================================================================
+
+function getExplorerUrl(chain, txHash) {
+    const explorers = {
+        ethereum: `https://etherscan.io/tx/${txHash}`,
+        polygon: `https://polygonscan.com/tx/${txHash}`,
+        arbitrum: `https://arbiscan.io/tx/${txHash}`,
+        bitcoin: `https://blockstream.info/tx/${txHash}`,
+        tron: `https://tronscan.org/#/transaction/${txHash}`
+    };
+    
+    return explorers[chain] || `https://etherscan.io/tx/${txHash}`;
+}
+
 app.post('/wallet/send', validateApiKey, async (req, res) => {
     try {
         const { encrypted_seed, chain, to, amount, gasless } = req.body;
