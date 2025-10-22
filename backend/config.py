@@ -503,7 +503,7 @@ class Settings(BaseSettings):
         env_file=os.path.join(os.path.dirname(__file__), '.env'),
         env_file_encoding='utf-8',
         extra="allow",
-        case_sensitive=False
+        case_sensitive=False  # ✅ Match .env variable casing
     )
 
     # Core Security
@@ -517,39 +517,36 @@ class Settings(BaseSettings):
     SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
     SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
 
-    # ========== FEATURE FLAGS ==========
-    ALGORAND_ENABLED: bool = Field(default=True, description="Enable/disable Algorand wallet creation")
+    # ========== ✅ FEATURE FLAGS ==========
+    ALGORAND_ENABLED: bool = Field(
+        default=True, 
+        description="Enable/disable Algorand wallet creation"
+    )
 
     # ========================================================================
-    # TETHER WDK CONFIGURATION (NEW)
+    # TETHER WDK CONFIGURATION
     # ========================================================================
-    # Your deployed WDK microservice (handles wallet creation, signing)
     WDK_SERVICE_URL: str = Field(
         default="https://seamount-wdk.onrender.com",
         description="Your deployed WDK microservice (Node.js)"
     )
 
-    # Official Tether WDK Indexer API (balances, transfers, history)
     WDK_API_URL: str = Field(
         default="https://wdk-api.tether.io",
         description="Official Tether WDK Indexer API for blockchain queries"
     )
 
-    # WDK API Key - Get from: https://wdk-api.tether.io/register
     WDK_API_KEY: Optional[SecretStr] = Field(
         default=None,
         description="Tether WDK API Key from https://wdk-api.tether.io"
     )
 
-    # Supported chains via WDK
     WDK_ENABLED_CHAINS: List[str] = Field(default=[
         "bitcoin", "lightning", "ethereum", "polygon", 
         "arbitrum", "ton", "tron", "solana"
     ])
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    WDK_DEFAULT_CHAIN: str = Field(default="ethereum")
 
     # Alchemy Configuration (for Ethereum, Polygon, Arbitrum)
     ALCHEMY_API_KEY_ETHEREUM: Optional[SecretStr] = Field(
@@ -566,12 +563,9 @@ class Settings(BaseSettings):
         default=None,
         description="Alchemy API key for Arbitrum"
     )
-
-    # Default chain for new wallets
-    WDK_DEFAULT_CHAIN: str = Field(default="ethereum")
     
     # ========================================================================
-    # ALGORAND CONFIGURATION (Existing - Keep)
+    # ALGORAND CONFIGURATION
     # ========================================================================
     ALGORAND_ALGOD_ADDRESS: str = Field(default="https://mainnet-api.algonode.cloud")
     ALGORAND_INDEXER_ADDRESS: str = Field(default="https://mainnet-idx.algonode.cloud")
@@ -733,6 +727,9 @@ class Settings(BaseSettings):
             return set()
         return {key.strip() for key in self.WHITELISTED_API_KEYS_STR.split(',')}
 
+# ❌ REMOVED: Duplicate Config class (Pydantic v1)
+# This was causing the error
+
 # Create settings instance
 try:
     settings = Settings()
@@ -754,7 +751,6 @@ __all__ = [
     'settings', 
     'MultiChainBusinessModel', 
     'LicenseTier',
-    'UserTier', 
     'BlockchainNetwork',
     'TransactionType',
     'PricingRegion'
