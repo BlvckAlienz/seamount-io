@@ -14,7 +14,7 @@ const ecc = require('tiny-secp256k1');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const WDK_API_KEY = process.env.WDK_API_KEY || 'smnt_wdk_local';
+const WDK_API_KEY = process.env.WDK_API_KEY || '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7';
 
 console.log('🚀 Starting WDK Service...');
 console.log(`🔐 API Key configured: ${WDK_API_KEY.slice(0, 10)}...`);
