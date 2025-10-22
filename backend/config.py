@@ -519,7 +519,7 @@ class Settings(BaseSettings):
 
     # ========== ✅ FEATURE FLAGS ==========
     ALGORAND_ENABLED: bool = Field(
-        default=True, 
+        default=False, 
         description="Enable/disable Algorand wallet creation"
     )
 
