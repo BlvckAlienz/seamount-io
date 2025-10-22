@@ -517,6 +517,9 @@ class Settings(BaseSettings):
     SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
     SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
 
+    # ========== FEATURE FLAGS ==========
+    ALGORAND_ENABLED: bool = Field(default=True, description="Enable/disable Algorand wallet creation")
+
     # ========================================================================
     # TETHER WDK CONFIGURATION (NEW)
     # ========================================================================
@@ -543,6 +546,10 @@ class Settings(BaseSettings):
         "bitcoin", "lightning", "ethereum", "polygon", 
         "arbitrum", "ton", "tron", "solana"
     ])
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
 
     # Alchemy Configuration (for Ethereum, Polygon, Arbitrum)
     ALCHEMY_API_KEY_ETHEREUM: Optional[SecretStr] = Field(
