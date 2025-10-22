@@ -148,36 +148,56 @@ class WDKClient:
     # ========== BALANCE QUERIES (Using Indexer API) ==========
     
     async def get_balance(
-        self, 
-        address: str, 
-        chain: str,
-        use_indexer: bool = True
-    ) -> Decimal:
-        """Get balance for address on specific chain"""
-        
-        if chain not in self.SUPPORTED_CHAINS:
-            raise ValueError(f"Unsupported chain: {chain}")
-        
-        # Try Indexer first (if available)
-        if use_indexer and self.indexer_url:
-            try:
-                result = await self._make_request(
-                    'GET', 
-                    f'/v1/balance/{chain}/{address}',
-                    use_indexer=True
-                )
+    self, 
+    address: str, 
+    chain: str,
+    use_indexer: bool = True
+) -> Decimal:
+    """Get balance for address on specific chain"""
+    
+    if chain not in self.SUPPORTED_CHAINS:
+        raise ValueError(f"Unsupported chain: {chain}")
+    
+    # Try Indexer first (if available)
+    if use_indexer and self.indexer_url:
+        try:
+            result = await self._make_request(
+                'GET', 
+                f'/v1/balance/{chain}/{address}',
+                use_indexer=True
+            )
+            return Decimal(str(result.get('balance', '0')))
+        except Exception as e:
+            logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
+    
+    # ✅ FIX: Use GET request with query params (not POST with body)
+    try:
+        async with aiohttp.ClientSession() as session:
+            headers = {
+                'Content-Type': 'application/json',
+                'X-API-Key': self.api_key
+            }
+            
+            # Use GET with query parameters
+            url = f"{self.base_url}/wallet/balance"
+            params = {
+                'chain': chain,
+                'address': address
+            }
+            
+            async with session.get(url, headers=headers, params=params) as response:
+                response.raise_for_status()
+                result = await response.json()
+                
+                if not result.get('success'):
+                    logger.error(f"Balance query failed: {result.get('error')}")
+                    return Decimal('0')
+                
                 return Decimal(str(result.get('balance', '0')))
-            except Exception as e:
-                logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
-        
-        # Fallback: Direct WDK service query
-        result = await self._make_request(
-            'POST', 
-            '/wallet/balance',
-            data={'address': address, 'chain': chain}
-        )
-        
-        return Decimal(str(result.get('balance', '0')))
+                
+    except Exception as e:
+        logger.error(f"❌ Balance query failed for {chain}: {e}")
+        return Decimal('0')
     
     async def get_balances_multi_chain(
         self, 

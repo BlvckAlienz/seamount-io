@@ -167,77 +167,156 @@ class MultiChainWalletService:
     
     # ========== BALANCE QUERIES ==========
     
-    async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
-        """Get unified balance view across ALL chains"""
+    async def get_user_balances(
+        self,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get unified balance view across ALL chains
+        """
         
         try:
-            # 1. Algorand balances
-            algo_wallet = self.db.supabase.table('user_wallets')\
+            # 1. Get Algorand balances
+            algo_wallet = await self.db.supabase.table('user_wallets')\
                 .select('algorand_address')\
                 .eq('user_id', user_id)\
+                .maybe_single()\
                 .execute()
             
             balances = {}
             total_usd = Decimal('0')
             
-            if algo_wallet.data and len(algo_wallet.data) > 0:
-                algo_address = algo_wallet.data[0].get('algorand_address')
+            if algo_wallet.data and algo_wallet.data.get('algorand_address'):
+                algo_address = algo_wallet.data['algorand_address']
                 
-                if algo_address:
-                    account_info = await self.algorand.get_account_info(algo_address)
+                # Query Algorand account
+                account_info = await self.algorand.get_account_info(algo_address)
+                
+                # Native ALGO balance
+                algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
+                if algo_balance > 0:
+                    algo_price, _ = await self.oracle.get_asset_price('algorand')
+                    balances['ALGO'] = {
+                        'balance': float(algo_balance),
+                        'chain': 'algorand',
+                        'usd_value': float(algo_balance * algo_price)
+                    }
+                    total_usd += algo_balance * algo_price
+                
+                # ASA balances (USDCa, USDT, goBTC, goETH)
+                for asset_info in account_info.get('assets', []):
+                    asset_id = asset_info.get('asset-id')
+                    amount = Decimal(str(asset_info.get('amount', 0)))
                     
-                    if account_info:
-                        # ALGO balance
-                        algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
-                        if algo_balance > 0:
+                    # Map asset ID to symbol
+                    asset_map = {
+                        31566704: ('USDCa', 6),
+                        312769: ('USDT', 6),
+                        386192725: ('goBTC', 8),
+                        386195940: ('goETH', 8)
+                    }
+                    
+                    if asset_id in asset_map:
+                        symbol, decimals = asset_map[asset_id]
+                        balance = amount / (Decimal('10') ** decimals)
+                        
+                        if balance > 0:
                             try:
-                                algo_price, _ = await self.oracle.get_asset_price('algorand')
-                                balances['ALGO'] = {
-                                    'balance': float(algo_balance),
+                                price, _ = await self.oracle.get_asset_price(symbol.lower())
+                                usd_value = balance * price
+                                
+                                balances[symbol] = {
+                                    'balance': float(balance),
                                     'chain': 'algorand',
-                                    'usd_value': float(algo_balance * algo_price)
+                                    'usd_value': float(usd_value)
                                 }
-                                total_usd += algo_balance * algo_price
+                                total_usd += usd_value
                             except Exception:
-                                balances['ALGO'] = {
-                                    'balance': float(algo_balance),
+                                balances[symbol] = {
+                                    'balance': float(balance),
                                     'chain': 'algorand',
                                     'usd_value': 0.0
                                 }
+            
+            # 2. Get WDK chain balances
+            wdk_wallets = await self.db.supabase.table('multi_chain_addresses')\
+                .select('blockchain, address')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if wdk_wallets.data:
+                for wallet in wdk_wallets.data:
+                    chain = wallet['blockchain']
+                    address = wallet['address']
+                    
+                    try:
+                        # ✅ FIX: Pass address and chain correctly
+                        balance = await self.wdk.get_balance(
+                            address=address,
+                            chain=chain,
+                            use_indexer=False  # Skip indexer, use direct query
+                        )
                         
-                        # ASA balances
-                        asset_map = {
-                            31566704: ('USDCa', 6),
-                            312769: ('USDT', 6),
-                            386192725: ('goBTC', 8),
-                            386195940: ('goETH', 8)
-                        }
-                        
-                        for asset_info in account_info.get('assets', []):
-                            asset_id = asset_info.get('asset-id')
-                            amount = Decimal(str(asset_info.get('amount', 0)))
+                        if balance > 0:
+                            native_asset = self._get_native_asset(chain)
                             
-                            if asset_id in asset_map:
-                                symbol, decimals = asset_map[asset_id]
-                                balance = amount / (Decimal('10') ** decimals)
+                            try:
+                                # Map chain to oracle asset name
+                                oracle_map = {
+                                    'bitcoin': 'bitcoin',
+                                    'ethereum': 'ethereum',
+                                    'polygon': 'matic-network',
+                                    'arbitrum': 'ethereum',  # Arbitrum uses ETH
+                                    'tron': 'tron',
+                                    'ton': 'the-open-network'
+                                }
                                 
-                                if balance > 0:
-                                    try:
-                                        price, _ = await self.oracle.get_asset_price(symbol.lower())
-                                        usd_value = balance * price
-                                        
-                                        balances[symbol] = {
-                                            'balance': float(balance),
-                                            'chain': 'algorand',
-                                            'usd_value': float(usd_value)
-                                        }
-                                        total_usd += usd_value
-                                    except Exception:
-                                        balances[symbol] = {
-                                            'balance': float(balance),
-                                            'chain': 'algorand',
-                                            'usd_value': 0.0
-                                        }
+                                oracle_id = oracle_map.get(chain, chain)
+                                price, _ = await self.oracle.get_asset_price(oracle_id)
+                                usd_value = balance * price
+                                
+                                balances[native_asset] = {
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': float(usd_value)
+                                }
+                                total_usd += usd_value
+                                
+                            except Exception as price_error:
+                                logger.warning(f"Price lookup failed for {chain}: {price_error}")
+                                balances[native_asset] = {
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': 0.0
+                                }
+                    
+                    except Exception as e:
+                        logger.error(f"❌ Balance query failed for {chain}: {e}")
+                        continue
+            
+            # 3. Format response
+            assets_list = sorted(
+                balances.values(),
+                key=lambda x: x['usd_value'],
+                reverse=True
+            )
+            
+            return {
+                'success': True,
+                'total_usd': float(total_usd),
+                'assets': assets_list,
+                'asset_count': len(balances),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Balance query failed: {e}")
+            return {
+                'success': False,
+                'total_usd': 0.0,
+                'assets': [],
+                'error': str(e)
+            }
             
             # 2. WDK balances
             wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
