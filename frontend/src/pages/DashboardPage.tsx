@@ -1,5 +1,5 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// 💎 TETHER WDK-INSPIRED PREMIUM DASHBOARD
+// TETHER WDK-INSPIRED PREMIUM DASHBOARD
 // Beautiful wallet cards, smooth animations, persistent KYC banner
 
 import React, { useState, useEffect } from 'react';
@@ -57,7 +57,7 @@ const AssetCard = ({ asset, onBuy, onSend }) => {
             <div className={`text-2xl font-bold ${hasBalance ? 'text-white' : 'text-gray-500'}`}>
               ${valueUsd.toFixed(2)}
             </div>
-            <div className="text-sm text-gray-400">≈ {balance.toFixed(6)}</div>
+            <div className="text-sm text-gray-400">â‰ˆ {balance.toFixed(6)}</div>
           </div>
         </div>
 
@@ -122,7 +122,7 @@ const KYCPromptBanner = ({ kycStatus, cumulativeVolume, limit, urgency }) => {
       border: 'border-blue-200 dark:border-blue-800',
       text: 'text-blue-800 dark:text-blue-200',
       icon: <AlertTriangle className="w-5 h-5" />,
-      title: '💡 Unlock Unlimited Transactions',
+      title: 'ðŸ’¡ Unlock Unlimited Transactions',
       message: `You've used $${cumulativeVolume.toFixed(2)} of your $${limit} limit. Verify your identity to remove all limits.`,
       action: 'Verify Now',
       dismissible: true,
@@ -132,7 +132,7 @@ const KYCPromptBanner = ({ kycStatus, cumulativeVolume, limit, urgency }) => {
       border: 'border-orange-200 dark:border-orange-800',
       text: 'text-orange-800 dark:text-orange-200',
       icon: <AlertTriangle className="w-5 h-5" />,
-      title: '⚠️ Approaching Transaction Limit',
+      title: 'âš ï¸ Approaching Transaction Limit',
       message: `Only $${remaining.toFixed(2)} remaining. Complete KYC verification to continue transacting.`,
       action: 'Complete KYC',
       dismissible: false,
@@ -142,7 +142,7 @@ const KYCPromptBanner = ({ kycStatus, cumulativeVolume, limit, urgency }) => {
       border: 'border-red-200 dark:border-red-800',
       text: 'text-red-800 dark:text-red-200',
       icon: <Shield className="w-5 h-5" />,
-      title: '🚨 Transaction Limit Reached',
+      title: 'ðŸš¨ Transaction Limit Reached',
       message: `You've reached your $${limit} limit. Verify your identity to continue.`,
       action: 'Verify Now (Required)',
       dismissible: false,
@@ -256,7 +256,7 @@ const WalletAddressCard = ({ address }) => {
           </div>
         </div>
         
-        {/* ✅ FIXED: Proper <a> tag structure */}
+        {/* FIXED: Proper <a> tag structure */}
         <a
           href={`https://explorer.blockchain.com/address/${address}`}
           target="_blank"
@@ -299,48 +299,61 @@ const DashboardPage = () => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchPortfolioData = async () => {
+  try {
+    setLoading(true);
+    
+    // ✅ FIX: Try portfolio endpoint first
     try {
-      setLoading(true);
+      const data = await portfolioService.getPortfolio(userProfile?.id || '');
       
-      // Fetch portfolio balances
-      const portfolioResponse = await apiClient.get('/api/v1/wallet/balances');
-      setPortfolioData(portfolioResponse.data);
-      
-      // ✅ FIX: Fetch KYC status with error handling
-      try {
-        const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
-        
-        // ✅ DEFENSIVE: Validate response structure
-        if (kycResponse.data) {
-          setKycInfo({
-            status: kycResponse.data.status || 'not_started',
-            cumulative_volume: kycResponse.data.cumulative_volume || 0,
-            limit: kycResponse.data.limit || 5000,
-            urgency: kycResponse.data.urgency || 'none',
-          });
-        }
-      } catch (kycError) {
-        console.error('KYC status fetch failed:', kycError);
-        
-        // ✅ FALLBACK: Set safe defaults if endpoint fails
-        setKycInfo({
-          status: 'not_started',
-          cumulative_volume: 0,
-          limit: 5000,
-          urgency: 'none',
+      if (data.wallet_exists) {
+        setPortfolioData({
+          success: true,
+          total_usd: data.total_balance_usd,
+          balances: data.assets.reduce((acc, asset) => {
+            acc[asset.symbol] = asset.balance;
+            return acc;
+          }, {} as Record<string, number>),
+          prices: data.assets.reduce((acc, asset) => {
+            acc[asset.symbol] = asset.price_usd;
+            return acc;
+          }, {} as Record<string, number>),
+          wallet_address: data.wallet_address
         });
-        
-        // Don't show error to user - this is optional data
+        setWalletAddress(data.wallet_address);
+        return; // ✅ Exit early if successful
       }
-      
-    } catch (error) {
-      console.error('Dashboard fetch error:', error);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
+    } catch (portfolioError) {
+      console.warn('Portfolio fetch failed, checking profile...', portfolioError);
     }
-  };
+    
+    // ✅ FIX: Fallback to profile (Phase 1 compatibility)
+    if (userProfile?.algorand_address) {
+      setWalletAddress(userProfile.algorand_address);
+      toast.info('Wallet found! Loading balances...');
+      
+      // Fetch balances manually
+      try {
+        const balanceResponse = await apiClient.get('/api/v1/wallet/balances');
+        if (balanceResponse.data.success) {
+          setPortfolioData(balanceResponse.data);
+        }
+      } catch (balanceError) {
+        console.error('Balance fetch failed:', balanceError);
+      }
+    } else {
+      // No wallet found - create one
+      await createWallet();
+    }
+    
+  } catch (error: any) {
+    console.error('Portfolio fetch error:', error);
+    toast.error('Failed to load portfolio');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleBuyAsset = (asset) => {
     toast('Buy feature coming soon!');
