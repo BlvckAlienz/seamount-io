@@ -30,36 +30,50 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
-  const { session: authSession } = useAuth(); // Only need the session to check for authenticated state
   const [sessionId, setSessionId] = useState<string | null>(null);
-
-  // Simplified state: derive consent directly from localStorage
+  
+  // ✅ FIX: Safe consent state initialization
   const [consentGiven, setConsentGiven] = useState<boolean>(() => {
-    return localStorage.getItem('seamount_consent_given') === 'true';
+    try {
+      return localStorage.getItem('seamount_consent_given') === 'true';
+    } catch {
+      return false;
+    }
   });
 
+  // ✅ FIX: Safe auth context access with fallback
+  let authSession = null;
+  try {
+    const auth = useAuth();
+    authSession = auth?.session || null;
+  } catch (error) {
+    console.error('Auth context error:', error);
+    // Continue without auth - let error boundary handle it
+  }
+
   useEffect(() => {
-    // This effect handles the creation of an anonymous session for unauthenticated users
-    // who have not yet given consent.
+    // Initialize anonymous session for unauthenticated users without consent
     const initializeAnonymousSession = async () => {
       try {
         const { data } = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
         setSessionId(data.session_id);
       } catch (error) {
-        console.error("Failed to initialize anonymous session. Cookie banner will not be shown.", error);
-        // If this fails, we don't block the user. The banner simply won't appear.
+        console.error("Failed to initialize anonymous session:", error);
       }
     };
     
-    // Only run this logic if the user is not logged in and has not already given consent.
     if (!authSession && !consentGiven) {
       initializeAnonymousSession();
     }
   }, [authSession, consentGiven]);
 
   const handleConsentGiven = () => {
-    localStorage.setItem('seamount_consent_given', 'true');
-    setConsentGiven(true);
+    try {
+      localStorage.setItem('seamount_consent_given', 'true');
+      setConsentGiven(true);
+    } catch (error) {
+      console.error('Failed to save consent:', error);
+    }
   };
 
   const handleOpenAuth = (view: 'login' | 'register') => {
@@ -97,7 +111,6 @@ const AppContent: React.FC = () => {
         initialView={authView}
       />
 
-      {/* The banner will only show if an anonymous session was successfully created */}
       {!authSession && !consentGiven && sessionId && (
         <CookieConsentBanner sessionId={sessionId} onConsentGiven={handleConsentGiven} />
       )}

@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    dedupe: ['react', 'react-dom'], // ✅ FIX: Force single React instance
   },
   build: {
     outDir: 'dist',
@@ -17,10 +18,11 @@ export default defineConfig({
       treeShaking: true,
     },
     rollupOptions: {
-      external: [
-        // Add any packages that should be treated as external
-        // (usually for SSR or special cases)
-      ],
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
     },
   },
   server: {
@@ -32,6 +34,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
+    include: ['react', 'react-dom'],
+    exclude: [], // ✅ FIX: Let Vite handle React naturally
   },
 });
