@@ -632,5 +632,5 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
     return "alien"
     
 def get_db_service() -> Optional["DatabaseService"]:
-    """Get database service instance (alias for get_database_service)"""
+    """Alias for get_database_service()"""
     return get_database_service()

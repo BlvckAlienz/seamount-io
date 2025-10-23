@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import uuid
 
-from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service
+from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service, get_database_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.config import KYCConfig
 
@@ -228,7 +228,7 @@ async def provision_wallets(
 @router.get("/kyc-status")
 async def get_kyc_status(
     current_user: dict = Depends(get_current_user),
-    db_service = Depends(get_db_service)
+    db_service = Depends(get_database_service)
 ):
     """
     Get user's KYC status and transaction limit info
