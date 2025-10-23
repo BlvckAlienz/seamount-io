@@ -307,9 +307,32 @@ const DashboardPage = () => {
       const portfolioResponse = await apiClient.get('/api/v1/wallet/balances');
       setPortfolioData(portfolioResponse.data);
       
-      // Fetch KYC status
-      const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
-      setKycInfo(kycResponse.data);
+      // ✅ FIX: Fetch KYC status with error handling
+      try {
+        const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
+        
+        // ✅ DEFENSIVE: Validate response structure
+        if (kycResponse.data) {
+          setKycInfo({
+            status: kycResponse.data.status || 'not_started',
+            cumulative_volume: kycResponse.data.cumulative_volume || 0,
+            limit: kycResponse.data.limit || 5000,
+            urgency: kycResponse.data.urgency || 'none',
+          });
+        }
+      } catch (kycError) {
+        console.error('KYC status fetch failed:', kycError);
+        
+        // ✅ FALLBACK: Set safe defaults if endpoint fails
+        setKycInfo({
+          status: 'not_started',
+          cumulative_volume: 0,
+          limit: 5000,
+          urgency: 'none',
+        });
+        
+        // Don't show error to user - this is optional data
+      }
       
     } catch (error) {
       console.error('Dashboard fetch error:', error);
