@@ -5,10 +5,12 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, Dict, Any
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 import uuid
 
 from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
+from backend.config import KYCConfig
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -222,7 +224,54 @@ async def provision_wallets(
     except Exception as e:
         logger.error(f"[Wallet Provision] Failed for user {current_user['id']}: {e}")
         raise HTTPException(status_code=500, detail="Wallet provisioning failed")
+
+@router.get("/kyc-status")
+async def get_kyc_status(
+    current_user: dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    Get user's KYC status and transaction limit info
+    """
     
+    try:
+        user_id = current_user['id']
+        
+        # Get user profile
+        profile = db_service.supabase.table('user_profiles')\
+            .select('kyc_status, cumulative_volume_30d')\
+            .eq('id', user_id)\
+            .execute()
+        
+        if not profile.data or len(profile.data) == 0:
+            return {
+                'status': 'not_started',
+                'cumulative_volume': 0.0,
+                'limit': float(KYCConfig.THRESHOLD_USD),
+                'remaining': float(KYCConfig.THRESHOLD_USD),
+                'urgency': 'none'
+            }
+        
+        data = profile.data[0]
+        kyc_status = data.get('kyc_status', 'not_started')
+        cumulative = Decimal(str(data.get('cumulative_volume_30d', 0)))
+        
+        remaining = KYCConfig.calculate_remaining_limit(cumulative)
+        urgency = KYCConfig.get_urgency_level(cumulative)
+        
+        return {
+            'status': kyc_status,
+            'cumulative_volume': float(cumulative),
+            'limit': float(KYCConfig.THRESHOLD_USD),
+            'remaining': float(remaining),
+            'urgency': urgency,
+            'percent_used': float((cumulative / KYCConfig.THRESHOLD_USD) * 100) if KYCConfig.THRESHOLD_USD > 0 else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"KYC status query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/api/errors")
 async def log_client_error(
     request: Request,

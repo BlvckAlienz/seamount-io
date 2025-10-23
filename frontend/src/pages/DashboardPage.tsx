@@ -1,4 +1,7 @@
 // File: frontend/src/pages/DashboardPage.tsx
+// 💎 TETHER WDK-INSPIRED PREMIUM DASHBOARD
+// Beautiful wallet cards, smooth animations, persistent KYC banner
+
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, DollarSign, Activity, RefreshCw, Shield, AlertTriangle,
@@ -7,29 +10,30 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { userAPI } from '../config/api';
-import { portfolioService } from '../services/portfolio';
-import NigerianUserBanner from '../components/layout/NigerianUserBanner';
-import ReceiveModal from '../components/payments/ReceiveModal';
+import { apiClient } from '../config/api';
 
-// Asset Card Component
-const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; onSend: () => void }) => {
+// ============================================================================
+// PREMIUM ASSET CARD COMPONENT
+// ============================================================================
+
+const AssetCard = ({ asset, onBuy, onSend }) => {
   const getGradient = (symbol: string) => {
-    const gradients: { [key: string]: string } = {
-      'ALGO': 'from-purple-500 to-indigo-600',
+    const gradients = {
+      'BTC': 'from-orange-500 to-yellow-600',
+      'ETH': 'from-gray-400 to-slate-600',
+      'MATIC': 'from-purple-500 to-indigo-600',
       'USDT': 'from-green-500 to-emerald-600',
-      'USDCa': 'from-blue-500 to-cyan-600',
-      'goBTC': 'from-orange-500 to-yellow-600',
-      'goETH': 'from-gray-400 to-slate-600'
+      'USDC': 'from-blue-500 to-cyan-600',
+      'ALGO': 'from-purple-500 to-indigo-600'
     };
     return gradients[symbol] || 'from-gray-500 to-gray-600';
   };
 
   const getIcon = (symbol: string) => {
     switch (symbol) {
-      case 'goBTC': return <Bitcoin className="h-8 w-8" />;
-      case 'goETH': return <Coins className="h-8 w-8" />;
-      case 'ALGO': return <Shield className="h-8 w-8" />;
+      case 'BTC': return <Bitcoin className="h-8 w-8" />;
+      case 'ETH': return <Coins className="h-8 w-8" />;
+      case 'MATIC': return <Coins className="h-8 w-8" />;
       default: return <DollarSign className="h-8 w-8" />;
     }
   };
@@ -39,12 +43,14 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
   const hasBalance = balance > 0;
 
   return (
-    <div className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10">
-      <div className={`absolute inset-0 bg-gradient-to-br ${getGradient(asset.symbol)} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`} />
+    <div className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-1">
+      {/* Gradient overlay on hover */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${getGradient(asset.symbol)} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-300`} />
       
       <div className="relative">
+        {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${getGradient(asset.symbol)} text-white`}>
+          <div className={`p-3 rounded-xl bg-gradient-to-br ${getGradient(asset.symbol)} text-white shadow-lg`}>
             {getIcon(asset.symbol)}
           </div>
           <div className="text-right">
@@ -55,6 +61,7 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
           </div>
         </div>
 
+        {/* Asset Info */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-white font-semibold">{asset.name}</div>
@@ -62,13 +69,15 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
           </div>
           <div className="text-right">
             <div className="text-gray-400 text-sm">${asset.price_usd?.toFixed(2) || '0.00'}</div>
+            <div className="text-xs text-green-400">+0.00%</div>
           </div>
         </div>
 
+        {/* Action Buttons */}
         <div className="flex gap-2">
           <button
             onClick={onBuy}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/50"
           >
             <ArrowDownLeft className="h-4 w-4" />
             Buy
@@ -76,9 +85,9 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
           <button
             onClick={onSend}
             disabled={!hasBalance}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
               hasBalance
-                ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                ? 'bg-gray-700 hover:bg-gray-600 text-white hover:shadow-lg'
                 : 'bg-gray-800 text-gray-500 cursor-not-allowed'
             }`}
           >
@@ -91,216 +100,128 @@ const AssetCard = ({ asset, onBuy, onSend }: { asset: any; onBuy: () => void; on
   );
 };
 
-// Mnemonic Backup Modal
-const MnemonicBackupModal = ({
-  mnemonic,
-  walletAddress,
-  onComplete
-}: {
-  mnemonic: string;
-  walletAddress: string;
-  onComplete: () => void;
-}) => {
-  const [step, setStep] = useState(1);
-  const [showMnemonic, setShowMnemonic] = useState(false);
-  const [verificationWords, setVerificationWords] = useState<number[]>([]);
-  const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
-  const [copied, setCopied] = useState(false);
+// ============================================================================
+// KYC PROMPT BANNER (Persistent, Color-coded)
+// ============================================================================
 
-  const words = mnemonic.split(' ');
+const KYCPromptBanner = ({ kycStatus, cumulativeVolume, limit, urgency }) => {
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    const positions: number[] = [];
-    while (positions.length < 3) {
-      const pos = Math.floor(Math.random() * 25);
-      if (!positions.includes(pos)) positions.push(pos);
-    }
-    setVerificationWords(positions.sort((a, b) => a - b));
-  }, []);
+  // Don't show if verified or dismissed
+  if (kycStatus === 'verified' || dismissed || urgency === 'none') {
+    return null;
+  }
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(mnemonic);
-    setCopied(true);
-    toast.success('Recovery phrase copied!');
-    setTimeout(() => setCopied(false), 2000);
+  const remaining = Math.max(0, limit - cumulativeVolume);
+  const percentUsed = (cumulativeVolume / limit) * 100;
+
+  // Urgency-based styling
+  const urgencyConfig = {
+    info: {
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      border: 'border-blue-200 dark:border-blue-800',
+      text: 'text-blue-800 dark:text-blue-200',
+      icon: <AlertTriangle className="w-5 h-5" />,
+      title: '💡 Unlock Unlimited Transactions',
+      message: `You've used $${cumulativeVolume.toFixed(2)} of your $${limit} limit. Verify your identity to remove all limits.`,
+      action: 'Verify Now',
+      dismissible: true,
+    },
+    warning: {
+      bg: 'bg-orange-50 dark:bg-orange-900/20',
+      border: 'border-orange-200 dark:border-orange-800',
+      text: 'text-orange-800 dark:text-orange-200',
+      icon: <AlertTriangle className="w-5 h-5" />,
+      title: '⚠️ Approaching Transaction Limit',
+      message: `Only $${remaining.toFixed(2)} remaining. Complete KYC verification to continue transacting.`,
+      action: 'Complete KYC',
+      dismissible: false,
+    },
+    critical: {
+      bg: 'bg-red-50 dark:bg-red-900/20',
+      border: 'border-red-200 dark:border-red-800',
+      text: 'text-red-800 dark:text-red-200',
+      icon: <Shield className="w-5 h-5" />,
+      title: '🚨 Transaction Limit Reached',
+      message: `You've reached your $${limit} limit. Verify your identity to continue.`,
+      action: 'Verify Now (Required)',
+      dismissible: false,
+    },
   };
 
-  const downloadMnemonic = () => {
-    const blob = new Blob([
-      `Seamount Wallet Recovery Phrase\n\n`,
-      `Wallet Address: ${walletAddress}\n\n`,
-      `Recovery Phrase:\n${mnemonic}\n\n`,
-      `⚠️ KEEP THIS SAFE! Never share with anyone.`
-    ], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'seamount-recovery-phrase.txt';
-    a.click();
-    toast.success('Recovery phrase downloaded!');
-  };
-
-  const verifyWords = () => {
-    const allCorrect = verificationWords.every(pos =>
-      userInputs[pos]?.toLowerCase().trim() === words[pos].toLowerCase()
-    );
-    
-    if (allCorrect) {
-      toast.success('Verification successful!');
-      onComplete();
-    } else {
-      toast.error('Incorrect words. Please check and try again.');
-    }
-  };
+  const config = urgencyConfig[urgency];
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-2xl w-full p-8 border border-blue-500/30 shadow-2xl">
-        {step === 1 && (
-          <>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="h-8 w-8 text-red-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Secure Your Wallet</h2>
-              <p className="text-gray-400">Your recovery phrase is the ONLY way to restore your wallet</p>
-            </div>
-
-            <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4 mb-6">
-              <h3 className="text-red-400 font-semibold mb-2 flex items-center">
-                <Lock className="h-4 w-4 mr-2" />
-                Critical Security Warning
-              </h3>
-              <ul className="text-sm text-gray-300 space-y-1">
-                <li>• Never share your recovery phrase with anyone</li>
-                <li>• Seamount will NEVER ask for your phrase</li>
-                <li>• Store it offline in multiple secure locations</li>
-                <li>• Anyone with this phrase can access your funds</li>
-              </ul>
-            </div>
-
+    <div className={`rounded-2xl border p-4 mb-6 ${config.bg} ${config.border} backdrop-blur-sm animate-in slide-in-from-top duration-500`}>
+      <div className="flex items-start gap-3">
+        <div className={config.text}>
+          {config.icon}
+        </div>
+        
+        <div className="flex-1">
+          <h3 className={`font-semibold mb-1 ${config.text}`}>
+            {config.title}
+          </h3>
+          
+          <p className={`text-sm mb-3 ${config.text}`}>
+            {config.message}
+          </p>
+          
+          {/* Progress bar */}
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${
+                urgency === 'critical' ? 'bg-red-600' :
+                urgency === 'warning' ? 'bg-orange-500' :
+                'bg-blue-500'
+              }`}
+              style={{ width: `${Math.min(100, percentUsed)}%` }}
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setStep(2)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all"
+              onClick={() => window.location.href = '/onboarding'}
+              className={`px-4 py-2 rounded-lg font-medium transition-all shadow-lg ${
+                urgency === 'critical' 
+                  ? 'bg-red-600 hover:bg-red-700 text-white hover:shadow-red-500/50'
+                  : urgency === 'warning'
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white hover:shadow-orange-500/50'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white hover:shadow-blue-500/50'
+              }`}
             >
-              I Understand - Show Recovery Phrase
+              {config.action}
             </button>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <div className="text-center mb-6">
-              <Shield className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Your Recovery Phrase</h2>
-              <p className="text-gray-400">Write these 25 words down in order</p>
-            </div>
-
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-400">Recovery Phrase</span>
-                <button
-                  onClick={() => setShowMnemonic(!showMnemonic)}
-                  className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
-                >
-                  {showMnemonic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showMnemonic ? 'Hide' : 'Show'}
-                </button>
-              </div>
-
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                {showMnemonic ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {words.map((word, index) => (
-                      <div key={index} className="bg-gray-700/50 rounded px-3 py-2 text-sm">
-                        <span className="text-gray-400 mr-2">{index + 1}.</span>
-                        <span className="text-white font-mono">{word}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    Click "Show" to reveal your recovery phrase
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3 mb-4">
+            
+            {config.dismissible && (
               <button
-                onClick={copyToClipboard}
-                className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
+                onClick={() => setDismissed(true)}
+                className={`text-sm ${config.text} hover:underline`}
               >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copied!' : 'Copy Phrase'}
+                Remind me later
               </button>
-              <button
-                onClick={downloadMnemonic}
-                className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                Download
-              </button>
-            </div>
-
-            <button
-              onClick={() => setStep(3)}
-              disabled={!showMnemonic}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50"
-            >
-              I've Saved My Recovery Phrase
-            </button>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <div className="text-center mb-6">
-              <Check className="h-12 w-12 text-green-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Verify Your Phrase</h2>
-              <p className="text-gray-400">Enter the requested words to confirm</p>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              {verificationWords.map(pos => (
-                <div key={pos}>
-                  <label className="block text-sm text-gray-400 mb-2">
-                    Word #{pos + 1}
-                  </label>
-                  <input
-                    type="text"
-                    value={userInputs[pos] || ''}
-                    onChange={(e) => setUserInputs({ ...userInputs, [pos]: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                    placeholder="Enter word"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep(2)}
-                className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={verifyWords}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-              >
-                Verify & Complete
-              </button>
-            </div>
-          </>
+            )}
+          </div>
+        </div>
+        
+        {config.dismissible && (
+          <button
+            onClick={() => setDismissed(true)}
+            className={`${config.text} hover:opacity-70`}
+          >
+            <Check className="w-5 h-5" />
+          </button>
         )}
       </div>
     </div>
   );
 };
 
-// Premium Wallet Address Display
-const WalletAddressCard = ({ address }: { address: string }) => {
+// ============================================================================
+// PREMIUM WALLET ADDRESS DISPLAY
+// ============================================================================
+
+const WalletAddressCard = ({ address }) => {
   const [copied, setCopied] = useState(false);
   
   const shortenAddress = (addr: string) => {
@@ -316,10 +237,10 @@ const WalletAddressCard = ({ address }: { address: string }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <div className="text-sm text-gray-400 mb-1">Your Algorand Address</div>
+          <div className="text-sm text-gray-400 mb-1">Your Primary Wallet</div>
           <div className="flex items-center gap-3">
             <span className="text-white font-mono text-lg">{shortenAddress(address)}</span>
             <button
@@ -334,8 +255,8 @@ const WalletAddressCard = ({ address }: { address: string }) => {
             </button>
           </div>
         </div>
-        <a
-          href={`https://explorer.perawallet.app/address/${address}`}
+        
+          href={`https://explorer.blockchain.com/address/${address}`}
           target="_blank"
           rel="noopener noreferrer"
           className="p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
@@ -347,120 +268,66 @@ const WalletAddressCard = ({ address }: { address: string }) => {
   );
 };
 
-// Main Dashboard Component
-const DashboardPage = () => {
-  const { userProfile, signOut } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [portfolioData, setPortfolioData] = useState<any>(null);
-  const [showMnemonicModal, setShowMnemonicModal] = useState(false);
-  const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string>('');
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
+// ============================================================================
+// MAIN DASHBOARD COMPONENT
+// ============================================================================
 
+const DashboardPage = () => {
+  const { user, signOut } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [kycInfo, setKycInfo] = useState({
+    status: 'not_started',
+    cumulative_volume: 0,
+    limit: 5000,
+    urgency: 'none',
+  });
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Supported assets configuration
   const SUPPORTED_ASSETS = [
-    { symbol: 'ALGO', name: 'Algorand', decimals: 6 },
-    { symbol: 'USDT', name: 'Tether', decimals: 6 },
-    { symbol: 'USDCa', name: 'USD Coin', decimals: 6 },
-    { symbol: 'goBTC', name: 'goBTC', decimals: 8 },
-    { symbol: 'goETH', name: 'goETH', decimals: 8 }
+    { symbol: 'BTC', name: 'Bitcoin', decimals: 8, blockchain: 'Bitcoin' },
+    { symbol: 'ETH', name: 'Ethereum', decimals: 18, blockchain: 'Ethereum' },
+    { symbol: 'MATIC', name: 'Polygon', decimals: 18, blockchain: 'Polygon' },
+    { symbol: 'USDT', name: 'Tether', decimals: 6, blockchain: 'Ethereum' },
+    { symbol: 'USDC', name: 'USD Coin', decimals: 6, blockchain: 'Ethereum' },
   ];
 
   useEffect(() => {
-    fetchPortfolioData();
+    fetchDashboardData();
   }, []);
 
-  const fetchPortfolioData = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const data = await portfolioService.getPortfolio(userProfile?.id || '');
-
-      if (data.wallet_exists) {
-        setPortfolioData({
-          success: true,
-          total_usd: data.total_balance_usd,
-          balances: data.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = asset.balance;
-            return acc;
-          }, {} as Record<string, number>),
-          prices: data.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = asset.price_usd;
-            return acc;
-          }, {} as Record<string, number>),
-          wallet_address: data.wallet_address
-        });
-        setWalletAddress(data.wallet_address);
-      } else if (userProfile?.algorand_address) {
-        // ✅ FIX: Sync wallet from profile if portfolio doesn't have it
-        setWalletAddress(userProfile.algorand_address);
-      } else {
-        await createWallet();
-      }
-    } catch (error: any) {
-      console.error('Portfolio fetch error:', error);
-      if (error.response?.status === 404) {
-        // ✅ FIX: Try syncing from profile before creating new wallet
-        if (userProfile?.algorand_address) {
-          setWalletAddress(userProfile.algorand_address);
-        } else {
-          await createWallet();
-        }
-      } else {
-        toast.error('Failed to load portfolio');
-      }
+      
+      // Fetch portfolio balances
+      const portfolioResponse = await apiClient.get('/api/v1/wallet/balances');
+      setPortfolioData(portfolioResponse.data);
+      
+      // Fetch KYC status
+      const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
+      setKycInfo(kycResponse.data);
+      
+    } catch (error) {
+      console.error('Dashboard fetch error:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const createWallet = async () => {
-    try {
-      const response = await userAPI.provisionWallets();
-
-      if (response.data.success && response.data.mnemonic) {
-        setPendingMnemonic(response.data.mnemonic);
-        setWalletAddress(response.data.wallet_address);
-        setShowMnemonicModal(true);
-        await fetchPortfolioData();
-      }
-    } catch (error) {
-      console.error('Wallet creation error:', error);
-      toast.error('Failed to create wallet');
-    }
+  const handleBuyAsset = (asset) => {
+    toast('Buy feature coming soon!');
+    // TODO: Implement on-ramp
   };
 
-  const handleMnemonicBackupComplete = () => {
-    localStorage.setItem('mnemonic_backed_up', 'true');
-    setShowMnemonicModal(false);
-    setPendingMnemonic(null);
-    toast.success('Wallet secured successfully!');
-  };
-
-  const handleBuyAsset = async (asset: any) => {
-    try {
-      const response = await userAPI.post('/api/v1/payments/on-ramp/ngn', {
-        user_id: userProfile?.id,
-        user_email: userProfile?.email,
-        amount_fiat: 10000,
-        currency: "NGN",
-        asset: asset.symbol
-      });
-      window.location.href = response.data.payment_url;
-    } catch (error) {
-      toast.error("Payment initialization failed");
-    }
-  };
-
-  const handleSendAsset = (asset: any) => {
+  const handleSendAsset = (asset) => {
     if (asset.balance <= 0) {
       toast.error('Insufficient balance');
       return;
     }
     window.location.href = `/send?asset=${asset.symbol}&balance=${asset.balance}`;
-  };
-
-  const handleStartKYC = () => {
-    window.location.href = '/onboarding';
   };
 
   const handleLogout = async () => {
@@ -473,36 +340,6 @@ const DashboardPage = () => {
     }
   };
 
-  const totalBalance = portfolioData?.total_usd || 0;
-  const assets = portfolioData?.balances || {};
-
-  const assetCards = SUPPORTED_ASSETS.map(asset => {
-    const balance = assets[asset.symbol] || 0;
-    const price = portfolioData?.prices?.[asset.symbol] || 0;
-    const value_usd = balance * price;
-
-    return {
-      ...asset,
-      balance,
-      price_usd: price,
-      value_usd
-    };
-  });
-
-  const kycStatus = userProfile?.kyc_status || 'not_started';
-  const kycLevel = userProfile?.kyc_level || 0;
-  const userRole = userProfile?.role || 'alien';
-
-  // CRITICAL: Show KYC banner only if NOT verified AND role is alien
-  // Check multiple verified states: 'verified', 'approved', level 3
-  const isVerified = 
-    kycStatus === 'verified' || 
-    kycStatus === 'approved' || 
-    userRole === 'tribe' || 
-    kycLevel >= 3;
-  
-  const shouldShowKYCBanner = !isVerified;
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -514,6 +351,24 @@ const DashboardPage = () => {
     );
   }
 
+  const totalBalance = portfolioData?.total_usd || 0;
+  const balances = portfolioData?.balances || {};
+  const walletAddress = portfolioData?.wallet_address || '';
+
+  // Build asset cards with live data
+  const assetCards = SUPPORTED_ASSETS.map(asset => {
+    const balance = balances[asset.symbol] || 0;
+    const price = portfolioData?.prices?.[asset.symbol] || 0;
+    const value_usd = balance * price;
+
+    return {
+      ...asset,
+      balance,
+      price_usd: price,
+      value_usd
+    };
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -521,89 +376,54 @@ const DashboardPage = () => {
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
-            <p className="text-gray-400 text-sm md:text-base">Manage your multi-asset Algorand wallet</p>
+            <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="relative">
             <button
-              onClick={() => setShowReceiveModal(true)}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
             >
-              <ArrowDownLeft className="h-4 w-4" />
-              Receive
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                {user?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <span className="text-sm hidden md:inline">{user?.email?.split('@')[0] || 'User'}</span>
             </button>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {userProfile?.first_name?.[0]?.toUpperCase() || 'U'}
+            {showProfileMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowProfileMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 backdrop-blur-xl">
+                  <button
+                    onClick={() => window.location.href = '/settings'}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
+                  </button>
                 </div>
-                <span className="text-sm hidden md:inline">{userProfile?.first_name || 'User'}</span>
-              </button>
-
-              {showProfileMenu && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setShowProfileMenu(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <button
-                      onClick={() => window.location.href = '/settings'}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span>Settings</span>
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </div>
 
-        <NigerianUserBanner />
-
-        {/* CONDITIONAL KYC BANNER */}
-        {shouldShowKYCBanner && (
-          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-2xl p-4 md:p-6 mb-6">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <AlertTriangle className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="text-yellow-400 font-semibold mb-1">Identity Verification Required</h3>
-                  <p className="text-gray-300 text-sm mb-3">
-                    Complete KYC to unlock full platform features and higher transaction limits
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Shield className="h-3 w-3" />
-                      Current Tier: {kycLevel}/3
-                    </span>
-                    <span>•</span>
-                    <span>Status: {kycStatus.replace('_', ' ')}</span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={handleStartKYC}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
-              >
-                Start Verification
-              </button>
-            </div>
-          </div>
-        )}
+        {/* KYC Banner */}
+        <KYCPromptBanner
+          kycStatus={kycInfo.status}
+          cumulativeVolume={kycInfo.cumulative_volume}
+          limit={kycInfo.limit}
+          urgency={kycInfo.urgency}
+        />
 
         {/* Wallet Address */}
         {walletAddress && (
@@ -614,31 +434,37 @@ const DashboardPage = () => {
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6">
+          {/* Total Balance */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <div className="text-sm text-gray-400 mb-1">Total Balance</div>
                 <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
               </div>
               <button
-                onClick={fetchPortfolioData}
-                className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
+                onClick={fetchDashboardData}
+                className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300"
               >
                 <RefreshCw className="h-5 w-5" />
               </button>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <Activity className="h-4 w-4 text-green-400" />
-              <span className="text-green-400">Live on Algorand Network</span>
+              <Activity className="h-4 w-4 text-green-400 animate-pulse" />
+              <span className="text-green-400">Live Multi-Chain Balances</span>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6">
-            <div className="text-sm text-gray-400 mb-2">Network</div>
-            <div className="text-2xl font-bold text-white mb-4">Algorand</div>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              Sub-5s Settlement
+          {/* Network Status */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="text-sm text-gray-400 mb-2">Networks</div>
+            <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
+            <div className="space-y-2">
+              {['Bitcoin', 'Ethereum', 'Polygon'].map(chain => (
+                <div key={chain} className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  {chain}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -662,30 +488,28 @@ const DashboardPage = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
-              <ArrowDownLeft className="h-6 w-6 text-blue-400" />
-              <span className="text-sm text-gray-300">Buy</span>
-            </button>
-            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
-              <ArrowUpRight className="h-6 w-6 text-purple-400" />
-              <span className="text-sm text-gray-300">Send</span>
-            </button>
-            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
-              <RefreshCw className="h-6 w-6 text-green-400" />
-              <span className="text-sm text-gray-300">Swap</span>
-            </button>
-            <button className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-colors">
-              <TrendingUp className="h-6 w-6 text-yellow-400" />
-              <span className="text-sm text-gray-300">Earn</span>
-            </button>
+            {[
+              { icon: ArrowDownLeft, label: 'Buy', color: 'text-blue-400' },
+              { icon: ArrowUpRight, label: 'Send', color: 'text-purple-400' },
+              { icon: RefreshCw, label: 'Swap', color: 'text-green-400' },
+              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400' },
+            ].map(action => (
+              <button 
+                key={action.label}
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105"
+              >
+                <action.icon className={`h-6 w-6 ${action.color}`} />
+                <span className="text-sm text-gray-300">{action.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Cross-Border CTA */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
@@ -703,28 +527,12 @@ const DashboardPage = () => {
                 </span>
               </div>
             </div>
-            <button className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap">
+            <button className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg hover:shadow-white/50">
               Send Money
             </button>
           </div>
         </div>
       </div>
-
-      {/* Modals */}
-      {showMnemonicModal && pendingMnemonic && (
-        <MnemonicBackupModal
-          mnemonic={pendingMnemonic}
-          walletAddress={walletAddress}
-          onComplete={handleMnemonicBackupComplete}
-        />
-      )}
-
-      {showReceiveModal && walletAddress && (
-        <ReceiveModal
-          walletAddress={walletAddress}
-          onClose={() => setShowReceiveModal(false)}
-        />
-      )}
     </div>
   );
 };

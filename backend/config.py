@@ -493,6 +493,48 @@ class MultiChainBusinessModel:
         }
 
 # ============================================================================
+# KYC THRESHOLD CONFIGURATION (Phase 2)
+# ============================================================================
+
+class KYCConfig:
+    """KYC requirement thresholds and enforcement rules"""
+    
+    # Cumulative transaction threshold
+    THRESHOLD_USD = Decimal("5000.00")  # $5K cumulative (30 days)
+    
+    # Grace period before enforcement
+    GRACE_PERIOD_DAYS = 30
+    
+    # Tracking window (rolling)
+    TRACKING_WINDOW_DAYS = 30
+    
+    # Exemptions (for testing/VIP)
+    EXEMPTED_USER_IDS: Set[str] = set()
+    
+    # Prompt timing
+    WARNING_THRESHOLD = Decimal("4000.00")  # Show warning at $4K
+    SOFT_BLOCK_THRESHOLD = Decimal("4500.00")  # Require acknowledgment at $4.5K
+    HARD_BLOCK_THRESHOLD = Decimal("5000.00")  # Block transactions at $5K
+    
+    @staticmethod
+    def calculate_remaining_limit(cumulative: Decimal) -> Decimal:
+        """Calculate remaining transaction capacity"""
+        return max(Decimal("0"), KYCConfig.THRESHOLD_USD - cumulative)
+    
+    @staticmethod
+    def get_urgency_level(cumulative: Decimal) -> str:
+        """Determine UI urgency level"""
+        remaining = KYCConfig.calculate_remaining_limit(cumulative)
+        
+        if remaining <= Decimal("500"):
+            return "critical"  # Red banner
+        elif remaining <= Decimal("1000"):
+            return "warning"  # Orange banner
+        elif remaining <= Decimal("2000"):
+            return "info"  # Blue banner
+        return "none"
+
+# ============================================================================
 # PYDANTIC SETTINGS CLASS (Environment Configuration)
 # ============================================================================
 
@@ -517,10 +559,20 @@ class Settings(BaseSettings):
     SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
     SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
 
-    # ========== ✅ FEATURE FLAGS ==========
-    ALGORAND_ENABLED: bool = Field(
-        default=False, 
-        description="Enable/disable Algorand wallet creation"
+    # KYC Configuration
+    KYC_THRESHOLD_USD: Decimal = Field(
+        default=Decimal("5000.00"),
+        description="Cumulative transaction limit before KYC required"
+    )
+    
+    KYC_GRACE_PERIOD_DAYS: int = Field(
+        default=30,
+        description="Days to complete KYC after triggering"
+    )
+    
+    KYC_TRACKING_WINDOW_DAYS: int = Field(
+        default=30,
+        description="Rolling window for cumulative volume tracking"
     )
 
     # ========================================================================

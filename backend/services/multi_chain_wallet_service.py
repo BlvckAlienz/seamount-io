@@ -18,9 +18,6 @@ from backend.config import get_settings
 
 import os
 
-# Feature flag for Algorand (disable during multi-chain testing)
-ALGORAND_ENABLED = os.getenv('ALGORAND_ENABLED', 'true').lower() == 'true'
-
 logger = logging.getLogger(__name__)
 
 class MultiChainWalletService:

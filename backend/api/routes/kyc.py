@@ -148,6 +148,43 @@ async def start_kyc_verification(
         logger.error(f"[KYC] Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
+@router.post("/skip-verification")
+async def skip_kyc_verification(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+) -> Dict[str, Any]:
+    """
+    Allow users to skip KYC for limited access ($5K limit)
+    """
+    try:
+        user_id = current_user.get('id')
+        
+        # Update status to "skipped"
+        update_data = {
+            'kyc_status': 'skipped',
+            'kyc_level': 1,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        supabase.table('user_profiles')\
+            .update(update_data)\
+            .eq('id', user_id)\
+            .execute()
+        
+        logger.info(f"User {user_id} skipped KYC verification")
+        
+        return {
+            'success': True,
+            'message': 'KYC skipped - $5,000 transaction limit applies',
+            'kyc_status': 'skipped',
+            'transaction_limit': 5000.00,
+            'next_step': 'dashboard'
+        }
+        
+    except Exception as e:
+        logger.error(f"Skip KYC error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to skip verification")
+
 @router.post("/webhook")
 async def kyc_webhook_handler(
     request: Request,
