@@ -78,20 +78,27 @@ except ImportError as e:
         logger.warning("Dependencies initialization skipped due to import errors")
 
 # ===== IMPORT CORE SERVICES =====
+from backend.config import get_settings, BusinessModelConfig
+from backend.models import UserRole
+
+# Import services individually with fallbacks
 try:
-    from backend.config import get_settings, BusinessModelConfig
+    from backend.services.multi_chain_wallet_service import MultiChainWalletService
+    logger.info("✅ MultiChainWalletService imported")
+except ImportError as e:
+    logger.error(f"❌ MultiChainWalletService import failed: {e}")
+    MultiChainWalletService = None
+
+try:
     from backend.services.email_service import EmailService
     from backend.services.notification_service import NotificationService
-    from backend.services.multi_chain_wallet_service import MultiChainWalletService
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService
-    from backend.models import UserRole
-    
     services_available = True
-    logger.info("✅ Core services imported successfully")
+    logger.info("✅ Core services imported")
 except ImportError as e:
-    logger.error(f"❌ Core service import error: {e}")
+    logger.error(f"❌ Core services import error: {e}")
     services_available = False
 
 # ===== IMPORT ORACLE SERVICE =====
@@ -605,7 +612,7 @@ async def initialize_session(
 async def create_wallet(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+    wallet_service = Depends(get_multi_chain_wallet_service)
 ):
     """Create a multi-chain wallet for the authenticated user"""
     try:

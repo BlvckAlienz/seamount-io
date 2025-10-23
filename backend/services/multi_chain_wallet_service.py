@@ -5,7 +5,6 @@ Algorand + WDK (Bitcoin, Ethereum, Polygon, TON, etc.)
 """
 
 import logging
-import os
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from datetime import datetime
@@ -22,14 +21,15 @@ logger = logging.getLogger(__name__)
 class MultiChainWalletService:
     """Production-ready multi-chain wallet orchestrator"""
     
+    # Asset-to-chain mapping
     ASSET_CHAIN_MAP = {
         'ALGO': 'algorand',
         'USDCa': 'algorand',
         'goBTC': 'algorand',
         'goETH': 'algorand',
-        'USDT': 'polygon',
+        'USDT': 'polygon',  # Default (gasless)
         'BTC': 'bitcoin',
-        'ETH': 'arbitrum',
+        'ETH': 'arbitrum',  # Cheaper than mainnet
         'MATIC': 'polygon',
         'TON': 'ton',
         'TRX': 'tron',
@@ -49,7 +49,7 @@ class MultiChainWalletService:
         self.oracle = oracle_service
         self.wdk = WDKClient()
         
-        logger.info("✅ MultiChainWalletService initialized")
+        logger.info("✅ MultiChainWalletService initialized (Algorand + WDK)")
     
     # ========== WALLET CREATION ==========
     
@@ -58,7 +58,10 @@ class MultiChainWalletService:
         user_id: str,
         chains: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """Create multi-chain wallet (Algorand + WDK)"""
+        """
+        Create multi-chain wallet for user
+        DEFAULT: Algorand + essential WDK chains
+        """
         
         result = {
             'user_id': user_id,
@@ -67,74 +70,76 @@ class MultiChainWalletService:
             'success': False
         }
         
-        # ✅ FIX: Check environment variable properly
-        algorand_enabled = os.getenv('ALGORAND_ENABLED', 'true').lower() == 'true'
-        
-        # 1. Create Algorand wallet (if enabled)
-        if algorand_enabled:
-            try:
-                # Check existing wallet
-                algo_wallet = self.db.supabase.table('user_wallets')\
-                    .select('algorand_address')\
-                    .eq('user_id', user_id)\
-                    .execute()
+        # 1. Create Algorand wallet (ALWAYS)
+        try:
+            # ✅ FIX: Query without maybe_single()
+            existing_algo = self.db.supabase.table('user_wallets')\
+                .select('algorand_address')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if existing_algo.data and len(existing_algo.data) > 0 and existing_algo.data[0].get('algorand_address'):
+                algo_address = existing_algo.data[0]['algorand_address']
+                logger.info(f"✅ Existing Algorand wallet: {algo_address[:10]}...")
+            else:
+                # Create new Algorand wallet
+                algo_wallet = await self.algorand.create_algorand_wallet(user_id)
+                algo_address = algo_wallet['wallet_address']
                 
-                if algo_wallet.data and len(algo_wallet.data) > 0 and algo_wallet.data[0].get('algorand_address'):
-                    algo_address = algo_wallet.data[0]['algorand_address']
-                    logger.info(f"✅ Existing Algorand wallet: {algo_address[:10]}...")
-                else:
-                    # Create new
-                    algo_wallet_data = await self.algorand.create_algorand_wallet(user_id)
-                    algo_address = algo_wallet_data['wallet_address']
-                    
-                    wallet_data = {
-                        'user_id': user_id,
-                        'algorand_address': algo_address,
-                        'algorand_private_key': algo_wallet_data['encrypted_private_key'],
-                        'algorand_mnemonic': algo_wallet_data['encrypted_mnemonic'],
-                        'created_at': datetime.utcnow().isoformat()
-                    }
-                    
-                    self.db.supabase.table('user_wallets').upsert(
-                        wallet_data, 
-                        on_conflict='user_id'
-                    ).execute()
-                    
-                    logger.info(f"✅ New Algorand wallet: {algo_address[:10]}...")
-                
-                result['wallets']['algorand'] = {
-                    'address': algo_address,
-                    'created_at': datetime.utcnow().isoformat(),
-                    'supported_assets': ['ALGO', 'USDCa', 'USDT', 'goBTC', 'goETH']
+                # Store in user_wallets
+                wallet_data = {
+                    'user_id': user_id,
+                    'algorand_address': algo_address,
+                    'algorand_private_key': algo_wallet['encrypted_private_key'],
+                    'algorand_mnemonic': algo_wallet['encrypted_mnemonic'],
+                    'created_at': datetime.utcnow().isoformat()
                 }
                 
-            except Exception as e:
-                logger.error(f"❌ Algorand wallet creation failed: {e}")
-        else:
-            logger.info("ℹ️ Algorand creation disabled")
+                self.db.supabase.table('user_wallets').upsert(
+                    wallet_data, 
+                    on_conflict='user_id'
+                ).execute()
+                
+                logger.info(f"✅ New Algorand wallet: {algo_address[:10]}...")
+            
+            result['wallets']['algorand'] = {
+                'address': algo_address,
+                'created_at': datetime.utcnow().isoformat(),
+                'supported_assets': ['ALGO', 'USDCa', 'USDT', 'goBTC', 'goETH']
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Algorand wallet failed: {e}")
+            result['errors'] = [f"Algorand: {str(e)}"]
+            return result
         
-        # 2. WDK chains
+        # 2. Determine WDK chains
         if chains:
             wdk_chains = [c for c in chains if c != 'algorand']
         else:
-            wdk_chains = ['bitcoin', 'ethereum', 'polygon']
+            # Default: Essential chains from Tether docs
+            wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'ton']
         
+        # 3. Create WDK wallets
         if wdk_chains:
             try:
                 seed_data = await self.wdk.generate_seed()
+                encrypted_seed = seed_data['encrypted_seed']
+                
                 wdk_result = await self.wdk.create_wallet(
-                    encrypted_seed=seed_data['encrypted_seed'],
+                    encrypted_seed=encrypted_seed,
                     chains=wdk_chains,
                     enable_gasless=True
                 )
                 
+                # Store WDK wallets
                 for chain, wallet_data in wdk_result.get('wallets', {}).items():
                     try:
                         self.db.supabase.table('multi_chain_addresses').upsert({
                             'user_id': user_id,
                             'blockchain': chain,
                             'address': wallet_data['address'],
-                            'encrypted_seed': seed_data['encrypted_seed'],
+                            'encrypted_seed': encrypted_seed,
                             'wallet_type': 'wdk',
                             'created_at': datetime.utcnow().isoformat()
                         }, on_conflict='user_id,blockchain').execute()
@@ -151,59 +156,45 @@ class MultiChainWalletService:
                 
             except Exception as e:
                 logger.error(f"❌ WDK wallet creation failed: {e}")
+                if 'errors' not in result:
+                    result['errors'] = []
+                result['errors'].append(f"WDK: {str(e)}")
         
         result['total_chains'] = len(result['wallets'])
         result['success'] = len(result['wallets']) > 0
         
         return result
     
-    # ========== BALANCE QUERIES (PHASE 1/2 HANDSHAKE) ==========
+    # ========== BALANCE QUERIES ==========
     
-    async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
-        """Get unified balance view (Phase 1 + Phase 2 compatibility)"""
+    async def get_user_balances(
+        self,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get unified balance view across ALL chains
+        """
         
         try:
             balances = {}
             total_usd = Decimal('0')
             
-            # ✅ FIX: Check Phase 1 table first
-            algo_address = None
-            
+            # 1. Get Algorand balances
             try:
-                phase1_wallet = self.db.supabase.table('user_wallets')\
+                # ✅ FIX: Proper Supabase query without maybe_single()
+                algo_wallet = self.db.supabase.table('user_wallets')\
                     .select('algorand_address')\
                     .eq('user_id', user_id)\
                     .execute()
                 
-                if phase1_wallet.data and len(phase1_wallet.data) > 0:
-                    algo_address = phase1_wallet.data[0].get('algorand_address')
-                    if algo_address:
-                        logger.info(f"✅ Found Phase 1 Algorand wallet: {algo_address[:10]}...")
-            except Exception as e:
-                logger.warning(f"Phase 1 wallet check failed: {e}")
-            
-            # Fallback to Phase 2
-            if not algo_address:
-                try:
-                    phase2_wallet = self.db.supabase.table('multi_chain_addresses')\
-                        .select('address')\
-                        .eq('user_id', user_id)\
-                        .eq('blockchain', 'algorand')\
-                        .execute()
+                if algo_wallet.data and len(algo_wallet.data) > 0 and algo_wallet.data[0].get('algorand_address'):
+                    algo_address = algo_wallet.data[0]['algorand_address']
                     
-                    if phase2_wallet.data and len(phase2_wallet.data) > 0:
-                        algo_address = phase2_wallet.data[0].get('address')
-                        logger.info(f"✅ Found Phase 2 Algorand wallet: {algo_address[:10]}...")
-                except Exception as e:
-                    logger.warning(f"Phase 2 wallet check failed: {e}")
-            
-            # Query Algorand balances
-            if algo_address:
-                try:
+                    # Query Algorand account
                     account_info = await self.algorand.get_account_info(algo_address)
                     
-                    if account_info:
-                        # Native ALGO
+                    if account_info:  # ✅ Check account exists
+                        # Native ALGO balance
                         algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
                         if algo_balance > 0:
                             try:
@@ -214,14 +205,15 @@ class MultiChainWalletService:
                                     'usd_value': float(algo_balance * algo_price)
                                 }
                                 total_usd += algo_balance * algo_price
-                            except Exception:
+                            except Exception as price_err:
+                                logger.warning(f"Price lookup failed for ALGO: {price_err}")
                                 balances['ALGO'] = {
                                     'balance': float(algo_balance),
                                     'chain': 'algorand',
                                     'usd_value': 0.0
                                 }
                         
-                        # ASAs
+                        # ASA balances (USDCa, USDT, goBTC, goETH)
                         asset_map = {
                             31566704: ('USDCa', 6),
                             312769: ('USDT', 6),
@@ -248,32 +240,31 @@ class MultiChainWalletService:
                                             'usd_value': float(usd_value)
                                         }
                                         total_usd += usd_value
-                                    except Exception:
+                                    except Exception as price_err:
+                                        logger.warning(f"Price lookup failed for {symbol}: {price_err}")
                                         balances[symbol] = {
                                             'balance': float(balance),
                                             'chain': 'algorand',
                                             'usd_value': 0.0
                                         }
-                
-                except Exception as algo_err:
-                    logger.warning(f"Algorand balance query failed: {algo_err}")
             
-            # 2. WDK balances
+            except Exception as algo_err:
+                logger.warning(f"⚠️ Algorand balance query failed: {algo_err}")
+            
+            # 2. Get WDK chain balances
             try:
                 wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
                     .select('blockchain, address')\
                     .eq('user_id', user_id)\
                     .execute()
                 
-                if wdk_wallets.data:
+                if wdk_wallets.data and len(wdk_wallets.data) > 0:
                     for wallet in wdk_wallets.data:
                         chain = wallet['blockchain']
                         address = wallet['address']
                         
-                        if chain == 'algorand':
-                            continue  # Already processed
-                        
                         try:
+                            # Query balance
                             balance = await self.wdk.get_balance(
                                 address=address,
                                 chain=chain,
@@ -284,6 +275,7 @@ class MultiChainWalletService:
                                 native_asset = self._get_native_asset(chain)
                                 
                                 try:
+                                    # Map chain to oracle asset name
                                     oracle_map = {
                                         'bitcoin': 'bitcoin',
                                         'ethereum': 'ethereum',
@@ -304,20 +296,22 @@ class MultiChainWalletService:
                                     }
                                     total_usd += usd_value
                                     
-                                except Exception:
+                                except Exception as price_error:
+                                    logger.warning(f"Price lookup failed for {chain}: {price_error}")
                                     balances[native_asset] = {
                                         'balance': float(balance),
                                         'chain': chain,
                                         'usd_value': 0.0
                                     }
                         
-                        except Exception as e:
-                            logger.error(f"❌ Balance query failed for {chain}: {e}")
+                        except Exception as balance_err:
+                            logger.error(f"❌ Balance query failed for {chain}: {balance_err}")
+                            continue
             
             except Exception as wdk_err:
-                logger.warning(f"WDK balance query failed: {wdk_err}")
+                logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
             
-            # Format response
+            # 3. Format response
             assets_list = sorted(
                 balances.values(),
                 key=lambda x: x.get('usd_value', 0),
@@ -329,7 +323,89 @@ class MultiChainWalletService:
                 'total_usd': float(total_usd),
                 'assets': assets_list,
                 'asset_count': len(balances),
-                'wallet_address': algo_address,  # ✅ Return primary address
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Balance query failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                'success': False,
+                'total_usd': 0.0,
+                'assets': [],
+                'error': str(e),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            # 2. Get WDK chain balances
+            wdk_wallets = await self.db.supabase.table('multi_chain_addresses')\
+                .select('blockchain, address')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if wdk_wallets.data:
+                for wallet in wdk_wallets.data:
+                    chain = wallet['blockchain']
+                    address = wallet['address']
+                    
+                    try:
+                        # ✅ FIX: Pass address and chain correctly
+                        balance = await self.wdk.get_balance(
+                            address=address,
+                            chain=chain,
+                            use_indexer=False  # Skip indexer, use direct query
+                        )
+                        
+                        if balance > 0:
+                            native_asset = self._get_native_asset(chain)
+                            
+                            try:
+                                # Map chain to oracle asset name
+                                oracle_map = {
+                                    'bitcoin': 'bitcoin',
+                                    'ethereum': 'ethereum',
+                                    'polygon': 'matic-network',
+                                    'arbitrum': 'ethereum',  # Arbitrum uses ETH
+                                    'tron': 'tron',
+                                    'ton': 'the-open-network'
+                                }
+                                
+                                oracle_id = oracle_map.get(chain, chain)
+                                price, _ = await self.oracle.get_asset_price(oracle_id)
+                                usd_value = balance * price
+                                
+                                balances[native_asset] = {
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': float(usd_value)
+                                }
+                                total_usd += usd_value
+                                
+                            except Exception as price_error:
+                                logger.warning(f"Price lookup failed for {chain}: {price_error}")
+                                balances[native_asset] = {
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': 0.0
+                                }
+                    
+                    except Exception as e:
+                        logger.error(f"❌ Balance query failed for {chain}: {e}")
+                        continue
+            
+            # 3. Format response
+            assets_list = sorted(
+                balances.values(),
+                key=lambda x: x['usd_value'],
+                reverse=True
+            )
+            
+            return {
+                'success': True,
+                'total_usd': float(total_usd),
+                'assets': assets_list,
+                'asset_count': len(balances),
                 'timestamp': datetime.utcnow().isoformat()
             }
             
@@ -341,19 +417,62 @@ class MultiChainWalletService:
                 'assets': [],
                 'error': str(e)
             }
-    
-    def _get_native_asset(self, chain: str) -> str:
-        """Get native asset for chain"""
-        native_map = {
-            'bitcoin': 'BTC',
-            'ethereum': 'ETH',
-            'polygon': 'MATIC',
-            'arbitrum': 'ETH',
-            'ton': 'TON',
-            'tron': 'TRX',
-            'solana': 'SOL'
-        }
-        return native_map.get(chain, 'UNKNOWN')
+            
+            # 2. WDK balances
+            wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
+                .select('blockchain, address')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if wdk_wallets.data:
+                address_map = {w['blockchain']: w['address'] for w in wdk_wallets.data}
+                wdk_balances = await self.wdk.get_balances_multi_chain(address_map)
+                
+                for chain, balance_data in wdk_balances.items():
+                    if balance_data.get('balance', 0) > 0:
+                        native_asset = self._get_native_asset(chain)
+                        balance = Decimal(str(balance_data['balance']))
+                        
+                        try:
+                            price, _ = await self.oracle.get_asset_price(native_asset.lower())
+                            usd_value = balance * price
+                            
+                            balances[native_asset] = {
+                                'balance': float(balance),
+                                'chain': chain,
+                                'usd_value': float(usd_value)
+                            }
+                            total_usd += usd_value
+                        except Exception:
+                            balances[native_asset] = {
+                                'balance': float(balance),
+                                'chain': chain,
+                                'usd_value': 0.0
+                            }
+            
+            # Format response
+            assets_list = sorted(
+                balances.values(),
+                key=lambda x: x['usd_value'],
+                reverse=True
+            )
+            
+            return {
+                'success': True,
+                'total_usd': float(total_usd),
+                'assets': assets_list,
+                'asset_count': len(balances),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Balance query failed: {e}")
+            return {
+                'success': False,
+                'total_usd': 0.0,
+                'assets': [],
+                'error': str(e)
+            }
     
     # ========== SEND PAYMENT ==========
     
