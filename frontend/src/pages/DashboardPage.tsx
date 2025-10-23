@@ -7,6 +7,7 @@ import {
   Bitcoin, Coins, Copy, Check, Eye, EyeOff, Download, Lock,
   ExternalLink, ArrowUpRight, ArrowDownLeft, Settings, LogOut, User, QrCode
 } from 'lucide-react';
+import { KYCBanner } from '../components/onboarding/KYCBanner';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { apiClient } from '../config/api';
@@ -14,6 +15,26 @@ import { portfolioService } from '../services/portfolio';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ReceiveModal from '../components/payments/ReceiveModal';
 import QRCodeGenerator from '../components/QRCodeGenerator';
+
+
+// Fetch KYC status
+const [kycInfo, setKycInfo] = useState({ cumulative_volume: 0, limit: 5000, status: 'not_started', urgency: 'none' });
+
+useEffect(() => {
+  const fetchKYC = async () => {
+    const response = await apiClient.get('/api/v1/user/kyc-status');
+    setKycInfo(response.data);
+  };
+  fetchKYC();
+}, []);
+
+// In render (after header):
+<KYCBanner
+  cumulativeVolume={kycInfo.volume}
+  limit={kycInfo.limit}
+  kycStatus={kycInfo.status}
+  onVerify={() => navigate('/onboarding')}
+/>
 
 // ============================================================================
 // KYC PROMPT BANNER (Phase 2 - Color-coded urgency)
@@ -234,77 +255,6 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, onBuy, onSend }) => {
           </button>
         </div>
       </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// WALLET ADDRESS CARD (With QR Code)
-// ============================================================================
-
-interface WalletAddressCardProps {
-  address: string;
-}
-
-const WalletAddressCard: React.FC<WalletAddressCardProps> = ({ address }) => {
-  const [copied, setCopied] = useState(false);
-  const [showQR, setShowQR] = useState(false);
-  
-  const shortenAddress = (addr: string) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 7)}...${addr.slice(-5)}`;
-  };
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    toast.success('Address copied!');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="text-sm text-gray-400 mb-1">Your Primary Wallet</div>
-          <div className="flex items-center gap-3">
-            <span className="text-white font-mono text-lg">{shortenAddress(address)}</span>
-            <button
-              onClick={copyAddress}
-              className={`p-2 rounded-lg transition-all ${
-                copied
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
-              }`}
-            >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowQR(!showQR)}
-            className="p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          >
-            <QrCode className="h-5 w-5" />
-          </button>
-          
-            href={`https://explorer.perawallet.app/address/${address}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          <a>
-            <ExternalLink className="h-5 w-5" />
-          </a>
-        </div>
-      </div>
-      
-      {showQR && (
-        <div className="mt-4 pt-4 border-t border-gray-700/50">
-          <QRCodeGenerator value={address} size={200} />
-        </div>
-      )}
     </div>
   );
 };
@@ -558,49 +508,55 @@ const DashboardPage = () => {
     }
   }, [user, userProfile]);
 
-  // ✅ FIX: Fetch portfolio data (Phase 1 + Phase 2 handshake)
-  const fetchPortfolioData = async () => {
-    try {
-      setLoading(true);
+// ✅ FIX: Fetch ALL chains, not just Algorand
+const fetchPortfolioData = async () => {
+  try {
+    setLoading(true);
+    
+    // Try to fetch multi-chain balances
+    const response = await apiClient.get('/api/v1/wallet/balances');
+    
+    if (response.data.success) {
+      setPortfolioData({
+        total_usd: response.data.total_usd,
+        assets: response.data.assets,
+        timestamp: response.data.timestamp
+      });
       
-      // Try unified balance endpoint first
-      try {
-        const response = await apiClient.get('/api/v1/wallet/balances');
-        
-        if (response.data.success) {
-          setPortfolioData(response.data);
-          setWalletAddress(response.data.wallet_address || '');
-          return; // ✅ Success - exit early
+      // Extract wallet address if available
+      if (response.data.assets && response.data.assets.length > 0) {
+        const algorandAsset = response.data.assets.find(a => a.chain === 'algorand');
+        if (algorandAsset?.address) {
+          setWalletAddress(algorandAsset.address);
         }
-      } catch (balanceError) {
-        console.warn('Balance endpoint failed, checking profile...', balanceError);
       }
-      
-      // ✅ Fallback: Check if user has Phase 1 Algorand wallet
-      if (userProfile?.algorand_address) {
-        setWalletAddress(userProfile.algorand_address);
-        toast.info('Loading your wallet...');
-        
-        // Set minimal portfolio data
-        setPortfolioData({
-          success: true,
-          total_usd: 0,
-          assets: [],
-          wallet_address: userProfile.algorand_address
-        });
-      } else {
-        // No wallet found - prompt creation
-        toast.error('Wallet not found. Creating wallet...');
-        await createWallet();
-      }
-      
-    } catch (error: any) {
-      console.error('Portfolio fetch error:', error);
-      toast.error('Failed to load wallet data');
-    } finally {
-      setLoading(false);
     }
-  };
+    
+  } catch (error: any) {
+    console.error('Portfolio fetch error:', error);
+    
+    // ✅ FALLBACK: Check if user has Phase 1 Algorand wallet
+    if (userProfile?.algorand_address) {
+      setWalletAddress(userProfile.algorand_address);
+      toast.info('Loading your wallet...');
+      
+      // Set minimal portfolio data
+      setPortfolioData({
+        success: true,
+        total_usd: 0,
+        assets: [],
+        wallet_address: userProfile.algorand_address
+      });
+    } else {
+      // No wallet found - prompt creation
+      toast.error('Wallet not found. Creating wallet...');
+      await createWallet();
+    }
+    
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ✅ FIX: Fetch KYC status
   const fetchKYCStatus = async () => {
@@ -785,13 +741,6 @@ const DashboardPage = () => {
           urgency={kycInfo.urgency}
         />
 
-        {/* Wallet Address */}
-        {walletAddress && (
-          <div className="mb-6">
-            <WalletAddressCard address={walletAddress} />
-          </div>
-        )}
-
         {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Total Balance */}
@@ -833,17 +782,39 @@ const DashboardPage = () => {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Your Assets</h2>
-            <span className="text-sm text-gray-400">{SUPPORTED_ASSETS.length} supported</span>
+            <span className="text-sm text-gray-400">
+              {portfolioData?.assets?.length || SUPPORTED_ASSETS.length} assets
+            </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {assetCards.map(asset => (
-              <AssetCard
-                key={asset.symbol}
-                asset={asset}
-                onBuy={() => handleBuyAsset(asset)}
-                onSend={() => handleSendAsset(asset)}
-              />
-            ))}
+            {/* ✅ Use multi-chain data if available, fallback to static list */}
+            {portfolioData?.assets && portfolioData.assets.length > 0 ? (
+              portfolioData.assets.map(asset => (
+                <AssetCard
+                  key={`${asset.chain}-${asset.symbol}`}
+                  asset={{
+                    symbol: asset.symbol || 'UNKNOWN',
+                    name: asset.name || asset.symbol,
+                    balance: asset.balance || 0,
+                    price_usd: asset.price_usd || 0,
+                    value_usd: asset.usd_value || 0,
+                    chain: asset.chain
+                  }}
+                  onBuy={() => handleBuyAsset(asset)}
+                  onSend={() => handleSendAsset(asset)}
+                />
+              ))
+            ) : (
+              // Fallback: Show supported assets with zero balances
+              assetCards.map(asset => (
+                <AssetCard
+                  key={asset.symbol}
+                  asset={asset}
+                  onBuy={() => handleBuyAsset(asset)}
+                  onSend={() => handleSendAsset(asset)}
+                />
+              ))
+            )}
           </div>
         </div>
 

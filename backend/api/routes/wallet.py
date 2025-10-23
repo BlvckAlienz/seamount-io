@@ -12,6 +12,9 @@ from decimal import Decimal
 from backend.dependencies import get_current_user, get_multi_chain_wallet_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService
 
+from backend.dependencies import get_multi_chain_wallet_service
+from backend.services.multi_chain_wallet_service import MultiChainWalletService
+
 router = APIRouter(prefix="/wallet", tags=["Multi-Chain Wallet"])
 
 # ========== REQUEST/RESPONSE MODELS ==========
@@ -27,6 +30,46 @@ class SendPaymentRequest(BaseModel):
     memo: Optional[str] = None
 
 # ========== ENDPOINTS ==========
+
+@router.post("/wallet/create")
+async def create_wallet(
+    current_user: dict = Depends(get_current_user),
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+):
+    """âœ… FIXED: Now uses dependency injection"""
+    try:
+        result = await wallet_service.create_wallet_for_user(
+            user_id=current_user['id'],
+            chains=None  # Default: Algorand + Bitcoin + Ethereum + Polygon
+        )
+        
+        # âœ… ADD ERROR HANDLING:
+        if not result.get("success"):
+            error_msg = result.get("error", "Wallet creation failed")
+            logger.error(f"Wallet creation failed: {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Wallet creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/wallet/balances")
+async def get_balances(
+    current_user: dict = Depends(get_current_user),
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+):
+    """✅ NEW: Multi-chain balance endpoint"""
+    try:
+        result = await wallet_service.get_user_balances(current_user['id'])
+        return result
+        
+    except Exception as e:
+        logger.error(f"Balance query failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/create")
 async def create_multi_chain_wallet(

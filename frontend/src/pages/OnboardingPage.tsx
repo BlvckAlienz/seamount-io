@@ -11,6 +11,7 @@ import {
   Globe, Lock, Download, Check, AlertCircle 
 } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
+import { MultiChainWalletConnect } from '../components/wallet/MultiChainWalletConnect';
 
 // ============================================================================
 // STEP COMPONENTS
@@ -102,6 +103,25 @@ const IdentityStep = ({ onVerify, onSkip }) => (
     </div>
   </div>
 );
+
+// Add state
+const [showWalletModal, setShowWalletModal] = useState(false);
+
+// After identity step, show wallet modal instead of direct API call
+const handleSkipVerification = async () => {
+  setShowWalletModal(true);  // ✅ Show modal instead
+};
+
+// In render (before closing div):
+<MultiChainWalletConnect
+  isOpen={showWalletModal}
+  onClose={() => setShowWalletModal(false)}
+  onWalletCreated={(mnemonic) => {
+    setMnemonic(mnemonic);
+    setShowWalletModal(false);
+    setStep('walletBackup');
+  }}
+/>
 
 const WalletBackupStep = ({ onNext, mnemonic }) => {
   const [showMnemonic, setShowMnemonic] = useState(false);
@@ -282,6 +302,7 @@ const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
@@ -335,21 +356,7 @@ const OnboardingPage = () => {
   };
 
   const handleSkipVerification = async () => {
-    const toastId = toast.loading('Setting up your wallet...');
-    
-    try {
-      await apiClient.post('/api/v1/kyc/skip-verification');
-      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-      
-      if (walletResponse.data.success && walletResponse.data.mnemonic) {
-        toast.success('Wallet created!', { id: toastId });
-        setMnemonic(walletResponse.data.mnemonic);
-        setStep('walletBackup');
-      }
-    } catch (error) {
-      console.error('Skip error:', error);
-      toast.error('Failed to create wallet', { id: toastId });
-    }
+    setShowWalletModal(true);  // Show modal instead of direct API call
   };
 
   const handleBackupComplete = async () => {
@@ -426,6 +433,16 @@ const OnboardingPage = () => {
           countryCode={userProfile?.country_code || 'NG'}
         />
       )}
+
+      <MultiChainWalletConnect
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onWalletCreated={(mnemonic) => {
+          setMnemonic(mnemonic);
+          setShowWalletModal(false);
+          setStep('walletBackup');
+        }}
+      />
     </div>
   );
 };

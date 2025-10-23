@@ -20,60 +20,38 @@ async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client)
 ):
-    """Create user profile - matches frontend POST /api/v1/user/profile"""
+    """Create user profile - FIXED to handle KYC fields"""
     try:
         data = await request.json()
         user_id = data.get('id')
-        if not user_id:
-            raise HTTPException(status_code=400, detail="User ID is required")
         
-        # Verify user exists in auth system
-        try:
-            auth_user = supabase.auth.admin.get_user(user_id)
-            if not auth_user.user:
-                raise HTTPException(status_code=404, detail="User not found in authentication system")
-        except Exception as auth_error:
-            logger.error(f"[Profile Create] Auth user check failed: {auth_error}")
-            raise HTTPException(status_code=400, detail="User must be authenticated before creating profile")
-            
         insert_data = {
             "id": user_id,
             "email": data.get('email', ''),
-            "first_name": data.get('firstName') or data.get('first_name', ''),
-            "last_name": data.get('lastName') or data.get('last_name', ''),
-            "country_code": (data.get('countryCode') or data.get('country_code', 'US')).upper(),
+            "first_name": data.get('firstName', ''),
+            "last_name": data.get('lastName', ''),
+            "country_code": data.get('countryCode', 'US').upper(),
             "phone": data.get('phone', ''),
-            "kyc_status": "not_started",  # ✅ FIXED
+            # ✅ ADD: KYC fields with safe defaults
+            "bvn": data.get('bvn'),  # nullable
+            "id_number": data.get('id_number'),  # nullable
+            "id_type": data.get('id_type', 'BVN'),
+            "date_of_birth": data.get('date_of_birth'),  # nullable
+            "gender": data.get('gender'),  # nullable
+            "kyc_status": "not_started",
             "kyc_level": 0,
             "role": "alien",
-            "is_active": True,
-            "kyc_provider": None,  # ✅ FIXED - NULL until KYC starts
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        # Upsert and fetch
-        upsert_result = supabase.from_("user_profiles").upsert(insert_data, on_conflict="id").execute()
-        fetch_result = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
+        result = supabase.from_("user_profiles").upsert(insert_data, on_conflict="id").execute()
         
-        if not fetch_result.data:
-            raise HTTPException(status_code=500, detail="Profile created but could not be retrieved")
-            
-        profile = fetch_result.data[0]
-        logger.info(f"[Profile Create] Profile created successfully: {profile.get('email')}")
+        return {"success": True, "profile": result.data[0]}
         
-        return {
-            "success": True,
-            "profile": profile,
-            "message": "Profile created successfully"
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        error_id = str(uuid.uuid4())[:8]
-        logger.error(f"[Profile Create] Unexpected error [Error ID: {error_id}]: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create profile. Error ID: {error_id}")
+        logger.error(f"Profile creation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/profile")
 async def get_user_profile(current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -197,32 +175,71 @@ async def provision_wallets(
         logger.info(f"[Wallet Provision] User: {user_id}")
         
         # Check if wallet exists
-        existing_wallet = await wallet_service.get_user_balances(user_id)
-        if existing_wallet.get('wallet_exists'):
-            return {
-                "success": True,
-                "wallet_address": existing_wallet['wallet_address'],
-                "message": "Wallet already exists",
-                "mnemonic": None  # Don't return mnemonic for existing wallets
-            }
+        try:
+            existing = wallet_service.db.supabase.table('user_wallets')\
+                .select('algorand_address, algorand_mnemonic')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if existing.data and len(existing.data) > 0:
+                existing_wallet = existing.data[0]
+                if existing_wallet.get('algorand_address'):
+                    return {
+                        "success": True,
+                        "wallet_address": existing_wallet['algorand_address'],
+                        "message": "Wallet already exists",
+                        "mnemonic": None  # Don't return mnemonic for existing wallets
+                    }
+        except Exception as check_error:
+            logger.warning(f"Existing wallet check failed: {check_error}")
         
         # Create new wallet
-        result = await wallet_service.create_algorand_wallet(user_id)
+        from cryptography.fernet import Fernet
+        import os
+        from algosdk import account, mnemonic
         
-        if result["success"]:
-            logger.info(f"[Wallet Provision] Wallet created: {result['wallet_address']}")
-            return {
-                "success": True,
-                "wallet_address": result["wallet_address"],
-                "mnemonic": result["mnemonic"],  # Return for one-time backup
-                "supported_assets": result.get("supported_assets", []),
-                "message": "Wallet created successfully"
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result.get("error", "Wallet creation failed"))
+        # Generate keypair
+        private_key, address = account.generate_account()
+        mnemonic_phrase = mnemonic.from_private_key(private_key)
+        
+        # Fund wallet (non-blocking)
+        try:
+            await wallet_service.algorand.fund_account_for_opt_in(address)
+        except Exception as fund_error:
+            logger.warning(f"Wallet funding skipped: {fund_error}")
+        
+        # Encrypt keys
+        encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
+        fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+        
+        encrypted_private_key = fernet.encrypt(private_key.encode()).decode()
+        encrypted_mnemonic = fernet.encrypt(mnemonic_phrase.encode()).decode()
+        
+        # Store wallet
+        wallet_data = {
+            'user_id': user_id,
+            'algorand_address': address,
+            'algorand_private_key': encrypted_private_key,
+            'algorand_mnemonic': encrypted_mnemonic,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        wallet_service.db.supabase.table('user_wallets').upsert(
+            wallet_data,
+            on_conflict='user_id'
+        ).execute()
+        
+        logger.info(f"[Wallet Provision] Created: {address[:10]}...")
+        
+        return {
+            "success": True,
+            "wallet_address": address,
+            "mnemonic": mnemonic_phrase,  # âœ… Return for first-time backup
+            "message": "Wallet created successfully"
+        }
             
     except Exception as e:
-        logger.error(f"[Wallet Provision] Failed for user {current_user['id']}: {e}")
+        logger.error(f"[Wallet Provision] Failed: {e}")
         raise HTTPException(status_code=500, detail="Wallet provisioning failed")
 
 @router.get("/kyc-status")

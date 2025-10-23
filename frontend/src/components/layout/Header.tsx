@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff, Settings, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -109,34 +110,34 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             </button>
 
             {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl shadow-2xl bg-gradient-to-b from-gray-800/95 to-gray-900/95 backdrop-blur-xl border border-gray-700/50 z-50 animate-in slide-in-from-top-2 duration-200">
-                <div className="py-2">
-                  <a href="#" className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white transition-colors">
-                    Your Profile
-                  </a>
-                  <a href="#" className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white transition-colors">
-                    Account Settings
-                  </a>
-                  <a href="#" className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white transition-colors">
-                    <button onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/kyc');
-                    }}>
-                      Identity Verification
-                    </button>
-                  </a>
-                  <div className="border-t border-gray-700/50 my-2"></div>
-                  <button 
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowProfileMenu(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 backdrop-blur-xl">
+                  <button
                     onClick={() => {
                       setShowProfileMenu(false);
-                      signOut();
+                      navigate('/settings');  // âœ… Navigate, don't logout
                     }}
-                    className="block w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800/60 hover:text-white transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg text-left"
                   >
-                    Sign out
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      signOut();  // âœ… THIS should trigger logout
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg text-left"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
                   </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>

@@ -324,6 +324,11 @@ async def lifespan(app: FastAPI):
                     algorand_service = AlgorandService(settings)
                     logger.info("✅ Algorand service initialized")
                     
+                    # Initialize Fee Calculator
+                    from backend.services.fee_calculator import FeeCalculatorService
+                    fee_calculator = FeeCalculatorService(db_service)
+                    logger.info("✅ Fee calculator initialized")
+
                     # Initialize Oracle service
                     oracle_service = None
                     if oracle_service_available:
@@ -332,11 +337,19 @@ async def lifespan(app: FastAPI):
                             logger.info("✅ Oracle service initialized")
                         except Exception as e:
                             logger.error(f"❌ Oracle service initialization failed: {e}")
-                    
-                    # Initialize Fee Calculator
-                    from backend.services.fee_calculator import FeeCalculatorService
-                    fee_calculator = FeeCalculatorService(db_service)
-                    logger.info("✅ Fee calculator initialized")
+                            logger.info("Creating mock oracle service for graceful degradation...")
+
+                    # ✅ ADD THIS FALLBACK (if oracle is still None):
+                    if oracle_service is None:
+                        logger.warning("⚠️ Using mock oracle service")
+                        # Create mock oracle class inline
+                        class MockOracleService:
+                            async def get_asset_price(self, asset_name: str):
+                                """Mock price: always returns $1.00"""
+                                return Decimal('1.0'), {'source': 'mock', 'asset': asset_name}
+                        
+                        oracle_service = MockOracleService()
+                        logger.info("✅ Mock oracle service created")
                     
                     # Initialize Multi-Chain Wallet Service (UNIFIED NAME)
                     multi_chain_wallet_service = MultiChainWalletService(

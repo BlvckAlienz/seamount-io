@@ -98,8 +98,9 @@ async def submit_kyc_data(
         
         # ✅ FIX: Store in fields that _start_regfyl_verification() reads
         update_data = {
+            'id': user_id,  # âœ… ADD: Primary key for upsert
             'bvn': id_number_value if id_type == 'BVN' else None,
-            'id_number': id_number_value,  # ✅ ALWAYS store here
+            'id_number': id_number_value,
             'id_type': id_type,
             'date_of_birth': data.get('date_of_birth'),
             'gender': data.get('gender'),
@@ -110,7 +111,7 @@ async def submit_kyc_data(
         
         # ✅ CRITICAL: Use upsert to ensure data is saved
         result = supabase.table('user_profiles').upsert(
-            {'id': user_id, **update_data},
+            update_data,  # Already has 'id' from above
             on_conflict='id'
         ).execute()
         
