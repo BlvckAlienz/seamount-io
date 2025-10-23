@@ -256,6 +256,8 @@ const WalletAddressCard = ({ address }) => {
           </div>
         </div>
         
+        {/* ✅ FIXED: Proper <a> tag structure */}
+        <a
           href={`https://explorer.blockchain.com/address/${address}`}
           target="_blank"
           rel="noopener noreferrer"
