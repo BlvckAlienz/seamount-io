@@ -87,6 +87,7 @@ try:
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService
     from backend.models import UserRole
+    
     services_available = True
     logger.info("✅ Core services imported successfully")
 except ImportError as e:
@@ -219,6 +220,7 @@ try:
 except ImportError as e:
     logger.error(f"❌ Yield router import error: {e}")
     routers_available['yield'] = None
+
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)

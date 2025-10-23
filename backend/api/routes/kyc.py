@@ -82,18 +82,25 @@ async def submit_kyc_data(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client)
 ) -> Dict[str, Any]:
+    """
+    ✅ FIXED: Stores KYC data in fields that kyc_service expects
+    """
     try:
         user_id = current_user.get('id')
         data = await request.json()
         
-        # Smart ID type handling
+        # Extract ID number (could be BVN or other)
         id_type = data.get('id_type', 'BVN')
-        id_number = data.get('bvn') or data.get('id_number', '')
+        id_number_value = data.get('bvn') or data.get('id_number', '')
         
+        if not id_number_value:
+            raise HTTPException(status_code=400, detail="ID number is required")
+        
+        # ✅ FIX: Store in fields that _start_regfyl_verification() reads
         update_data = {
-            'bvn': id_number if id_type == 'BVN' else None,  # Only set if BVN
-            'id_number': id_number,  # Always set
-            'id_type': id_type,  # Use submitted type
+            'bvn': id_number_value if id_type == 'BVN' else None,
+            'id_number': id_number_value,  # ✅ ALWAYS store here
+            'id_type': id_type,
             'date_of_birth': data.get('date_of_birth'),
             'gender': data.get('gender'),
             'phone': data.get('phone'),
@@ -101,12 +108,25 @@ async def submit_kyc_data(
             'updated_at': datetime.utcnow().isoformat()
         }
         
-        supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
+        # ✅ CRITICAL: Use upsert to ensure data is saved
+        result = supabase.table('user_profiles').upsert(
+            {'id': user_id, **update_data},
+            on_conflict='id'
+        ).execute()
         
-        logger.info(f"[KYC Data] Stored {id_type}: {id_number[:3]}*** for {user_id}")
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to store KYC data")
         
-        return {"success": True, "message": "KYC data stored successfully"}
+        logger.info(f"[KYC Data] Stored {id_type}: {id_number_value[:3]}*** for {user_id}")
         
+        return {
+            "success": True,
+            "message": "KYC data stored successfully",
+            "fields_updated": list(update_data.keys())
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[KYC Data Submit] Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to store KYC data")

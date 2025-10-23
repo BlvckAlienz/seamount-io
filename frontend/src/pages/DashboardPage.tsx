@@ -296,37 +296,38 @@ const DashboardPage = () => {
   ];
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    fetchPortfolioData(); // ✅ Correct function name
+    fetchKYCStatus();     // ✅ Also fetch KYC info
+  }, [user]);
 
   const fetchPortfolioData = async () => {
-  try {
-    setLoading(true);
-    
-    // ✅ FIX: Try portfolio endpoint first
     try {
-      const data = await portfolioService.getPortfolio(userProfile?.id || '');
+      setLoading(true);
       
-      if (data.wallet_exists) {
-        setPortfolioData({
-          success: true,
-          total_usd: data.total_balance_usd,
-          balances: data.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = asset.balance;
-            return acc;
-          }, {} as Record<string, number>),
-          prices: data.assets.reduce((acc, asset) => {
-            acc[asset.symbol] = asset.price_usd;
-            return acc;
-          }, {} as Record<string, number>),
-          wallet_address: data.wallet_address
-        });
-        setWalletAddress(data.wallet_address);
-        return; // ✅ Exit early if successful
+      // ✅ FIX: Try portfolio endpoint first
+      try {
+        const data = await portfolioService.getPortfolio(userProfile?.id || '');
+        
+        if (data.wallet_exists) {
+          setPortfolioData({
+            success: true,
+            total_usd: data.total_balance_usd,
+            balances: data.assets.reduce((acc, asset) => {
+              acc[asset.symbol] = asset.balance;
+              return acc;
+            }, {} as Record<string, number>),
+            prices: data.assets.reduce((acc, asset) => {
+              acc[asset.symbol] = asset.price_usd;
+              return acc;
+            }, {} as Record<string, number>),
+            wallet_address: data.wallet_address
+          });
+          setWalletAddress(data.wallet_address);
+          return; // ✅ Exit early if successful
+        }
+      } catch (portfolioError) {
+        console.warn('Portfolio fetch failed, checking profile...', portfolioError);
       }
-    } catch (portfolioError) {
-      console.warn('Portfolio fetch failed, checking profile...', portfolioError);
-    }
     
     // ✅ FIX: Fallback to profile (Phase 1 compatibility)
     if (userProfile?.algorand_address) {
@@ -353,6 +354,29 @@ const DashboardPage = () => {
   } finally {
     setLoading(false);
   }
+
+  const fetchKYCStatus = async () => {
+    try {
+      const response = await apiClient.get('/api/v1/users/kyc-status');
+      if (response.data) {
+        setKycInfo({
+          status: response.data.status || 'not_started',
+          cumulative_volume: response.data.cumulative_volume || 0,
+          limit: response.data.limit || 5000,
+          urgency: response.data.urgency || 'none',
+        });
+      }
+    } catch (error) {
+      console.error('KYC status fetch failed:', error);
+      // Set defaults to prevent crash
+      setKycInfo({
+        status: 'not_started',
+        cumulative_volume: 0,
+        limit: 5000,
+        urgency: 'none',
+      });
+    }
+  };
 };
 
   const handleBuyAsset = (asset) => {
