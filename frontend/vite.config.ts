@@ -5,27 +5,26 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    dedupe: ['react', 'react-dom'], // ✅ FIX: Force single React instance
   },
   build: {
     outDir: 'dist',
-    minify: 'esbuild', 
-    esbuild: {
-      treeShaking: true,
-    },
+    sourcemap: false, // Disable for production
+    minify: 'esbuild',
+    target: 'es2015',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-        },
+        // Simpler chunk strategy - let Vite handle it
+        manualChunks: undefined, // Remove manual chunking
       },
     },
   },
   server: {
+    port: 5173,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
@@ -34,7 +33,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom'],
-    exclude: [], // ✅ FIX: Let Vite handle React naturally
+    include: ['react', 'react-dom', 'react-router-dom'], // Pre-bundle these
+    exclude: [], // Don't exclude anything
   },
 });

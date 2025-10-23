@@ -31,25 +31,23 @@ const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  
-  // ✅ FIX: Safe consent state initialization
-  const [consentGiven, setConsentGiven] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('seamount_consent_given') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [consentGiven, setConsentGiven] = useState<boolean>(false);
 
-  // ✅ FIX: Safe auth context access with fallback
-  let authSession = null;
-  try {
-    const auth = useAuth();
-    authSession = auth?.session || null;
-  } catch (error) {
-    console.error('Auth context error:', error);
-    // Continue without auth - let error boundary handle it
-  }
+  // ✅ FIXED: Call hook unconditionally at top level
+  const auth = useAuth();
+  const authSession = auth?.session || null;
+
+  // ✅ Initialize consent from localStorage after mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('seamount_consent_given');
+      if (stored === 'true') {
+        setConsentGiven(true);
+      }
+    } catch (error) {
+      console.error('Failed to read consent:', error);
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize anonymous session for unauthenticated users without consent

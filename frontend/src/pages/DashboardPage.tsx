@@ -16,26 +16,6 @@ import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ReceiveModal from '../components/payments/ReceiveModal';
 import QRCodeGenerator from '../components/QRCodeGenerator';
 
-
-// Fetch KYC status
-const [kycInfo, setKycInfo] = useState({ cumulative_volume: 0, limit: 5000, status: 'not_started', urgency: 'none' });
-
-useEffect(() => {
-  const fetchKYC = async () => {
-    const response = await apiClient.get('/api/v1/user/kyc-status');
-    setKycInfo(response.data);
-  };
-  fetchKYC();
-}, []);
-
-// In render (after header):
-<KYCBanner
-  cumulativeVolume={kycInfo.volume}
-  limit={kycInfo.limit}
-  kycStatus={kycInfo.status}
-  onVerify={() => navigate('/onboarding')}
-/>
-
 // ============================================================================
 // KYC PROMPT BANNER (Phase 2 - Color-coded urgency)
 // ============================================================================
@@ -508,55 +488,55 @@ const DashboardPage = () => {
     }
   }, [user, userProfile]);
 
-// ✅ FIX: Fetch ALL chains, not just Algorand
-const fetchPortfolioData = async () => {
-  try {
-    setLoading(true);
-    
-    // Try to fetch multi-chain balances
-    const response = await apiClient.get('/api/v1/wallet/balances');
-    
-    if (response.data.success) {
-      setPortfolioData({
-        total_usd: response.data.total_usd,
-        assets: response.data.assets,
-        timestamp: response.data.timestamp
-      });
+  // ✅ FIX: Fetch ALL chains, not just Algorand
+  const fetchPortfolioData = async () => {
+    try {
+      setLoading(true);
       
-      // Extract wallet address if available
-      if (response.data.assets && response.data.assets.length > 0) {
-        const algorandAsset = response.data.assets.find(a => a.chain === 'algorand');
-        if (algorandAsset?.address) {
-          setWalletAddress(algorandAsset.address);
+      // Try to fetch multi-chain balances
+      const response = await apiClient.get('/api/v1/wallet/balances');
+      
+      if (response.data.success) {
+        setPortfolioData({
+          total_usd: response.data.total_usd,
+          assets: response.data.assets,
+          timestamp: response.data.timestamp
+        });
+        
+        // Extract wallet address if available
+        if (response.data.assets && response.data.assets.length > 0) {
+          const algorandAsset = response.data.assets.find(a => a.chain === 'algorand');
+          if (algorandAsset?.address) {
+            setWalletAddress(algorandAsset.address);
+          }
         }
       }
-    }
-    
-  } catch (error: any) {
-    console.error('Portfolio fetch error:', error);
-    
-    // ✅ FALLBACK: Check if user has Phase 1 Algorand wallet
-    if (userProfile?.algorand_address) {
-      setWalletAddress(userProfile.algorand_address);
-      toast.info('Loading your wallet...');
       
-      // Set minimal portfolio data
-      setPortfolioData({
-        success: true,
-        total_usd: 0,
-        assets: [],
-        wallet_address: userProfile.algorand_address
-      });
-    } else {
-      // No wallet found - prompt creation
-      toast.error('Wallet not found. Creating wallet...');
-      await createWallet();
+    } catch (error: any) {
+      console.error('Portfolio fetch error:', error);
+      
+      // ✅ FALLBACK: Check if user has Phase 1 Algorand wallet
+      if (userProfile?.algorand_address) {
+        setWalletAddress(userProfile.algorand_address);
+        toast.info('Loading your wallet...');
+        
+        // Set minimal portfolio data
+        setPortfolioData({
+          success: true,
+          total_usd: 0,
+          assets: [],
+          wallet_address: userProfile.algorand_address
+        });
+      } else {
+        // No wallet found - prompt creation
+        toast.error('Wallet not found. Creating wallet...');
+        await createWallet();
+      }
+      
+    } finally {
+      setLoading(false);
     }
-    
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // ✅ FIX: Fetch KYC status
   const fetchKYCStatus = async () => {
@@ -665,7 +645,7 @@ const fetchPortfolioData = async () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-400">Loading your portfolio...</p>
         </div>
       </div>

@@ -17,7 +17,7 @@ import { MultiChainWalletConnect } from '../components/wallet/MultiChainWalletCo
 // STEP COMPONENTS
 // ============================================================================
 
-const WelcomeStep = ({ onNext }) => (
+const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
   <div className="text-center">
     <div className="mb-8">
       <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
@@ -60,7 +60,7 @@ const WelcomeStep = ({ onNext }) => (
   </div>
 );
 
-const IdentityStep = ({ onVerify, onSkip }) => (
+const IdentityStep = ({ onVerify, onSkip }: { onVerify: () => void; onSkip: () => void }) => (
   <div className="text-center">
     <div className="mb-6">
       <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
@@ -104,36 +104,17 @@ const IdentityStep = ({ onVerify, onSkip }) => (
   </div>
 );
 
-// Add state
-const [showWalletModal, setShowWalletModal] = useState(false);
-
-// After identity step, show wallet modal instead of direct API call
-const handleSkipVerification = async () => {
-  setShowWalletModal(true);  // ✅ Show modal instead
-};
-
-// In render (before closing div):
-<MultiChainWalletConnect
-  isOpen={showWalletModal}
-  onClose={() => setShowWalletModal(false)}
-  onWalletCreated={(mnemonic) => {
-    setMnemonic(mnemonic);
-    setShowWalletModal(false);
-    setStep('walletBackup');
-  }}
-/>
-
-const WalletBackupStep = ({ onNext, mnemonic }) => {
+const WalletBackupStep = ({ onNext, mnemonic }: { onNext: () => void; mnemonic: string }) => {
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [copied, setCopied] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [verificationWords, setVerificationWords] = useState([]);
-  const [userInputs, setUserInputs] = useState({});
+  const [verificationWords, setVerificationWords] = useState<number[]>([]);
+  const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
   
   const words = mnemonic.split(' ');
 
   useEffect(() => {
-    const positions = [];
+    const positions: number[] = [];
     while (positions.length < 3) {
       const pos = Math.floor(Math.random() * 25);
       if (!positions.includes(pos)) positions.push(pos);
@@ -300,7 +281,7 @@ const WalletBackupStep = ({ onNext, mnemonic }) => {
 
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
-  const [mnemonic, setMnemonic] = useState(null);
+  const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
@@ -320,7 +301,7 @@ const OnboardingPage = () => {
   };
 
   // ✅ FIX: Called AFTER user submits BVN data
-  const handleBVNSubmit = async (formData) => {
+  const handleBVNSubmit = async (formData: any) => {
     const toastId = toast.loading('Starting verification...');
     
     try {
@@ -348,7 +329,7 @@ const OnboardingPage = () => {
         setStep('walletBackup');
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('KYC submission error:', error);
       toast.error(error.response?.data?.detail || 'Verification failed', { id: toastId });
       setShowBVNModal(false);
@@ -381,7 +362,7 @@ const OnboardingPage = () => {
     step === 'welcome' ? '33%' : 
     step === 'identity' ? '66%' : '100%';
 
-  const stepTitles = {
+  const stepTitles: { [key: string]: string } = {
     welcome: 'Welcome to Seamount',
     identity: 'Identity Verification',
     walletBackup: 'Wallet Backup'
