@@ -1,7 +1,7 @@
 // File: frontend/src/components/wallet/MultiChainWalletConnect.tsx
 
 import React, { useState } from 'react';
-import { Wallet, Check, Loader } from 'lucide-react';
+import { Wallet, Check, Loader, Shield } from 'lucide-react'; // ✅ ADDED Shield import
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
 
@@ -156,7 +156,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
         {/* Footer */}
         <div className="border-t border-gray-700 p-6 bg-gray-900/50">
           <div className="flex items-start gap-2 text-sm text-gray-400">
-            <Shield className="h-4 w-4 mt-0.5 text-yellow-400" />
+            <Shield className="h-4 w-4 mt-0.5 text-yellow-400" /> {/* ✅ NOW FIXED */}
             <p>
               <strong className="text-white">Security Tip:</strong> Never share your recovery phrase. 
               Seamount will never ask for it.
