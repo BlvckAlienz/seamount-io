@@ -294,7 +294,7 @@ const WalletAddressCard: React.FC<WalletAddressCardProps> = ({ address }) => {
             target="_blank"
             rel="noopener noreferrer"
             className="p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          >
+          <a>
             <ExternalLink className="h-5 w-5" />
           </a>
         </div>
