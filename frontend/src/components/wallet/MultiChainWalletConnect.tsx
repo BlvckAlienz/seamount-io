@@ -1,7 +1,7 @@
 // File: frontend/src/components/wallet/MultiChainWalletConnect.tsx
 
 import React, { useState } from 'react';
-import { Wallet, Check, Loader, Shield } from 'lucide-react'; // ✅ ADDED Shield import
+import { Wallet, Check, Loader, Shield } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
 
@@ -59,18 +59,49 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     const toastId = toast.loading('Creating your multi-chain wallet...');
     
     try {
-      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      console.log('🔄 Calling /api/v1/user/provision-wallets...');
       
-      if (response.data.success && response.data.mnemonic) {
-        toast.success('Wallet created on 4 chains!', { id: toastId });
-        onWalletCreated(response.data.mnemonic);
-        onClose();
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      console.log('📦 API Response:', response.data);
+      
+      // ✅ IMPROVED: Handle different response structures
+      if (response.data && response.data.success) {
+        if (response.data.mnemonic) {
+          // ✅ SUCCESS: New wallet created with mnemonic
+          toast.success('Multi-chain wallet created!', { id: toastId });
+          onWalletCreated(response.data.mnemonic);
+          onClose();
+        } else if (response.data.wallet_address) {
+          // ✅ SUCCESS: Wallet exists but no mnemonic returned
+          toast.success('Wallet already exists!', { id: toastId });
+          // For existing wallets, we need to handle this differently
+          // Since we can't get the mnemonic again, we'll create a new one
+          // or skip to dashboard. For now, show error.
+          throw new Error('Wallet already exists. Please contact support to reset.');
+        } else {
+          throw new Error('Wallet creation succeeded but no mnemonic returned');
+        }
       } else {
-        throw new Error('Wallet creation failed');
+        // Handle API success: false or unexpected response
+        const errorMessage = response.data?.detail || response.data?.error || response.data?.message || 'Wallet creation failed';
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
-      console.error('Wallet creation error:', error);
-      toast.error(error.response?.data?.detail || 'Wallet creation failed', { id: toastId });
+      console.error('❌ Wallet creation error details:', error);
+      
+      // ✅ IMPROVED: Better error logging
+      if (error.response) {
+        console.error('📡 Server response error:', error.response.data);
+        console.error('🔢 HTTP Status:', error.response.status);
+        const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
+        toast.error(serverError, { id: toastId });
+      } else if (error.message) {
+        console.error('💬 Error message:', error.message);
+        toast.error(error.message, { id: toastId });
+      } else {
+        console.error('🚨 Unknown error:', error);
+        toast.error('Wallet creation failed. Please try again.', { id: toastId });
+      }
     } finally {
       setLoading(null);
     }
@@ -78,8 +109,53 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
 
   const handleConnectExternal = async (walletId: string) => {
     setLoading(walletId);
-    toast('External wallet integration coming soon! 🚀', { icon: '⏳' });
-    setLoading(null);
+    
+    try {
+      switch (walletId) {
+        case 'pera':
+          // ✅ PERA WALLET INTEGRATION
+          if (typeof window !== 'undefined' && (window as any).PeraWallet) {
+            const peraWallet = new (window as any).PeraWallet();
+            const accounts = await peraWallet.connect();
+            toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
+          } else {
+            // Redirect to Pera Wallet download
+            window.open('https://perawallet.app/', '_blank');
+            toast.error('Please install Pera Wallet app');
+          }
+          break;
+          
+        case 'metamask':
+          // ✅ METAMASK INTEGRATION
+          if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+              const accounts = await (window as any).ethereum.request({
+                method: 'eth_requestAccounts'
+              });
+              toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
+            } catch (metaError) {
+              toast.error('User rejected MetaMask connection');
+            }
+          } else {
+            window.open('https://metamask.io/download/', '_blank');
+            toast.error('Please install MetaMask extension');
+          }
+          break;
+          
+        case 'walletconnect':
+          // ✅ WALLETCONNECT INTEGRATION
+          toast('WalletConnect integration coming soon!', { icon: '🔗' });
+          break;
+          
+        default:
+          toast('External wallet integration coming soon! 🚀', { icon: '⏳' });
+      }
+    } catch (error) {
+      console.error(`External wallet connection failed for ${walletId}:`, error);
+      toast.error(`Failed to connect ${walletId}`);
+    } finally {
+      setLoading(null);
+    }
   };
 
   if (!isOpen) return null;
@@ -110,6 +186,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
             <button
               key={wallet.id}
               onClick={() => {
+                setSelectedWallet(wallet.id);
                 if (wallet.id === 'seamount-native') {
                   handleCreateWallet();
                 } else {
@@ -156,7 +233,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
         {/* Footer */}
         <div className="border-t border-gray-700 p-6 bg-gray-900/50">
           <div className="flex items-start gap-2 text-sm text-gray-400">
-            <Shield className="h-4 w-4 mt-0.5 text-yellow-400" /> {/* ✅ NOW FIXED */}
+            <Shield className="h-4 w-4 mt-0.5 text-yellow-400" />
             <p>
               <strong className="text-white">Security Tip:</strong> Never share your recovery phrase. 
               Seamount will never ask for it.

@@ -169,6 +169,7 @@ async def provision_wallets(
 ):
     """
     CRITICAL FIX: Provision Algorand wallet with mnemonic return
+    ✅ FIXED: Now returns exact structure frontend expects
     """
     try:
         user_id = current_user['id']
@@ -184,11 +185,11 @@ async def provision_wallets(
             if existing.data and len(existing.data) > 0:
                 existing_wallet = existing.data[0]
                 if existing_wallet.get('algorand_address'):
+                    logger.info(f"[Wallet Provision] Wallet exists: {existing_wallet['algorand_address'][:10]}...")
                     return {
                         "success": True,
-                        "wallet_address": existing_wallet['algorand_address'],
-                        "message": "Wallet already exists",
-                        "mnemonic": None  # Don't return mnemonic for existing wallets
+                        "mnemonic": None,  # Don't return mnemonic for existing wallets
+                        "message": "Wallet already exists"
                     }
         except Exception as check_error:
             logger.warning(f"Existing wallet check failed: {check_error}")
@@ -205,8 +206,9 @@ async def provision_wallets(
         # Fund wallet (non-blocking)
         try:
             await wallet_service.algorand.fund_account_for_opt_in(address)
+            logger.info(f"✅ Funded wallet {address[:10]}...")
         except Exception as fund_error:
-            logger.warning(f"Wallet funding skipped: {fund_error}")
+            logger.warning(f"⚠️ Wallet funding skipped: {fund_error}")
         
         # Encrypt keys
         encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
@@ -231,16 +233,19 @@ async def provision_wallets(
         
         logger.info(f"[Wallet Provision] Created: {address[:10]}...")
         
+        # ✅ CRITICAL FIX: Return exact structure frontend expects
         return {
             "success": True,
-            "wallet_address": address,
-            "mnemonic": mnemonic_phrase,  # âœ… Return for first-time backup
+            "mnemonic": mnemonic_phrase,  # ✅ Return for first-time backup
+            "wallet_address": address,    # ✅ Keep for backward compatibility
             "message": "Wallet created successfully"
         }
             
     except Exception as e:
         logger.error(f"[Wallet Provision] Failed: {e}")
-        raise HTTPException(status_code=500, detail="Wallet provisioning failed")
+        import traceback
+        logger.error(f"[Wallet Provision] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/kyc-status")
 async def get_kyc_status(

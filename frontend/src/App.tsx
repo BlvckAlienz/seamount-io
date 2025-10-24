@@ -79,6 +79,35 @@ const AppContent: React.FC = () => {
     setShowAuthModal(true);
   };
 
+// Add this temporary debug function to your App.tsx or main component
+// Remove after debugging
+
+const debugWalletAPI = async () => {
+  try {
+    console.log('🔍 Testing wallet creation API...');
+    const response = await fetch('/api/v1/user/provision-wallets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      }
+    });
+    
+    const data = await response.json();
+    console.log('📊 API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      data: data
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('❌ Debug error:', error);
+    return null;
+  }
+};
+
+// Run in browser console: debugWalletAPI()
   return (
     <>
       <Routes>
