@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { Wallet, Check, Loader, Shield, X, AlertCircle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
-import AutomatedWalletConnect from './AutomatedWalletConnect';
 
 interface WalletOption {
   id: string;
@@ -26,7 +25,6 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
-  const [showAutomatedConnect, setShowAutomatedConnect] = useState(false);
 
   const WALLET_OPTIONS: WalletOption[] = [
     {
@@ -246,6 +244,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
       const response = await apiClient.post('/api/v1/user/provision-wallets');
       console.log('📦 API Response:', response.data);
       
+      // ✅ COMPREHENSIVE response validation
       if (response.data) {
         if (response.data.success === true) {
           if (response.data.mnemonic) {
@@ -256,6 +255,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
           } else {
             // ✅ WALLET EXISTS: No mnemonic but wallet exists - complete onboarding
             toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+            // Call onWalletCreated with a special value to indicate wallet exists
             onWalletCreated('WALLET_ALREADY_EXISTS');
             onClose();
           }
@@ -282,12 +282,14 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     } catch (error: any) {
       console.error('❌ Wallet creation error details:', error);
       
+      // ✅ COMPREHENSIVE error logging
       if (error.response) {
         console.error('📡 Server response error:', error.response.data);
         console.error('🔢 HTTP Status:', error.response.status);
         
+        // ✅ SPECIFIC: Handle wallet exists error from HTTP exception
         if (error.response.data?.code === 'WALLET_ALREADY_EXISTS' || 
-            error.response.status === 409) {
+            error.response.status === 409) { // 409 Conflict often used for "already exists"
           toast.success('Welcome back! Your wallet is ready.', { id: toastId });
           onWalletCreated('WALLET_ALREADY_EXISTS');
           onClose();
