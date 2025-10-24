@@ -168,8 +168,7 @@ async def provision_wallets(
     wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
-    CRITICAL FIX: Provision Algorand wallet with PROPER mnemonic return
-    ✅ FIXED: Now ALWAYS returns mnemonic when creating new wallet
+    CRITICAL FIX: Handle existing wallets properly
     """
     try:
         user_id = current_user['id']
@@ -187,12 +186,12 @@ async def provision_wallets(
                 if existing_wallet.get('algorand_address'):
                     logger.info(f"[Wallet Provision] Wallet exists: {existing_wallet['algorand_address'][:10]}...")
                     
-                    # ✅ FIX: If wallet exists but we need mnemonic for onboarding, return error
-                    # since we can't retrieve encrypted mnemonic
+                    # ✅ FIX: Return 200 with specific code instead of error
                     return {
-                        "success": False,
-                        "error": "Wallet already exists. Cannot retrieve mnemonic for existing wallet.",
-                        "code": "WALLET_ALREADY_EXISTS"
+                        "success": True,  # Still success because user has wallet
+                        "exists": True,   # Flag to indicate existing wallet
+                        "wallet_address": existing_wallet['algorand_address'],
+                        "message": "Wallet already exists"
                     }
         except Exception as check_error:
             logger.warning(f"Existing wallet check failed: {check_error}")
@@ -258,11 +257,7 @@ async def provision_wallets(
         logger.error(f"[Wallet Provision] Failed: {e}")
         import traceback
         logger.error(f"[Wallet Provision] Traceback: {traceback.format_exc()}")
-        return {
-            "success": False,
-            "error": str(e),
-            "code": "WALLET_CREATION_FAILED"
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/debug/provision-wallets")
 async def debug_provision_wallets(

@@ -56,7 +56,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
 
   const handleCreateWallet = async () => {
   setLoading('seamount-native');
-  const toastId = toast.loading('Creating your multi-chain wallet...');
+  const toastId = toast.loading('Checking your wallet...');
   
   try {
     console.log('🔄 Calling /api/v1/user/provision-wallets...');
@@ -72,18 +72,25 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
           toast.success('Multi-chain wallet created!', { id: toastId });
           onWalletCreated(response.data.mnemonic);
           onClose();
-        } else if (response.data.code === 'WALLET_ALREADY_EXISTS') {
-          // ✅ HANDLED: Wallet already exists
-          toast.error('Wallet already exists. Please contact support.', { id: toastId });
         } else {
-          // ❌ SUCCESS but no mnemonic - critical error
-          console.error('❌ Critical: Success=true but no mnemonic:', response.data);
-          throw new Error('Wallet creation succeeded but no recovery phrase was returned. This is a critical error.');
+          // ✅ WALLET EXISTS: No mnemonic but wallet exists - complete onboarding
+          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+          // Call onWalletCreated with a special value to indicate wallet exists
+          onWalletCreated('WALLET_ALREADY_EXISTS');
+          onClose();
         }
       } else if (response.data.success === false) {
-        // ✅ HANDLED: Explicit failure from backend
-        const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
-        throw new Error(errorMsg);
+        // Handle specific error codes
+        if (response.data.code === 'WALLET_ALREADY_EXISTS') {
+          // ✅ WALLET EXISTS: Complete onboarding without mnemonic
+          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+          onWalletCreated('WALLET_ALREADY_EXISTS');
+          onClose();
+        } else {
+          // ❌ Other errors
+          const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
+          throw new Error(errorMsg);
+        }
       } else {
         // ❌ UNEXPECTED: No success field
         throw new Error('Invalid response from server');
@@ -99,6 +106,16 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     if (error.response) {
       console.error('📡 Server response error:', error.response.data);
       console.error('🔢 HTTP Status:', error.response.status);
+      
+      // ✅ SPECIFIC: Handle wallet exists error from HTTP exception
+      if (error.response.data?.code === 'WALLET_ALREADY_EXISTS' || 
+          error.response.status === 409) { // 409 Conflict often used for "already exists"
+        toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+        onWalletCreated('WALLET_ALREADY_EXISTS');
+        onClose();
+        return;
+      }
+      
       const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
       toast.error(serverError, { id: toastId });
     } else if (error.message) {

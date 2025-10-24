@@ -340,6 +340,20 @@ const OnboardingPage = () => {
     setShowWalletModal(true);  // Show modal instead of direct API call
   };
 
+  // ✅ UPDATE: Handle both new wallet and existing wallet cases
+  const handleWalletCreated = (mnemonicOrStatus: string) => {
+    if (mnemonicOrStatus === 'WALLET_ALREADY_EXISTS') {
+      // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
+      console.log('✅ Wallet exists, completing onboarding...');
+      handleBackupComplete(); // This will mark onboarding complete and go to dashboard
+    } else {
+      // ✅ NEW WALLET: Proceed with backup flow
+      setMnemonic(mnemonicOrStatus);
+      setShowWalletModal(false);
+      setStep('walletBackup');
+    }
+  };
+
   const handleBackupComplete = async () => {
     const toastId = toast.loading('Completing setup...');
     
@@ -418,11 +432,7 @@ const OnboardingPage = () => {
       <MultiChainWalletConnect
         isOpen={showWalletModal}
         onClose={() => setShowWalletModal(false)}
-        onWalletCreated={(mnemonic) => {
-          setMnemonic(mnemonic);
-          setShowWalletModal(false);
-          setStep('walletBackup');
-        }}
+        onWalletCreated={handleWalletCreated} // ✅ Use updated handler
       />
     </div>
   );
