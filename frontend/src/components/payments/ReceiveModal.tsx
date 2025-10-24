@@ -1,18 +1,34 @@
 // File: frontend/src/components/payments/ReceiveModal.tsx
-import React, { useState } from 'react';
+// Replace the entire file with this:
+
+import React, { useState, useEffect } from 'react';
 import { Copy, ExternalLink, Check, X, Download, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCodeGenerator from '../QRCodeGenerator';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ReceiveModalProps {
-  walletAddress: string;
   onClose: () => void;
 }
 
-const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) => {
+const ReceiveModal: React.FC<ReceiveModalProps> = ({ onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const { userProfile } = useAuth();
+
+  useEffect(() => {
+    // ✅ Use Seamount's Algorand wallet address, not external wallets
+    if (userProfile?.algorand_address) {
+      setWalletAddress(userProfile.algorand_address);
+    } else {
+      toast.error('No Seamount wallet found');
+      onClose();
+    }
+  }, [userProfile, onClose]);
 
   const handleCopy = async () => {
+    if (!walletAddress) return;
+    
     try {
       await navigator.clipboard.writeText(walletAddress);
       setCopied(true);
@@ -24,6 +40,8 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
   };
 
   const handleDownloadQR = () => {
+    if (!walletAddress) return;
+    
     const canvas = document.querySelector('canvas');
     if (canvas) {
       canvas.toBlob((blob) => {
@@ -45,11 +63,13 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
   };
 
   const handleShare = async () => {
+    if (!walletAddress) return;
+    
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'Seamount Wallet Address',
-          text: `Send crypto to my Algorand wallet: ${walletAddress}`,
+          text: `Send crypto to my Seamount Algorand wallet: ${walletAddress}`,
         });
         toast.success('Shared successfully!');
       } catch (error: any) {
@@ -69,6 +89,16 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
     }
   };
 
+  if (!walletAddress) {
+    return (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-800 rounded-2xl p-6">
+          <p className="text-white">Loading wallet address...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
@@ -87,7 +117,7 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
         </div>
 
         <p className="text-gray-400 text-sm mb-6">
-          Share this address or QR code to receive payments
+          Share your Seamount wallet address to receive payments
         </p>
 
         {/* QR Code */}
@@ -97,7 +127,7 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
 
         {/* Address Display */}
         <div className="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
-          <p className="text-xs text-gray-400 mb-2">Your Algorand Address</p>
+          <p className="text-xs text-gray-400 mb-2">Your Seamount Wallet Address</p>
           <p className="text-white font-mono text-xs md:text-sm break-all leading-relaxed">
             {walletAddress}
           </p>
@@ -122,7 +152,7 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
             className="flex flex-col items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-medium transition-colors"
           >
             <Download className="h-5 w-5" />
-            <span className="text-xs">Save</span>
+            <span className="text-xs">Save QR</span>
           </button>
 
           <button
@@ -142,7 +172,7 @@ const ReceiveModal: React.FC<ReceiveModalProps> = ({ walletAddress, onClose }) =
           className="flex items-center justify-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors py-2"
         >
           <ExternalLink className="h-4 w-4" />
-          View on Explorer
+          View on Algorand Explorer
         </a>
 
         {/* Info Banner */}

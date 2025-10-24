@@ -474,7 +474,8 @@ const DashboardPage = () => {
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [isWalletConnectOpen, setIsWalletConnectOpen] = useState(false); // ✅ ADDED: Real wallet connect state
-
+  const [showWalletModal, setShowWalletModal] = useState(false); // 🔥 ADD THIS LINE
+  
   // Supported assets configuration
   const SUPPORTED_ASSETS = [
     { symbol: 'ALGO', name: 'Algorand', decimals: 6, blockchain: 'Algorand' },
@@ -676,7 +677,7 @@ const DashboardPage = () => {
           <div className="flex items-center gap-3">
             {/* ✅ ADDED: Connect Wallet Button */}
             <button
-              onClick={() => setIsWalletConnectOpen(true)}
+              onClick={() => setShowWalletModal(true)}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
               <Wallet className="h-4 w-4" />
@@ -878,19 +879,23 @@ const DashboardPage = () => {
         />
       )}
 
-      {showReceiveModal && walletAddress && (
-        <ReceiveModal
-          walletAddress={walletAddress}
-          onClose={() => setShowReceiveModal(false)}
-        />
+      {showReceiveModal && (
+        <ReceiveModal onClose={() => setShowReceiveModal(false)} />
       )}
 
-      {/* ✅ ADDED: Real Wallet Connect Modal */}
-      <RealWalletConnect
-        isOpen={isWalletConnectOpen}
-        onClose={() => setIsWalletConnectOpen(false)}
-        onWalletConnected={handleWalletConnected}
-      />
+      // Add this modal at the bottom of return statement (replace RealWalletConnect):
+      {showWalletModal && (
+        <WalletConnectModal
+          isOpen={showWalletModal}
+          onClose={() => setShowWalletModal(false)}
+          onWalletConnected={(address, provider) => {
+            console.log('Wallet connected:', address, provider);
+            setWalletAddress(address);
+            fetchPortfolioData();
+            toast.success(`${provider} wallet connected to Seamount!`);
+          }}
+        />
+      )}
     </div>
   );
 };
