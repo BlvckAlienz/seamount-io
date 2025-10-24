@@ -7,7 +7,6 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 import uuid
-from pydantic import BaseModel
 
 from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service, get_database_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
@@ -15,104 +14,6 @@ from backend.config import KYCConfig
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# ADD THIS MODEL DEFINITION BEFORE THE ROUTES
-class LinkWalletRequest(BaseModel):
-    wallet_type: str
-    address: str
-    chain: str
-    is_manual: bool = False
-
-# ADD THIS MODEL FOR ADDRESS VALIDATION
-class ValidateAddressRequest(BaseModel):
-    address: str
-    chain: str
-
-# FIX THE ROUTE - REPLACE THE BROKEN ONE:
-@router.post("/link-external-wallet")
-async def link_external_wallet(
-    request: LinkWalletRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),  # ✅ FIX: Use Dict instead of User
-    supabase=Depends(get_supabase_client)
-):
-    """Link an external wallet to user account"""
-    try:
-        user_id = current_user.get('id')
-        logger.info(f"[External Wallet] Linking {request.wallet_type} wallet for user: {user_id}")
-        
-        # Store external wallet info
-        wallet_data = {
-            "user_id": user_id,
-            "wallet_type": request.wallet_type,
-            "address": request.address,
-            "chain": request.chain,
-            "is_manual": request.is_manual,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        # Insert into external_wallets table
-        result = supabase.from_("external_wallets").insert(wallet_data).execute()
-        
-        if result.data:
-            logger.info(f"[External Wallet] Successfully linked {request.wallet_type} wallet")
-            return {
-                "success": True, 
-                "message": f"{request.wallet_type} wallet linked successfully",
-                "wallet_address": request.address
-            }
-        else:
-            raise Exception("Failed to save wallet to database")
-            
-    except Exception as e:
-        logger.error(f"[External Wallet] Linking failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to link wallet: {str(e)}")
-
-# ADD THIS NEW ENDPOINT FOR ADDRESS VALIDATION
-@router.post("/validate-address")
-async def validate_address(
-    request: ValidateAddressRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """Validate wallet address format for specific chain"""
-    try:
-        address = request.address.strip()
-        chain = request.chain.lower()
-        
-        # Chain-specific validation patterns
-        validation_patterns = {
-            'algorand': r'^[A-Z2-7]{58}$',
-            'ethereum': r'^0x[a-fA-F0-9]{40}$',
-            'bsc': r'^0x[a-fA-F0-9]{40}$',  # BSC uses same format as Ethereum
-            'bitcoin': r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$',
-            'polygon': r'^0x[a-fA-F0-9]{40}$'  # Polygon uses Ethereum format
-        }
-        
-        import re
-        pattern = validation_patterns.get(chain)
-        
-        if not pattern:
-            return {
-                "success": True,
-                "valid": True,  # If we don't have pattern, assume valid
-                "message": "Chain validation not implemented"
-            }
-        
-        is_valid = bool(re.match(pattern, address))
-        
-        return {
-            "success": True,
-            "valid": is_valid,
-            "message": "Valid address" if is_valid else "Invalid address format for this chain"
-        }
-        
-    except Exception as e:
-        logger.error(f"[Address Validation] Error: {str(e)}")
-        return {
-            "success": False,
-            "valid": False,
-            "message": "Validation error"
-        }
 
 @router.post("/profile")
 async def create_user_profile(
@@ -177,8 +78,7 @@ async def update_user_profile(
     # ADD KYC-SPECIFIC FIELDS
     allowed_fields = [
         'first_name', 'last_name', 'country_code', 'phone', 
-        'date_of_birth', 'gender', 'bvn', 'id_type',
-        'onboarding_complete', 'kyc_status'  # 🆕 ADD THESE
+        'date_of_birth', 'gender', 'bvn', 'id_type'  # 🆕 ADD KYC FIELDS
     ]
     
     """Update user profile"""
@@ -268,11 +168,12 @@ async def provision_wallets(
     wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
-    CRITICAL FIX: Handle existing wallets properly
+    CRITICAL FIX: Provision Algorand wallet with mnemonic return
+    ✅ FIXED: Now returns exact structure frontend expects
     """
     try:
         user_id = current_user['id']
-        logger.info(f"[Wallet Provision] Starting for user: {user_id}")
+        logger.info(f"[Wallet Provision] User: {user_id}")
         
         # Check if wallet exists
         try:
@@ -285,12 +186,9 @@ async def provision_wallets(
                 existing_wallet = existing.data[0]
                 if existing_wallet.get('algorand_address'):
                     logger.info(f"[Wallet Provision] Wallet exists: {existing_wallet['algorand_address'][:10]}...")
-                    
-                    # ✅ FIX: Return 200 with specific code instead of error
                     return {
-                        "success": True,  # Still success because user has wallet
-                        "exists": True,   # Flag to indicate existing wallet
-                        "wallet_address": existing_wallet['algorand_address'],
+                        "success": True,
+                        "mnemonic": None,  # Don't return mnemonic for existing wallets
                         "message": "Wallet already exists"
                     }
         except Exception as check_error:
@@ -301,23 +199,16 @@ async def provision_wallets(
         import os
         from algosdk import account, mnemonic
         
-        logger.info("[Wallet Provision] Generating new Algorand keypair...")
-        
         # Generate keypair
         private_key, address = account.generate_account()
         mnemonic_phrase = mnemonic.from_private_key(private_key)
         
-        logger.info(f"[Wallet Provision] Generated wallet: {address[:10]}...")
-        
-        # Fund wallet (non-blocking) - but don't let this fail the whole process
-        funding_success = False
+        # Fund wallet (non-blocking)
         try:
             await wallet_service.algorand.fund_account_for_opt_in(address)
-            funding_success = True
             logger.info(f"✅ Funded wallet {address[:10]}...")
         except Exception as fund_error:
             logger.warning(f"⚠️ Wallet funding skipped: {fund_error}")
-            # Continue without funding - user can fund later
         
         # Encrypt keys
         encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
@@ -335,21 +226,18 @@ async def provision_wallets(
             'created_at': datetime.utcnow().isoformat()
         }
         
-        logger.info("[Wallet Provision] Storing wallet in database...")
-        
-        insert_result = wallet_service.db.supabase.table('user_wallets').upsert(
+        wallet_service.db.supabase.table('user_wallets').upsert(
             wallet_data,
             on_conflict='user_id'
         ).execute()
         
-        logger.info(f"[Wallet Provision] Success! Wallet stored for user: {user_id}")
+        logger.info(f"[Wallet Provision] Created: {address[:10]}...")
         
-        # ✅ CRITICAL FIX: Return EXACT structure frontend expects
+        # ✅ CRITICAL FIX: Return exact structure frontend expects
         return {
             "success": True,
-            "mnemonic": mnemonic_phrase,  # ✅ MUST BE PRESENT for new wallets
-            "wallet_address": address,
-            "funded": funding_success,
+            "mnemonic": mnemonic_phrase,  # ✅ Return for first-time backup
+            "wallet_address": address,    # ✅ Keep for backward compatibility
             "message": "Wallet created successfully"
         }
             

@@ -236,7 +236,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
 
   const handleCreateWallet = async () => {
     setLoading('seamount-native');
-    const toastId = toast.loading('Checking your wallet...');
+    const toastId = toast.loading('Creating your multi-chain wallet...');
     
     try {
       console.log('🔄 Calling /api/v1/user/provision-wallets...');
@@ -244,58 +244,35 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
       const response = await apiClient.post('/api/v1/user/provision-wallets');
       console.log('📦 API Response:', response.data);
       
-      // ✅ COMPREHENSIVE response validation
-      if (response.data) {
-        if (response.data.success === true) {
-          if (response.data.mnemonic) {
-            // ✅ SUCCESS: New wallet created with mnemonic
-            toast.success('Multi-chain wallet created!', { id: toastId });
-            onWalletCreated(response.data.mnemonic);
-            onClose();
-          } else {
-            // ✅ WALLET EXISTS: No mnemonic but wallet exists - complete onboarding
-            toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-            // Call onWalletCreated with a special value to indicate wallet exists
-            onWalletCreated('WALLET_ALREADY_EXISTS');
-            onClose();
-          }
-        } else if (response.data.success === false) {
-          // Handle specific error codes
-          if (response.data.code === 'WALLET_ALREADY_EXISTS') {
-            // ✅ WALLET EXISTS: Complete onboarding without mnemonic
-            toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-            onWalletCreated('WALLET_ALREADY_EXISTS');
-            onClose();
-          } else {
-            // ❌ Other errors
-            const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
-            throw new Error(errorMsg);
-          }
+      // ✅ IMPROVED: Handle different response structures
+      if (response.data && response.data.success) {
+        if (response.data.mnemonic) {
+          // ✅ SUCCESS: New wallet created with mnemonic
+          toast.success('Multi-chain wallet created!', { id: toastId });
+          onWalletCreated(response.data.mnemonic);
+          onClose();
+        } else if (response.data.wallet_address) {
+          // ✅ SUCCESS: Wallet exists but no mnemonic returned
+          toast.success('Wallet already exists!', { id: toastId });
+          // For existing wallets, we need to handle this differently
+          // Since we can't get the mnemonic again, we'll create a new one
+          // or skip to dashboard. For now, show error.
+          throw new Error('Wallet already exists. Please contact support to reset.');
         } else {
-          // ❌ UNEXPECTED: No success field
-          throw new Error('Invalid response from server');
+          throw new Error('Wallet creation succeeded but no mnemonic returned');
         }
       } else {
-        // ❌ NO RESPONSE DATA
-        throw new Error('No response from server');
+        // Handle API success: false or unexpected response
+        const errorMessage = response.data?.detail || response.data?.error || response.data?.message || 'Wallet creation failed';
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
       console.error('❌ Wallet creation error details:', error);
       
-      // ✅ COMPREHENSIVE error logging
+      // ✅ IMPROVED: Better error logging
       if (error.response) {
         console.error('📡 Server response error:', error.response.data);
         console.error('🔢 HTTP Status:', error.response.status);
-        
-        // ✅ SPECIFIC: Handle wallet exists error from HTTP exception
-        if (error.response.data?.code === 'WALLET_ALREADY_EXISTS' || 
-            error.response.status === 409) { // 409 Conflict often used for "already exists"
-          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-          onWalletCreated('WALLET_ALREADY_EXISTS');
-          onClose();
-          return;
-        }
-        
         const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
         toast.error(serverError, { id: toastId });
       } else if (error.message) {
@@ -315,9 +292,45 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     setLoading(walletId);
     
     try {
-      // Show automated connection modal instead of manual input
-      setShowAutomatedConnect(true);
-      setSelectedWallet(walletId);
+      switch (walletId) {
+        case 'pera':
+          // ✅ PERA WALLET INTEGRATION
+          if (typeof window !== 'undefined' && (window as any).PeraWallet) {
+            const peraWallet = new (window as any).PeraWallet();
+            const accounts = await peraWallet.connect();
+            toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
+          } else {
+            // Redirect to Pera Wallet download
+            window.open('https://perawallet.app/', '_blank');
+            toast.error('Please install Pera Wallet app');
+          }
+          break;
+          
+        case 'metamask':
+          // ✅ METAMASK INTEGRATION
+          if (typeof window !== 'undefined' && (window as any).ethereum) {
+            try {
+              const accounts = await (window as any).ethereum.request({
+                method: 'eth_requestAccounts'
+              });
+              toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
+            } catch (metaError) {
+              toast.error('User rejected MetaMask connection');
+            }
+          } else {
+            window.open('https://metamask.io/download/', '_blank');
+            toast.error('Please install MetaMask extension');
+          }
+          break;
+          
+        case 'walletconnect':
+          // ✅ WALLETCONNECT INTEGRATION
+          toast('WalletConnect integration coming soon!', { icon: '🔗' });
+          break;
+          
+        default:
+          toast('External wallet integration coming soon! 🚀', { icon: '⏳' });
+      }
     } catch (error) {
       console.error(`External wallet connection failed for ${walletId}:`, error);
       toast.error(`Failed to connect ${walletId}`);
