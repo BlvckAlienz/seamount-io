@@ -1,10 +1,9 @@
 // File: frontend/src/components/wallet/MultiChainWalletConnect.tsx
 
 import React, { useState } from 'react';
-import { Wallet, Check, Loader, Shield } from 'lucide-react';
+import { Wallet, Check, Loader, Shield, X, AlertCircle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
-import { X, Check, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface WalletOption {
   id: string;
@@ -14,237 +13,231 @@ interface WalletOption {
   description: string;
 }
 
-const WALLET_OPTIONS: WalletOption[] = [
-  {
-    id: 'seamount-native',
-    name: 'Create Seamount Wallet',
-    icon: '🌊',
-    chains: ['Algorand', 'Bitcoin', 'Ethereum', 'Polygon'],
-    description: 'New multi-chain wallet (Recommended)'
-  },
-  {
-    id: 'coinbase',
-    name: 'Coinbase Wallet', 
-    icon: '🟡',
-    chains: ['Ethereum', 'Polygon', 'Arbitrum'],
-    description: 'Connect your Coinbase wallet'
-  },
-  {
-    id: 'binance',
-    name: 'Binance Chain Wallet',
-    icon: '🟠', 
-    chains: ['Binance Smart Chain'],
-    description: 'Connect your Binance wallet'
-  },
-  {
-    id: 'pera',
-    name: 'Pera Wallet',
-    icon: '🟢',
-    chains: ['Algorand'],
-    description: 'Connect your Algorand wallet'
-  },
-  {
-    id: 'metamask', 
-    name: 'MetaMask',
-    icon: '🦊',
-    chains: ['Ethereum', 'Polygon', 'Arbitrum'],
-    description: 'Connect your EVM wallet'
-  }
-];
-
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onWalletCreated: (mnemonic: string) => void;
 }
 
-// ADD THIS INTERFACE FOR THE ADDRESS MODAL
-interface AddressInputModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  wallet: WalletOption;
-  onAddressSubmit: (address: string, walletId: string) => void;
-}
-
-// ADD THIS COMPONENT BEFORE THE MAIN COMPONENT
-const AddressInputModal: React.FC<AddressInputModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  wallet, 
-  onAddressSubmit 
-}) => {
-  const [address, setAddress] = useState('');
-  const [validating, setValidating] = useState(false);
-  const [isValid, setIsValid] = useState<boolean | null>(null);
-
-  const validateAddress = async (addr: string): Promise<boolean> => {
-    // Chain-specific address validation
-    const validations: { [key: string]: RegExp } = {
-      'pera': /^[A-Z2-7]{58}$/, // Algorand
-      'metamask': /^0x[a-fA-F0-9]{40}$/, // Ethereum
-      'coinbase': /^0x[a-fA-F0-9]{40}$/, // Ethereum
-      'binance': /^(bnb|tbnb)[a-z0-9]{39}$/i, // BNB
-    };
-
-    const regex = validations[wallet.id] || /^[a-zA-Z0-9]{20,60}$/; // Generic fallback
-    return regex.test(addr);
-  };
-
-  const handleAddressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const addr = e.target.value;
-    setAddress(addr);
-    
-    if (addr.length > 10) {
-      setValidating(true);
-      const valid = await validateAddress(addr);
-      setIsValid(valid);
-      setValidating(false);
-    } else {
-      setIsValid(null);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (isValid) {
-      onAddressSubmit(address, wallet.id);
-      setAddress('');
-      setIsValid(null);
-    }
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-gray-800 rounded-2xl max-w-md w-full p-6 border border-gray-700 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-xl font-bold text-white">Connect {wallet.name}</h3>
-            <p className="text-gray-400 text-sm">Enter your wallet address</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Address Input */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">
-              Wallet Address
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={address}
-                onChange={handleAddressChange}
-                placeholder={`Enter your ${wallet.name} address...`}
-                className={`w-full bg-gray-900 border rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 ${
-                  isValid === true 
-                    ? 'border-green-500 focus:ring-green-500/20' 
-                    : isValid === false 
-                    ? 'border-red-500 focus:ring-red-500/20'
-                    : 'border-gray-600 focus:ring-blue-500/20'
-                }`}
-              />
-              {validating && (
-                <div className="absolute right-3 top-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-                </div>
-              )}
-              {isValid === true && !validating && (
-                <Check className="absolute right-3 top-3 h-5 w-5 text-green-500" />
-              )}
-              {isValid === false && !validating && (
-                <AlertCircle className="absolute right-3 top-3 h-5 w-5 text-red-500" />
-              )}
-            </div>
-            
-            {/* Validation Messages */}
-            {isValid === false && (
-              <p className="text-red-400 text-sm mt-2 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Invalid {wallet.name} address format
-              </p>
-            )}
-            {isValid === true && (
-              <p className="text-green-400 text-sm mt-2 flex items-center gap-2">
-                <Check className="h-4 w-4" />
-                Valid address format
-              </p>
-            )}
-          </div>
-
-          {/* Chain Info */}
-          <div className="bg-gray-900/50 rounded-lg p-4">
-            <p className="text-sm text-gray-400 mb-2">Supported Chains:</p>
-            <div className="flex flex-wrap gap-2">
-              {wallet.chains.map(chain => (
-                <span 
-                  key={chain}
-                  className="text-xs bg-blue-900/30 text-blue-300 px-2 py-1 rounded"
-                >
-                  {chain}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onClose}
-              className="flex-1 border border-gray-600 text-gray-300 py-3 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!isValid || validating}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
-            >
-              Connect Wallet
-            </button>
-          </div>
-
-          {/* Help Link */}
-          <div className="text-center pt-2">
-            <a
-              href={`https://support.seamount.io/wallets/${wallet.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" />
-              How to find my {wallet.name} address
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-  // ADD THESE STATE VARIABLES AT THE TOP OF THE COMPONENT
+// ✅ FIXED - MOVE ADDRESS MODAL COMPONENT INSIDE MAIN COMPONENT
+// (This ensures proper React scope and hooks)
+export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
+  // ✅ ALL HOOKS MUST BE AT THE TOP LEVEL OF COMPONENT
+  const [loading, setLoading] = useState<string | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
 
-export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
+// ✅ FIXED WALLET OPTIONS - MOVE INSIDE COMPONENT OR KEEP CONST OUTSIDE
+  const WALLET_OPTIONS: WalletOption[] = [
+    {
+      id: 'seamount-native',
+      name: 'Create Seamount Wallet',
+      icon: '🌊',
+      chains: ['Algorand', 'Bitcoin', 'Ethereum', 'Polygon'],
+      description: 'New multi-chain wallet (Recommended)'
+    },
+    {
+      id: 'coinbase',
+      name: 'Coinbase Wallet', 
+      icon: '🟡',
+      chains: ['Ethereum', 'Polygon', 'Arbitrum'],
+      description: 'Connect your Coinbase wallet'
+    },
+    {
+      id: 'binance',
+      name: 'Binance Chain Wallet',
+      icon: '🟠', 
+      chains: ['Binance Smart Chain'],
+      description: 'Connect your Binance wallet'
+    },
+    {
+      id: 'pera',
+      name: 'Pera Wallet',
+      icon: '🟢',
+      chains: ['Algorand'],
+      description: 'Connect your Algorand wallet'
+    },
+    {
+      id: 'metamask', 
+      name: 'MetaMask',
+      icon: '🦊',
+      chains: ['Ethereum', 'Polygon', 'Arbitrum'],
+      description: 'Connect your EVM wallet'
+    }
+  ];
+
+// ✅ FIXED - ADDRESS MODAL COMPONENT NOW INSIDE MAIN COMPONENT
+  const AddressInputModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    wallet: WalletOption;
+    onAddressSubmit: (address: string, walletId: string) => void;
+  }> = ({ isOpen, onClose, wallet, onAddressSubmit }) => {
+    // ✅ HOOKS INSIDE NESTED COMPONENT ARE FINE
+    const [address, setAddress] = useState('');
+    const [validating, setValidating] = useState(false);
+    const [isValid, setIsValid] = useState<boolean | null>(null);
+
+    const validateAddress = async (addr: string): Promise<boolean> => {
+      const validations: { [key: string]: RegExp } = {
+        'pera': /^[A-Z2-7]{58}$/, // Algorand
+        'metamask': /^0x[a-fA-F0-9]{40}$/, // Ethereum
+        'coinbase': /^0x[a-fA-F0-9]{40}$/, // Ethereum
+        'binance': /^0x[a-fA-F0-9]{40}$/, // BSC uses same format
+      };
+
+      const regex = validations[wallet.id] || /^[a-zA-Z0-9]{20,60}$/;
+      return regex.test(addr);
+    };
+
+    const handleAddressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const addr = e.target.value;
+      setAddress(addr);
+      
+      if (addr.length > 10) {
+        setValidating(true);
+        const valid = await validateAddress(addr);
+        setIsValid(valid);
+        setValidating(false);
+      } else {
+        setIsValid(null);
+      }
+    };
+
+    const handleSubmit = () => {
+      if (isValid) {
+        onAddressSubmit(address, wallet.id);
+        setAddress('');
+        setIsValid(null);
+      }
+    };
+
+    const handleBackdropClick = (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={handleBackdropClick}
+      >
+        <div className="bg-gray-800 rounded-2xl max-w-md w-full p-6 border border-gray-700 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-xl font-bold text-white">Connect {wallet.name}</h3>
+              <p className="text-gray-400 text-sm">Enter your wallet address</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Address Input */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">
+                Wallet Address
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={address}
+                  onChange={handleAddressChange}
+                  placeholder={`Enter your ${wallet.name} address...`}
+                  className={`w-full bg-gray-900 border rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 ${
+                    isValid === true 
+                      ? 'border-green-500 focus:ring-green-500/20' 
+                      : isValid === false 
+                      ? 'border-red-500 focus:ring-red-500/20'
+                      : 'border-gray-600 focus:ring-blue-500/20'
+                  }`}
+                />
+                {validating && (
+                  <div className="absolute right-3 top-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                  </div>
+                )}
+                {isValid === true && !validating && (
+                  <Check className="absolute right-3 top-3 h-5 w-5 text-green-500" />
+                )}
+                {isValid === false && !validating && (
+                  <AlertCircle className="absolute right-3 top-3 h-5 w-5 text-red-500" />
+                )}
+              </div>
+              
+              {/* Validation Messages */}
+              {isValid === false && (
+                <p className="text-red-400 text-sm mt-2 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Invalid {wallet.name} address format
+                </p>
+              )}
+              {isValid === true && (
+                <p className="text-green-400 text-sm mt-2 flex items-center gap-2">
+                  <Check className="h-4 w-4" />
+                  Valid address format
+                </p>
+              )}
+            </div>
+
+            {/* Chain Info */}
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <p className="text-sm text-gray-400 mb-2">Supported Chains:</p>
+              <div className="flex flex-wrap gap-2">
+                {wallet.chains.map(chain => (
+                  <span 
+                    key={chain}
+                    className="text-xs bg-blue-900/30 text-blue-300 px-2 py-1 rounded"
+                  >
+                    {chain}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={onClose}
+                className="flex-1 border border-gray-600 text-gray-300 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!isValid || validating}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
+              >
+                Connect Wallet
+              </button>
+            </div>
+
+            {/* Help Link */}
+            <div className="text-center pt-2">
+              <a
+                href={`https://support.seamount.io/wallets/${wallet.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                How to find my {wallet.name} address
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const handleCreateWallet = async () => {
   setLoading('seamount-native');

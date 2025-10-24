@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 import uuid
+from pydantic import BaseModel
 
 from backend.dependencies import get_supabase_client, get_current_user, get_multi_chain_wallet_service, get_database_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
@@ -14,6 +15,104 @@ from backend.config import KYCConfig
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# ADD THIS MODEL DEFINITION BEFORE THE ROUTES
+class LinkWalletRequest(BaseModel):
+    wallet_type: str
+    address: str
+    chain: str
+    is_manual: bool = False
+
+# ADD THIS MODEL FOR ADDRESS VALIDATION
+class ValidateAddressRequest(BaseModel):
+    address: str
+    chain: str
+
+# FIX THE ROUTE - REPLACE THE BROKEN ONE:
+@router.post("/link-external-wallet")
+async def link_external_wallet(
+    request: LinkWalletRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),  # ✅ FIX: Use Dict instead of User
+    supabase=Depends(get_supabase_client)
+):
+    """Link an external wallet to user account"""
+    try:
+        user_id = current_user.get('id')
+        logger.info(f"[External Wallet] Linking {request.wallet_type} wallet for user: {user_id}")
+        
+        # Store external wallet info
+        wallet_data = {
+            "user_id": user_id,
+            "wallet_type": request.wallet_type,
+            "address": request.address,
+            "chain": request.chain,
+            "is_manual": request.is_manual,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Insert into external_wallets table
+        result = supabase.from_("external_wallets").insert(wallet_data).execute()
+        
+        if result.data:
+            logger.info(f"[External Wallet] Successfully linked {request.wallet_type} wallet")
+            return {
+                "success": True, 
+                "message": f"{request.wallet_type} wallet linked successfully",
+                "wallet_address": request.address
+            }
+        else:
+            raise Exception("Failed to save wallet to database")
+            
+    except Exception as e:
+        logger.error(f"[External Wallet] Linking failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to link wallet: {str(e)}")
+
+# ADD THIS NEW ENDPOINT FOR ADDRESS VALIDATION
+@router.post("/validate-address")
+async def validate_address(
+    request: ValidateAddressRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Validate wallet address format for specific chain"""
+    try:
+        address = request.address.strip()
+        chain = request.chain.lower()
+        
+        # Chain-specific validation patterns
+        validation_patterns = {
+            'algorand': r'^[A-Z2-7]{58}$',
+            'ethereum': r'^0x[a-fA-F0-9]{40}$',
+            'bsc': r'^0x[a-fA-F0-9]{40}$',  # BSC uses same format as Ethereum
+            'bitcoin': r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$',
+            'polygon': r'^0x[a-fA-F0-9]{40}$'  # Polygon uses Ethereum format
+        }
+        
+        import re
+        pattern = validation_patterns.get(chain)
+        
+        if not pattern:
+            return {
+                "success": True,
+                "valid": True,  # If we don't have pattern, assume valid
+                "message": "Chain validation not implemented"
+            }
+        
+        is_valid = bool(re.match(pattern, address))
+        
+        return {
+            "success": True,
+            "valid": is_valid,
+            "message": "Valid address" if is_valid else "Invalid address format for this chain"
+        }
+        
+    except Exception as e:
+        logger.error(f"[Address Validation] Error: {str(e)}")
+        return {
+            "success": False,
+            "valid": False,
+            "message": "Validation error"
+        }
 
 @router.post("/profile")
 async def create_user_profile(
@@ -260,37 +359,6 @@ async def provision_wallets(
         logger.error(f"[Wallet Provision] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/debug/provision-wallets")
-async def debug_provision_wallets(
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    """
-    Temporary debug endpoint to test wallet creation
-    """
-    try:
-        from algosdk import account, mnemonic
-        
-        # Generate test wallet
-        private_key, address = account.generate_account()
-        mnemonic_phrase = mnemonic.from_private_key(private_key)
-        
-        logger.info(f"[Debug] Generated test wallet: {address}")
-        
-        return {
-            "success": True,
-            "mnemonic": mnemonic_phrase,
-            "wallet_address": address,
-            "test": True,
-            "message": "Debug wallet created successfully"
-        }
-        
-    except Exception as e:
-        logger.error(f"[Debug] Failed: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
 @router.get("/kyc-status")
 async def get_kyc_status(
     current_user: dict = Depends(get_current_user),
@@ -337,15 +405,6 @@ async def get_kyc_status(
     except Exception as e:
         logger.error(f"KYC status query failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/link-external-wallet")
-async def link_external_wallet(
-    request: LinkWalletRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Link an external wallet to user account"""
-    # Implementation to save wallet to user profile
-    pass
 
 @router.post("/api/errors")
 async def log_client_error(
