@@ -1,5 +1,5 @@
 // File: frontend/src/pages/OnboardingPage.tsx
-// ✅ MERGED: OLD logic (BVN, country) + NEW design (Tether WDK)
+// ✅ PRODUCTION READY: Fixed scope issues + aligned with working backend
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -293,14 +293,28 @@ const OnboardingPage = () => {
     }
   }, [userProfile, navigate]);
 
+  // ✅ FIX: Move handleWalletCreated to component scope
+  const handleWalletCreated = (mnemonicOrStatus: string) => {
+    if (mnemonicOrStatus === 'WALLET_ALREADY_EXISTS') {
+      // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
+      console.log('✅ Wallet exists, completing onboarding...');
+      handleBackupComplete();
+    } else {
+      // ✅ NEW WALLET: Proceed with backup flow
+      setMnemonic(mnemonicOrStatus);
+      setShowWalletModal(false);
+      setStep('walletBackup');
+    }
+  };
+
   const handleWelcomeComplete = () => setStep('identity');
 
-  // ✅ FIX: Show BVN modal instead of direct API call
+  // ✅ FIXED: Show BVN modal instead of direct API call
   const handleStartVerification = () => {
     setShowBVNModal(true);
   };
 
-  // ✅ FIX: Called AFTER user submits BVN data
+  // ✅ FIXED: Called AFTER user submits BVN data
   const handleBVNSubmit = async (formData: any) => {
     const toastId = toast.loading('Starting verification...');
     
@@ -320,28 +334,21 @@ const OnboardingPage = () => {
       
       toast.success('Verification submitted!', { id: toastId });
 
-      
-      // ✅ UPDATE: Handle both new wallet and existing wallet cases
-      const handleWalletCreated = (mnemonicOrStatus: string) => {
-        if (mnemonicOrStatus === 'WALLET_ALREADY_EXISTS') {
-          // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
-          console.log('✅ Wallet exists, completing onboarding...');
-          handleBackupComplete(); // This will mark onboarding complete and go to dashboard
-        } else {
-          // ✅ NEW WALLET: Proceed with backup flow
-          setMnemonic(mnemonicOrStatus);
-          setShowWalletModal(false);
-          setStep('walletBackup');
-        }
-      };
-
       // 3. Create wallet
       const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
       
-      if (walletResponse.data.success && walletResponse.data.mnemonic) {
-        setMnemonic(walletResponse.data.mnemonic);
-        setShowBVNModal(false);
-        setStep('walletBackup');
+      if (walletResponse.data.success) {
+        if (walletResponse.data.mnemonic) {
+          // ✅ NEW WALLET: Proceed with backup flow
+          setMnemonic(walletResponse.data.mnemonic);
+          setShowBVNModal(false);
+          setStep('walletBackup');
+        } else {
+          // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
+          console.log('✅ Wallet exists, completing onboarding...');
+          setShowBVNModal(false);
+          await handleBackupComplete(); // This will mark onboarding complete and go to dashboard
+        }
       }
       
     } catch (error: any) {
@@ -351,8 +358,20 @@ const OnboardingPage = () => {
     }
   };
 
+  // ✅ FIXED: Use skip verification endpoint
   const handleSkipVerification = async () => {
-    setShowWalletModal(true);  // Show modal instead of direct API call
+    try {
+      const toastId = toast.loading('Skipping verification...');
+      const response = await apiClient.post('/api/v1/kyc/skip-verification');
+      
+      if (response.data.success) {
+        toast.success('Verification skipped!', { id: toastId });
+        setShowWalletModal(true);  // Show wallet creation modal
+      }
+    } catch (error: any) {
+      console.error('Skip verification error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to skip verification');
+    }
   };
 
   const handleBackupComplete = async () => {
@@ -433,7 +452,7 @@ const OnboardingPage = () => {
       <MultiChainWalletConnect
         isOpen={showWalletModal}
         onClose={() => setShowWalletModal(false)}
-        onWalletCreated={handleWalletCreated} // ✅ Use updated handler
+        onWalletCreated={handleWalletCreated} // ✅ Now properly defined
       />
     </div>
   );
