@@ -55,57 +55,96 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
 
   const handleCreateWallet = async () => {
-    setLoading('seamount-native');
-    const toastId = toast.loading('Creating your multi-chain wallet...');
+  setLoading('seamount-native');
+  const toastId = toast.loading('Creating your multi-chain wallet...');
+  
+  try {
+    console.log('🔄 Calling /api/v1/user/provision-wallets...');
     
-    try {
-      console.log('🔄 Calling /api/v1/user/provision-wallets...');
-      
-      const response = await apiClient.post('/api/v1/user/provision-wallets');
-      console.log('📦 API Response:', response.data);
-      
-      // ✅ IMPROVED: Handle different response structures
-      if (response.data && response.data.success) {
+    const response = await apiClient.post('/api/v1/user/provision-wallets');
+    console.log('📦 API Response:', response.data);
+    
+    // ✅ COMPREHENSIVE response validation
+    if (response.data) {
+      if (response.data.success === true) {
         if (response.data.mnemonic) {
           // ✅ SUCCESS: New wallet created with mnemonic
           toast.success('Multi-chain wallet created!', { id: toastId });
           onWalletCreated(response.data.mnemonic);
           onClose();
-        } else if (response.data.wallet_address) {
-          // ✅ SUCCESS: Wallet exists but no mnemonic returned
-          toast.success('Wallet already exists!', { id: toastId });
-          // For existing wallets, we need to handle this differently
-          // Since we can't get the mnemonic again, we'll create a new one
-          // or skip to dashboard. For now, show error.
-          throw new Error('Wallet already exists. Please contact support to reset.');
+        } else if (response.data.code === 'WALLET_ALREADY_EXISTS') {
+          // ✅ HANDLED: Wallet already exists
+          toast.error('Wallet already exists. Please contact support.', { id: toastId });
         } else {
-          throw new Error('Wallet creation succeeded but no mnemonic returned');
+          // ❌ SUCCESS but no mnemonic - critical error
+          console.error('❌ Critical: Success=true but no mnemonic:', response.data);
+          throw new Error('Wallet creation succeeded but no recovery phrase was returned. This is a critical error.');
         }
+      } else if (response.data.success === false) {
+        // ✅ HANDLED: Explicit failure from backend
+        const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
+        throw new Error(errorMsg);
       } else {
-        // Handle API success: false or unexpected response
-        const errorMessage = response.data?.detail || response.data?.error || response.data?.message || 'Wallet creation failed';
-        throw new Error(errorMessage);
+        // ❌ UNEXPECTED: No success field
+        throw new Error('Invalid response from server');
+      }
+    } else {
+      // ❌ NO RESPONSE DATA
+      throw new Error('No response from server');
+    }
+  } catch (error: any) {
+    console.error('❌ Wallet creation error details:', error);
+    
+    // ✅ COMPREHENSIVE error logging
+    if (error.response) {
+      console.error('📡 Server response error:', error.response.data);
+      console.error('🔢 HTTP Status:', error.response.status);
+      const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
+      toast.error(serverError, { id: toastId });
+    } else if (error.message) {
+      console.error('💬 Error message:', error.message);
+      toast.error(error.message, { id: toastId });
+    } else {
+      console.error('🚨 Unknown error:', error);
+      toast.error('Wallet creation failed. Please try again.', { id: toastId });
+    }
+  } finally {
+    setLoading(null);
+  }
+};
+
+  // TEMPORARY: Add this debug function to MultiChainWalletConnect.tsx
+  const debugCreateWallet = async () => {
+    setLoading('seamount-native');
+    const toastId = toast.loading('Creating debug wallet...');
+    
+    try {
+      console.log('🔄 Calling DEBUG endpoint...');
+      
+      // Temporary: Use debug endpoint
+      const response = await apiClient.post('/api/v1/user/debug/provision-wallets');
+      console.log('📦 DEBUG API Response:', response.data);
+      
+      if (response.data && response.data.success && response.data.mnemonic) {
+        toast.success('Debug wallet created!', { id: toastId });
+        onWalletCreated(response.data.mnemonic);
+        onClose();
+      } else {
+        throw new Error('Debug wallet creation failed: ' + (response.data?.error || 'Unknown error'));
       }
     } catch (error: any) {
-      console.error('❌ Wallet creation error details:', error);
-      
-      // ✅ IMPROVED: Better error logging
-      if (error.response) {
-        console.error('📡 Server response error:', error.response.data);
-        console.error('🔢 HTTP Status:', error.response.status);
-        const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
-        toast.error(serverError, { id: toastId });
-      } else if (error.message) {
-        console.error('💬 Error message:', error.message);
-        toast.error(error.message, { id: toastId });
-      } else {
-        console.error('🚨 Unknown error:', error);
-        toast.error('Wallet creation failed. Please try again.', { id: toastId });
-      }
+      console.error('❌ Debug wallet creation error:', error);
+      toast.error(error.message, { id: toastId });
     } finally {
       setLoading(null);
     }
   };
+
+  // TEMPORARY: Replace the handleCreateWallet call with debugCreateWallet in the button click
+  // In the wallet options mapping, change:
+  // if (wallet.id === 'seamount-native') {
+  //   debugCreateWallet(); // TEMPORARY DEBUG
+  // }
 
   const handleConnectExternal = async (walletId: string) => {
     setLoading(walletId);

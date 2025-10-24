@@ -168,12 +168,12 @@ async def provision_wallets(
     wallet_service: WalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
-    CRITICAL FIX: Provision Algorand wallet with mnemonic return
-    ✅ FIXED: Now returns exact structure frontend expects
+    CRITICAL FIX: Provision Algorand wallet with PROPER mnemonic return
+    ✅ FIXED: Now ALWAYS returns mnemonic when creating new wallet
     """
     try:
         user_id = current_user['id']
-        logger.info(f"[Wallet Provision] User: {user_id}")
+        logger.info(f"[Wallet Provision] Starting for user: {user_id}")
         
         # Check if wallet exists
         try:
@@ -186,10 +186,13 @@ async def provision_wallets(
                 existing_wallet = existing.data[0]
                 if existing_wallet.get('algorand_address'):
                     logger.info(f"[Wallet Provision] Wallet exists: {existing_wallet['algorand_address'][:10]}...")
+                    
+                    # ✅ FIX: If wallet exists but we need mnemonic for onboarding, return error
+                    # since we can't retrieve encrypted mnemonic
                     return {
-                        "success": True,
-                        "mnemonic": None,  # Don't return mnemonic for existing wallets
-                        "message": "Wallet already exists"
+                        "success": False,
+                        "error": "Wallet already exists. Cannot retrieve mnemonic for existing wallet.",
+                        "code": "WALLET_ALREADY_EXISTS"
                     }
         except Exception as check_error:
             logger.warning(f"Existing wallet check failed: {check_error}")
@@ -199,16 +202,23 @@ async def provision_wallets(
         import os
         from algosdk import account, mnemonic
         
+        logger.info("[Wallet Provision] Generating new Algorand keypair...")
+        
         # Generate keypair
         private_key, address = account.generate_account()
         mnemonic_phrase = mnemonic.from_private_key(private_key)
         
-        # Fund wallet (non-blocking)
+        logger.info(f"[Wallet Provision] Generated wallet: {address[:10]}...")
+        
+        # Fund wallet (non-blocking) - but don't let this fail the whole process
+        funding_success = False
         try:
             await wallet_service.algorand.fund_account_for_opt_in(address)
+            funding_success = True
             logger.info(f"✅ Funded wallet {address[:10]}...")
         except Exception as fund_error:
             logger.warning(f"⚠️ Wallet funding skipped: {fund_error}")
+            # Continue without funding - user can fund later
         
         # Encrypt keys
         encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
@@ -226,18 +236,21 @@ async def provision_wallets(
             'created_at': datetime.utcnow().isoformat()
         }
         
-        wallet_service.db.supabase.table('user_wallets').upsert(
+        logger.info("[Wallet Provision] Storing wallet in database...")
+        
+        insert_result = wallet_service.db.supabase.table('user_wallets').upsert(
             wallet_data,
             on_conflict='user_id'
         ).execute()
         
-        logger.info(f"[Wallet Provision] Created: {address[:10]}...")
+        logger.info(f"[Wallet Provision] Success! Wallet stored for user: {user_id}")
         
-        # ✅ CRITICAL FIX: Return exact structure frontend expects
+        # ✅ CRITICAL FIX: Return EXACT structure frontend expects
         return {
             "success": True,
-            "mnemonic": mnemonic_phrase,  # ✅ Return for first-time backup
-            "wallet_address": address,    # ✅ Keep for backward compatibility
+            "mnemonic": mnemonic_phrase,  # ✅ MUST BE PRESENT for new wallets
+            "wallet_address": address,
+            "funded": funding_success,
             "message": "Wallet created successfully"
         }
             
@@ -245,7 +258,42 @@ async def provision_wallets(
         logger.error(f"[Wallet Provision] Failed: {e}")
         import traceback
         logger.error(f"[Wallet Provision] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "success": False,
+            "error": str(e),
+            "code": "WALLET_CREATION_FAILED"
+        }
+
+@router.post("/debug/provision-wallets")
+async def debug_provision_wallets(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Temporary debug endpoint to test wallet creation
+    """
+    try:
+        from algosdk import account, mnemonic
+        
+        # Generate test wallet
+        private_key, address = account.generate_account()
+        mnemonic_phrase = mnemonic.from_private_key(private_key)
+        
+        logger.info(f"[Debug] Generated test wallet: {address}")
+        
+        return {
+            "success": True,
+            "mnemonic": mnemonic_phrase,
+            "wallet_address": address,
+            "test": True,
+            "message": "Debug wallet created successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"[Debug] Failed: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 @router.get("/kyc-status")
 async def get_kyc_status(
