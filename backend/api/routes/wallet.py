@@ -8,16 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from decimal import Decimal
+import logging
 
-from backend.dependencies import get_current_user, get_multi_chain_wallet_service
-from backend.services.multi_chain_wallet_service import MultiChainWalletService
-
-from backend.dependencies import get_multi_chain_wallet_service
-from backend.services.multi_chain_wallet_service import MultiChainWalletService
-
-router = APIRouter(prefix="/wallet", tags=["Multi-Chain Wallet"])
 
 # ========== REQUEST/RESPONSE MODELS ==========
+
+# ✅ ADD MISSING MODEL DEFINITION
+class ValidateAddressRequest(BaseModel):
+    address: str
+    chain: str
 
 class WalletCreateRequest(BaseModel):
     chains: Optional[List[str]] = None  # None = default essential chains
@@ -29,6 +28,14 @@ class SendPaymentRequest(BaseModel):
     amount: Decimal
     memo: Optional[str] = None
 
+# ✅ ADD LOGGER
+logger = logging.getLogger(__name__)
+
+from backend.dependencies import get_current_user, get_multi_chain_wallet_service
+from backend.services.multi_chain_wallet_service import MultiChainWalletService
+
+router = APIRouter(prefix="/wallet", tags=["Multi-Chain Wallet"])
+
 # ========== ENDPOINTS ==========
 
 @router.post("/wallet/create")
@@ -36,14 +43,14 @@ async def create_wallet(
     current_user: dict = Depends(get_current_user),
     wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
 ):
-    """âœ… FIXED: Now uses dependency injection"""
+    """✅ FIXED: Now uses dependency injection"""
     try:
         result = await wallet_service.create_wallet_for_user(
             user_id=current_user['id'],
             chains=None  # Default: Algorand + Bitcoin + Ethereum + Polygon
         )
         
-        # âœ… ADD ERROR HANDLING:
+        # ✅ ADD ERROR HANDLING:
         if not result.get("success"):
             error_msg = result.get("error", "Wallet creation failed")
             logger.error(f"Wallet creation failed: {error_msg}")
@@ -99,11 +106,55 @@ async def create_multi_chain_wallet(
         "total_chains": result["total_chains"]
     }
 
+# ✅ FIX THE VALIDATE ADDRESS ENDPOINT - ADD IMPLEMENTATION
 @router.post("/validate-address")
-async def validate_address(request: ValidateAddressRequest):
+async def validate_address(
+    request: ValidateAddressRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """Validate wallet address format for specific chain"""
-    # Implementation for chain-specific address validation
-    pass
+    try:
+        address = request.address.strip()
+        chain = request.chain.lower()
+        
+        # Chain-specific validation patterns
+        validation_patterns = {
+            'algorand': r'^[A-Z2-7]{58}$',
+            'ethereum': r'^0x[a-fA-F0-9]{40}$',
+            'bsc': r'^0x[a-fA-F0-9]{40}$',  # BSC uses same format as Ethereum
+            'bitcoin': r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$',
+            'polygon': r'^0x[a-fA-F0-9]{40}$',  # Polygon uses Ethereum format
+            'arbitrum': r'^0x[a-fA-F0-9]{40}$',
+            'ton': r'^[a-zA-Z0-9_-]{48}$',
+            'tron': r'^T[A-Za-z1-9]{33}$',
+            'solana': r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+        }
+        
+        import re
+        pattern = validation_patterns.get(chain)
+        
+        if not pattern:
+            return {
+                "success": True,
+                "valid": True,  # If we don't have pattern, assume valid
+                "message": "Chain validation not implemented"
+            }
+        
+        is_valid = bool(re.match(pattern, address))
+        
+        return {
+            "success": True,
+            "valid": is_valid,
+            "message": "Valid address" if is_valid else "Invalid address format for this chain"
+        }
+        
+    except Exception as e:
+        logger.error(f"[Address Validation] Error: {str(e)}")
+        return {
+            "success": False,
+            "valid": False,
+            "message": "Validation error"
+        }
 
 @router.get("/balances")
 async def get_balances(
