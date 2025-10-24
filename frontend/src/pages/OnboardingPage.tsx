@@ -11,7 +11,6 @@ import {
   Globe, Lock, Download, Check, AlertCircle 
 } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
-import { MultiChainWalletConnect } from '../components/wallet/MultiChainWalletConnect';
 
 // ============================================================================
 // STEP COMPONENTS
@@ -283,7 +282,6 @@ const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
-  const [showWalletModal, setShowWalletModal] = useState(false);
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
@@ -292,20 +290,6 @@ const OnboardingPage = () => {
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
-
-  // ✅ FIX: Move handleWalletCreated to component scope
-  const handleWalletCreated = (mnemonicOrStatus: string) => {
-    if (mnemonicOrStatus === 'WALLET_ALREADY_EXISTS') {
-      // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
-      console.log('✅ Wallet exists, completing onboarding...');
-      handleBackupComplete();
-    } else {
-      // ✅ NEW WALLET: Proceed with backup flow
-      setMnemonic(mnemonicOrStatus);
-      setShowWalletModal(false);
-      setStep('walletBackup');
-    }
-  };
 
   const handleWelcomeComplete = () => setStep('identity');
 
@@ -366,7 +350,21 @@ const OnboardingPage = () => {
       
       if (response.data.success) {
         toast.success('Verification skipped!', { id: toastId });
-        setShowWalletModal(true);  // Show wallet creation modal
+        
+        // ✅ Create wallet directly without external connection
+        const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
+        
+        if (walletResponse.data.success) {
+          if (walletResponse.data.mnemonic) {
+            // ✅ NEW WALLET: Proceed with backup flow
+            setMnemonic(walletResponse.data.mnemonic);
+            setStep('walletBackup');
+          } else {
+            // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
+            console.log('✅ Wallet exists, completing onboarding...');
+            await handleBackupComplete(); // This will mark onboarding complete and go to dashboard
+          }
+        }
       }
     } catch (error: any) {
       console.error('Skip verification error:', error);
@@ -448,12 +446,6 @@ const OnboardingPage = () => {
           countryCode={userProfile?.country_code || 'NG'}
         />
       )}
-
-      <MultiChainWalletConnect
-        isOpen={showWalletModal}
-        onClose={() => setShowWalletModal(false)}
-        onWalletCreated={handleWalletCreated} // ✅ Now properly defined
-      />
     </div>
   );
 };

@@ -1,8 +1,7 @@
 // File: frontend/src/components/wallet/RealWalletConnect.tsx
 import React, { useState, useEffect } from 'react';
 import { Wallet, X, CheckCircle, ExternalLink, Smartphone, Monitor, AlertCircle } from 'lucide-react';
-import { WalletConnectModal } from '@walletconnect/modal';
-import { WalletConnectProvider } from '@walletconnect/web3-provider';
+import WalletConnectProvider from '@walletconnect/web3-provider'; // ✅ FIXED: Default import
 import Web3 from 'web3';
 import toast from 'react-hot-toast';
 
