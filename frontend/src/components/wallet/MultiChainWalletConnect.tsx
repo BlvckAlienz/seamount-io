@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Wallet, Check, Loader, Shield } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
+import { X, Check, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface WalletOption {
   id: string;
@@ -22,6 +23,20 @@ const WALLET_OPTIONS: WalletOption[] = [
     description: 'New multi-chain wallet (Recommended)'
   },
   {
+    id: 'coinbase',
+    name: 'Coinbase Wallet', 
+    icon: '🟡',
+    chains: ['Ethereum', 'Polygon', 'Arbitrum'],
+    description: 'Connect your Coinbase wallet'
+  },
+  {
+    id: 'binance',
+    name: 'Binance Chain Wallet',
+    icon: '🟠', 
+    chains: ['Binance Smart Chain'],
+    description: 'Connect your Binance wallet'
+  },
+  {
     id: 'pera',
     name: 'Pera Wallet',
     icon: '🟢',
@@ -29,18 +44,11 @@ const WALLET_OPTIONS: WalletOption[] = [
     description: 'Connect your Algorand wallet'
   },
   {
-    id: 'metamask',
+    id: 'metamask', 
     name: 'MetaMask',
     icon: '🦊',
     chains: ['Ethereum', 'Polygon', 'Arbitrum'],
     description: 'Connect your EVM wallet'
-  },
-  {
-    id: 'walletconnect',
-    name: 'WalletConnect',
-    icon: '🔗',
-    chains: ['Multi-chain'],
-    description: 'Connect any WalletConnect-compatible wallet'
   }
 ];
 
@@ -49,6 +57,190 @@ interface Props {
   onClose: () => void;
   onWalletCreated: (mnemonic: string) => void;
 }
+
+// ADD THIS INTERFACE FOR THE ADDRESS MODAL
+interface AddressInputModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  wallet: WalletOption;
+  onAddressSubmit: (address: string, walletId: string) => void;
+}
+
+// ADD THIS COMPONENT BEFORE THE MAIN COMPONENT
+const AddressInputModal: React.FC<AddressInputModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  wallet, 
+  onAddressSubmit 
+}) => {
+  const [address, setAddress] = useState('');
+  const [validating, setValidating] = useState(false);
+  const [isValid, setIsValid] = useState<boolean | null>(null);
+
+  const validateAddress = async (addr: string): Promise<boolean> => {
+    // Chain-specific address validation
+    const validations: { [key: string]: RegExp } = {
+      'pera': /^[A-Z2-7]{58}$/, // Algorand
+      'metamask': /^0x[a-fA-F0-9]{40}$/, // Ethereum
+      'coinbase': /^0x[a-fA-F0-9]{40}$/, // Ethereum
+      'binance': /^(bnb|tbnb)[a-z0-9]{39}$/i, // BNB
+    };
+
+    const regex = validations[wallet.id] || /^[a-zA-Z0-9]{20,60}$/; // Generic fallback
+    return regex.test(addr);
+  };
+
+  const handleAddressChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const addr = e.target.value;
+    setAddress(addr);
+    
+    if (addr.length > 10) {
+      setValidating(true);
+      const valid = await validateAddress(addr);
+      setIsValid(valid);
+      setValidating(false);
+    } else {
+      setIsValid(null);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (isValid) {
+      onAddressSubmit(address, wallet.id);
+      setAddress('');
+      setIsValid(null);
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-gray-800 rounded-2xl max-w-md w-full p-6 border border-gray-700 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-xl font-bold text-white">Connect {wallet.name}</h3>
+            <p className="text-gray-400 text-sm">Enter your wallet address</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <X className="h-5 w-5 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Address Input */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              Wallet Address
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={address}
+                onChange={handleAddressChange}
+                placeholder={`Enter your ${wallet.name} address...`}
+                className={`w-full bg-gray-900 border rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 ${
+                  isValid === true 
+                    ? 'border-green-500 focus:ring-green-500/20' 
+                    : isValid === false 
+                    ? 'border-red-500 focus:ring-red-500/20'
+                    : 'border-gray-600 focus:ring-blue-500/20'
+                }`}
+              />
+              {validating && (
+                <div className="absolute right-3 top-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                </div>
+              )}
+              {isValid === true && !validating && (
+                <Check className="absolute right-3 top-3 h-5 w-5 text-green-500" />
+              )}
+              {isValid === false && !validating && (
+                <AlertCircle className="absolute right-3 top-3 h-5 w-5 text-red-500" />
+              )}
+            </div>
+            
+            {/* Validation Messages */}
+            {isValid === false && (
+              <p className="text-red-400 text-sm mt-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Invalid {wallet.name} address format
+              </p>
+            )}
+            {isValid === true && (
+              <p className="text-green-400 text-sm mt-2 flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Valid address format
+              </p>
+            )}
+          </div>
+
+          {/* Chain Info */}
+          <div className="bg-gray-900/50 rounded-lg p-4">
+            <p className="text-sm text-gray-400 mb-2">Supported Chains:</p>
+            <div className="flex flex-wrap gap-2">
+              {wallet.chains.map(chain => (
+                <span 
+                  key={chain}
+                  className="text-xs bg-blue-900/30 text-blue-300 px-2 py-1 rounded"
+                >
+                  {chain}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 border border-gray-600 text-gray-300 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!isValid || validating}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
+            >
+              Connect Wallet
+            </button>
+          </div>
+
+          {/* Help Link */}
+          <div className="text-center pt-2">
+            <a
+              href={`https://support.seamount.io/wallets/${wallet.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              How to find my {wallet.name} address
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ADD THESE STATE VARIABLES AT THE TOP OF THE COMPONENT
+const [showAddressModal, setShowAddressModal] = useState(false);
+const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
 
 export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
   const [loading, setLoading] = useState<string | null>(null);
@@ -130,87 +322,162 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   }
 };
 
-  // TEMPORARY: Add this debug function to MultiChainWalletConnect.tsx
-  const debugCreateWallet = async () => {
-    setLoading('seamount-native');
-    const toastId = toast.loading('Creating debug wallet...');
+  // COMPLETE MODERN handleConnectExternal FUNCTION
+  const handleConnectExternal = async (walletId: string) => {
+    setLoading(walletId);
     
+    const wallet = WALLET_OPTIONS.find(w => w.id === walletId);
+    if (!wallet) {
+      toast.error('Wallet option not found');
+      setLoading(null);
+      return;
+    }
+
     try {
-      console.log('🔄 Calling DEBUG endpoint...');
-      
-      // Temporary: Use debug endpoint
-      const response = await apiClient.post('/api/v1/user/debug/provision-wallets');
-      console.log('📦 DEBUG API Response:', response.data);
-      
-      if (response.data && response.data.success && response.data.mnemonic) {
-        toast.success('Debug wallet created!', { id: toastId });
-        onWalletCreated(response.data.mnemonic);
-        onClose();
-      } else {
-        throw new Error('Debug wallet creation failed: ' + (response.data?.error || 'Unknown error'));
+      // For mobile/extension wallets, try direct connection first
+      if (walletId === 'metamask' && typeof window !== 'undefined' && (window as any).ethereum) {
+        try {
+          const accounts = await (window as any).ethereum.request({
+            method: 'eth_requestAccounts'
+          });
+          
+          if (accounts && accounts.length > 0) {
+            const address = accounts[0];
+            await handleExternalWalletSuccess(address, walletId);
+            return;
+          }
+        } catch (error: any) {
+          if (error.code === 4001) {
+            // User rejected connection - fall back to manual input
+            console.log('User rejected MetaMask connection');
+          } else {
+            throw error;
+          }
+        }
       }
+
+      // For Pera Wallet on mobile
+      if (walletId === 'pera' && typeof window !== 'undefined' && (window as any).PeraWallet) {
+        try {
+          const peraWallet = new (window as any).PeraWallet();
+          const accounts = await peraWallet.connect();
+          
+          if (accounts && accounts.length > 0) {
+            const address = accounts[0];
+            await handleExternalWalletSuccess(address, walletId);
+            return;
+          }
+        } catch (error: any) {
+          if (error?.data?.type !== 'CONNECT_MODAL_CLOSED') {
+            // Only fallback if not user-cancelled
+            console.log('Pera Wallet connection failed, falling back to manual input');
+          }
+        }
+      }
+
+      // Fallback to manual address input for all cases
+      setSelectedExternalWallet(wallet);
+      setShowAddressModal(true);
+      
     } catch (error: any) {
-      console.error('❌ Debug wallet creation error:', error);
-      toast.error(error.message, { id: toastId });
+      console.error(`External wallet connection failed for ${walletId}:`, error);
+      
+      // Even if error, fall back to manual input
+      setSelectedExternalWallet(wallet);
+      setShowAddressModal(true);
     } finally {
       setLoading(null);
     }
   };
 
-  // TEMPORARY: Replace the handleCreateWallet call with debugCreateWallet in the button click
-  // In the wallet options mapping, change:
-  // if (wallet.id === 'seamount-native') {
-  //   debugCreateWallet(); // TEMPORARY DEBUG
-  // }
-
-  const handleConnectExternal = async (walletId: string) => {
-    setLoading(walletId);
+  // ADD THIS HELPER FUNCTION FOR SUCCESSFUL CONNECTIONS
+  const handleExternalWalletSuccess = async (address: string, walletId: string) => {
+    const toastId = toast.loading(`Connecting ${walletId}...`);
     
     try {
-      switch (walletId) {
-        case 'pera':
-          // ✅ PERA WALLET INTEGRATION
-          if (typeof window !== 'undefined' && (window as any).PeraWallet) {
-            const peraWallet = new (window as any).PeraWallet();
-            const accounts = await peraWallet.connect();
-            toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
-          } else {
-            // Redirect to Pera Wallet download
-            window.open('https://perawallet.app/', '_blank');
-            toast.error('Please install Pera Wallet app');
-          }
-          break;
-          
-        case 'metamask':
-          // ✅ METAMASK INTEGRATION
-          if (typeof window !== 'undefined' && (window as any).ethereum) {
-            try {
-              const accounts = await (window as any).ethereum.request({
-                method: 'eth_requestAccounts'
-              });
-              toast.success(`Connected: ${accounts[0].slice(0, 10)}...`);
-            } catch (metaError) {
-              toast.error('User rejected MetaMask connection');
-            }
-          } else {
-            window.open('https://metamask.io/download/', '_blank');
-            toast.error('Please install MetaMask extension');
-          }
-          break;
-          
-        case 'walletconnect':
-          // ✅ WALLETCONNECT INTEGRATION
-          toast('WalletConnect integration coming soon!', { icon: '🔗' });
-          break;
-          
-        default:
-          toast('External wallet integration coming soon! 🚀', { icon: '⏳' });
+      // Save the external wallet to user profile
+      const response = await apiClient.post('/api/v1/user/link-external-wallet', {
+        wallet_type: walletId,
+        address: address,
+        chain: getPrimaryChain(walletId)
+      });
+
+      if (response.data.success) {
+        toast.success(`${walletId.charAt(0).toUpperCase() + walletId.slice(1)} connected!`, { 
+          id: toastId,
+          duration: 3000 
+        });
+        
+        // Close modal and proceed
+        onClose();
+        
+        // Notify parent component about successful external wallet connection
+        // Using a special identifier that parent can recognize
+        onWalletCreated(`EXTERNAL_WALLET_${walletId}_CONNECTED`);
+      } else {
+        throw new Error(response.data.error || 'Failed to link wallet');
       }
-    } catch (error) {
-      console.error(`External wallet connection failed for ${walletId}:`, error);
-      toast.error(`Failed to connect ${walletId}`);
-    } finally {
-      setLoading(null);
+    } catch (error: any) {
+      console.error('Wallet linking error:', error);
+      toast.error(
+        error.response?.data?.detail || error.message || 'Failed to connect wallet', 
+        { id: toastId }
+      );
+    }
+  };
+
+  // ADD THIS HELPER FUNCTION TO GET PRIMARY CHAIN
+  const getPrimaryChain = (walletId: string): string => {
+    const chainMap: { [key: string]: string } = {
+      'pera': 'algorand',
+      'metamask': 'ethereum', 
+      'coinbase': 'ethereum',
+      'binance': 'bsc'
+    };
+    return chainMap[walletId] || 'multichain';
+  };
+
+  // ADD THIS FUNCTION TO HANDLE MANUAL ADDRESS SUBMISSION
+  const handleManualAddressSubmit = async (address: string, walletId: string) => {
+    const toastId = toast.loading(`Verifying ${walletId} address...`);
+    
+    try {
+      // Validate address format first
+      const validationResponse = await apiClient.post('/api/v1/wallet/validate-address', {
+        address: address,
+        chain: getPrimaryChain(walletId)
+      });
+
+      if (!validationResponse.data.valid) {
+        throw new Error('Invalid address format for this wallet type');
+      }
+
+      // Save the external wallet
+      const saveResponse = await apiClient.post('/api/v1/user/link-external-wallet', {
+        wallet_type: walletId,
+        address: address,
+        chain: getPrimaryChain(walletId),
+        is_manual: true
+      });
+
+      if (saveResponse.data.success) {
+        toast.success(`${walletId} address saved!`, { id: toastId });
+        
+        setShowAddressModal(false);
+        setSelectedExternalWallet(null);
+        onClose();
+        
+        // Notify parent
+        onWalletCreated(`EXTERNAL_WALLET_${walletId}_CONNECTED`);
+      } else {
+        throw new Error(saveResponse.data.error || 'Failed to save wallet');
+      }
+    } catch (error: any) {
+      console.error('Manual wallet connection error:', error);
+      toast.error(
+        error.response?.data?.detail || error.message || 'Failed to connect wallet', 
+        { id: toastId }
+      );
     }
   };
 
@@ -297,6 +564,18 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
           </div>
         </div>
       </div>
+      {/* ADD THIS MODAL AT THE BOTTOM OF THE RETURN */}
+      {selectedExternalWallet && (
+        <AddressInputModal
+          isOpen={showAddressModal}
+          onClose={() => {
+            setShowAddressModal(false);
+            setSelectedExternalWallet(null);
+          }}
+          wallet={selectedExternalWallet}
+          onAddressSubmit={handleManualAddressSubmit}
+        />
+      )}
     </div>
   );
 };

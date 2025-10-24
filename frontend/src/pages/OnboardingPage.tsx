@@ -359,8 +359,8 @@ const OnboardingPage = () => {
     
     try {
       await apiClient.put('/api/v1/user/profile', {
-        kyc_level: 1,
-        onboarding_complete: true
+        onboarding_complete: true,  // 🆕 CRITICAL FLAG
+        kyc_level: 1
       });
       
       await refreshProfile();

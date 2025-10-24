@@ -99,6 +99,12 @@ async def create_multi_chain_wallet(
         "total_chains": result["total_chains"]
     }
 
+@router.post("/validate-address")
+async def validate_address(request: ValidateAddressRequest):
+    """Validate wallet address format for specific chain"""
+    # Implementation for chain-specific address validation
+    pass
+
 @router.get("/balances")
 async def get_balances(
     current_user: dict = Depends(get_current_user),

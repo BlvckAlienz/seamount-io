@@ -78,7 +78,8 @@ async def update_user_profile(
     # ADD KYC-SPECIFIC FIELDS
     allowed_fields = [
         'first_name', 'last_name', 'country_code', 'phone', 
-        'date_of_birth', 'gender', 'bvn', 'id_type'  # 🆕 ADD KYC FIELDS
+        'date_of_birth', 'gender', 'bvn', 'id_type',
+        'onboarding_complete', 'kyc_status'  # 🆕 ADD THESE
     ]
     
     """Update user profile"""
@@ -336,6 +337,15 @@ async def get_kyc_status(
     except Exception as e:
         logger.error(f"KYC status query failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/link-external-wallet")
+async def link_external_wallet(
+    request: LinkWalletRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Link an external wallet to user account"""
+    # Implementation to save wallet to user profile
+    pass
 
 @router.post("/api/errors")
 async def log_client_error(
