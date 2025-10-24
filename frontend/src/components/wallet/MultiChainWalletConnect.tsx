@@ -238,9 +238,9 @@ const AddressInputModal: React.FC<AddressInputModalProps> = ({
   );
 };
 
-// ADD THESE STATE VARIABLES AT THE TOP OF THE COMPONENT
-const [showAddressModal, setShowAddressModal] = useState(false);
-const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
+  // ADD THESE STATE VARIABLES AT THE TOP OF THE COMPONENT
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
 
 export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
   const [loading, setLoading] = useState<string | null>(null);
