@@ -1,5 +1,5 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// COMPLETE VERSION - Merging Phase 1 stability + Phase 2 design
+// UPDATED VERSION - Added SettingsModal integration
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,6 +15,7 @@ import { portfolioService } from '../services/portfolio';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ReceiveModal from '../components/payments/ReceiveModal';
 import QRCodeGenerator from '../components/QRCodeGenerator';
+import SettingsModal from '../components/dashboard/SettingsModal';
 
 // ============================================================================
 // KYC PROMPT BANNER (Phase 2 - Color-coded urgency)
@@ -471,6 +472,7 @@ const DashboardPage = () => {
   const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string>('');
   const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false); // 🆕 ADD STATE
 
   // Supported assets configuration
   const SUPPORTED_ASSETS = [
@@ -490,53 +492,58 @@ const DashboardPage = () => {
 
   // ✅ FIX: Fetch ALL chains, not just Algorand
   const fetchPortfolioData = async () => {
+  try {
+    setLoading(true);
+    
+    // ✅ FIX: Try multiple endpoints for wallet address
+    let walletAddressFound = '';
+    
+    // Method 1: Try multi-chain balances endpoint
     try {
-      setLoading(true);
-      
-      // Try to fetch multi-chain balances
       const response = await apiClient.get('/api/v1/wallet/balances');
-      
-      if (response.data.success) {
-        setPortfolioData({
-          total_usd: response.data.total_usd,
-          assets: response.data.assets,
-          timestamp: response.data.timestamp
-        });
-        
-        // Extract wallet address if available
-        if (response.data.assets && response.data.assets.length > 0) {
-          const algorandAsset = response.data.assets.find(a => a.chain === 'algorand');
-          if (algorandAsset?.address) {
-            setWalletAddress(algorandAsset.address);
-          }
+      if (response.data.success && response.data.assets?.length > 0) {
+        const algorandAsset = response.data.assets.find((a: any) => a.chain === 'algorand');
+        if (algorandAsset?.address) {
+          walletAddressFound = algorandAsset.address;
         }
       }
-      
-    } catch (error: any) {
-      console.error('Portfolio fetch error:', error);
-      
-      // ✅ FALLBACK: Check if user has Phase 1 Algorand wallet
-      if (userProfile?.algorand_address) {
-        setWalletAddress(userProfile.algorand_address);
-        toast.info('Loading your wallet...');
-        
-        // Set minimal portfolio data
-        setPortfolioData({
-          success: true,
-          total_usd: 0,
-          assets: [],
-          wallet_address: userProfile.algorand_address
-        });
-      } else {
-        // No wallet found - prompt creation
-        toast.error('Wallet not found. Creating wallet...');
-        await createWallet();
-      }
-      
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.log('Multi-chain balance fetch failed, trying fallback...');
     }
-  };
+    
+    // Method 2: Check user profile
+    if (!walletAddressFound && userProfile?.algorand_address) {
+      walletAddressFound = userProfile.algorand_address;
+    }
+    
+    // Method 3: Check wallet info endpoint
+    if (!walletAddressFound) {
+      try {
+        const walletResponse = await apiClient.get('/api/v1/user/wallet-info');
+        if (walletResponse.data.wallet_address) {
+          walletAddressFound = walletResponse.data.wallet_address;
+        }
+      } catch (error) {
+        console.log('Wallet info endpoint failed');
+      }
+    }
+    
+    // ✅ SET WALLET ADDRESS FOR RECEIVE MODAL
+    if (walletAddressFound) {
+      setWalletAddress(walletAddressFound);
+      console.log('✅ Wallet address found:', walletAddressFound);
+    } else {
+      console.log('❌ No wallet address found, user needs to create wallet');
+      // Don't auto-create wallet here - let user initiate through UI
+    }
+    
+  } catch (error: any) {
+    console.error('Portfolio fetch error:', error);
+    toast.error('Failed to load portfolio data');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ✅ FIX: Fetch KYC status
   const fetchKYCStatus = async () => {
@@ -689,8 +696,12 @@ const DashboardPage = () => {
                     onClick={() => setShowProfileMenu(false)}
                   />
                   <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 backdrop-blur-xl">
+                    {/* 🆕 UPDATE: Settings button to use new modal */}
                     <button
-                      onClick={() => window.location.href = '/settings'}
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowSettingsModal(true); // 🆕 Use new settings modal
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
                     >
                       <Settings className="h-4 w-4" />
@@ -862,6 +873,14 @@ const DashboardPage = () => {
         <ReceiveModal
           walletAddress={walletAddress}
           onClose={() => setShowReceiveModal(false)}
+        />
+      )}
+
+      {/* 🆕 ADD SETTINGS MODAL */}
+      {showSettingsModal && (
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
         />
       )}
     </div>

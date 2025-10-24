@@ -319,6 +319,38 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
   
+  // ADD this function to check onboarding completion
+  const checkOnboardingCompletion = useCallback(async () => {
+    if (state.session && !state.loading) {
+      try {
+        const profile = await fetchUserProfile();
+        if (profile) {
+          // ✅ CRITICAL: Check multiple completion indicators
+          const isOnboardingComplete = 
+            profile.onboarding_complete === true ||
+            profile.kyc_level >= 1 || 
+            profile.algorand_address ||
+            profile.wallet_address;
+          
+          if (isOnboardingComplete && window.location.pathname === '/onboarding') {
+            console.log('✅ Onboarding completed, redirecting to dashboard');
+            navigate('/dashboard');
+          } else if (!isOnboardingComplete && window.location.pathname === '/dashboard') {
+            console.log('🔄 Onboarding not complete, redirecting to onboarding');
+            navigate('/onboarding');
+          }
+        }
+      } catch (error) {
+        console.error('Onboarding check failed:', error);
+      }
+    }
+  }, [state.session, state.loading, fetchUserProfile, navigate]);
+
+  // ADD this useEffect to the AuthContext
+  useEffect(() => {
+    checkOnboardingCompletion();
+  }, [checkOnboardingCompletion]);
+
   const refreshProfile = useCallback(async () => {
     const currentUser = state.user || state.session?.user;
     if (currentUser?.id) {

@@ -1,5 +1,5 @@
 // File: frontend/src/pages/OnboardingPage.tsx
-// ✅ MERGED: OLD logic (BVN, country) + NEW design (Tether WDK)
+// UPDATED VERSION - Fix onboarding completion check
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -287,9 +287,19 @@ const OnboardingPage = () => {
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  // 🆕 UPDATE: Enhanced onboarding completion check
   useEffect(() => {
-    if (userProfile?.kyc_status === 'verified') {
-      navigate('/dashboard');
+    if (userProfile) {
+      // Check multiple indicators of onboarding completion
+      const isOnboardingComplete = 
+        userProfile.onboarding_complete === true || 
+        userProfile.kyc_status === 'verified' ||
+        userProfile.algorand_address; // Has wallet address
+      
+      if (isOnboardingComplete) {
+        console.log('✅ Onboarding already completed, redirecting to dashboard');
+        navigate('/dashboard');
+      }
     }
   }, [userProfile, navigate]);
 
@@ -358,14 +368,22 @@ const OnboardingPage = () => {
     const toastId = toast.loading('Completing setup...');
     
     try {
+      // 🆕 ENHANCE: Set multiple completion flags
       await apiClient.put('/api/v1/user/profile', {
         onboarding_complete: true,  // 🆕 CRITICAL FLAG
-        kyc_level: 1
+        kyc_level: userProfile?.kyc_level || 1,
+        // Ensure other completion indicators are set
       });
       
-      await refreshProfile();
+      await refreshProfile(); // Force refresh to get latest profile
+      
       toast.success('Welcome to Seamount!', { id: toastId });
-      navigate('/dashboard');
+      
+      // 🆕 ADD: Small delay to ensure profile refresh
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+      
     } catch (error) {
       console.error('Backup error:', error);
       toast.error('Setup failed', { id: toastId });

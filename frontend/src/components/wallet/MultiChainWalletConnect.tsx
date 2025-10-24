@@ -1,9 +1,11 @@
 // File: frontend/src/components/wallet/MultiChainWalletConnect.tsx
+// UPDATED VERSION - Added AutomatedWalletConnect integration
 
 import React, { useState } from 'react';
 import { Wallet, Check, Loader, Shield, X, AlertCircle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
+import AutomatedWalletConnect from './AutomatedWalletConnect'; // 🆕 ADD IMPORT
 
 interface WalletOption {
   id: string;
@@ -22,11 +24,11 @@ interface Props {
 // ✅ FIXED - MOVE ADDRESS MODAL COMPONENT INSIDE MAIN COMPONENT
 // (This ensures proper React scope and hooks)
 export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
-  // ✅ ALL HOOKS MUST BE AT THE TOP LEVEL OF COMPONENT
   const [loading, setLoading] = useState<string | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
+  const [showAutomatedConnect, setShowAutomatedConnect] = useState(false); // 🆕 ADD STATE
 
 // ✅ FIXED WALLET OPTIONS - MOVE INSIDE COMPONENT OR KEEP CONST OUTSIDE
   const WALLET_OPTIONS: WalletOption[] = [
@@ -315,39 +317,32 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   }
 };
 
-  // COMPLETE MODERN handleConnectExternal FUNCTION
+  // 🆕 UPDATE: handleConnectExternal to use automated flow
   const handleConnectExternal = async (walletId: string) => {
     setLoading(walletId);
     
-    const wallet = WALLET_OPTIONS.find(w => w.id === walletId);
-    if (!wallet) {
-      toast.error('Wallet option not found');
-      setLoading(null);
-      return;
-    }
-
     try {
-      // For mobile/extension wallets, try direct connection first
-      if (walletId === 'metamask' && typeof window !== 'undefined' && (window as any).ethereum) {
-        try {
-          const accounts = await (window as any).ethereum.request({
-            method: 'eth_requestAccounts'
-          });
-          
-          if (accounts && accounts.length > 0) {
-            const address = accounts[0];
-            await handleExternalWalletSuccess(address, walletId);
-            return;
-          }
-        } catch (error: any) {
-          if (error.code === 4001) {
-            // User rejected connection - fall back to manual input
-            console.log('User rejected MetaMask connection');
-          } else {
-            throw error;
-          }
-        }
-      }
+      // 🆕 Show automated connection modal instead of manual input
+      setShowAutomatedConnect(true);
+      setSelectedWallet(walletId);
+    } catch (error) {
+      console.error(`External wallet connection failed for ${walletId}:`, error);
+      toast.error(`Failed to connect ${walletId}`);
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // 🆕 ADD: Handler for successful automated connection
+  const handleAutomatedConnection = (address: string, provider: string) => {
+    console.log(`✅ Automated connection: ${provider} - ${address}`);
+    
+    // Save the connected wallet
+    handleExternalWalletSuccess(address, provider);
+    
+    // Close the automated modal
+    setShowAutomatedConnect(false);
+  };
 
       // For Pera Wallet on mobile
       if (walletId === 'pera' && typeof window !== 'undefined' && (window as any).PeraWallet) {
@@ -380,9 +375,8 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
       setShowAddressModal(true);
     } finally {
       setLoading(null);
-    }
-  };
-
+    };
+  
   // ADD THIS HELPER FUNCTION FOR SUCCESSFUL CONNECTIONS
   const handleExternalWalletSuccess = async (address: string, walletId: string) => {
     const toastId = toast.loading(`Connecting ${walletId}...`);
@@ -557,7 +551,8 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
           </div>
         </div>
       </div>
-      {/* ADD THIS MODAL AT THE BOTTOM OF THE RETURN */}
+
+      {/* Existing Address Input Modal */}
       {selectedExternalWallet && (
         <AddressInputModal
           isOpen={showAddressModal}
@@ -569,6 +564,14 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
           onAddressSubmit={handleManualAddressSubmit}
         />
       )}
+
+      {/* 🆕 ADD AUTOMATED WALLET CONNECT MODAL */}
+      {showAutomatedConnect && (
+        <AutomatedWalletConnect
+          isOpen={showAutomatedConnect}
+          onClose={() => setShowAutomatedConnect(false)}
+          onWalletConnected={handleAutomatedConnection}
+        />
+      )}
     </div>
   );
-};

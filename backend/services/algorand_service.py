@@ -1,4 +1,6 @@
 # File: backend/services/algorand_service.py
+# UPDATED VERSION - Remove test funding for production
+
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional
@@ -38,7 +40,7 @@ class AlgorandService:
             raise
 
     async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
-        """Create new Algorand wallet for user"""
+        """Create new Algorand wallet for user - NO TEST FUNDING"""
         try:
             from cryptography.fernet import Fernet
             import os
@@ -49,12 +51,9 @@ class AlgorandService:
             
             logger.info(f"Generated Algorand wallet: {address[:10]}...")
             
-            # Fund with minimum balance (0.1 ALGO)
-            try:
-                await self.fund_account_for_opt_in(address)
-                logger.info(f"✅ Funded wallet {address[:10]}...")
-            except Exception as e:
-                logger.warning(f"⚠️ Could not fund (testnet down?): {e}")
+            # 🆕 REMOVED: Test funding for production
+            # Users will fund their own wallets or use on-ramp services
+            logger.info(f"✅ Wallet created (no test funding): {address[:10]}...")
             
             # Encrypt keys
             encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
@@ -188,31 +187,35 @@ class AlgorandService:
                     pass
         raise TimeoutError(f"Transaction {tx_id} not confirmed")
 
+    # 🆕 COMMENT OUT: Remove funding method or make it conditional
     async def fund_account_for_opt_in(self, user_address: str) -> Optional[str]:
-        """Fund new account with minimum balance for opt-in"""
-        try:
-            min_balance = 100000  # 0.1 ALGO base
-            asset_opt_in_fee = 100000  # 0.1 ALGO per asset
-            total_funding = min_balance + asset_opt_in_fee
-            
-            params = self.algod_client.suggested_params()
-            txn = PaymentTxn(
-                sender=self.treasury_address,
-                sp=params,
-                receiver=user_address,
-                amt=total_funding,
-                note=b"Seamount Account Funding"
-            )
-            
-            signed_txn = txn.sign(self.treasury_private_key)
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            await self.wait_for_confirmation(tx_id)
-            
-            logger.info(f"Funded {user_address} with {total_funding} microAlgos")
-            return tx_id
-        except Exception as e:
-            logger.error(f"Account funding failed: {e}")
-            raise
+        """🆕 DISABLED: Funding removed for production"""
+        logger.info(f"🆕 Funding disabled for production: {user_address[:10]}...")
+        return None  # No funding in production
+        
+        # try:
+        #     min_balance = 100000  # 0.1 ALGO base
+        #     asset_opt_in_fee = 100000  # 0.1 ALGO per asset
+        #     total_funding = min_balance + asset_opt_in_fee
+        #     
+        #     params = self.algod_client.suggested_params()
+        #     txn = PaymentTxn(
+        #         sender=self.treasury_address,
+        #         sp=params,
+        #         receiver=user_address,
+        #         amt=total_funding,
+        #         note=b"Seamount Account Funding"
+        #     )
+        #     
+        #     signed_txn = txn.sign(self.treasury_private_key)
+        #     tx_id = self.algod_client.send_transaction(signed_txn)
+        #     await self.wait_for_confirmation(tx_id)
+        #     
+        #     logger.info(f"Funded {user_address} with {total_funding} microAlgos")
+        #     return tx_id
+        # except Exception as e:
+        #     logger.error(f"Account funding failed: {e}")
+        #     raise
 
     async def prepare_payment_txn(self, sender: str, receiver: str, amount: Decimal) -> Dict[str, Any]:
         """Prepare ALGO payment transaction"""
