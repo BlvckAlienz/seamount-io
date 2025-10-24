@@ -1,7 +1,7 @@
 // File: frontend/src/components/wallet/RealWalletConnect.tsx
 import React, { useState, useEffect } from 'react';
 import { Wallet, X, CheckCircle, ExternalLink, Smartphone, Monitor, AlertCircle } from 'lucide-react';
-import WalletConnectProvider from '@walletconnect/web3-provider'; // ✅ FIXED: Default import
+import WalletConnectProvider from '@walletconnect/web3-provider';
 import Web3 from 'web3';
 import toast from 'react-hot-toast';
 
@@ -156,7 +156,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
 
   const connectWithMetaMask = async () => {
     if (typeof window === 'undefined' || !(window as any).ethereum) {
-      // Redirect to MetaMask install
       window.open('https://metamask.io/download/', '_blank');
       throw new Error('MetaMask not detected. Redirecting to install page.');
     }
@@ -187,7 +186,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     
     const PeraWallet = (window as any).PeraWallet;
     if (!PeraWallet) {
-      // Redirect to Pera Wallet download on mobile
       if (isMobile()) {
         window.location.href = 'https://perawallet.app/download/';
         throw new Error('Redirecting to Pera Wallet download...');
@@ -217,15 +215,8 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     
     const ethereum = (window as any).ethereum;
     if (!ethereum?.isCoinbaseWallet) {
-      // Try to use WalletLink as fallback
-      if ((window as any).WalletLink) {
-        // WalletLink implementation would go here
-        throw new Error('Coinbase Wallet connection not implemented');
-      }
       throw new Error('Coinbase Wallet not detected');
     }
-
-    // Coinbase Wallet supports EIP-1193, so we can use the same method as MetaMask
     return connectWithMetaMask();
   };
 
@@ -237,7 +228,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
   ) => {
     let finalAddress = address;
 
-    // If no address provided, try to get it from the provider
     if (!finalAddress && providerId === 'walletconnect' && provider) {
       finalAddress = provider.accounts[0];
     }
@@ -249,7 +239,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     setConnectionStep('success');
     toast.success(`${providerId} connected successfully!`);
 
-    // Notify parent after a brief success display
     setTimeout(() => {
       onWalletConnected(finalAddress!, providerId, chainId);
       onClose();
@@ -288,7 +277,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
       onClick={handleBackdropClick}
     >
       <div className="bg-gray-800 rounded-2xl max-w-md w-full p-6 border border-gray-700 shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -313,7 +301,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="space-y-4">
           {connectionStep === 'select' && (
             <>

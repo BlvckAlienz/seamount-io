@@ -11,6 +11,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    global: 'globalThis', // ✅ ADD THIS LINE - FIXES "global is not defined"
+  },
   build: {
     outDir: 'dist',
     sourcemap: false, // Disable for production
