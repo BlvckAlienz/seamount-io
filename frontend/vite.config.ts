@@ -12,17 +12,17 @@ export default defineConfig({
     },
   },
   define: {
-    global: 'globalThis', // ✅ ADD THIS LINE - FIXES "global is not defined"
+    global: 'globalThis', // ✅ Fixes "global is not defined"
+    'process.env': {}, // ✅ Fixes process.env references
   },
   build: {
     outDir: 'dist',
-    sourcemap: false, // Disable for production
+    sourcemap: false,
     minify: 'esbuild',
     target: 'es2015',
     rollupOptions: {
       output: {
-        // Simpler chunk strategy - let Vite handle it
-        manualChunks: undefined, // Remove manual chunking
+        manualChunks: undefined,
       },
     },
   },
@@ -36,7 +36,16 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom'], // Pre-bundle these
-    exclude: [], // Don't exclude anything
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom',
+      'buffer', // ✅ Pre-bundle buffer polyfill
+    ],
+    esbuildOptions: {
+      define: {
+        global: 'globalThis', // ✅ Also define for dev server
+      },
+    },
   },
 });

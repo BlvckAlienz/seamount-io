@@ -1,9 +1,21 @@
 // File: frontend/src/components/wallet/RealWalletConnect.tsx
 import React, { useState, useEffect } from 'react';
 import { Wallet, X, CheckCircle, ExternalLink, Smartphone, Monitor, AlertCircle } from 'lucide-react';
-import WalletConnectProvider from '@walletconnect/web3-provider';
-import Web3 from 'web3';
 import toast from 'react-hot-toast';
+
+// Dynamic imports to avoid build-time issues
+let WalletConnectProvider: any = null;
+let Web3: any = null;
+
+// Only import in browser environment
+if (typeof window !== 'undefined') {
+  import('@walletconnect/web3-provider').then(module => {
+    WalletConnectProvider = module.default;
+  });
+  import('web3').then(module => {
+    Web3 = module.default;
+  });
+}
 
 interface RealWalletConnectProps {
   isOpen: boolean;
@@ -19,19 +31,11 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
   const [connectionStep, setConnectionStep] = useState<'select' | 'connecting' | 'success' | 'error'>('select');
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [provider, setProvider] = useState<WalletConnectProvider | null>(null);
-  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [provider, setProvider] = useState<any>(null);
+  const [web3, setWeb3] = useState<any>(null);
+  const [walletConnectReady, setWalletConnectReady] = useState(false);
 
   const walletProviders = [
-    {
-      id: 'walletconnect',
-      name: 'WalletConnect',
-      icon: '🔗',
-      description: 'Connect any WalletConnect-compatible wallet',
-      mobile: true,
-      desktop: true,
-      supportedChains: ['Ethereum', 'Polygon', 'Binance Smart Chain']
-    },
     {
       id: 'metamask',
       name: 'MetaMask',
@@ -61,48 +65,40 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     }
   ];
 
-  // Initialize WalletConnect
+  // Initialize WalletConnect only when needed
   useEffect(() => {
     const initWalletConnect = async () => {
+      if (!isOpen || !WalletConnectProvider) return;
+      
       try {
         const walletConnectProvider = new WalletConnectProvider({
-          infuraId: '27e484dcd9e3efcfd25a83a78777cdf1', // Free Infura ID for Ethereum
+          infuraId: '27e484dcd9e3efcfd25a83a78777cdf1',
           qrcodeModalOptions: {
-            mobileLinks: [
-              'metamask',
-              'trust',
-              'rainbow',
-              'argent',
-              'coinbase',
-              'imtoken'
-            ]
+            mobileLinks: ['metamask', 'trust', 'rainbow', 'argent', 'coinbase']
           }
         });
 
         setProvider(walletConnectProvider);
-        setWeb3(new Web3(walletConnectProvider as any));
+        if (Web3) {
+          setWeb3(new Web3(walletConnectProvider));
+        }
 
-        // Subscribe to connection events
-        walletConnectProvider.on('connect', (error, payload) => {
-          if (error) {
-            console.error('Connection error:', error);
-            return;
-          }
+        walletConnectProvider.on('connect', () => {
           handleConnectionSuccess(walletConnectProvider, 'walletconnect');
         });
 
-        walletConnectProvider.on('disconnect', (error) => {
+        walletConnectProvider.on('disconnect', () => {
           console.log('Wallet disconnected');
         });
 
+        setWalletConnectReady(true);
       } catch (error) {
-        console.error('Failed to initialize WalletConnect:', error);
+        console.error('WalletConnect init failed:', error);
+        setWalletConnectReady(false);
       }
     };
 
-    if (isOpen) {
-      initWalletConnect();
-    }
+    initWalletConnect();
 
     return () => {
       if (provider) {
@@ -118,9 +114,6 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
 
     try {
       switch (providerId) {
-        case 'walletconnect':
-          await connectWithWalletConnect();
-          break;
         case 'metamask':
           await connectWithMetaMask();
           break;
@@ -140,24 +133,10 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     }
   };
 
-  const connectWithWalletConnect = async () => {
-    if (!provider) throw new Error('WalletConnect not initialized');
-
-    try {
-      await provider.enable();
-      // The connection will be handled by the event listener
-    } catch (error: any) {
-      if (error.message?.includes('User rejected')) {
-        throw new Error('Connection rejected by user');
-      }
-      throw error;
-    }
-  };
-
   const connectWithMetaMask = async () => {
     if (typeof window === 'undefined' || !(window as any).ethereum) {
       window.open('https://metamask.io/download/', '_blank');
-      throw new Error('MetaMask not detected. Redirecting to install page.');
+      throw new Error('MetaMask not detected');
     }
 
     const ethereum = (window as any).ethereum;
@@ -169,7 +148,7 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
       
       if (accounts && accounts.length > 0) {
         const chainId = await ethereum.request({ method: 'eth_chainId' });
-        handleConnectionSuccess(ethereum, 'metamask', parseInt(chainId), accounts[0]);
+        handleConnectionSuccess('metamask', parseInt(chainId), accounts[0]);
       } else {
         throw new Error('No accounts found');
       }
@@ -198,7 +177,7 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
       const accounts = await peraWallet.connect();
       
       if (accounts && accounts.length > 0) {
-        handleConnectionSuccess(peraWallet, 'pera', undefined, accounts[0]);
+        handleConnectionSuccess('pera', undefined, accounts[0]);
       } else {
         throw new Error('No accounts found');
       }
@@ -229,7 +208,7 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     let finalAddress = address;
 
     if (!finalAddress && providerId === 'walletconnect' && provider) {
-      finalAddress = provider.accounts[0];
+      finalAddress = provider.accounts?.[0];
     }
 
     if (!finalAddress) {
@@ -256,8 +235,7 @@ const RealWalletConnect: React.FC<RealWalletConnectProps> = ({
     const urls: { [key: string]: string } = {
       'metamask': 'https://metamask.io',
       'pera': 'https://perawallet.app',
-      'coinbase': 'https://coinbase.com/wallet',
-      'walletconnect': 'https://walletconnect.com'
+      'coinbase': 'https://coinbase.com/wallet'
     };
 
     window.open(urls[providerId] || '#', '_blank', 'noopener,noreferrer');
