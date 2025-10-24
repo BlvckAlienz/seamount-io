@@ -1,11 +1,11 @@
 // File: frontend/src/components/wallet/MultiChainWalletConnect.tsx
-// UPDATED VERSION - Added AutomatedWalletConnect integration
+// FIXED VERSION - All async/await properly handled
 
 import React, { useState } from 'react';
 import { Wallet, Check, Loader, Shield, X, AlertCircle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
-import AutomatedWalletConnect from './AutomatedWalletConnect'; // 🆕 ADD IMPORT
+import AutomatedWalletConnect from './AutomatedWalletConnect';
 
 interface WalletOption {
   id: string;
@@ -21,16 +21,13 @@ interface Props {
   onWalletCreated: (mnemonic: string) => void;
 }
 
-// ✅ FIXED - MOVE ADDRESS MODAL COMPONENT INSIDE MAIN COMPONENT
-// (This ensures proper React scope and hooks)
 export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWalletCreated }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
-  const [showAutomatedConnect, setShowAutomatedConnect] = useState(false); // 🆕 ADD STATE
+  const [showAutomatedConnect, setShowAutomatedConnect] = useState(false);
 
-// ✅ FIXED WALLET OPTIONS - MOVE INSIDE COMPONENT OR KEEP CONST OUTSIDE
   const WALLET_OPTIONS: WalletOption[] = [
     {
       id: 'seamount-native',
@@ -69,14 +66,12 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     }
   ];
 
-// ✅ FIXED - ADDRESS MODAL COMPONENT NOW INSIDE MAIN COMPONENT
   const AddressInputModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     wallet: WalletOption;
     onAddressSubmit: (address: string, walletId: string) => void;
   }> = ({ isOpen, onClose, wallet, onAddressSubmit }) => {
-    // ✅ HOOKS INSIDE NESTED COMPONENT ARE FINE
     const [address, setAddress] = useState('');
     const [validating, setValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
@@ -242,87 +237,83 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   };
 
   const handleCreateWallet = async () => {
-  setLoading('seamount-native');
-  const toastId = toast.loading('Checking your wallet...');
-  
-  try {
-    console.log('🔄 Calling /api/v1/user/provision-wallets...');
+    setLoading('seamount-native');
+    const toastId = toast.loading('Checking your wallet...');
     
-    const response = await apiClient.post('/api/v1/user/provision-wallets');
-    console.log('📦 API Response:', response.data);
-    
-    // ✅ COMPREHENSIVE response validation
-    if (response.data) {
-      if (response.data.success === true) {
-        if (response.data.mnemonic) {
-          // ✅ SUCCESS: New wallet created with mnemonic
-          toast.success('Multi-chain wallet created!', { id: toastId });
-          onWalletCreated(response.data.mnemonic);
-          onClose();
+    try {
+      console.log('🔄 Calling /api/v1/user/provision-wallets...');
+      
+      const response = await apiClient.post('/api/v1/user/provision-wallets');
+      console.log('📦 API Response:', response.data);
+      
+      if (response.data) {
+        if (response.data.success === true) {
+          if (response.data.mnemonic) {
+            // ✅ SUCCESS: New wallet created with mnemonic
+            toast.success('Multi-chain wallet created!', { id: toastId });
+            onWalletCreated(response.data.mnemonic);
+            onClose();
+          } else {
+            // ✅ WALLET EXISTS: No mnemonic but wallet exists - complete onboarding
+            toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+            onWalletCreated('WALLET_ALREADY_EXISTS');
+            onClose();
+          }
+        } else if (response.data.success === false) {
+          // Handle specific error codes
+          if (response.data.code === 'WALLET_ALREADY_EXISTS') {
+            // ✅ WALLET EXISTS: Complete onboarding without mnemonic
+            toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+            onWalletCreated('WALLET_ALREADY_EXISTS');
+            onClose();
+          } else {
+            // ❌ Other errors
+            const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
+            throw new Error(errorMsg);
+          }
         } else {
-          // ✅ WALLET EXISTS: No mnemonic but wallet exists - complete onboarding
-          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-          // Call onWalletCreated with a special value to indicate wallet exists
-          onWalletCreated('WALLET_ALREADY_EXISTS');
-          onClose();
-        }
-      } else if (response.data.success === false) {
-        // Handle specific error codes
-        if (response.data.code === 'WALLET_ALREADY_EXISTS') {
-          // ✅ WALLET EXISTS: Complete onboarding without mnemonic
-          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-          onWalletCreated('WALLET_ALREADY_EXISTS');
-          onClose();
-        } else {
-          // ❌ Other errors
-          const errorMsg = response.data.error || response.data.detail || 'Wallet creation failed';
-          throw new Error(errorMsg);
+          // ❌ UNEXPECTED: No success field
+          throw new Error('Invalid response from server');
         }
       } else {
-        // ❌ UNEXPECTED: No success field
-        throw new Error('Invalid response from server');
+        // ❌ NO RESPONSE DATA
+        throw new Error('No response from server');
       }
-    } else {
-      // ❌ NO RESPONSE DATA
-      throw new Error('No response from server');
-    }
-  } catch (error: any) {
-    console.error('❌ Wallet creation error details:', error);
-    
-    // ✅ COMPREHENSIVE error logging
-    if (error.response) {
-      console.error('📡 Server response error:', error.response.data);
-      console.error('🔢 HTTP Status:', error.response.status);
+    } catch (error: any) {
+      console.error('❌ Wallet creation error details:', error);
       
-      // ✅ SPECIFIC: Handle wallet exists error from HTTP exception
-      if (error.response.data?.code === 'WALLET_ALREADY_EXISTS' || 
-          error.response.status === 409) { // 409 Conflict often used for "already exists"
-        toast.success('Welcome back! Your wallet is ready.', { id: toastId });
-        onWalletCreated('WALLET_ALREADY_EXISTS');
-        onClose();
-        return;
+      if (error.response) {
+        console.error('📡 Server response error:', error.response.data);
+        console.error('🔢 HTTP Status:', error.response.status);
+        
+        if (error.response.data?.code === 'WALLET_ALREADY_EXISTS' || 
+            error.response.status === 409) {
+          toast.success('Welcome back! Your wallet is ready.', { id: toastId });
+          onWalletCreated('WALLET_ALREADY_EXISTS');
+          onClose();
+          return;
+        }
+        
+        const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
+        toast.error(serverError, { id: toastId });
+      } else if (error.message) {
+        console.error('💬 Error message:', error.message);
+        toast.error(error.message, { id: toastId });
+      } else {
+        console.error('🚨 Unknown error:', error);
+        toast.error('Wallet creation failed. Please try again.', { id: toastId });
       }
-      
-      const serverError = error.response.data?.detail || error.response.data?.error || `Server error: ${error.response.status}`;
-      toast.error(serverError, { id: toastId });
-    } else if (error.message) {
-      console.error('💬 Error message:', error.message);
-      toast.error(error.message, { id: toastId });
-    } else {
-      console.error('🚨 Unknown error:', error);
-      toast.error('Wallet creation failed. Please try again.', { id: toastId });
+    } finally {
+      setLoading(null);
     }
-  } finally {
-    setLoading(null);
-  }
-};
+  };
 
-  // 🆕 UPDATE: handleConnectExternal to use automated flow
+  // ✅ FIXED: Proper async function for external wallet connection
   const handleConnectExternal = async (walletId: string) => {
     setLoading(walletId);
     
     try {
-      // 🆕 Show automated connection modal instead of manual input
+      // Show automated connection modal instead of manual input
       setShowAutomatedConnect(true);
       setSelectedWallet(walletId);
     } catch (error) {
@@ -333,51 +324,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     }
   };
 
-  // 🆕 ADD: Handler for successful automated connection
-  const handleAutomatedConnection = (address: string, provider: string) => {
-    console.log(`✅ Automated connection: ${provider} - ${address}`);
-    
-    // Save the connected wallet
-    handleExternalWalletSuccess(address, provider);
-    
-    // Close the automated modal
-    setShowAutomatedConnect(false);
-  };
-
-      // For Pera Wallet on mobile
-      if (walletId === 'pera' && typeof window !== 'undefined' && (window as any).PeraWallet) {
-        try {
-          const peraWallet = new (window as any).PeraWallet();
-          const accounts = await peraWallet.connect();
-          
-          if (accounts && accounts.length > 0) {
-            const address = accounts[0];
-            await handleExternalWalletSuccess(address, walletId);
-            return;
-          }
-        } catch (error: any) {
-          if (error?.data?.type !== 'CONNECT_MODAL_CLOSED') {
-            // Only fallback if not user-cancelled
-            console.log('Pera Wallet connection failed, falling back to manual input');
-          }
-        }
-      }
-
-      // Fallback to manual address input for all cases
-      setSelectedExternalWallet(wallet);
-      setShowAddressModal(true);
-      
-    } catch (error: any) {
-      console.error(`External wallet connection failed for ${walletId}:`, error);
-      
-      // Even if error, fall back to manual input
-      setSelectedExternalWallet(wallet);
-      setShowAddressModal(true);
-    } finally {
-      setLoading(null);
-    };
-  
-  // ADD THIS HELPER FUNCTION FOR SUCCESSFUL CONNECTIONS
+  // ✅ FIXED: Add missing helper functions
   const handleExternalWalletSuccess = async (address: string, walletId: string) => {
     const toastId = toast.loading(`Connecting ${walletId}...`);
     
@@ -399,7 +346,6 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
         onClose();
         
         // Notify parent component about successful external wallet connection
-        // Using a special identifier that parent can recognize
         onWalletCreated(`EXTERNAL_WALLET_${walletId}_CONNECTED`);
       } else {
         throw new Error(response.data.error || 'Failed to link wallet');
@@ -413,7 +359,6 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     }
   };
 
-  // ADD THIS HELPER FUNCTION TO GET PRIMARY CHAIN
   const getPrimaryChain = (walletId: string): string => {
     const chainMap: { [key: string]: string } = {
       'pera': 'algorand',
@@ -424,7 +369,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
     return chainMap[walletId] || 'multichain';
   };
 
-  // ADD THIS FUNCTION TO HANDLE MANUAL ADDRESS SUBMISSION
+  // ✅ FIXED: Add missing manual address submission handler
   const handleManualAddressSubmit = async (address: string, walletId: string) => {
     const toastId = toast.loading(`Verifying ${walletId} address...`);
     
@@ -466,6 +411,17 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
         { id: toastId }
       );
     }
+  };
+
+  // ✅ FIXED: Add automated connection handler
+  const handleAutomatedConnection = (address: string, provider: string) => {
+    console.log(`✅ Automated connection: ${provider} - ${address}`);
+    
+    // Save the connected wallet
+    handleExternalWalletSuccess(address, provider);
+    
+    // Close the automated modal
+    setShowAutomatedConnect(false);
   };
 
   if (!isOpen) return null;
@@ -565,7 +521,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
         />
       )}
 
-      {/* 🆕 ADD AUTOMATED WALLET CONNECT MODAL */}
+      {/* Automated Wallet Connect Modal */}
       {showAutomatedConnect && (
         <AutomatedWalletConnect
           isOpen={showAutomatedConnect}
@@ -575,3 +531,4 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
       )}
     </div>
   );
+};
