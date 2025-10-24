@@ -1,6 +1,6 @@
 // File: frontend/src/components/wallet/AutomatedWalletConnect.tsx
 import React, { useState, useEffect } from 'react';
-import { X, Loader, Check, AlertCircle, ExternalLink, Smartphone, Desktop } from 'lucide-react';
+import { X, Loader, Check, AlertCircle, ExternalLink, Smartphone, Monitor } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AutomatedWalletConnectProps {
@@ -281,7 +281,7 @@ const AutomatedWalletConnect: React.FC<AutomatedWalletConnectProps> = ({
                     <div className="text-sm text-gray-400">{provider.description}</div>
                     <div className="flex items-center gap-2 mt-1">
                       {provider.mobile && <Smartphone className="h-3 w-3 text-green-400" />}
-                      {provider.desktop && <Desktop className="h-3 w-3 text-blue-400" />}
+                      {provider.desktop && <Monitor className="h-3 w-3 text-blue-400" />}
                       <span className="text-xs text-gray-500">
                         {provider.mobile && provider.desktop ? 'Mobile & Desktop' : 
                          provider.mobile ? 'Mobile Only' : 'Desktop Only'}
