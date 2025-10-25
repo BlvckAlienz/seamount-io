@@ -1,25 +1,22 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// ✅ PRODUCTION READY: Multi-chain WDK integration + All requested UI improvements
+// ✅ PRODUCTION READY: Premium multi-chain wallet dashboard
 
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, DollarSign, Activity, RefreshCw, Shield, AlertTriangle,
-  Bitcoin, Coins, Copy, Check, Eye, EyeOff, Download, Lock,
-  ExternalLink, ArrowUpRight, ArrowDownLeft, Settings, LogOut, User, QrCode,
-  Wallet, Plus, Key, ArrowDownLeft as ReceiveIcon
+  TrendingUp, Activity, RefreshCw, Shield, AlertTriangle,
+  Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
+  Wallet, ArrowDownLeft, RefreshCw as SwapIcon
 } from 'lucide-react';
 import { KYCBanner } from '../components/onboarding/KYCBanner';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { apiClient } from '../config/api';
-import { portfolioService } from '../services/portfolio';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
-import ReceiveModal from '../components/payments/ReceiveModal';
-import QRCodeGenerator from '../components/QRCodeGenerator';
-import CreateWalletModal from '../components/wallet/CreateWalletModal';
+import ChainWalletCard from '../components/wallet/ChainWalletCard';
+import WalletDetailModal from '../components/wallet/WalletDetailModal';
 
 // ============================================================================
-// KYC PROMPT BANNER (Phase 2 - Color-coded urgency)
+// KYC PROMPT BANNER (Keep existing)
 // ============================================================================
 
 interface KYCBannerProps {
@@ -145,461 +142,7 @@ const KYCPromptBanner: React.FC<KYCBannerProps> = ({
 };
 
 // ============================================================================
-// MULTI-CHAIN WALLET CARD COMPONENT (UPDATED WITH PROPER ICONS & BUTTONS)
-// ============================================================================
-
-interface ChainWalletCardProps {
-  chain: string;
-  address: string;
-  balance: number;
-  status: 'created' | 'pending' | 'not_created';
-  onView: () => void;
-  onBuy: () => void;
-}
-
-const ChainWalletCard: React.FC<ChainWalletCardProps> = ({ 
-  chain, 
-  address, 
-  balance, 
-  status, 
-  onView,
-  onBuy
-}) => {
-  const getChainConfig = (chain: string) => {
-    const configs = {
-      bitcoin: {
-        name: 'Bitcoin',
-        icon: 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/bitcoin.png',
-        color: 'from-orange-500 to-yellow-600',
-        symbol: 'BTC',
-        explorer: `https://blockstream.info/address/${address}`
-      },
-      ethereum: {
-        name: 'Ethereum', 
-        icon: 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/ethereum.png',
-        color: 'from-gray-400 to-slate-600',
-        symbol: 'ETH',
-        explorer: `https://etherscan.io/address/${address}`
-      },
-      polygon: {
-        name: 'Polygon',
-        icon: 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/polygon.png',
-        color: 'from-purple-500 to-indigo-600',
-        symbol: 'MATIC',
-        explorer: `https://polygonscan.com/address/${address}`
-      },
-      algorand: {
-        name: 'Algorand',
-        icon: 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/algorand.png',
-        color: 'from-blue-500 to-cyan-600',
-        symbol: 'ALGO',
-        explorer: `https://algoexplorer.io/address/${address}`
-      }
-    };
-    return configs[chain as keyof typeof configs] || configs.algorand;
-  };
-
-  const config = getChainConfig(chain);
-  const [copied, setCopied] = useState(false);
-
-  const copyAddress = () => {
-    if (!address) {
-      toast.error('No address available');
-      return;
-    }
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    toast.success(`${config.name} address copied!`);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (status === 'not_created') {
-    return (
-      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${config.color} text-white shadow-lg`}>
-            <img src={config.icon} alt={config.name} className="w-6 h-6" />
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-400">Not Created</div>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <div className="text-white font-semibold">{config.name}</div>
-          <div className="text-gray-400 text-sm">Create wallet to start using</div>
-        </div>
-
-        <button
-          onClick={onBuy}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-all hover:shadow-lg hover:shadow-blue-500/50"
-        >
-          <Plus className="h-4 w-4" />
-          Create {config.name} Wallet
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-1">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl bg-gradient-to-br ${config.color} text-white shadow-lg`}>
-          <img src={config.icon} alt={config.name} className="w-6 h-6" />
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-white">
-            {balance > 0 ? `$${balance.toFixed(2)}` : '$0.00'}
-          </div>
-          <div className="text-sm text-gray-400">
-            {status === 'pending' ? 'Creating...' : 'Ready'}
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <div className="text-white font-semibold">{config.name}</div>
-        <div className="text-gray-400 text-sm flex items-center gap-2">
-          {address ? (
-            <>
-              <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-              <button onClick={copyAddress} className="hover:text-blue-400">
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-              </button>
-            </>
-          ) : (
-            <span className="text-gray-500">No address</span>
-          )}
-        </div>
-      </div>
-
-      {/* ✅ UPDATED: View & Buy buttons */}
-      <div className="flex gap-2">
-        <button
-          onClick={onView}
-          className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/50"
-        >
-          <ExternalLink className="h-4 w-4" />
-          View
-        </button>
-        <button
-          onClick={onBuy}
-          className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-green-500/50"
-        >
-          <ArrowDownLeft className="h-4 w-4" />
-          Buy
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// ASSET CARD COMPONENT (Updated for multi-chain)
-// ============================================================================
-
-interface AssetCardProps {
-  asset: any;
-  onBuy: () => void;
-  onSend: () => void;
-}
-
-const AssetCard: React.FC<AssetCardProps> = ({ asset, onBuy, onSend }) => {
-  const getGradient = (symbol: string) => {
-    const gradients: { [key: string]: string } = {
-      'ALGO': 'from-purple-500 to-indigo-600',
-      'USDT': 'from-green-500 to-emerald-600',
-      'USDCa': 'from-blue-500 to-cyan-600',
-      'goBTC': 'from-orange-500 to-yellow-600',
-      'goETH': 'from-gray-400 to-slate-600',
-      'BTC': 'from-orange-500 to-yellow-600',
-      'ETH': 'from-gray-400 to-slate-600',
-      'MATIC': 'from-purple-500 to-indigo-600',
-    };
-    return gradients[symbol] || 'from-gray-500 to-gray-600';
-  };
-
-  const getIcon = (symbol: string) => {
-    const iconMap: { [key: string]: string } = {
-      'BTC': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/bitcoin.png',
-      'goBTC': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/bitcoin.png',
-      'ETH': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/ethereum.png',
-      'goETH': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/ethereum.png',
-      'ALGO': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/algorand.png',
-      'MATIC': 'https://raw.githubusercontent.com/BlvckAlienz/seamount-io/main/frontend/public/icons/polygon.png',
-    };
-
-    const iconUrl = iconMap[symbol];
-    if (iconUrl) {
-      return <img src={iconUrl} alt={symbol} className="h-8 w-8" />;
-    }
-
-    // Fallback to Lucide icons
-    switch (symbol) {
-      case 'USDT':
-      case 'USDCa':
-        return <DollarSign className="h-8 w-8" />;
-      default:
-        return <Coins className="h-8 w-8" />;
-    }
-  };
-
-  const balance = asset.balance || 0;
-  const valueUsd = asset.value_usd || 0;
-  const hasBalance = balance > 0;
-
-  return (
-    <div className="group relative bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-1">
-      <div className={`absolute inset-0 bg-gradient-to-br ${getGradient(asset.symbol)} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-300`} />
-      
-      <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-xl bg-gradient-to-br ${getGradient(asset.symbol)} text-white shadow-lg`}>
-            {getIcon(asset.symbol)}
-          </div>
-          <div className="text-right">
-            <div className={`text-2xl font-bold ${hasBalance ? 'text-white' : 'text-gray-500'}`}>
-              ${valueUsd.toFixed(2)}
-            </div>
-            <div className="text-sm text-gray-400">≈ {balance.toFixed(6)}</div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="text-white font-semibold">{asset.name}</div>
-            <div className="text-gray-400 text-sm">{asset.symbol}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-gray-400 text-sm">${asset.price_usd?.toFixed(2) || '0.00'}</div>
-            <div className="text-xs text-green-400">+0.00%</div>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={onBuy}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-blue-500/50"
-          >
-            <ArrowDownLeft className="h-4 w-4" />
-            Buy
-          </button>
-          <button
-            onClick={onSend}
-            disabled={!hasBalance}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-              hasBalance
-                ? 'bg-gray-700 hover:bg-gray-600 text-white hover:shadow-lg'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MNEMONIC BACKUP MODAL (Keep existing logic)
-// ============================================================================
-
-interface MnemonicBackupModalProps {
-  mnemonic: string;
-  walletAddress: string;
-  onComplete: () => void;
-}
-
-const MnemonicBackupModal: React.FC<MnemonicBackupModalProps> = ({
-  mnemonic,
-  walletAddress,
-  onComplete
-}) => {
-  const [step, setStep] = useState(1);
-  const [showMnemonic, setShowMnemonic] = useState(false);
-  const [verificationWords, setVerificationWords] = useState<number[]>([]);
-  const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
-  const [copied, setCopied] = useState(false);
-
-  const words = mnemonic.split(' ');
-
-  useEffect(() => {
-    const positions: number[] = [];
-    while (positions.length < 3) {
-      const pos = Math.floor(Math.random() * 25);
-      if (!positions.includes(pos)) positions.push(pos);
-    }
-    setVerificationWords(positions.sort((a, b) => a - b));
-  }, []);
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(mnemonic);
-    setCopied(true);
-    toast.success('Recovery phrase copied!');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const downloadMnemonic = () => {
-    const blob = new Blob([
-      `Seamount Wallet Recovery Phrase\n\n`,
-      `Wallet Address: ${walletAddress}\n\n`,
-      `Recovery Phrase:\n${mnemonic}\n\n`,
-      `⚠️ KEEP THIS SAFE! Never share with anyone.`
-    ], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'seamount-recovery-phrase.txt';
-    a.click();
-    toast.success('Recovery phrase downloaded!');
-  };
-
-  const verifyWords = () => {
-    const allCorrect = verificationWords.every(pos =>
-      userInputs[pos]?.toLowerCase().trim() === words[pos].toLowerCase()
-    );
-    
-    if (allCorrect) {
-      toast.success('Verification successful! 🎉');
-      onComplete();
-    } else {
-      toast.error('Incorrect words. Please check and try again.');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-2xl w-full p-8 border border-blue-500/30 shadow-2xl">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Secure Your Wallet</h2>
-          <p className="text-gray-400">Back up your recovery phrase to protect your funds</p>
-        </div>
-
-        {step === 1 && (
-          <div className="space-y-6">
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-3 text-yellow-400 mb-2">
-                <Shield className="h-5 w-5" />
-                <span className="font-semibold">Security Warning</span>
-              </div>
-              <p className="text-yellow-300 text-sm">
-                Never share your recovery phrase! Anyone with these words can steal your funds.
-              </p>
-            </div>
-
-            <div className="bg-gray-800 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-semibold">Your Recovery Phrase</h3>
-                <button
-                  onClick={() => setShowMnemonic(!showMnemonic)}
-                  className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
-                >
-                  {showMnemonic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showMnemonic ? 'Hide' : 'Show'}
-                </button>
-              </div>
-
-              {showMnemonic ? (
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {words.map((word, index) => (
-                    <div key={index} className="bg-gray-700 rounded-lg p-3 text-center">
-                      <span className="text-gray-400 text-xs mr-1">{index + 1}.</span>
-                      <span className="text-white font-medium">{word}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  {words.map((_, index) => (
-                    <div key={index} className="bg-gray-700 rounded-lg p-3 text-center">
-                      <span className="text-gray-400 text-xs mr-1">{index + 1}.</span>
-                      <span className="text-gray-600">•••••</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={copyToClipboard}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-lg font-medium transition-colors"
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <button
-                  onClick={downloadMnemonic}
-                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep(2)}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
-              >
-                I've Saved It Securely
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-white mb-2">Verify Your Recovery Phrase</h3>
-              <p className="text-gray-400">Enter the words below to confirm you saved them correctly</p>
-            </div>
-
-            <div className="space-y-4">
-              {verificationWords.map((position, index) => (
-                <div key={position} className="bg-gray-800 rounded-xl p-4">
-                  <label className="block text-gray-400 text-sm mb-2">
-                    Word #{position + 1}
-                  </label>
-                  <input
-                    type="text"
-                    value={userInputs[position] || ''}
-                    onChange={(e) => setUserInputs(prev => ({
-                      ...prev,
-                      [position]: e.target.value
-                    }))}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
-                    placeholder={`Enter word #${position + 1}`}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={verifyWords}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition-colors"
-              >
-                Verify & Complete
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
-// MAIN DASHBOARD COMPONENT - PRODUCTION READY WITH ALL FIXES
+// MAIN DASHBOARD COMPONENT - PREMIUM ZERO-FRICTION EXPERIENCE
 // ============================================================================
 
 const DashboardPage = () => {
@@ -613,12 +156,9 @@ const DashboardPage = () => {
     urgency: 'none',
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showMnemonicModal, setShowMnemonicModal] = useState(false);
-  const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string>('');
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [showCreateWalletModal, setShowCreateWalletModal] = useState(false);
   const [multiChainWallets, setMultiChainWallets] = useState<any>({});
+  const [selectedChain, setSelectedChain] = useState<string | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   
   // Supported chains for wallet creation
   const SUPPORTED_CHAINS = [
@@ -626,18 +166,6 @@ const DashboardPage = () => {
     { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
     { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
     { id: 'algorand', name: 'Algorand', symbol: 'ALGO' }
-  ];
-
-  // Supported assets configuration
-  const SUPPORTED_ASSETS = [
-    { symbol: 'ALGO', name: 'Algorand', decimals: 6, blockchain: 'Algorand' },
-    { symbol: 'USDT', name: 'Tether', decimals: 6, blockchain: 'Algorand' },
-    { symbol: 'USDCa', name: 'USD Coin', decimals: 6, blockchain: 'Algorand' },
-    { symbol: 'goBTC', name: 'Wrapped Bitcoin', decimals: 8, blockchain: 'Algorand' },
-    { symbol: 'goETH', name: 'Wrapped Ethereum', decimals: 8, blockchain: 'Algorand' },
-    { symbol: 'BTC', name: 'Bitcoin', decimals: 8, blockchain: 'Bitcoin' },
-    { symbol: 'ETH', name: 'Ethereum', decimals: 18, blockchain: 'Ethereum' },
-    { symbol: 'MATIC', name: 'Polygon', decimals: 18, blockchain: 'Polygon' },
   ];
 
   useEffect(() => {
@@ -648,7 +176,7 @@ const DashboardPage = () => {
     }
   }, [user, userProfile]);
 
-  // ✅ FIXED: Fetch multi-chain wallet status
+  // Fetch multi-chain wallet status
   const fetchMultiChainWallets = async () => {
     try {
       const response = await apiClient.get('/api/v1/wallet/multi-chain-status');
@@ -661,7 +189,7 @@ const DashboardPage = () => {
     }
   };
 
-  // ✅ FIXED: Map assets to chains properly for balance calculation
+  // Map assets to chains properly for balance calculation
   const getAssetChain = (symbol: string) => {
     const chainMap: { [key: string]: string } = {
       'ALGO': 'algorand',
@@ -676,7 +204,7 @@ const DashboardPage = () => {
     return chainMap[symbol] || 'algorand';
   };
 
-  // ✅ FIXED: Proper balance calculation for wallet cards
+  // Proper balance calculation for wallet cards
   const calculateChainBalance = (chain: string) => {
     if (!portfolioData?.assets) return 0;
     
@@ -690,7 +218,7 @@ const DashboardPage = () => {
     }, 0);
   };
 
-  // ✅ UPDATED: Fetch portfolio data including multi-chain balances
+  // Fetch portfolio data
   const fetchPortfolioData = async () => {
     try {
       setLoading(true);
@@ -714,7 +242,6 @@ const DashboardPage = () => {
       
       // Fallback to Algorand-only if multi-chain fails
       if (userProfile?.algorand_address) {
-        setWalletAddress(userProfile.algorand_address);
         setPortfolioData({
           success: true,
           total_usd: 0,
@@ -728,119 +255,17 @@ const DashboardPage = () => {
     }
   };
 
-  // ✅ NEW: Create multi-chain wallet
-  const createMultiChainWallet = async (chains?: string[]) => {
-    try {
-      setLoading(true);
-      const response = await apiClient.post('/api/v1/wallet/create-multi-chain', {
-        chains: chains || ['bitcoin', 'ethereum', 'polygon', 'algorand']
-      });
-
-      if (response.data.success) {
-        toast.success(`Wallets created on ${response.data.total_chains} chains!`);
-        setMultiChainWallets(response.data.wallets);
-        
-        if (response.data.mnemonic) {
-          setPendingMnemonic(response.data.mnemonic);
-          setShowMnemonicModal(true);
-        }
-        
-        fetchPortfolioData();
-      }
-    } catch (error: any) {
-      console.error('Multi-chain wallet creation failed:', error);
-      toast.error(error.response?.data?.error || 'Failed to create wallets');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ NEW: Create single chain wallet
-  const createSingleChainWallet = async (chain: string) => {
-    try {
-      setLoading(true);
-      const response = await apiClient.post(`/api/v1/wallet/${chain}/create`);
-
-      if (response.data.success) {
-        toast.success(`${chain.toUpperCase()} wallet created!`);
-        setMultiChainWallets((prev: any) => ({
-          ...prev,
-          [chain]: response.data.wallet
-        }));
-        fetchPortfolioData();
-      }
-    } catch (error: any) {
-      console.error(`${chain} wallet creation failed:`, error);
-      toast.error(error.response?.data?.error || `Failed to create ${chain} wallet`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ✅ NEW: Handler functions for wallet card actions
-  const handleViewChain = (chain: string, address: string) => {
-    if (!address) {
-      toast.error('No wallet address found');
-      return;
-    }
-
-    const explorers: { [key: string]: string } = {
-      bitcoin: `https://blockstream.info/address/${address}`,
-      ethereum: `https://etherscan.io/address/${address}`,
-      polygon: `https://polygonscan.com/address/${address}`,
-      algorand: `https://algoexplorer.io/address/${address}`
-    };
-
-    const explorerUrl = explorers[chain];
-    if (explorerUrl) {
-      window.open(explorerUrl, '_blank');
+  // Handle wallet card click
+  const handleWalletCardClick = (chain: string) => {
+    if (multiChainWallets[chain]?.address) {
+      setSelectedChain(chain);
+      setShowWalletModal(true);
     } else {
-      toast.error('Explorer not available for this chain');
+      toast.error(`${chain} wallet not created yet`);
     }
   };
 
-  const handleBuyChain = async (chain: string, chainName: string) => {
-    try {
-      // If wallet doesn't exist, create it first
-      if (!multiChainWallets[chain]?.address) {
-        await createSingleChainWallet(chain);
-      }
-
-      // Get the native asset for the chain
-      const nativeAssets: { [key: string]: string } = {
-        bitcoin: 'BTC',
-        ethereum: 'ETH',
-        polygon: 'MATIC',
-        algorand: 'ALGO'
-      };
-
-      const asset = nativeAssets[chain];
-      if (!asset) {
-        toast.error('Unsupported chain for buying');
-        return;
-      }
-
-      // Trigger buy flow for the native asset
-      const response = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
-        user_id: userProfile?.id,
-        user_email: userProfile?.email,
-        amount_fiat: 10000,
-        currency: "NGN",
-        asset: asset
-      });
-      
-      if (response.data.payment_url) {
-        window.location.href = response.data.payment_url;
-      } else {
-        toast.error('Payment initialization failed');
-      }
-    } catch (error) {
-      console.error('Buy chain error:', error);
-      toast.error('Failed to initiate purchase');
-    }
-  };
-
-  // Keep existing functions
+  // KYC status
   const fetchKYCStatus = async () => {
     try {
       const response = await apiClient.get('/api/v1/users/kyc-status');
@@ -863,44 +288,8 @@ const DashboardPage = () => {
     }
   };
 
-  const handleMnemonicBackupComplete = () => {
-    localStorage.setItem('mnemonic_backed_up', 'true');
-    setShowMnemonicModal(false);
-    setPendingMnemonic(null);
-    toast.success('Wallet secured successfully! 🎉');
-    fetchPortfolioData();
-  };
-
-  const handleBuyAsset = async (asset: any) => {
-    try {
-      const response = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
-        user_id: userProfile?.id,
-        user_email: userProfile?.email,
-        amount_fiat: 10000,
-        currency: "NGN",
-        asset: asset.symbol
-      });
-      
-      if (response.data.payment_url) {
-        window.location.href = response.data.payment_url;
-      }
-    } catch (error) {
-      console.error('Buy asset error:', error);
-      toast.error("Payment initialization failed");
-    }
-  };
-
-  const handleSendAsset = (asset: any) => {
-    if (asset.balance <= 0) {
-      toast.error('Insufficient balance');
-      return;
-    }
-    window.location.href = `/send?asset=${asset.symbol}&balance=${asset.balance}`;
-  };
-
   const handleVerifyKYC = async () => {
     try {
-      // Check current KYC status first
       const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
       
       if (kycResponse.data.status === 'verified' || kycResponse.data.status === 'approved') {
@@ -908,7 +297,6 @@ const DashboardPage = () => {
         return;
       }
       
-      // Redirect to KYC onboarding
       window.location.href = '/onboarding';
       
     } catch (error) {
@@ -928,21 +316,6 @@ const DashboardPage = () => {
   };
 
   const totalBalance = portfolioData?.total_usd || 0;
-  const balances = portfolioData?.balances || {};
-
-  // Build asset cards with live data
-  const assetCards = SUPPORTED_ASSETS.map(asset => {
-    const balance = balances[asset.symbol] || 0;
-    const price = portfolioData?.prices?.[asset.symbol] || 0;
-    const value_usd = balance * price;
-
-    return {
-      ...asset,
-      balance,
-      price_usd: price,
-      value_usd
-    };
-  });
 
   // Calculate created chains count
   const createdChains = Object.keys(multiChainWallets).filter(chain => 
@@ -970,16 +343,8 @@ const DashboardPage = () => {
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
 
-          {/* ✅ UPDATED: Header Buttons - Create Wallet, Send, Swap, Earn */}
+          {/* ✅ UPDATED: Header Buttons - Send, Swap, Earn (Create Wallet removed) */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowCreateWalletModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
-            >
-              <Key className="h-4 w-4" />
-              Create Wallet
-            </button>
-
             <button
               onClick={() => toast.info('Send functionality coming soon!')}
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
@@ -992,7 +357,7 @@ const DashboardPage = () => {
               onClick={() => toast.info('Swap functionality coming soon!')}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
-              <RefreshCw className="h-4 w-4" />
+              <SwapIcon className="h-4 w-4" />
               Swap
             </button>
 
@@ -1070,10 +435,9 @@ const DashboardPage = () => {
                 key={chain.id}
                 chain={chain.id}
                 address={multiChainWallets[chain.id]?.address || ''}
-                balance={calculateChainBalance(chain.id)} // ✅ FIXED: Proper balance calculation
+                balance={calculateChainBalance(chain.id)}
                 status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'}
-                onView={() => handleViewChain(chain.id, multiChainWallets[chain.id]?.address)}
-                onBuy={() => handleBuyChain(chain.id, chain.name)}
+                onCardClick={() => handleWalletCardClick(chain.id)}
               />
             ))}
           </div>
@@ -1118,52 +482,15 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Assets Grid */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">Your Assets</h2>
-            <span className="text-sm text-gray-400">
-              {portfolioData?.assets?.length || SUPPORTED_ASSETS.length} assets
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {portfolioData?.assets && portfolioData.assets.length > 0 ? (
-              portfolioData.assets.map((asset: any) => (
-                <AssetCard
-                  key={`${asset.chain}-${asset.symbol}`}
-                  asset={{
-                    symbol: asset.symbol || 'UNKNOWN',
-                    name: asset.name || asset.symbol,
-                    balance: asset.balance || 0,
-                    price_usd: asset.price_usd || 0,
-                    value_usd: asset.usd_value || 0,
-                    chain: asset.chain
-                  }}
-                  onBuy={() => handleBuyAsset(asset)}
-                  onSend={() => handleSendAsset(asset)}
-                />
-              ))
-            ) : (
-              assetCards.map(asset => (
-                <AssetCard
-                  key={asset.symbol}
-                  asset={asset}
-                  onBuy={() => handleBuyAsset(asset)}
-                  onSend={() => handleSendAsset(asset)}
-                />
-              ))
-            )}
-          </div>
-        </div>
+        {/* ✅ REMOVED: Your Assets Section - Now handled in wallet detail modals */}
 
         {/* Quick Actions */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { icon: ArrowDownLeft, label: 'Buy', color: 'text-blue-400', action: () => toast.info('Select an asset above to buy') },
-              { icon: ArrowUpRight, label: 'Send', color: 'text-purple-400', action: () => toast.info('Select an asset above to send') },
-              { icon: RefreshCw, label: 'Swap', color: 'text-green-400', action: () => toast.info('Swap feature coming soon!') },
+              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toast.info('Send functionality coming soon!') },
+              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toast.info('Swap feature coming soon!') },
               { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toast.info('Yield farming coming soon!') },
             ].map(action => (
               <button 
@@ -1207,30 +534,18 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      {showMnemonicModal && pendingMnemonic && (
-        <MnemonicBackupModal
-          mnemonic={pendingMnemonic}
-          walletAddress={walletAddress}
-          onComplete={handleMnemonicBackupComplete}
-        />
-      )}
-
-      {showReceiveModal && (
-        <ReceiveModal onClose={() => setShowReceiveModal(false)} />
-      )}
-
-      {/* Multi-chain Wallet Creation Modal */}
-      {showCreateWalletModal && (
-        <CreateWalletModal
-          isOpen={showCreateWalletModal}
-          onClose={() => setShowCreateWalletModal(false)}
-          onWalletCreated={(wallets) => {
-            setMultiChainWallets(wallets);
-            fetchPortfolioData();
-            toast.success('Multi-chain wallets created successfully! 🎉');
+      {/* Wallet Detail Modal */}
+      {selectedChain && (
+        <WalletDetailModal
+          isOpen={showWalletModal}
+          onClose={() => {
+            setShowWalletModal(false);
+            setSelectedChain(null);
           }}
-          existingWallets={multiChainWallets}
+          chain={selectedChain}
+          chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain}
+          address={multiChainWallets[selectedChain]?.address || ''}
+          balance={calculateChainBalance(selectedChain)}
         />
       )}
     </div>
