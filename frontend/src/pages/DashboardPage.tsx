@@ -1,5 +1,5 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// ✅ PRODUCTION READY: Premium multi-chain wallet dashboard
+// ✅ POLISHED VERSION: Clean imports, no shadowing, proper structure
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -7,7 +7,6 @@ import {
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon
 } from 'lucide-react';
-import { KYCBanner } from '../components/onboarding/KYCBanner';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { apiClient } from '../config/api';
@@ -16,17 +15,17 @@ import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
 
 // ============================================================================
-// KYC PROMPT BANNER (Keep existing)
+// KYC BANNER - Clean inline component (no import conflict)
 // ============================================================================
 
-interface KYCBannerProps {
+interface KYCPromptBannerProps {
   kycStatus: string;
   cumulativeVolume: number;
   limit: number;
   urgency: string;
 }
 
-const KYCPromptBanner: React.FC<KYCBannerProps> = ({
+const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   kycStatus,
   cumulativeVolume,
   limit,
@@ -142,7 +141,7 @@ const KYCPromptBanner: React.FC<KYCBannerProps> = ({
 };
 
 // ============================================================================
-// MAIN DASHBOARD COMPONENT - PREMIUM ZERO-FRICTION EXPERIENCE
+// MAIN DASHBOARD - PREMIUM MULTI-CHAIN WALLET
 // ============================================================================
 
 const DashboardPage = () => {
@@ -160,7 +159,6 @@ const DashboardPage = () => {
   const [selectedChain, setSelectedChain] = useState<string | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   
-  // Supported chains for wallet creation
   const SUPPORTED_CHAINS = [
     { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
     { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
@@ -176,7 +174,6 @@ const DashboardPage = () => {
     }
   }, [user, userProfile]);
 
-  // Fetch multi-chain wallet status
   const fetchMultiChainWallets = async () => {
     try {
       const response = await apiClient.get('/api/v1/wallet/multi-chain-status');
@@ -189,7 +186,6 @@ const DashboardPage = () => {
     }
   };
 
-  // Map assets to chains properly for balance calculation
   const getAssetChain = (symbol: string) => {
     const chainMap: { [key: string]: string } = {
       'ALGO': 'algorand',
@@ -204,7 +200,6 @@ const DashboardPage = () => {
     return chainMap[symbol] || 'algorand';
   };
 
-  // Proper balance calculation for wallet cards
   const calculateChainBalance = (chain: string) => {
     if (!portfolioData?.assets) return 0;
     
@@ -218,11 +213,9 @@ const DashboardPage = () => {
     }, 0);
   };
 
-  // Fetch portfolio data
   const fetchPortfolioData = async () => {
     try {
       setLoading(true);
-      
       const response = await apiClient.get('/api/v1/wallet/balances');
       
       if (response.data.success) {
@@ -236,11 +229,9 @@ const DashboardPage = () => {
           setMultiChainWallets(response.data.wallet_addresses);
         }
       }
-      
     } catch (error: any) {
       console.error('Portfolio fetch error:', error);
       
-      // Fallback to Algorand-only if multi-chain fails
       if (userProfile?.algorand_address) {
         setPortfolioData({
           success: true,
@@ -249,13 +240,11 @@ const DashboardPage = () => {
           wallet_address: userProfile.algorand_address
         });
       }
-      
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle wallet card click
   const handleWalletCardClick = (chain: string) => {
     if (multiChainWallets[chain]?.address) {
       setSelectedChain(chain);
@@ -265,7 +254,6 @@ const DashboardPage = () => {
     }
   };
 
-  // KYC status
   const fetchKYCStatus = async () => {
     try {
       const response = await apiClient.get('/api/v1/users/kyc-status');
@@ -279,12 +267,6 @@ const DashboardPage = () => {
       }
     } catch (error) {
       console.error('KYC status fetch failed:', error);
-      setKycInfo({
-        status: 'not_started',
-        cumulative_volume: 0,
-        limit: 5000,
-        urgency: 'none',
-      });
     }
   };
 
@@ -298,7 +280,6 @@ const DashboardPage = () => {
       }
       
       window.location.href = '/onboarding';
-      
     } catch (error) {
       console.error('KYC verification error:', error);
       toast.error('Unable to start verification process');
@@ -316,8 +297,6 @@ const DashboardPage = () => {
   };
 
   const totalBalance = portfolioData?.total_usd || 0;
-
-  // Calculate created chains count
   const createdChains = Object.keys(multiChainWallets).filter(chain => 
     multiChainWallets[chain]?.address
   ).length;
@@ -343,7 +322,7 @@ const DashboardPage = () => {
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
 
-          {/* ✅ UPDATED: Header Buttons - Send, Swap, Earn (Create Wallet removed) */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => toast.info('Send functionality coming soon!')}
@@ -445,7 +424,6 @@ const DashboardPage = () => {
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          {/* Total Balance */}
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -465,7 +443,6 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          {/* Network Status */}
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
             <div className="text-sm text-gray-400 mb-2">Networks</div>
             <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
@@ -481,8 +458,6 @@ const DashboardPage = () => {
             </div>
           </div>
         </div>
-
-        {/* ✅ REMOVED: Your Assets Section - Now handled in wallet detail modals */}
 
         {/* Quick Actions */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
