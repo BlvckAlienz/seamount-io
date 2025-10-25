@@ -1,5 +1,5 @@
 // File: frontend/src/pages/OnboardingPage.tsx
-// ✅ PRODUCTION READY: Fixed scope issues + aligned with working backend
+// ✅ PRODUCTION READY: Multi-chain wallet creation integrated
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,12 +8,13 @@ import { apiClient } from '../config/api';
 import toast from 'react-hot-toast';
 import { 
   Eye, EyeOff, Copy, Shield, Wallet, CheckCircle, 
-  Globe, Lock, Download, Check, AlertCircle 
+  Globe, Lock, Download, Check, AlertCircle,
+  Bitcoin, Coins, Sparkles
 } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
 
 // ============================================================================
-// STEP COMPONENTS
+// STEP COMPONENTS - UPDATED FOR MULTI-CHAIN
 // ============================================================================
 
 const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
@@ -37,7 +38,7 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
       </h4>
       <div className="space-y-3 text-gray-300">
         {[
-          "Multi-chain wallet (Algorand, Bitcoin, Ethereum, Polygon)",
+          "Multi-chain wallet (Bitcoin, Ethereum, Polygon, Algorand)",
           "Lightning-fast settlement (sub-5 seconds)",
           "Cross-border transfers at 2.9% (vs 8% traditional)",
           "Bank-grade security with Web3 freedom"
@@ -103,179 +104,109 @@ const IdentityStep = ({ onVerify, onSkip }: { onVerify: () => void; onSkip: () =
   </div>
 );
 
-const WalletBackupStep = ({ onNext, mnemonic }: { onNext: () => void; mnemonic: string }) => {
-  const [showMnemonic, setShowMnemonic] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verificationWords, setVerificationWords] = useState<number[]>([]);
-  const [userInputs, setUserInputs] = useState<{ [key: number]: string }>({});
+const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => void }) => {
+  const [creating, setCreating] = useState(false);
+  const [wallets, setWallets] = useState<any>({});
   
-  const words = mnemonic.split(' ');
+  const chains = [
+    { id: 'bitcoin', name: 'Bitcoin', icon: Bitcoin, color: 'from-orange-500 to-yellow-600' },
+    { id: 'ethereum', name: 'Ethereum', icon: Coins, color: 'from-gray-400 to-slate-600' },
+    { id: 'polygon', name: 'Polygon', icon: Coins, color: 'from-purple-500 to-indigo-600' },
+    { id: 'algorand', name: 'Algorand', icon: Shield, color: 'from-blue-500 to-cyan-600' }
+  ];
 
-  useEffect(() => {
-    const positions: number[] = [];
-    while (positions.length < 3) {
-      const pos = Math.floor(Math.random() * 25);
-      if (!positions.includes(pos)) positions.push(pos);
-    }
-    setVerificationWords(positions.sort((a, b) => a - b));
-  }, []);
+  const createMultiChainWallets = async () => {
+    setCreating(true);
+    try {
+      const response = await apiClient.post('/api/v1/wallet/create-multi-chain', {
+        chains: ['bitcoin', 'ethereum', 'polygon', 'algorand']
+      });
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(mnemonic);
-    setCopied(true);
-    toast.success('Recovery phrase copied!');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const downloadBackup = () => {
-    const blob = new Blob([
-      `Seamount Wallet Recovery Phrase\n\n`,
-      `⚠️ KEEP THIS SAFE! Never share with anyone.\n\n`,
-      `Recovery Phrase:\n${mnemonic}\n\n`,
-      `Created: ${new Date().toISOString()}`
-    ], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'seamount-recovery-phrase.txt';
-    a.click();
-    toast.success('Recovery phrase downloaded!');
-  };
-
-  const verifyWords = () => {
-    const allCorrect = verificationWords.every(pos => 
-      userInputs[pos]?.toLowerCase().trim() === words[pos].toLowerCase()
-    );
-    
-    if (allCorrect) {
-      toast.success('Verification successful! 🎉');
-      onNext();
-    } else {
-      toast.error('Incorrect words. Please check and try again.');
+      if (response.data.success) {
+        setWallets(response.data.wallets);
+        toast.success(`Wallets created on ${response.data.total_chains} chains!`);
+        
+        // Auto-complete after successful creation
+        setTimeout(() => {
+          onComplete(response.data.wallets);
+        }, 2000);
+      }
+    } catch (error: any) {
+      console.error('Multi-chain wallet creation failed:', error);
+      toast.error(error.response?.data?.error || 'Failed to create wallets');
+    } finally {
+      setCreating(false);
     }
   };
-
-  if (verifying) {
-    return (
-      <div className="text-left">
-        <div className="text-center mb-6">
-          <Check className="h-12 w-12 text-green-400 mx-auto mb-4 animate-bounce" />
-          <h3 className="text-2xl font-bold text-white mb-2">Verify Your Phrase</h3>
-          <p className="text-gray-400">Enter these words to confirm you saved it</p>
-        </div>
-
-        <div className="space-y-4 mb-6">
-          {verificationWords.map(pos => (
-            <div key={pos}>
-              <label className="block text-sm text-gray-400 mb-2">
-                Word #{pos + 1}
-              </label>
-              <input
-                type="text"
-                value={userInputs[pos] || ''}
-                onChange={(e) => setUserInputs({ ...userInputs, [pos]: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                placeholder="Enter word"
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={() => setVerifying(false)}
-            className="flex-1 border border-gray-700 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-800"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={verifyWords}
-            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 px-4 rounded-lg"
-          >
-            Verify & Complete
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="text-left">
-      <div className="text-center mb-6">
+    <div className="text-center">
+      <div className="mb-6">
         <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <Wallet className="h-8 w-8 text-white" />
+          <Sparkles className="h-8 w-8 text-white" />
         </div>
-        <h3 className="text-2xl font-bold text-white mb-2">Back Up Your Wallet</h3>
-        <p className="text-gray-400">This is your master key. Store it safely offline.</p>
+        <h3 className="text-2xl font-bold text-white mb-2">Multi-Chain Wallet</h3>
+        <p className="text-gray-400">Create your unified wallet across multiple blockchains</p>
       </div>
-      
-      <div className="relative border border-gray-700 rounded-xl p-5 mb-4 bg-gray-900/50">
-        <div className={`grid grid-cols-3 gap-2 text-gray-300 ${!showMnemonic ? 'blur-sm' : ''}`}>
-          {words.map((word, index) => (
-            <div key={index} className="flex items-center bg-gray-800/50 rounded px-3 py-2 text-sm">
-              <span className="text-gray-500 w-6">{index + 1}.</span>
-              <span className="font-mono">{word}</span>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        {chains.map(chain => (
+          <div key={chain.id} className={`bg-gradient-to-br ${chain.color} rounded-xl p-4 text-white`}>
+            <chain.icon className="h-8 w-8 mx-auto mb-2" />
+            <div className="text-sm font-semibold">{chain.name}</div>
+            <div className="text-xs opacity-80">
+              {wallets[chain.id] ? '✓ Created' : 'Ready to create'}
             </div>
-          ))}
-        </div>
-        {!showMnemonic && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 rounded-xl">
-            <button
-              onClick={() => setShowMnemonic(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
-            >
-              <Eye className="h-5 w-5" />
-              Reveal Phrase
-            </button>
           </div>
-        )}
+        ))}
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <button 
-          onClick={handleCopy} 
-          disabled={!showMnemonic}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border ${
-            copied ? "bg-green-900/20 border-green-500 text-green-400" : "border-gray-700 text-gray-300 hover:bg-gray-800"
-          } disabled:opacity-50`}
-        >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied!" : "Copy"}
-        </button>
-        <button 
-          onClick={downloadBackup}
-          disabled={!showMnemonic}
-          className="flex-1 flex items-center justify-center gap-2 border border-gray-700 text-gray-300 py-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" />
-          Download
-        </button>
+      <div className="bg-blue-900/20 rounded-xl p-4 mb-6 border border-blue-500/30 text-left">
+        <h4 className="font-semibold text-white mb-2 flex items-center">
+          <CheckCircle className="h-4 w-4 text-blue-400 mr-2" />
+          One Wallet, Multiple Chains
+        </h4>
+        <ul className="text-sm text-gray-300 space-y-1">
+          <li>• Single recovery phrase for all chains</li>
+          <li>• Auto-routing to fastest/cheapest network</li>
+          <li>• Unified balance across Bitcoin, Ethereum, Polygon, Algorand</li>
+          <li>• No blockchain complexity - we handle everything</li>
+        </ul>
       </div>
 
-      <div className="bg-red-900/20 border-l-4 border-red-500 text-red-300 p-4 rounded-r-lg mb-6">
-        <div className="flex items-start gap-3">
-          <Lock className="h-5 w-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold mb-1">Never Lose This Phrase</p>
-            <p className="text-sm">Seamount cannot recover your wallet. You are in full control.</p>
-          </div>
-        </div>
-      </div>
-
-      <button 
-        onClick={() => setVerifying(true)}
-        disabled={!showMnemonic}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-6 rounded-xl disabled:opacity-50 shadow-lg"
+      <button
+        onClick={createMultiChainWallets}
+        disabled={creating || Object.keys(wallets).length > 0}
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-6 rounded-xl disabled:opacity-50 shadow-lg transition-all"
       >
-        I've Backed It Up ✓
+        {creating ? (
+          <div className="flex items-center justify-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            Creating Multi-Chain Wallet...
+          </div>
+        ) : Object.keys(wallets).length > 0 ? (
+          <div className="flex items-center justify-center gap-2">
+            <Check className="h-5 w-5" />
+            Wallets Created Successfully!
+          </div>
+        ) : (
+          'Create Multi-Chain Wallet'
+        )}
       </button>
+
+      {Object.keys(wallets).length > 0 && (
+        <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+          <p className="text-green-400 text-sm">
+            ✓ Your multi-chain wallet is ready! Redirecting to dashboard...
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
 // ============================================================================
-// MAIN COMPONENT
+// MAIN COMPONENT - UPDATED FOR MULTI-CHAIN
 // ============================================================================
 
 const OnboardingPage = () => {
@@ -293,12 +224,11 @@ const OnboardingPage = () => {
 
   const handleWelcomeComplete = () => setStep('identity');
 
-  // ✅ FIXED: Show BVN modal instead of direct API call
   const handleStartVerification = () => {
     setShowBVNModal(true);
   };
 
-  // ✅ FIXED: Called AFTER user submits BVN data
+  // ✅ UPDATED: Handle BVN submit with multi-chain wallet creation
   const handleBVNSubmit = async (formData: any) => {
     const toastId = toast.loading('Starting verification...');
     
@@ -318,22 +248,9 @@ const OnboardingPage = () => {
       
       toast.success('Verification submitted!', { id: toastId });
 
-      // 3. Create wallet
-      const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-      
-      if (walletResponse.data.success) {
-        if (walletResponse.data.mnemonic) {
-          // ✅ NEW WALLET: Proceed with backup flow
-          setMnemonic(walletResponse.data.mnemonic);
-          setShowBVNModal(false);
-          setStep('walletBackup');
-        } else {
-          // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
-          console.log('✅ Wallet exists, completing onboarding...');
-          setShowBVNModal(false);
-          await handleBackupComplete(); // This will mark onboarding complete and go to dashboard
-        }
-      }
+      // 3. Proceed to wallet creation step
+      setShowBVNModal(false);
+      setStep('walletCreation');
       
     } catch (error: any) {
       console.error('KYC submission error:', error);
@@ -342,7 +259,7 @@ const OnboardingPage = () => {
     }
   };
 
-  // ✅ FIXED: Use skip verification endpoint
+  // ✅ UPDATED: Skip verification with multi-chain wallet creation
   const handleSkipVerification = async () => {
     try {
       const toastId = toast.loading('Skipping verification...');
@@ -350,21 +267,7 @@ const OnboardingPage = () => {
       
       if (response.data.success) {
         toast.success('Verification skipped!', { id: toastId });
-        
-        // ✅ Create wallet directly without external connection
-        const walletResponse = await apiClient.post('/api/v1/user/provision-wallets');
-        
-        if (walletResponse.data.success) {
-          if (walletResponse.data.mnemonic) {
-            // ✅ NEW WALLET: Proceed with backup flow
-            setMnemonic(walletResponse.data.mnemonic);
-            setStep('walletBackup');
-          } else {
-            // ✅ WALLET EXISTS: Skip backup and complete onboarding immediately
-            console.log('✅ Wallet exists, completing onboarding...');
-            await handleBackupComplete(); // This will mark onboarding complete and go to dashboard
-          }
-        }
+        setStep('walletCreation');
       }
     } catch (error: any) {
       console.error('Skip verification error:', error);
@@ -372,7 +275,8 @@ const OnboardingPage = () => {
     }
   };
 
-  const handleBackupComplete = async () => {
+  // ✅ NEW: Handle multi-chain wallet creation completion
+  const handleWalletCreationComplete = async (wallets: any) => {
     const toastId = toast.loading('Completing setup...');
     
     try {
@@ -385,19 +289,20 @@ const OnboardingPage = () => {
       toast.success('Welcome to Seamount!', { id: toastId });
       navigate('/dashboard');
     } catch (error) {
-      console.error('Backup error:', error);
+      console.error('Setup completion error:', error);
       toast.error('Setup failed', { id: toastId });
     }
   };
 
   const progressPercentage = 
-    step === 'welcome' ? '33%' : 
-    step === 'identity' ? '66%' : '100%';
+    step === 'welcome' ? '25%' : 
+    step === 'identity' ? '50%' : 
+    step === 'walletCreation' ? '100%' : '100%';
 
   const stepTitles: { [key: string]: string } = {
     welcome: 'Welcome to Seamount',
     identity: 'Identity Verification',
-    walletBackup: 'Wallet Backup'
+    walletCreation: 'Multi-Chain Wallet Setup'
   };
 
   return (
@@ -426,14 +331,9 @@ const OnboardingPage = () => {
               onVerify={handleStartVerification}
               onSkip={handleSkipVerification}
             />
-          ) : mnemonic ? (
-            <WalletBackupStep onNext={handleBackupComplete} mnemonic={mnemonic} />
-          ) : (
-            <div className="text-center p-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-400">Processing...</p>
-            </div>
-          )}
+          ) : step === 'walletCreation' ? (
+            <MultiChainWalletStep onComplete={handleWalletCreationComplete} />
+          ) : null}
         </div>
       </div>
 

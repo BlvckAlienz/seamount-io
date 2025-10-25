@@ -14,8 +14,6 @@
     "@supabase/supabase-js": "^2.55.0",
     "@vercel/analytics": "^1.0.1",
     "@vercel/speed-insights": "^1.0.1",
-    "@walletconnect/modal": "^2.7.0",
-    "@walletconnect/web3-provider": "^1.8.0",
     "axios": "^1.6.0",
     "buffer": "^6.0.3",
     "clsx": "^2.0.0",

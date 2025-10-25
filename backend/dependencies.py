@@ -1,5 +1,5 @@
 # File Location: backend/dependencies.py
-# CRITICAL FIX: Complete implementation with proper service dependency handling
+# 🚀 ULTIMATE FIX: Complete multi-chain service dependency orchestration
 
 import logging
 from fastapi import Depends, HTTPException, status
@@ -16,26 +16,30 @@ import json
 from backend.config import get_settings
 from backend.models import UserRole
 
+# ========== TYPE CHECKING IMPORTS ==========
 if TYPE_CHECKING:
-    from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
+    from backend.services.multi_chain_wallet_service import MultiChainWalletService
     from backend.services.notification_service import NotificationService
     from backend.services.audit_service import AuditService
     from backend.services.kyc_service import KYCService
     from backend.services.database_service import DatabaseService
     from backend.services.algorand_service import AlgorandService
     from backend.services.oracle_service import OracleService
+    from backend.services.fee_calculator import FeeCalculatorService
 else:
     # Runtime imports for actual service instantiation
     try:
-        from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
+        from backend.services.multi_chain_wallet_service import MultiChainWalletService
         from backend.services.notification_service import NotificationService
         from backend.services.audit_service import AuditService
         from backend.services.kyc_service import KYCService
         from backend.services.database_service import DatabaseService
         from backend.services.algorand_service import AlgorandService
         from backend.services.oracle_service import OracleService
+        from backend.services.fee_calculator import FeeCalculatorService
     except ImportError as e:
         logging.warning(f"Service import failed: {e}")
+        # Set to None for graceful degradation
         MultiChainWalletService = None
         NotificationService = None
         AuditService = None
@@ -43,10 +47,11 @@ else:
         DatabaseService = None
         AlgorandService = None
         OracleService = None
-       
+        FeeCalculatorService = None
+
 logger = logging.getLogger(__name__)
 
-# Global service instances
+# ========== GLOBAL SERVICE INSTANCES ==========
 _supabase_client: Optional[Client] = None
 _notification_service: Optional["NotificationService"] = None
 _audit_service: Optional["AuditService"] = None
@@ -56,62 +61,10 @@ _algorand_service: Optional["AlgorandService"] = None
 _oracle_service: Optional["OracleService"] = None
 _multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
 _fee_calculator_service: Optional["FeeCalculatorService"] = None
+
+# JWT caching
 jwks_cache: Dict[str, Any] = {}
 jwks_cache_expiry: Optional[datetime] = None
-
-# ========== MULTI-CHAIN WALLET SERVICE ==========
-
-_multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
-
-def get_multi_chain_wallet_service() -> "MultiChainWalletService":
-    """Get multi-chain wallet service instance"""
-    global _multi_chain_wallet_service
-    
-    if _multi_chain_wallet_service is None:
-        try:
-            from backend.services.multi_chain_wallet_service import MultiChainWalletService
-            
-            # Initialize with dependencies
-            _multi_chain_wallet_service = MultiChainWalletService(
-                db_service=get_database_service(),
-                algorand_service=get_algorand_service(),
-                fee_calculator=get_fee_calculator_service(),
-                oracle_service=get_oracle_service()
-            )
-            
-            logger.info("✅ MultiChainWalletService initialized")
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize MultiChainWalletService: {e}")
-            raise HTTPException(
-                status_code=503,
-                detail="Multi-chain wallet service unavailable"
-            )
-    
-    return _multi_chain_wallet_service
-
-def get_fee_calculator_service() -> "FeeCalculatorService":
-    """Get fee calculator service instance"""
-    global _fee_calculator_service
-    
-    if _fee_calculator_service is None:
-        try:
-            from backend.services.fee_calculator import FeeCalculatorService
-            
-            _fee_calculator_service = FeeCalculatorService(
-                db_service=get_database_service()
-            )
-            
-            logger.info("✅ FeeCalculatorService initialized")
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize FeeCalculatorService: {e}")
-            raise HTTPException(
-                status_code=503,
-                detail="Fee calculator service unavailable"
-            )
-    
-    return _fee_calculator_service
 
 # Security schemes
 security = HTTPBearer(auto_error=False)  # For optional auth
@@ -122,6 +75,8 @@ def get_settings_cached():
     """Cached settings instance for performance"""
     return get_settings()
 
+# ========== SERVICE INITIALIZATION ==========
+
 def initialize_dependencies(
     supabase_client: Client, 
     multi_chain_wallet_service: "MultiChainWalletService", 
@@ -130,11 +85,13 @@ def initialize_dependencies(
     kyc_service: Optional["KYCService"] = None,
     database_service: Optional["DatabaseService"] = None,
     algorand_service: Optional["AlgorandService"] = None,
-    oracle_service: Optional["OracleService"] = None
+    oracle_service: Optional["OracleService"] = None,
+    fee_calculator_service: Optional["FeeCalculatorService"] = None
 ):
     """Initialize dependency services - used in main.py startup"""
     global _supabase_client, _multi_chain_wallet_service, _notification_service
     global _audit_service, _kyc_service, _database_service, _algorand_service, _oracle_service
+    global _fee_calculator_service
     
     _supabase_client = supabase_client
     _multi_chain_wallet_service = multi_chain_wallet_service
@@ -144,13 +101,12 @@ def initialize_dependencies(
     _database_service = database_service
     _algorand_service = algorand_service
     _oracle_service = oracle_service
+    _fee_calculator_service = fee_calculator_service
     
-    logger.info("✅ Dependencies initialized successfully")
+    logger.info("✅ All dependencies initialized successfully")
 
 def get_supabase_client() -> Client:
-    """
-    CRITICAL FIX: Proper singleton Supabase client with correct config attributes
-    """
+    """CRITICAL FIX: Proper singleton Supabase client"""
     global _supabase_client
     
     if _supabase_client is None:
@@ -159,14 +115,15 @@ def get_supabase_client() -> Client:
             supabase_url = settings.SUPABASE_URL
             supabase_key = settings.SUPABASE_SERVICE_KEY.get_secret_value()
             
-            # ✅ FIX: Remove proxy parameter for compatibility
             _supabase_client = create_client(supabase_url, supabase_key)
             logger.info("✅ Supabase client initialized successfully")
             
         except Exception as e:
             logger.error(f"❌ CRITICAL: Supabase client initialization failed: {e}")
-            _supabase_client = None
-            logger.warning("Using mock Supabase client - some features may not work")
+            raise HTTPException(
+                status_code=503,
+                detail="Database service unavailable - Supabase client failed"
+            )
     
     return _supabase_client
 
@@ -179,18 +136,117 @@ def get_database_service() -> "DatabaseService":
             from backend.services.database_service import DatabaseService
             
             supabase = get_supabase_client()
-            if supabase is None:
-                logger.error("❌ Cannot initialize DatabaseService: Supabase client is None")
-                raise HTTPException(status_code=503, detail="Database service unavailable")
-            
             _database_service = DatabaseService(supabase)
             logger.info("✅ DatabaseService initialized successfully")
+            
         except Exception as e:
             logger.error(f"❌ Failed to initialize DatabaseService: {e}")
-            raise HTTPException(status_code=503, detail="Database service unavailable")
+            raise HTTPException(
+                status_code=503, 
+                detail="Database service unavailable"
+            )
     
     return _database_service
+
+def get_algorand_service() -> "AlgorandService":
+    """Get Algorand service instance"""
+    global _algorand_service
     
+    if _algorand_service is None:
+        try:
+            from backend.services.algorand_service import AlgorandService
+            
+            _algorand_service = AlgorandService(get_settings_cached())
+            logger.info("✅ Algorand service initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Algorand service: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Algorand service unavailable"
+            )
+    
+    return _algorand_service
+
+def get_oracle_service() -> "OracleService":
+    """Get Oracle service instance - FIXED to pass DatabaseService properly"""
+    global _oracle_service
+    
+    if _oracle_service is None:
+        try:
+            from backend.services.oracle_service import OracleService
+            
+            # ✅ CRITICAL FIX: Get database service FIRST
+            db_service = get_database_service()
+            
+            # Pass it to OracleService
+            _oracle_service = OracleService(db_service)
+            logger.info("✅ Oracle service initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Oracle service: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Oracle service unavailable - critical for conversion rates"
+            )
+    
+    return _oracle_service
+
+def get_fee_calculator_service() -> "FeeCalculatorService":
+    """Get fee calculator service instance"""
+    global _fee_calculator_service
+    
+    if _fee_calculator_service is None:
+        try:
+            from backend.services.fee_calculator import FeeCalculatorService
+            
+            _fee_calculator_service = FeeCalculatorService(
+                db_service=get_database_service()
+            )
+            logger.info("✅ FeeCalculatorService initialized")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize FeeCalculatorService: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Fee calculator service unavailable"
+            )
+    
+    return _fee_calculator_service
+
+def get_multi_chain_wallet_service() -> "MultiChainWalletService":
+    """🎯 ULTIMATE FIX: Get multi-chain wallet service instance with proper dependency injection"""
+    global _multi_chain_wallet_service
+    
+    if _multi_chain_wallet_service is None:
+        try:
+            from backend.services.multi_chain_wallet_service import MultiChainWalletService
+            
+            # ✅ CRITICAL: Initialize all required dependencies FIRST
+            db_service = get_database_service()
+            algorand_service = get_algorand_service()
+            fee_calculator = get_fee_calculator_service()
+            oracle_service = get_oracle_service()
+            
+            # Initialize the multi-chain wallet service
+            _multi_chain_wallet_service = MultiChainWalletService(
+                db_service=db_service,
+                algorand_service=algorand_service,
+                fee_calculator=fee_calculator,
+                oracle_service=oracle_service
+            )
+            
+            logger.info("✅ MultiChainWalletService initialized with all dependencies")
+            
+        except Exception as e:
+            logger.error(f"❌ CRITICAL: Failed to initialize MultiChainWalletService: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail="Multi-chain wallet service unavailable"
+            )
+    
+    return _multi_chain_wallet_service
+
 def get_kyc_service() -> "KYCService":
     """Get KYC service instance"""
     global _kyc_service
@@ -207,49 +263,27 @@ def get_kyc_service() -> "KYCService":
             )
             logger.info("✅ KYC service initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize KYC service: {e}")
-            raise HTTPException(status_code=500, detail="KYC service initialization failed")
+            logger.error(f"❌ Failed to initialize KYC service: {e}")
+            raise HTTPException(
+                status_code=503, 
+                detail="KYC service unavailable"
+            )
     
     return _kyc_service
 
-def get_algorand_service() -> "AlgorandService":
-    """Get Algorand service instance"""
-    global _algorand_service
-    
-    if _algorand_service is None:
-        try:
-            from backend.services.algorand_service import AlgorandService
-            
-            _algorand_service = AlgorandService(get_settings_cached())
-            logger.info("✅ Algorand service initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize Algorand service: {e}")
-            raise HTTPException(status_code=500, detail="Algorand service initialization failed")
-    
-    return _algorand_service
+def get_notification_service() -> "NotificationService":
+    """Get notification service instance"""
+    if _notification_service is None: 
+        logger.error("❌ Notification service not initialized")
+        raise HTTPException(
+            status_code=503, 
+            detail="Notification service unavailable"
+        )
+    return _notification_service
 
-def get_oracle_service() -> "OracleService":
-    """Get Oracle service instance - FIXED to pass DatabaseService properly"""
-    global _oracle_service
-    
-    if _oracle_service is None:
-        try:
-            from backend.services.oracle_service import OracleService
-            
-            # Get database service FIRST
-            db_service = get_database_service()
-            
-            # Pass it to OracleService
-            _oracle_service = OracleService(db_service)
-            logger.info("✅ Oracle service initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize Oracle service: {e}")
-            raise HTTPException(
-                status_code=500, 
-                detail="Oracle service initialization failed - critical for conversion rates"
-            )
-    
-    return _oracle_service
+def get_audit_service() -> Optional["AuditService"]:
+    """Get audit service instance (optional)"""
+    return _audit_service
 
 def get_payment_service():
     """Get payment service instance with graceful fallback"""
@@ -257,29 +291,25 @@ def get_payment_service():
         from backend.services.payment_service import PaymentService
         return PaymentService()
     except ImportError as e:
-        logger.error(f"Payment service not available: {e}")
+        logger.error(f"❌ Payment service not available: {e}")
         
         class MockPaymentService:
             async def initialize_payment(self, *args, **kwargs):
-                raise HTTPException(status_code=503, detail="Payment service unavailable")
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Payment service unavailable"
+                )
             
             async def verify_payment(self, *args, **kwargs):
-                raise HTTPException(status_code=503, detail="Payment service unavailable")
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Payment service unavailable"
+                )
         
         return MockPaymentService()
 
-def get_notification_service() -> "NotificationService":
-    """Get notification service instance"""
-    if _notification_service is None: 
-        logger.error("❌ Notification service not initialized")
-        raise HTTPException(status_code=503, detail="Notification service unavailable")
-    return _notification_service
+# ========== AUTHENTICATION DEPENDENCIES ==========
 
-def get_audit_service() -> Optional["AuditService"]:
-    """Get audit service instance (optional)"""
-    return _audit_service
-
-# CRITICAL FIX: Add OptionalAuth class at the top level
 class OptionalAuth:
     """Optional authentication container"""
     def __init__(self, user: Optional[dict] = None, payload: Optional[dict] = None):
@@ -525,6 +555,8 @@ async def get_current_user(
         detail="Unexpected error in user profile retrieval"
     )
 
+# ========== AUTHORIZATION & ACCESS CONTROL ==========
+
 def require_role(required_role: Union[UserRole, str]):
     """Dependency factory for role-based access control"""
     async def role_checker(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
@@ -630,7 +662,7 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
     if current_user.get('kyc_status') == 'verified' or current_user.get('is_demo', False):
         return "tribe"
     return "alien"
-    
+
 def get_db_service() -> Optional["DatabaseService"]:
     """Alias for get_database_service()"""
     return get_database_service()
