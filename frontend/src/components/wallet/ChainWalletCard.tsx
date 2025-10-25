@@ -6,8 +6,8 @@ interface ChainWalletCardProps {
   balance: string;
   address: string;
   chainName: string;
-  onSendClick: () => void;
-  onReceiveClick: (chain: string, address: string, chainName: string) => void;
+  onViewClick: () => void;
+  onBuyClick: (chain: string, address: string, chainName: string) => void;
 }
 
 const ChainWalletCard: React.FC<ChainWalletCardProps> = ({ 
@@ -15,8 +15,8 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   balance, 
   address, 
   chainName,
-  onSendClick,
-  onReceiveClick
+  onViewClick,
+  onBuyClick
 }) => {
   const getChainIcon = () => {
     const icons: { [key: string]: string } = {
@@ -75,19 +75,19 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         </p>
       </div>
       
-      {/* Action Buttons */}
+      {/* Action Buttons - UPDATED: View & Buy */}
       <div className="flex space-x-3">
         <button 
-          onClick={onSendClick}
+          onClick={onViewClick}
           className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 px-4 rounded-lg font-medium transition-colors text-sm"
         >
-          Send
+          View
         </button>
         <button 
-          onClick={() => onReceiveClick(chain, address, chainName)}
+          onClick={() => onBuyClick(chain, address, chainName)}
           className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2.5 px-4 rounded-lg font-medium transition-colors text-sm"
         >
-          Receive
+          Buy
         </button>
       </div>
       
