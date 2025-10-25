@@ -1,8 +1,10 @@
 // File: frontend/src/components/wallet/WalletDetailModal.tsx
+// ✅ FIXED: Correct import path (../../config/api)
+
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ArrowDownLeft, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { apiClient } from '../../../config/api';
+import { apiClient } from '../../config/api';
 
 interface WalletDetailModalProps {
   isOpen: boolean;
@@ -146,7 +148,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
 
         <div className="flex flex-col lg:flex-row h-[calc(90vh-120px)]">
           {/* Sidebar - Asset Selection */}
-          <div className="lg:w-80 border-r border-gray-700 p-6">
+          <div className="lg:w-80 border-r border-gray-700 p-6 overflow-auto">
             <h3 className="text-lg font-semibold text-white mb-4">Assets</h3>
             <div className="space-y-2">
               {chainAssets[chain]?.map(asset => (
@@ -174,10 +176,10 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                   navigator.clipboard.writeText(address);
                   toast.success('Address copied!');
                 }}
-                className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1"
+                className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full"
               >
-                {address.slice(0, 8)}...{address.slice(-6)}
-                <ExternalLink className="w-3 h-3" />
+                <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </button>
             </div>
           </div>
