@@ -1,7 +1,7 @@
 # File: backend/services/multi_chain_wallet_service.py
 """
-Multi-Chain Wallet Service - ROCK SOLID Implementation
-Algorand + WDK (Bitcoin, Ethereum, Polygon, TON, etc.)
+Multi-Chain Wallet Service - PRODUCTION READY FIXED VERSION
+Fixed missing _get_user_address method and other issues
 """
 
 import logging
@@ -19,7 +19,7 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 
 class MultiChainWalletService:
-    """Production-ready multi-chain wallet orchestrator"""
+    """Production-ready multi-chain wallet orchestrator - FIXED VERSION"""
     
     # Asset-to-chain mapping
     ASSET_CHAIN_MAP = {
@@ -27,9 +27,9 @@ class MultiChainWalletService:
         'USDCa': 'algorand',
         'goBTC': 'algorand',
         'goETH': 'algorand',
-        'USDT': 'polygon',  # Default (gasless)
+        'USDT': 'polygon',
         'BTC': 'bitcoin',
-        'ETH': 'arbitrum',  # Cheaper than mainnet
+        'ETH': 'arbitrum',
         'MATIC': 'polygon',
         'TON': 'ton',
         'TRX': 'tron',
@@ -51,38 +51,59 @@ class MultiChainWalletService:
         
         logger.info("✅ MultiChainWalletService initialized (Algorand + WDK)")
     
-    # ========== WALLET CREATION ==========
+    # ========== FIXED: ADD MISSING METHOD ==========
     
-    async def create_wallet_for_user(
-        self,
-        user_id: str,
-        chains: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def _get_user_address(self, user_id: str, chain: str) -> Optional[str]:
         """
-        Create multi-chain wallet for user
-        DEFAULT: Algorand + essential WDK chains
+        FIXED: Retrieve user's wallet address for specific chain
+        This was missing and causing the 500 errors
         """
-        
-        result = {
-            'user_id': user_id,
-            'wallets': {},
-            'created_at': datetime.utcnow().isoformat(),
-            'success': False
-        }
-        
-        # 1. Create Algorand wallet (ALWAYS)
         try:
-            # ✅ FIX: Query without maybe_single()
-            existing_algo = self.db.supabase.table('user_wallets')\
-                .select('algorand_address')\
-                .eq('user_id', user_id)\
-                .execute()
-            
-            if existing_algo.data and len(existing_algo.data) > 0 and existing_algo.data[0].get('algorand_address'):
-                algo_address = existing_algo.data[0]['algorand_address']
-                logger.info(f"✅ Existing Algorand wallet: {algo_address[:10]}...")
+            if chain == 'algorand':
+                # Query user_wallets table for Algorand
+                result = self.db.supabase.table('user_wallets')\
+                    .select('algorand_address')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if result.data and len(result.data) > 0:
+                    return result.data[0].get('algorand_address')
             else:
-                # Create new Algorand wallet
+                # Query multi_chain_addresses for WDK chains
+                result = self.db.supabase.table('multi_chain_addresses')\
+                    .select('address')\
+                    .eq('user_id', user_id)\
+                    .eq('blockchain', chain)\
+                    .execute()
+                
+                if result.data and len(result.data) > 0:
+                    return result.data[0].get('address')
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user address for {chain}: {e}")
+            return None
+    
+    # ========== FIXED WALLET CREATION ==========
+    
+    async def create_single_chain_wallet(self, user_id: str, chain: str) -> Dict[str, Any]:
+        """
+        FIXED: Create wallet for single chain - used by individual chain endpoints
+        """
+        try:
+            # Check if user already has wallet for this chain
+            existing_address = self._get_user_address(user_id, chain)
+            if existing_address:
+                return {
+                    'success': True,
+                    'address': existing_address,
+                    'message': f'Wallet already exists on {chain}',
+                    'chain': chain
+                }
+            
+            if chain == 'algorand':
+                # Create Algorand wallet
                 algo_wallet = await self.algorand.create_algorand_wallet(user_id)
                 algo_address = algo_wallet['wallet_address']
                 
@@ -100,14 +121,81 @@ class MultiChainWalletService:
                     on_conflict='user_id'
                 ).execute()
                 
-                logger.info(f"✅ New Algorand wallet: {algo_address[:10]}...")
-            
-            result['wallets']['algorand'] = {
-                'address': algo_address,
-                'created_at': datetime.utcnow().isoformat(),
-                'supported_assets': ['ALGO', 'USDCa', 'USDT', 'goBTC', 'goETH']
+                return {
+                    'success': True,
+                    'address': algo_address,
+                    'chain': chain,
+                    'created_at': datetime.utcnow().isoformat()
+                }
+                
+            else:
+                # Create WDK wallet for the specific chain
+                seed_data = await self.wdk.generate_seed()
+                encrypted_seed = seed_data['encrypted_seed']
+                
+                wdk_result = await self.wdk.create_wallet(
+                    encrypted_seed=encrypted_seed,
+                    chains=[chain],  # Only create for the requested chain
+                    enable_gasless=True
+                )
+                
+                wallet_data = wdk_result.get('wallets', {}).get(chain)
+                if wallet_data:
+                    # Store in multi_chain_addresses
+                    self.db.supabase.table('multi_chain_addresses').upsert({
+                        'user_id': user_id,
+                        'blockchain': chain,
+                        'address': wallet_data['address'],
+                        'encrypted_seed': encrypted_seed,
+                        'wallet_type': 'wdk',
+                        'created_at': datetime.utcnow().isoformat()
+                    }, on_conflict='user_id,blockchain').execute()
+                    
+                    return {
+                        'success': True,
+                        'address': wallet_data['address'],
+                        'chain': chain,
+                        'created_at': wallet_data.get('created_at', datetime.utcnow().isoformat())
+                    }
+                else:
+                    raise Exception(f"WDK returned no wallet data for {chain}")
+                    
+        except Exception as e:
+            logger.error(f"❌ Single chain wallet creation failed for {chain}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'chain': chain
             }
-            
+    
+    async def create_wallet_for_user(
+        self,
+        user_id: str,
+        chains: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Create multi-chain wallet for user - FIXED VERSION
+        """
+        
+        result = {
+            'user_id': user_id,
+            'wallets': {},
+            'created_at': datetime.utcnow().isoformat(),
+            'success': False
+        }
+        
+        # 1. Create Algorand wallet (ALWAYS)
+        try:
+            algo_result = await self.create_single_chain_wallet(user_id, 'algorand')
+            if algo_result['success']:
+                result['wallets']['algorand'] = {
+                    'address': algo_result['address'],
+                    'created_at': algo_result.get('created_at', datetime.utcnow().isoformat()),
+                    'supported_assets': ['ALGO', 'USDCa', 'USDT', 'goBTC', 'goETH']
+                }
+            else:
+                raise Exception(algo_result.get('error', 'Algorand wallet creation failed'))
+                
         except Exception as e:
             logger.error(f"❌ Algorand wallet failed: {e}")
             result['errors'] = [f"Algorand: {str(e)}"]
@@ -117,54 +205,64 @@ class MultiChainWalletService:
         if chains:
             wdk_chains = [c for c in chains if c != 'algorand']
         else:
-            # Default: Essential chains from Tether docs
-            wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'ton']
+            # Default: Essential chains
+            wdk_chains = ['bitcoin', 'ethereum', 'polygon']
         
-        # 3. Create WDK wallets
-        if wdk_chains:
+        # 3. Create WDK wallets sequentially to avoid race conditions
+        for chain in wdk_chains:
             try:
-                seed_data = await self.wdk.generate_seed()
-                encrypted_seed = seed_data['encrypted_seed']
-                
-                wdk_result = await self.wdk.create_wallet(
-                    encrypted_seed=encrypted_seed,
-                    chains=wdk_chains,
-                    enable_gasless=True
-                )
-                
-                # Store WDK wallets
-                for chain, wallet_data in wdk_result.get('wallets', {}).items():
-                    try:
-                        self.db.supabase.table('multi_chain_addresses').upsert({
-                            'user_id': user_id,
-                            'blockchain': chain,
-                            'address': wallet_data['address'],
-                            'encrypted_seed': encrypted_seed,
-                            'wallet_type': 'wdk',
-                            'created_at': datetime.utcnow().isoformat()
-                        }, on_conflict='user_id,blockchain').execute()
-                        
-                        result['wallets'][chain] = {
-                            'address': wallet_data['address'],
-                            'created_at': wallet_data['created_at']
-                        }
-                        
-                        logger.info(f"✅ {chain.upper()} wallet: {wallet_data['address'][:10]}...")
-                        
-                    except Exception as db_error:
-                        logger.error(f"❌ Failed to store {chain} wallet: {db_error}")
-                
+                chain_result = await self.create_single_chain_wallet(user_id, chain)
+                if chain_result['success']:
+                    result['wallets'][chain] = {
+                        'address': chain_result['address'],
+                        'created_at': chain_result.get('created_at', datetime.utcnow().isoformat())
+                    }
+                    logger.info(f"✅ {chain.upper()} wallet: {chain_result['address'][:10]}...")
+                else:
+                    if 'errors' not in result:
+                        result['errors'] = []
+                    result['errors'].append(f"{chain}: {chain_result.get('error')}")
+                    
             except Exception as e:
-                logger.error(f"❌ WDK wallet creation failed: {e}")
+                logger.error(f"❌ {chain} wallet creation failed: {e}")
                 if 'errors' not in result:
                     result['errors'] = []
-                result['errors'].append(f"WDK: {str(e)}")
+                result['errors'].append(f"{chain}: {str(e)}")
         
         result['total_chains'] = len(result['wallets'])
         result['success'] = len(result['wallets']) > 0
         
         return result
     
+    # ========== ADDITIONAL FIXED METHODS ==========
+    
+    async def get_wallet_addresses(self, user_id: str) -> Dict[str, str]:
+        """
+        Get all wallet addresses for a user across all chains
+        """
+        addresses = {}
+        
+        try:
+            # Get Algorand address
+            algo_address = self._get_user_address(user_id, 'algorand')
+            if algo_address:
+                addresses['algorand'] = algo_address
+            
+            # Get WDK addresses
+            wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
+                .select('blockchain, address')\
+                .eq('user_id', user_id)\
+                .execute()
+            
+            if wdk_wallets.data:
+                for wallet in wdk_wallets.data:
+                    addresses[wallet['blockchain']] = wallet['address']
+                    
+        except Exception as e:
+            logger.error(f"Error getting wallet addresses: {e}")
+            
+        return addresses
+
     # ========== BALANCE QUERIES ==========
     
     async def get_user_balances(
