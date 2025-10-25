@@ -5,7 +5,7 @@ Merged for Maximum Efficiency & Supremacy
 Unified endpoints for Algorand + 9 WDK chains
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request  # ✅ FIXED: Added Request import
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
@@ -120,10 +120,11 @@ GASLESS_CHAINS = ["ethereum", "polygon", "arbitrum"]
 
 # ========== ENDPOINTS ==========
 
-@router.post("/create-multi-chain")
+@router.post("/create")
 async def create_multi_chain_wallet(
-    request: Request,
-    current_user: dict = Depends(get_current_user)
+    request: WalletCreateRequest = None,
+    current_user: dict = Depends(get_current_user),
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
     🚀 CREATE MULTI-CHAIN WALLET (Ultimate Version)
@@ -196,7 +197,6 @@ async def create_multi_chain_wallet(
         logger.error(f"Multi-chain wallet creation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Wallet creation failed: {str(e)}")
 
-# ✅ ADD THIS TO YOUR EXISTING wallet.py - Fix the 404 error
 @router.post("/create-multi-chain")
 async def create_multi_chain_wallet_legacy(
     request: WalletCreateRequest = None,
@@ -282,7 +282,7 @@ async def create_single_chain_wallet(
         logger.info(f"Creating {chain} wallet for user {user_id}")
         
         # Check if wallet already exists
-        existing_address = await wallet_service._get_user_address(user_id, chain)
+        existing_address = wallet_service._get_user_address(user_id, chain)
         if existing_address:
             return {
                 "success": True,
@@ -552,89 +552,4 @@ async def validate_address(
             "message": "Validation error"
         }
 
-@router.get("/chains")
-async def get_supported_chains():
-    """
-    🌐 GET SUPPORTED BLOCKCHAINS
-    
-    Returns comprehensive chain information:
-    - Chain metadata and capabilities
-    - Supported assets per chain
-    - Speed and cost estimates
-    - Gasless chain identification
-    """
-    try:
-        chains_list = []
-        for chain_id, config in SUPPORTED_CHAINS.items():
-            chains_list.append({
-                "id": chain_id,
-                "name": config["name"],
-                "native_asset": config["native_asset"],
-                "supported_assets": config["supported_assets"],
-                "speed": config["speed"],
-                "cost": config["cost"],
-                "gasless": chain_id in GASLESS_CHAINS
-            })
-        
-        return {
-            "chains": chains_list,
-            "total_chains": len(chains_list),
-            "gasless_chains": GASLESS_CHAINS,
-            "default_chains": ["algorand", "bitcoin", "ethereum", "polygon"]
-        }
-        
-    except Exception as e:
-        logger.error(f"Chains endpoint failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch chain information")
-
-@router.get("/health")
-async def wallet_health_check(
-    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
-):
-    """
-    🩺 WALLET SERVICE HEALTH CHECK
-    
-    Comprehensive health status:
-    - Multi-chain service connectivity
-    - Database connectivity
-    - Chain-specific status
-    - Overall system health
-    """
-    try:
-        # Test database connectivity
-        from backend.services.database_service import DatabaseService
-        db = DatabaseService()
-        
-        # Test multi-chain service
-        health_status = {
-            "status": "healthy",
-            "timestamp": None,
-            "services": {
-                "database": "connected",
-                "multi_chain_service": "connected",
-                "algorand": "connected",
-                "wdk_service": "unknown"
-            },
-            "supported_chains": list(SUPPORTED_CHAINS.keys()),
-            "total_chains": len(SUPPORTED_CHAINS)
-        }
-        
-        # Try to test WDK service
-        try:
-            wdk_health = await wallet_service.wdk.health_check()
-            health_status["services"]["wdk_service"] = wdk_health.get("status", "unknown")
-        except Exception as e:
-            health_status["services"]["wdk_service"] = f"error: {str(e)}"
-        
-        return health_status
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "services": {
-                "database": "error",
-                "multi_chain_service": "error"
-            }
-        }
+@router
