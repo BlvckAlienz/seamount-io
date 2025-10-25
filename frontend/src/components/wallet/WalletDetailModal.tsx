@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ArrowDownLeft, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { apiClient } from '../config/api';
+import { apiClient } from '../../../config/api';
 
 interface WalletDetailModalProps {
   isOpen: boolean;
@@ -74,14 +74,13 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       setLoading(true);
       const assets = chainAssets[chain] || [];
       
-      // In a real app, you'd fetch actual price data from your API
-      // For now, we'll simulate with mock data
+      // Mock data for demonstration
       const mockPriceData: AssetPriceData[] = assets.map(asset => ({
         symbol: asset.symbol,
         name: asset.name,
-        price: Math.random() * 1000 + 10, // Mock price
-        change24h: (Math.random() - 0.5) * 10, // Mock 24h change
-        chartData: Array.from({ length: 24 }, () => Math.random() * 100 + 50) // Mock chart data
+        price: Math.random() * 1000 + 10,
+        change24h: (Math.random() - 0.5) * 10,
+        chartData: Array.from({ length: 24 }, () => Math.random() * 100 + 50)
       }));
 
       setPriceData(mockPriceData);
@@ -96,8 +95,8 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   const handleBuyAsset = async () => {
     try {
       const response = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
-        user_id: 'current-user-id', // You'd get this from context
-        user_email: 'user@example.com', // You'd get this from context
+        user_id: 'current-user-id',
+        user_email: 'user@example.com',
         amount_fiat: 10000,
         currency: "NGN",
         asset: selectedAsset
@@ -119,7 +118,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       bitcoin: `https://blockstream.info/address/${address}`,
       ethereum: `https://etherscan.io/address/${address}`,
       polygon: `https://polygonscan.com/address/${address}`,
-      algorand: `https://lora.algokit.io/explorer/address/${address}` // ✅ UPDATED: Lora explorer
+      algorand: `https://lora.algokit.io/explorer/address/${address}`
     };
     return explorers[chain] || '#';
   };

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
-  Wallet, ArrowDownLeft, RefreshCw as SwapIcon
+  ArrowDownLeft, RefreshCw as SwapIcon
 } from 'lucide-react';
 import { KYCBanner } from '../components/onboarding/KYCBanner';
 import { useAuth } from '../contexts/AuthContext';

@@ -1,6 +1,7 @@
 // File: frontend/src/components/wallet/ChainWalletCard.tsx
 import React, { useState } from 'react';
 import { Copy, Check, ExternalLink } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface ChainWalletCardProps {
   chain: string;
@@ -21,25 +22,25 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
     const configs = {
       bitcoin: {
         name: 'Bitcoin',
-        icon: 'https://cdn-icons-png.flaticon.com/512/825/825423.png', // Bitcoin by Freepik
+        icon: 'https://cdn-icons-png.flaticon.com/512/825/825423.png',
         color: 'from-orange-500 to-yellow-600',
         symbol: 'BTC'
       },
       ethereum: {
         name: 'Ethereum', 
-        icon: 'https://cdn-icons-png.flaticon.com/512/825/825426.png', // ETH by bouzix
+        icon: 'https://cdn-icons-png.flaticon.com/512/825/825426.png',
         color: 'from-gray-400 to-slate-600',
         symbol: 'ETH'
       },
       polygon: {
         name: 'Polygon',
-        icon: 'https://cdn-icons-png.flaticon.com/512/8241/8241186.png', // Matic by bouzix
+        icon: 'https://cdn-icons-png.flaticon.com/512/8241/8241186.png',
         color: 'from-purple-500 to-indigo-600',
         symbol: 'MATIC'
       },
       algorand: {
         name: 'Algorand',
-        icon: 'https://cdn-icons-png.flaticon.com/512/6250/6250945.png', // Algorand by bouzix
+        icon: 'https://cdn-icons-png.flaticon.com/512/6250/6250945.png',
         color: 'from-blue-500 to-cyan-600',
         symbol: 'ALGO'
       }
@@ -51,7 +52,7 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   const [copied, setCopied] = useState(false);
 
   const copyAddress = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering card click
+    e.stopPropagation();
     if (!address) {
       toast.error('No address available');
       return;
@@ -64,8 +65,6 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
 
   const handleCardClick = () => {
     if (status === 'not_created') {
-      // For not created wallets, we might want to trigger creation
-      // or show a different action. For now, just return.
       return;
     }
     onCardClick();
