@@ -52,19 +52,31 @@ class EnhancedOracleService:
                 'bitcoin': 'BTCUSDT',
                 'ethereum': 'ETHUSDT', 
                 'algorand': 'ALGOUSDT',
-                'tether': 'USDCUSDT'  # Proxy for USDT rate
+                'tether': 'USDCUSDT',  # Proxy for USDT rate
+                'matic': 'MATICUSDT',
+                'tron': 'TRXUSDT',
+                'solana': 'SOLUSDT',
+                'ton': 'TONUSDT'
             },
             'coingecko': {
                 'bitcoin': 'bitcoin',
                 'ethereum': 'ethereum',
                 'algorand': 'algorand',
-                'tether': 'tether'
+                'tether': 'tether',
+                'matic': 'matic-network',
+                'tron': 'tron',
+                'solana': 'solana',
+                'ton': 'the-open-network'
             },
             'dia': {
                 'bitcoin': 'BTC',
                 'ethereum': 'ETH', 
                 'algorand': 'ALGO',
-                'tether': 'USDT'
+                'tether': 'USDT',
+                'matic': 'MATIC',
+                'tron': 'TRX',
+                'solana': 'SOL',
+                'ton': 'TON'
             }
         }
         
@@ -122,6 +134,22 @@ class EnhancedOracleService:
         asyncio.create_task(self._store_price_data_safe([price_data]))
         
         return price_data.rate, metadata
+    
+    # ✅ FIXED: Add missing get_algorand_price method
+    async def get_algorand_price(self) -> Decimal:
+        """
+        Get Algorand price specifically - for backward compatibility
+        """
+        price, _ = await self.get_asset_price('algorand')
+        return price
+    
+    # ✅ FIXED: Add method for getting price without metadata
+    async def get_price_simple(self, asset_name: str) -> Decimal:
+        """
+        Simple method to get price without metadata
+        """
+        price, _ = await self.get_asset_price(asset_name)
+        return price
     
     async def _store_price_data_safe(self, price_data: List[PriceData]):
         """Wrapper for safe async price data storage with error handling"""
@@ -261,7 +289,11 @@ class EnhancedOracleService:
             'bitcoin': Decimal("63500.00"),
             'ethereum': Decimal("2650.00"),
             'algorand': Decimal("0.18"),
-            'tether': Decimal("1.00")
+            'tether': Decimal("1.00"),
+            'matic': Decimal("0.75"),
+            'tron': Decimal("0.12"),
+            'solana': Decimal("150.00"),
+            'ton': Decimal("2.50")
         }
         
         rate = emergency_rates.get(asset_name.lower())

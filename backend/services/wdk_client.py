@@ -1,22 +1,54 @@
 # File: backend/services/wdk_client.py
 """
 ROCK SOLID WDK Client - Follows Tether's Official Patterns
-Based on: https://docs.wallet.tether.io/start-building/react-native-quickstart
+With comprehensive retry logic and circuit breaker pattern
 """
 
 import logging
 import aiohttp
+import asyncio
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+class CircuitBreaker:
+    """Circuit breaker pattern for WDK service resilience"""
+    
+    def __init__(self, failure_threshold=5, recovery_timeout=60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+    
+    def can_execute(self):
+        if self.state == "OPEN":
+            if datetime.now() - self.last_failure_time > timedelta(seconds=self.recovery_timeout):
+                self.state = "HALF_OPEN"
+                return True
+            return False
+        return True
+    
+    def record_success(self):
+        self.failure_count = 0
+        self.state = "CLOSED"
+        self.last_failure_time = None
+    
+    def record_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = datetime.now()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = "OPEN"
+            logger.warning(f"🚨 Circuit breaker OPENED after {self.failure_count} failures")
+
 class WDKClient:
     """
-    Production-ready Tether WDK client
+    Production-ready Tether WDK client with comprehensive resilience
     Implements patterns from official React Native starter
     """
     
@@ -51,6 +83,13 @@ class WDKClient:
         # WDK Indexer API (balance queries, tx history)
         self.indexer_url = "https://indexer-api.tether.io" if self.api_key else None
         
+        # Circuit breaker for service resilience
+        self.circuit_breaker = CircuitBreaker()
+        
+        # Service health tracking
+        self.service_healthy = True
+        self.last_health_check = None
+        
         if self.indexer_url:
             logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: ON")
             logger.info(f"   Using API Key: {self.api_key[:10]}...")
@@ -58,56 +97,122 @@ class WDKClient:
             logger.warning(f"⚠️ WDK Client initialized WITHOUT Indexer API key")
             logger.warning(f"   Get key from: https://wdk-api.tether.io")
     
-    async def _make_request(
+    async def _make_request_with_retry(
         self, 
         method: str, 
         endpoint: str, 
         data: Optional[Dict] = None,
-        use_indexer: bool = False
+        use_indexer: bool = False,
+        max_retries: int = 3,
+        base_delay: float = 1.0
     ) -> Dict[str, Any]:
-        """Make authenticated HTTP request"""
+        """Make authenticated HTTP request with exponential backoff retry"""
         
-        # Choose base URL
-        if use_indexer:
-            if not self.indexer_url:
-                raise Exception("WDK Indexer API key not configured")
-            base = self.indexer_url
-        else:
-            base = self.base_url
+        # Check circuit breaker first
+        if not self.circuit_breaker.can_execute():
+            raise Exception("WDK service temporarily unavailable (circuit breaker open)")
         
-        url = f"{base}{endpoint}"
+        last_exception = None
         
-        headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
-        }
+        for attempt in range(max_retries):
+            try:
+                # Choose base URL
+                if use_indexer:
+                    if not self.indexer_url:
+                        raise Exception("WDK Indexer API key not configured")
+                    base = self.indexer_url
+                else:
+                    base = self.base_url
+                
+                url = f"{base}{endpoint}"
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    if method == 'GET':
+                        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            if response.status in [502, 503, 504]:
+                                raise aiohttp.ClientResponseError(
+                                    request_info=response.request_info,
+                                    history=response.history,
+                                    status=response.status,
+                                    message=f"Service unavailable: {response.status}"
+                                )
+                            response.raise_for_status()
+                            result = await response.json()
+                            
+                            # Success - record it in circuit breaker
+                            self.circuit_breaker.record_success()
+                            self.service_healthy = True
+                            return result
+                    else:  # POST, PUT, etc.
+                        async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            if response.status in [502, 503, 504]:
+                                raise aiohttp.ClientResponseError(
+                                    request_info=response.request_info,
+                                    history=response.history,
+                                    status=response.status,
+                                    message=f"Service unavailable: {response.status}"
+                                )
+                            response.raise_for_status()
+                            result = await response.json()
+                            
+                            # Success - record it in circuit breaker
+                            self.circuit_breaker.record_success()
+                            self.service_healthy = True
+                            return result
+                            
+            except aiohttp.ClientError as e:
+                last_exception = e
+                logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                
+                # Record failure in circuit breaker
+                self.circuit_breaker.record_failure()
+                self.service_healthy = False
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff with jitter
+                    delay = base_delay * (2 ** attempt) * (0.5 + 0.5 * asyncio.get_event_loop().time() % 1)
+                    logger.info(f"Retrying WDK request in {delay:.2f} seconds...")
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"❌ All {max_retries} attempts failed for {method} {endpoint}")
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                if method == 'GET':
-                    async with session.get(url, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-                else:  # POST
-                    async with session.post(url, json=data, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"❌ WDK request failed ({method} {endpoint}): {e}")
-            raise Exception(f"WDK service unavailable: {str(e)}")
+        # All retries failed
+        raise Exception(f"WDK service unavailable after {max_retries} attempts: {str(last_exception)}")
+    
+    # Alias for backward compatibility
+    _make_request = _make_request_with_retry
     
     # ========== WALLET CREATION (Tether Pattern) ==========
     
     async def generate_seed(self) -> Dict[str, Any]:
         """Generate encrypted mnemonic seed phrase"""
-        result = await self._make_request('POST', '/wallet/generate-seed')
-        
-        if not result.get('success'):
-            raise Exception("Seed generation failed")
-        
+        try:
+            result = await self._make_request('POST', '/wallet/generate-seed')
+            
+            if not result.get('success'):
+                raise Exception("Seed generation failed")
+            
+            return {
+                'encrypted_seed': result['encrypted_seed'],
+                'created_at': datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"❌ Seed generation failed: {e}")
+            # Fallback: generate locally (for development)
+            if self.settings.ENVIRONMENT == "development":
+                return self._generate_seed_fallback()
+            raise
+    
+    def _generate_seed_fallback(self) -> Dict[str, Any]:
+        """Fallback seed generation for development"""
+        logger.warning("Using fallback seed generation for development")
         return {
-            'encrypted_seed': result['encrypted_seed'],
+            'encrypted_seed': 'dev_fallback_encrypted_seed_' + datetime.utcnow().isoformat(),
             'created_at': datetime.utcnow().isoformat()
         }
     
@@ -152,7 +257,7 @@ class WDKClient:
         address: str, 
         chain: str,
         use_indexer: bool = True
-    ) -> Decimal:
+    ) -> Dict[str, Any]:
         """Get balance for address on specific chain"""
         
         if chain not in self.SUPPORTED_CHAINS:
@@ -166,11 +271,11 @@ class WDKClient:
                     f'/v1/balance/{chain}/{address}',
                     use_indexer=True
                 )
-                return Decimal(str(result.get('balance', '0')))
+                return result
             except Exception as e:
                 logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
         
-        # ✅ FIX: Use GET request with query params (not POST with body)
+        # ✅ FIXED: Use GET request with query params (not POST with body)
         try:
             async with aiohttp.ClientSession() as session:
                 headers = {
@@ -185,19 +290,22 @@ class WDKClient:
                     'address': address
                 }
                 
-                async with session.get(url, headers=headers, params=params) as response:
-                    response.raise_for_status()
+                async with session.get(url, headers=headers, params=params, timeout=30) as response:
+                    if response.status != 200:
+                        logger.warning(f"Balance query returned {response.status}")
+                        return {'balance': '0', 'success': False}
+                    
                     result = await response.json()
                     
                     if not result.get('success'):
                         logger.error(f"Balance query failed: {result.get('error')}")
-                        return Decimal('0')
+                        return {'balance': '0', 'success': False}
                     
-                    return Decimal(str(result.get('balance', '0')))
+                    return result
                     
         except Exception as e:
             logger.error(f"❌ Balance query failed for {chain}: {e}")
-            return Decimal('0')
+            return {'balance': '0', 'success': False}
     
     async def get_balances_multi_chain(
         self, 
@@ -223,15 +331,17 @@ class WDKClient:
         # Fallback: Query each chain individually
         for chain, address in addresses.items():
             try:
-                balance = await self.get_balance(address, chain, use_indexer=False)
+                balance_data = await self.get_balance(address, chain, use_indexer=False)
+                balance = Decimal(str(balance_data.get('balance', '0')))
                 balances[chain] = {
                     'balance': float(balance),
                     'address': address,
-                    'chain': chain
+                    'chain': chain,
+                    'success': balance_data.get('success', False)
                 }
             except Exception as e:
                 logger.error(f"❌ Balance query failed for {chain}: {e}")
-                balances[chain] = {'balance': 0.0, 'error': str(e)}
+                balances[chain] = {'balance': 0.0, 'error': str(e), 'success': False}
         
         return balances
     
@@ -294,11 +404,22 @@ class WDKClient:
                 'status': 'healthy',
                 'wdk_service': result,
                 'indexer_enabled': self.indexer_url is not None,
-                'supported_chains': self.SUPPORTED_CHAINS
+                'supported_chains': self.SUPPORTED_CHAINS,
+                'circuit_breaker': self.circuit_breaker.state
             }
         except Exception as e:
             return {
                 'status': 'unhealthy',
                 'error': str(e),
-                'supported_chains': self.SUPPORTED_CHAINS
+                'supported_chains': self.SUPPORTED_CHAINS,
+                'circuit_breaker': self.circuit_breaker.state
             }
+    
+    def get_service_status(self) -> Dict[str, Any]:
+        """Get current service status"""
+        return {
+            'healthy': self.service_healthy,
+            'circuit_breaker_state': self.circuit_breaker.state,
+            'failure_count': self.circuit_breaker.failure_count,
+            'last_failure': self.circuit_breaker.last_failure_time.isoformat() if self.circuit_breaker.last_failure_time else None
+        }
