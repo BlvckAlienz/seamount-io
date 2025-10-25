@@ -120,11 +120,10 @@ GASLESS_CHAINS = ["ethereum", "polygon", "arbitrum"]
 
 # ========== ENDPOINTS ==========
 
-@router.post("/create")
+@router.post("/create-multi-chain")
 async def create_multi_chain_wallet(
-    request: WalletCreateRequest = None,
-    current_user: dict = Depends(get_current_user),
-    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+    request: Request,
+    current_user: dict = Depends(get_current_user)
 ):
     """
     🚀 CREATE MULTI-CHAIN WALLET (Ultimate Version)
@@ -195,6 +194,67 @@ async def create_multi_chain_wallet(
         raise
     except Exception as e:
         logger.error(f"Multi-chain wallet creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Wallet creation failed: {str(e)}")
+
+# ✅ ADD THIS TO YOUR EXISTING wallet.py - Fix the 404 error
+@router.post("/create-multi-chain")
+async def create_multi_chain_wallet_legacy(
+    request: WalletCreateRequest = None,
+    current_user: dict = Depends(get_current_user),
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+):
+    """
+    🚀 LEGACY ENDPOINT: CREATE MULTI-CHAIN WALLET
+    This fixes the 404 error for frontend calling /create-multi-chain
+    """
+    try:
+        user_id = current_user["id"]
+        
+        # Determine chains to create
+        if request and request.create_all:
+            chains = list(SUPPORTED_CHAINS.keys())
+        elif request and request.chains:
+            chains = [chain for chain in request.chains if chain in SUPPORTED_CHAINS]
+        else:
+            chains = ["algorand", "bitcoin", "ethereum", "polygon"]
+        
+        logger.info(f"Creating multi-chain wallet via legacy endpoint for user {user_id}")
+        
+        result = await wallet_service.create_wallet_for_user(
+            user_id=user_id,
+            chains=chains
+        )
+        
+        if not result["success"]:
+            error_msg = result.get("error", "Wallet creation failed")
+            logger.error(f"Legacy wallet creation failed for user {user_id}: {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        # Enhanced response
+        enhanced_wallets = {}
+        for chain_id, wallet_data in result.get("wallets", {}).items():
+            chain_info = SUPPORTED_CHAINS.get(chain_id, {})
+            enhanced_wallets[chain_id] = {
+                **wallet_data,
+                "chain_name": chain_info.get("name", chain_id),
+                "native_asset": chain_info.get("native_asset"),
+                "supported_assets": chain_info.get("supported_assets", [])
+            }
+        
+        logger.info(f"✅ Legacy multi-chain wallet created for user {user_id}")
+        
+        return {
+            "success": True,
+            "message": f"Wallet created on {result['total_chains']} chains!",
+            "wallets": enhanced_wallets,
+            "total_chains": result["total_chains"],
+            "user_id": user_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Legacy multi-chain wallet creation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Wallet creation failed: {str(e)}")
 
 @router.post("/{chain}/create")

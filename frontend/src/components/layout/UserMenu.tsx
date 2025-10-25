@@ -27,12 +27,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onLogout }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSettings = () => {
+  const handleSettings = (e: React.MouseEvent) => {
+    e.preventDefault();
     setIsOpen(false);
-    navigate('/settings'); // Proper navigation to settings page
+    navigate('/settings');
   };
 
-  const handleLogout = () => {
+  const handleLogout = (e: React.MouseEvent) => {
+    e.preventDefault();
     setIsOpen(false);
     onLogout();
   };
