@@ -1,6 +1,6 @@
-# 🌊 Seamount.io - AI-Powered Financial Platform
+# 🌊 Seamount.io - Digital Assets & Yield-Farming Gateway
 
-**Production-ready cross-border payment platform with USDS stablecoin, Flutterwave integration, and KYC verification**
+**Production-ready cross-border payment platform with one-click multi-chain wallet generation across 4+ chains (Algorand, Bitcoin, Ethereum, and Polygon)**
 
 ## 🚀 Quick Setup
 
@@ -26,19 +26,17 @@ cp .env.example .env
 
 2. Key services you'll need:
    - Supabase account (for database)
-   - ComplyCube (for KYC verification)
-   - Flutterwave (for African payments)
-   - Alpha Vantage (for market data)
-   - Sentry (for error tracking)
+   - Regfyl (for KYC verification)
+   - Cashramp, Paystack, & Flutterwave (for African payments)
+   - Binance & Coin Gecko (for market data)
 
 ## 🎯 What Works Right Now
 
 - ✅ **Authentication** - Full login/signup flow with Supabase
-- ✅ **KYC Verification** - ComplyCube integration for identity verification
-- ✅ **Wallet Creation** - Algorand-compatible addresses
-- ✅ **Flutterwave Integration** - Pan-African payment processing
-- ✅ **USDS-Powered Fees** - All transaction fees in USDS
-- ✅ **Cross-Border Payments** - Multiple African countries supported
+- ✅ **KYC Verification** - Regfyl integration for identity verification
+- ✅ **One-Click Wallet Creation** - Algorand + Bitcoin + Ethereum + Ploygon compatible addresses
+- ✅ **Local Payment Channel Integration** - Pan-African payment processing
+- ✅ **Cross-Border Payments** - 10+ African countries supported
 
 ## 🚀 Enterprise Features
 
@@ -50,24 +48,25 @@ cp .env.example .env
 
 ## 💰 Revenue Model
 
-- **0.1-0.5%** transaction fees
-- **$50K-150K/month** B2B infrastructure licensing  
-- **$30-100/month** premium subscriptions
+- **2.9%** transaction fees
+- **$3,500-15K/month** B2B infrastructure licensing
+- **1-2% mgt. + 20% on upside** staking fees  
+  
 
 ## 🌍 Target Markets
 
-**Primary:** Nigeria (Flutterwave integration ready)  
+**Primary:** Nigeria   
 **Secondary:** Kenya, South Africa, Ghana, Uganda
 
 ## 📊 Updated Tech Stack
 
 - **Frontend:** React 18 + TypeScript + Tailwind
 - **Backend:** Python FastAPI + SQLite/PostgreSQL
-- **Blockchain:** Algorand + USDS stablecoin
-- **Payments:** Flutterwave, M-Pesa integration
-- **Deploy:** Netlify (frontend) + Vercel (backend)
+- **Blockchain:** Algorand + Bitcoin + Ethereum + Polygon
+- **Payments:** Cashramp + Paystack + Flutterwave + M-Pesa integration
+- **Deploy:** Vercel (frontend) + Render (backend)
 - **Auth & Database:** Supabase
-- **KYC:** ComplyCube
+- **KYC:** Regfyl
 
 ## 📋 Deployment Guide
 
@@ -78,7 +77,7 @@ cp .env.example .env
 npm run deploy:vercel
 ```
 
-### Frontend (Netlify)
+### Frontend (Vercel)
 
 ```bash
 # Build and deploy to Netlify
@@ -122,6 +121,6 @@ For testing payments, use these Flutterwave test credentials:
 
 For full integration instructions, see [INTEGRATION_GUIDE.md](./docs/INTEGRATION_GUIDE.md).
 
-## 🚨 Important Note About Transaction Fees
+## 🚨 Important Note 
 
-All transaction fees on the Seamount platform are paid in USDS stablecoin. Users should always maintain a small balance of USDS (minimum 5 USDS recommended) to cover transaction fees, even when working with other assets.# Deployment trigger
+Repo is actively being built and subject to CI/CD
