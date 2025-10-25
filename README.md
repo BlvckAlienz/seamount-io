@@ -40,10 +40,10 @@ cp .env.example .env
 
 ## 🚀 Enterprise Features
 
-- **AI Fraud Detection** - 95% accuracy risk scoring
-- **Cross-border Payments** - 87% cost savings vs traditional banking
+- **Tight FX Spreads** - Low volatility and improved access to FX
+- **Cross-border Payments + Access to DeFi** - Fast settlements + Cost savings vs traditional banking
 - **Multi-currency Support** - KES, USD, NGN, ZAR
-- **Real-time Analytics** - Professional trading interface
+- **Real-time Analytics** - Monitor assets performance in real-time
 - **Mobile-first Design** - Optimized for African markets
 
 ## 💰 Revenue Model
