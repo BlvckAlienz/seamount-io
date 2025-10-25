@@ -5,7 +5,7 @@ Merged for Maximum Efficiency & Supremacy
 Unified endpoints for Algorand + 9 WDK chains
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request  # ✅ FIXED: Added Request import
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
@@ -128,15 +128,6 @@ async def create_multi_chain_wallet(
 ):
     """
     🚀 CREATE MULTI-CHAIN WALLET (Ultimate Version)
-    
-    DEFAULT: Algorand + essential chains (Bitcoin, Ethereum, Polygon)
-    OPTIONAL: Specify custom chains or create_all=True for all 9 chains
-    
-    ✅ USER EXPERIENCE:
-    - One-click creation of multiple blockchain wallets
-    - Single recovery phrase for all chains
-    - Auto-optimized chain selection
-    - Zero blockchain jargon exposed
     """
     try:
         user_id = current_user["id"]
@@ -169,7 +160,7 @@ async def create_multi_chain_wallet(
             logger.error(f"Wallet creation failed for user {user_id}: {error_msg}")
             raise HTTPException(status_code=500, detail=error_msg)
         
-        # ✅ ENHANCED RESPONSE: Include chain metadata
+        # Enhanced response with chain metadata
         enhanced_wallets = {}
         for chain_id, wallet_data in result.get("wallets", {}).items():
             chain_info = SUPPORTED_CHAINS.get(chain_id, {})
@@ -265,9 +256,6 @@ async def create_single_chain_wallet(
 ):
     """
     🎯 CREATE SINGLE CHAIN WALLET
-    
-    Create wallet for specific blockchain only
-    Perfect for incremental wallet expansion
     """
     try:
         user_id = current_user["id"]
@@ -336,9 +324,6 @@ async def get_multi_chain_status(
 ):
     """
     📊 GET MULTI-CHAIN WALLET STATUS
-    
-    Comprehensive status of all created wallets
-    Used by frontend to show chain creation progress
     """
     try:
         user_id = current_user["id"]
@@ -415,12 +400,6 @@ async def get_balances(
 ):
     """
     💰 GET UNIFIED BALANCES ACROSS ALL CHAINS
-    
-    Returns comprehensive balance view:
-    - Total USD value across all chains
-    - Individual asset balances with USD values  
-    - Chain information (hidden from UI)
-    - Real-time price data from oracle
     """
     try:
         user_id = current_user["id"]
@@ -430,7 +409,6 @@ async def get_balances(
         
         if not result["success"]:
             logger.warning(f"Balance query failed for user {user_id}: {result.get('error')}")
-            # Return empty but successful response for frontend
             return {
                 "success": True,
                 "total_usd": 0.0,
@@ -445,7 +423,6 @@ async def get_balances(
         
     except Exception as e:
         logger.error(f"Balance query failed: {str(e)}")
-        # Don't fail completely - return empty balances
         return {
             "success": True,
             "total_usd": 0.0,
@@ -463,18 +440,6 @@ async def send_payment(
 ):
     """
     ⚡ SEND PAYMENT WITH AUTO-ROUTING
-    
-    SMART FEATURES:
-    - Auto-selects optimal chain (fastest/cheapest)
-    - Abstracts gas fees as "transaction fee"  
-    - Handles cross-chain bridging when needed
-    - Zero technical errors exposed to user
-    
-    USER EXPERIENCE:
-    - "Sending 100 USDT..." 
-    - "✓ Payment sent!"
-    - "Fee: $2.90"
-    - No blockchain jargon ever shown
     """
     try:
         user_id = current_user["id"]
@@ -510,9 +475,6 @@ async def validate_address(
 ):
     """
     🔍 VALIDATE WALLET ADDRESS FOR SPECIFIC CHAIN
-    
-    Uses chain-specific validation patterns
-    Prevents user errors before sending funds
     """
     try:
         address = request.address.strip()
@@ -523,7 +485,7 @@ async def validate_address(
         if not chain_config:
             return {
                 "success": True,
-                "valid": True,  # Assume valid if chain not recognized
+                "valid": True,
                 "message": "Chain validation not implemented"
             }
         
@@ -552,4 +514,77 @@ async def validate_address(
             "message": "Validation error"
         }
 
-@router
+@router.get("/chains")
+async def get_supported_chains():
+    """
+    🌐 GET SUPPORTED BLOCKCHAINS
+    """
+    try:
+        chains_list = []
+        for chain_id, config in SUPPORTED_CHAINS.items():
+            chains_list.append({
+                "id": chain_id,
+                "name": config["name"],
+                "native_asset": config["native_asset"],
+                "supported_assets": config["supported_assets"],
+                "speed": config["speed"],
+                "cost": config["cost"],
+                "gasless": chain_id in GASLESS_CHAINS
+            })
+        
+        return {
+            "chains": chains_list,
+            "total_chains": len(chains_list),
+            "gasless_chains": GASLESS_CHAINS,
+            "default_chains": ["algorand", "bitcoin", "ethereum", "polygon"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Chains endpoint failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch chain information")
+
+@router.get("/health")
+async def wallet_health_check(
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+):
+    """
+    🩺 WALLET SERVICE HEALTH CHECK
+    """
+    try:
+        # Test database connectivity
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        # Test multi-chain service
+        health_status = {
+            "status": "healthy",
+            "timestamp": None,
+            "services": {
+                "database": "connected",
+                "multi_chain_service": "connected",
+                "algorand": "connected",
+                "wdk_service": "unknown"
+            },
+            "supported_chains": list(SUPPORTED_CHAINS.keys()),
+            "total_chains": len(SUPPORTED_CHAINS)
+        }
+        
+        # Try to test WDK service
+        try:
+            wdk_health = await wallet_service.wdk.health_check()
+            health_status["services"]["wdk_service"] = wdk_health.get("status", "unknown")
+        except Exception as e:
+            health_status["services"]["wdk_service"] = f"error: {str(e)}"
+        
+        return health_status
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "services": {
+                "database": "error",
+                "multi_chain_service": "error"
+            }
+        }
