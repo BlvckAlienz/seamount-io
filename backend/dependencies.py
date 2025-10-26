@@ -16,6 +16,16 @@ import json
 from backend.config import get_settings
 from backend.models import UserRole
 
+# ADD THIS IMPORT AT THE TOP OF THE FILE:
+
+try:
+    from backend.services.wallet_creation_service import WalletCreationService
+    WALLET_CREATION_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"WalletCreationService import failed: {e}")
+    WalletCreationService = None
+    WALLET_CREATION_AVAILABLE = False
+
 # ========== TYPE CHECKING IMPORTS ==========
 if TYPE_CHECKING:
     from backend.services.multi_chain_wallet_service import MultiChainWalletService
@@ -91,10 +101,9 @@ def initialize_dependencies(
     oracle_service: Optional["OracleService"] = None,
     fee_calculator_service: Optional["FeeCalculatorService"] = None
 ):
-    """Initialize dependency services - used in main.py startup"""
     global _supabase_client, _multi_chain_wallet_service, _notification_service
     global _audit_service, _kyc_service, _database_service, _algorand_service, _oracle_service
-    global _fee_calculator_service
+    global _fee_calculator_service, _wallet_creation_service
     
     _supabase_client = supabase_client
     _multi_chain_wallet_service = multi_chain_wallet_service
@@ -106,19 +115,21 @@ def initialize_dependencies(
     _oracle_service = oracle_service
     _fee_calculator_service = fee_calculator_service
     
-    # Initialize wallet creation service
-    global _wallet_creation_service
-    _wallet_creation_service = WalletCreationService(
-        db_service=db_service,
-        algorand_service=algorand_service,
-        wdk_client=MultiChainWalletService(
-            db_service=db_service,
-            algorand_service=algorand_service,
-            fee_calculator=fee_calculator,
-            oracle_service=oracle_service
-        ).wdk_client if hasattr(multi_chain_wallet_service, 'wdk_client') else None
-    )
-    logger.info("✅ All dependencies initialized successfully")
+    # ✅ FIXED: Initialize WalletCreationService safely
+    if WALLET_CREATION_AVAILABLE and WalletCreationService is not None:
+        try:
+            _wallet_creation_service = WalletCreationService(
+                db_service=_database_service,
+                algorand_service=_algorand_service,
+                wdk_client=_multi_chain_wallet_service.wdk  # Use the WDK client from multi_chain service
+            )
+            logger.info("✅ WalletCreationService initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ WalletCreationService instantiation failed: {e}")
+            _wallet_creation_service = None
+    else:
+        logger.warning("⚠️ WalletCreationService not available - skipping initialization")
+        _wallet_creation_service = None
 
 def get_supabase_client() -> Client:
     """CRITICAL FIX: Proper singleton Supabase client"""
