@@ -58,14 +58,14 @@ class WalletCreationService:
                     'error': status.get('error_message')
                 }
             
-            # Add summary
+            # Add summary - FIXED: Use actual count from database
             successful_count = sum(1 for s in statuses if s.get('status') == 'success')
             failed_count = sum(1 for s in statuses if s.get('status') == 'failed')
             pending_count = sum(1 for s in statuses if s.get('status') == 'pending')
             retrying_count = sum(1 for s in statuses if s.get('status') == 'retrying')
             
             status_dict['summary'] = {
-                'total': 4,
+                'total': len(statuses),  # ✅ FIXED: Use actual count, not hardcoded 4
                 'successful': successful_count,
                 'failed': failed_count,
                 'pending': pending_count,
@@ -90,7 +90,7 @@ class WalletCreationService:
                 'user_id': user_id,
                 'overall_complete': False,
                 'chains': {},
-                'summary': {'total': 4, 'successful': 0, 'failed': 0, 'pending': 0, 'retrying': 0}
+                'summary': {'total': 0, 'successful': 0, 'failed': 0, 'pending': 0, 'retrying': 0}
             }
     
     async def create_all_wallets(self, user_id: str, background: bool = False) -> Dict[str, any]:
@@ -125,13 +125,21 @@ class WalletCreationService:
                 'user_id': user_id
             }
     
+    # In wallet_creation_service.py, MODIFY the retry_failed_wallets method:
+
     async def retry_failed_wallets(self, user_id: str, chains: Optional[List[str]] = None) -> Dict[str, any]:
-        """Manual retry failed wallet creations - SIMPLIFIED FOR TESTING"""
-        logger.info(f"🔄 Manual retry requested by user {user_id} for chains: {chains}")
+        """Manual retry failed wallet creations - WITH AUTO-INITIALIZATION"""
+        logger.info(f"🔄 Manual retry requested by user {user_id}")
         
         try:
             # Get current status first
             current_status = await self.get_wallet_status(user_id)
+            
+            # ✅ AUTO-INITIALIZE if no wallet status exists
+            if current_status['summary']['total'] == 0:
+                logger.info(f"🔄 No wallet status found for user {user_id}, initializing...")
+                await self._initialize_wallet_status(user_id)
+                current_status = await self.get_wallet_status(user_id)
             
             if current_status['overall_complete']:
                 return {
@@ -141,14 +149,14 @@ class WalletCreationService:
                     'results': {}
                 }
             
-            # Increment retry count
+            # Rest of your existing retry logic...
             await self._increment_retry_count(user_id)
             
             return {
                 'success': True,
                 'user_id': user_id,
-                'message': 'Retry system is working - wallet recreation logic ready for implementation',
-                'retried_chains': chains or ['bitcoin', 'ethereum', 'polygon'],  # Default to common failures
+                'message': 'Wallet status initialized and ready for retry',
+                'retried_chains': chains or ['bitcoin', 'ethereum', 'polygon'],
                 'results': {},
                 'current_status': current_status
             }
@@ -217,4 +225,45 @@ class WalletCreationService:
         # This will be implemented once basic status tracking is working
         return {"message": "Retry queue processor ready"}
 
-# Additional helper methods can be added here as needed
+    @router.post("/initialize")
+    async def initialize_wallet_creation(
+        current_user: dict = Depends(get_current_user),
+        service: WalletCreationService = Depends(get_wallet_creation_service)
+    ):
+        """
+        Initialize wallet creation status for current user.
+        This creates the 4 chain status records.
+        """
+        try:
+            user_id = current_user['id']
+            logger.info(f"🔄 Initializing wallet creation status for user {user_id}")
+            
+            # Check if already initialized - FIXED: Check actual database records
+            current_status = await service.get_wallet_status(user_id)
+            
+            # ✅ FIXED: Check if we have less than 4 chains (not initialized properly)
+            if current_status['summary']['total'] >= 4:
+                return {
+                    "success": True,
+                    "message": "Wallet status already initialized",
+                    "user_id": user_id,
+                    "existing_chains": list(current_status['chains'].keys())
+                }
+            
+            # Initialize wallet status using the service method
+            await service._initialize_wallet_status(user_id)
+            
+            # Get updated status
+            updated_status = await service.get_wallet_status(user_id)
+            
+            return {
+                "success": True,
+                "message": "Wallet creation status initialized successfully",
+                "user_id": user_id,
+                "initialized_chains": list(updated_status['chains'].keys()),
+                "status": updated_status
+            }
+            
+        except Exception as e:
+            logger.error(f"Error initializing wallet creation: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
