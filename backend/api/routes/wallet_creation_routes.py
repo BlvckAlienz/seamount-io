@@ -179,38 +179,54 @@ async def trigger_background_retry(
 
 @router.post("/initialize")
 async def initialize_wallet_creation(
+    force: bool = False,
     current_user: dict = Depends(get_current_user),
     service: WalletCreationService = Depends(get_wallet_creation_service)
 ):
     """
     Initialize wallet creation status for current user.
     This creates the 4 chain status records.
+    
+    Args:
+        force: If True, will reinitialize even if already initialized
     """
     try:
         user_id = current_user['id']
-        logger.info(f"🔄 Initializing wallet creation status for user {user_id}")
+        logger.info(f"🔄 Initializing wallet creation status for user {user_id} (force: {force})")
         
         # Check if already initialized
-        current_status = await service.get_wallet_status(user_id)
+        profile = await service.db.get_user_profile(user_id)
         
-        # If we already have chains data, don't reinitialize
-        if current_status['summary']['total'] > 0:
+        if not force and profile and profile.get('wallet_creation_started_at') is not None:
+            current_status = await service.get_wallet_status(user_id)
             return {
                 "success": True,
-                "message": "Wallet status already initialized",
+                "message": "Wallet status already initialized. Use force=true to reinitialize.",
                 "user_id": user_id,
-                "existing_chains": list(current_status['chains'].keys())
+                "existing_chains": list(current_status['chains'].keys()),
+                "started_at": profile.get('wallet_creation_started_at')
             }
         
-        # Initialize wallet status using the service method
+        # If force=true, delete existing records first
+        if force:
+            logger.info(f"🔄 Force reinitializing - clearing existing records for {user_id}")
+            await asyncio.to_thread(
+                lambda: service.db.supabase.table("wallet_creation_status")
+                .delete()
+                .eq("user_id", user_id)
+                .execute()
+            )
+        
+        # Initialize wallet status
         await service._initialize_wallet_status(user_id)
         
         # Get updated status
         updated_status = await service.get_wallet_status(user_id)
         
+        action = "reinitialized" if force else "initialized"
         return {
             "success": True,
-            "message": "Wallet creation status initialized successfully",
+            "message": f"Wallet creation status {action} successfully",
             "user_id": user_id,
             "initialized_chains": list(updated_status['chains'].keys()),
             "status": updated_status
