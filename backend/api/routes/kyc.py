@@ -98,22 +98,18 @@ async def submit_kyc_data(
         
         # ✅ FIX: Store in fields that _start_regfyl_verification() reads
         update_data = {
-            'id': user_id,  # âœ… ADD: Primary key for upsert
-            'bvn': id_number_value if id_type == 'BVN' else None,
-            'id_number': id_number_value,
-            'id_type': id_type,
-            'date_of_birth': data.get('date_of_birth'),
-            'gender': data.get('gender'),
-            'phone': data.get('phone'),
-            'country_code': data.get('country_code', 'NG'),
-            'updated_at': datetime.utcnow().isoformat()
-        }
+        'bvn': id_number_value if id_type == 'BVN' else None,
+        'id_number': id_number_value,
+        'id_type': id_type,
+        'date_of_birth': data.get('date_of_birth'),
+        'gender': data.get('gender'),
+        'phone': data.get('phone'),
+        'country_code': data.get('country_code', 'NG'),
+        'updated_at': datetime.utcnow().isoformat()
+    }
         
         # ✅ CRITICAL: Use upsert to ensure data is saved
-        result = supabase.table('user_profiles').upsert(
-            update_data,  # Already has 'id' from above
-            on_conflict='id'
-        ).execute()
+        result = supabase.table('user_profiles').update(update_data).eq('id', user_id).execute()
         
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to store KYC data")
