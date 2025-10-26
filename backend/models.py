@@ -268,3 +268,37 @@ class APIResponse(BaseModel):
     message: str
     data: Optional[Any] = None
     errors: Optional[List[ValidationError]] = None
+
+class WalletCreationStatus(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    chain: str
+    status: str = "pending"  # pending, creating, success, failed, retrying
+    address: Optional[str] = None
+    encrypted_key: Optional[str] = None
+    attempt_count: int = 0
+    last_attempt_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    error_code: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class WalletCreationQueue(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    chain: str
+    priority: int = 5
+    scheduled_for: datetime
+    locked_at: Optional[datetime] = None
+    locked_by: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 10
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True

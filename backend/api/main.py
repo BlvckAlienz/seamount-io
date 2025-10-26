@@ -456,6 +456,14 @@ if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
     logger.info("✅ Users router registered at /api/v1/user")
 
+# Register wallet creation routes
+try:
+    from backend.api.routes.wallet_creation_routes import router as wallet_creation_router
+    app.include_router(wallet_creation_router)
+    logger.info("✅ Wallet creation routes registered at /api/v1/wallet-creation")
+except ImportError as e:
+    logger.error(f"❌ Failed to import wallet creation routes: {e}")
+
 if routers_available.get('kyc'):
     app.include_router(routers_available['kyc'], prefix="/api/v1/kyc", tags=["KYC"])
     logger.info("✅ KYC router registered at /api/v1/kyc")

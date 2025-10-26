@@ -1,11 +1,11 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// ✅ POLISHED VERSION: Clean imports, no shadowing, proper structure
+// ✅ COMPLETE VERSION - Ready for production
 
 import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
-  ArrowDownLeft, RefreshCw as SwapIcon
+  ArrowDownLeft, RefreshCw as SwapIcon, Key
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -13,11 +13,9 @@ import { apiClient } from '../config/api';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
+import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatusBanner';
 
-// ============================================================================
-// KYC BANNER - Clean inline component (no import conflict)
-// ============================================================================
-
+// KYC Banner Component
 interface KYCPromptBannerProps {
   kycStatus: string;
   cumulativeVolume: number;
@@ -78,60 +76,41 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   return (
     <div className={`rounded-2xl border p-4 mb-6 ${config.bg} ${config.border} backdrop-blur-sm animate-in slide-in-from-top duration-500`}>
       <div className="flex items-start gap-3">
-        <div className={config.text}>
-          {config.icon}
-        </div>
-        
+        <div className={config.text}>{config.icon}</div>
         <div className="flex-1">
-          <h3 className={`font-semibold mb-1 ${config.text}`}>
-            {config.title}
-          </h3>
-          
-          <p className={`text-sm mb-3 ${config.text}`}>
-            {config.message}
-          </p>
-          
+          <h3 className={`font-semibold mb-1 ${config.text}`}>{config.title}</h3>
+          <p className={`text-sm mb-3 ${config.text}`}>{config.message}</p>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
             <div
               className={`h-2 rounded-full transition-all duration-300 ${
                 urgency === 'critical' ? 'bg-red-600' :
-                urgency === 'warning' ? 'bg-orange-500' :
-                'bg-blue-500'
+                urgency === 'warning' ? 'bg-orange-500' : 'bg-blue-500'
               }`}
               style={{ width: `${Math.min(100, percentUsed)}%` }}
             />
           </div>
-          
           <div className="flex items-center gap-3">
             <button
               onClick={() => window.location.href = '/onboarding'}
               className={`px-4 py-2 rounded-lg font-medium transition-all shadow-lg ${
                 urgency === 'critical' 
-                  ? 'bg-red-600 hover:bg-red-700 text-white hover:shadow-red-500/50'
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
                   : urgency === 'warning'
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white hover:shadow-orange-500/50'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white hover:shadow-blue-500/50'
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
               }`}
             >
               {config.action}
             </button>
-            
             {config.dismissible && (
-              <button
-                onClick={() => setDismissed(true)}
-                className={`text-sm ${config.text} hover:underline`}
-              >
+              <button onClick={() => setDismissed(true)} className={`text-sm ${config.text} hover:underline`}>
                 Remind me later
               </button>
             )}
           </div>
         </div>
-        
         {config.dismissible && (
-          <button
-            onClick={() => setDismissed(true)}
-            className={`${config.text} hover:opacity-70`}
-          >
+          <button onClick={() => setDismissed(true)} className={`${config.text} hover:opacity-70`}>
             <Check className="w-5 h-5" />
           </button>
         )}
@@ -140,10 +119,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   );
 };
 
-// ============================================================================
-// MAIN DASHBOARD - PREMIUM MULTI-CHAIN WALLET
-// ============================================================================
-
+// Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -158,6 +134,7 @@ const DashboardPage = () => {
   const [multiChainWallets, setMultiChainWallets] = useState<any>({});
   const [selectedChain, setSelectedChain] = useState<string | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
   
   const SUPPORTED_CHAINS = [
     { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
@@ -171,8 +148,26 @@ const DashboardPage = () => {
       fetchPortfolioData();
       fetchKYCStatus();
       fetchMultiChainWallets();
+      fetchWalletCreationStatus();
     }
   }, [user, userProfile]);
+
+  const fetchWalletCreationStatus = async () => {
+    try {
+      const response = await apiClient.get('/api/v1/wallet-creation/status');
+      if (response.data.success) {
+        setWalletCreationStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch wallet creation status:', error);
+    }
+  };
+
+  const handleRetrySuccess = () => {
+    fetchWalletCreationStatus();
+    fetchMultiChainWallets();
+    fetchPortfolioData();
+  };
 
   const fetchMultiChainWallets = async () => {
     try {
@@ -188,57 +183,38 @@ const DashboardPage = () => {
 
   const getAssetChain = (symbol: string) => {
     const chainMap: { [key: string]: string } = {
-      'ALGO': 'algorand',
-      'USDCa': 'algorand',
-      'USDT': 'algorand', 
-      'goBTC': 'algorand',
-      'goETH': 'algorand',
-      'BTC': 'bitcoin',
-      'ETH': 'ethereum',
-      'MATIC': 'polygon'
+      'ALGO': 'algorand', 'USDCa': 'algorand', 'USDT': 'algorand', 
+      'goBTC': 'algorand', 'goETH': 'algorand', 'BTC': 'bitcoin',
+      'ETH': 'ethereum', 'MATIC': 'polygon'
     };
     return chainMap[symbol] || 'algorand';
   };
 
   const calculateChainBalance = (chain: string) => {
     if (!portfolioData?.assets) return 0;
-    
-    const chainAssets = portfolioData.assets.filter((asset: any) => {
-      const assetChain = getAssetChain(asset.symbol);
-      return assetChain === chain;
-    });
-    
-    return chainAssets.reduce((total: number, asset: any) => {
-      return total + (asset.usd_value || 0);
-    }, 0);
+    return portfolioData.assets
+      .filter((asset: any) => getAssetChain(asset.symbol) === chain)
+      .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
   };
 
   const fetchPortfolioData = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/wallet/balances');
-      
       if (response.data.success) {
         setPortfolioData({
           total_usd: response.data.total_usd,
           assets: response.data.assets,
           timestamp: response.data.timestamp
         });
-        
         if (response.data.wallet_addresses) {
           setMultiChainWallets(response.data.wallet_addresses);
         }
       }
     } catch (error: any) {
       console.error('Portfolio fetch error:', error);
-      
       if (userProfile?.algorand_address) {
-        setPortfolioData({
-          success: true,
-          total_usd: 0,
-          assets: [],
-          wallet_address: userProfile.algorand_address
-        });
+        setPortfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
       }
     } finally {
       setLoading(false);
@@ -273,17 +249,19 @@ const DashboardPage = () => {
   const handleVerifyKYC = async () => {
     try {
       const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
-      
       if (kycResponse.data.status === 'verified' || kycResponse.data.status === 'approved') {
         toast.success('Your account is already verified!');
         return;
       }
-      
       window.location.href = '/onboarding';
     } catch (error) {
       console.error('KYC verification error:', error);
       toast.error('Unable to start verification process');
     }
+  };
+
+  const handleViewSeedPhrases = () => {
+    window.location.href = '/wallet-recovery';
   };
 
   const handleLogout = async () => {
@@ -297,9 +275,7 @@ const DashboardPage = () => {
   };
 
   const totalBalance = portfolioData?.total_usd || 0;
-  const createdChains = Object.keys(multiChainWallets).filter(chain => 
-    multiChainWallets[chain]?.address
-  ).length;
+  const createdChains = Object.keys(multiChainWallets).filter(chain => multiChainWallets[chain]?.address).length;
 
   if (loading) {
     return (
@@ -315,69 +291,41 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
-
-          {/* Action Buttons */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => toast.info('Send functionality coming soon!')}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
-            >
-              <ArrowUpRight className="h-4 w-4" />
-              Send
+            <button onClick={() => toast.info('Send functionality coming soon!')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+              <ArrowUpRight className="h-4 w-4" />Send
             </button>
-
-            <button
-              onClick={() => toast.info('Swap functionality coming soon!')}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
-            >
-              <SwapIcon className="h-4 w-4" />
-              Swap
+            <button onClick={() => toast.info('Swap functionality coming soon!')} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+              <SwapIcon className="h-4 w-4" />Swap
             </button>
-
-            <button
-              onClick={() => toast.info('Earn functionality coming soon!')}
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
-            >
-              <TrendingUp className="h-4 w-4" />
-              Earn
+            <button onClick={() => toast.info('Earn functionality coming soon!')} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+              <TrendingUp className="h-4 w-4" />Earn
             </button>
-
-            {/* User Menu */}
             <div className="relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
-              >
+              <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
                   {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <span className="text-sm hidden md:inline">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
               </button>
-
               {showProfileMenu && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setShowProfileMenu(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 backdrop-blur-xl">
-                    <button
-                      onClick={handleVerifyKYC}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors rounded-t-lg"
-                    >
+                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Key className="h-4 w-4" />
+                      <span>Recovery Phrases</span>
+                    </button>
+                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
                       <Shield className="h-4 w-4" />
                       <span>Verify</span>
                     </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg"
-                    >
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
                       <LogOut className="h-4 w-4" />
                       <span>Logout</span>
                     </button>
@@ -388,41 +336,26 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Nigerian User Banner */}
         <NigerianUserBanner />
+        
+        {walletCreationStatus && !walletCreationStatus.overall_complete && (
+          <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
+        )}
 
-        {/* KYC Banner */}
-        <KYCPromptBanner
-          kycStatus={kycInfo.status}
-          cumulativeVolume={kycInfo.cumulative_volume}
-          limit={kycInfo.limit}
-          urgency={kycInfo.urgency}
-        />
+        <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
 
-        {/* Multi-Chain Wallet Status */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
-            <span className="text-sm text-gray-400">
-              {createdChains} of {SUPPORTED_CHAINS.length} created
-            </span>
+            <span className="text-sm text-gray-400">{createdChains} of {SUPPORTED_CHAINS.length} created</span>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {SUPPORTED_CHAINS.map(chain => (
-              <ChainWalletCard
-                key={chain.id}
-                chain={chain.id}
-                address={multiChainWallets[chain.id]?.address || ''}
-                balance={calculateChainBalance(chain.id)}
-                status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'}
-                onCardClick={() => handleWalletCardClick(chain.id)}
-              />
+              <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
             ))}
           </div>
         </div>
 
-        {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
             <div className="flex items-center justify-between mb-4">
@@ -430,10 +363,7 @@ const DashboardPage = () => {
                 <div className="text-sm text-gray-400 mb-1">Total Balance</div>
                 <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
               </div>
-              <button
-                onClick={fetchPortfolioData}
-                className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300"
-              >
+              <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
                 <RefreshCw className="h-5 w-5" />
               </button>
             </div>
@@ -442,16 +372,13 @@ const DashboardPage = () => {
               <span className="text-green-400">Live Multi-Chain Balances</span>
             </div>
           </div>
-
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
             <div className="text-sm text-gray-400 mb-2">Networks</div>
             <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
             <div className="space-y-2">
               {SUPPORTED_CHAINS.map(chain => (
                 <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
-                  <div className={`w-2 h-2 rounded-full ${
-                    multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'
-                  }`}></div>
+                  <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
                   {chain.name}
                 </div>
               ))}
@@ -459,7 +386,6 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -468,11 +394,7 @@ const DashboardPage = () => {
               { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toast.info('Swap feature coming soon!') },
               { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toast.info('Yield farming coming soon!') },
             ].map(action => (
-              <button 
-                key={action.label}
-                onClick={action.action}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105"
-              >
+              <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
                 <action.icon className={`h-6 w-6 ${action.color}`} />
                 <span className="text-sm text-gray-300">{action.label}</span>
               </button>
@@ -480,48 +402,25 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {/* Cross-Border CTA */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
-              <p className="text-blue-100 text-sm mb-3">
-                Send money globally at 2.9% fee vs 8% traditional (5.1% savings!)
-              </p>
+              <p className="text-blue-100 text-sm mb-3">Send money globally at 2.9% fee vs 8% traditional (5.1% savings!)</p>
               <div className="flex flex-wrap items-center gap-4 text-xs">
-                <span className="flex items-center gap-1">
-                  <Activity className="h-3 w-3" />
-                  Sub-5s settlement
-                </span>
-                <span className="flex items-center gap-1">
-                  <Shield className="h-3 w-3" />
-                  Bank-grade security
-                </span>
+                <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
+                <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
               </div>
             </div>
-            <button 
-              onClick={() => toast.info('Cross-border payments coming soon!')}
-              className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg hover:shadow-white/50"
-            >
+            <button onClick={() => toast.info('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
               Send Money
             </button>
           </div>
         </div>
       </div>
 
-      {/* Wallet Detail Modal */}
       {selectedChain && (
-        <WalletDetailModal
-          isOpen={showWalletModal}
-          onClose={() => {
-            setShowWalletModal(false);
-            setSelectedChain(null);
-          }}
-          chain={selectedChain}
-          chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain}
-          address={multiChainWallets[selectedChain]?.address || ''}
-          balance={calculateChainBalance(selectedChain)}
-        />
+        <WalletDetailModal isOpen={showWalletModal} onClose={() => { setShowWalletModal(false); setSelectedChain(null); }} chain={selectedChain} chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} address={multiChainWallets[selectedChain]?.address || ''} balance={calculateChainBalance(selectedChain)} />
       )}
     </div>
   );

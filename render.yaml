@@ -1,4 +1,8 @@
+# File: render.yaml (Project Root)
+# ✅ COMPLETE: Web service + Background wallet retry worker
+
 services:
+  # Main API Service
   - type: web
     name: seamount-api
     env: python
@@ -6,6 +10,23 @@ services:
     plan: starter
     buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt || pip install -r requirements.txt
     startCommand: gunicorn backend.api.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    runtime: python
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PIP_NO_BINARY
+        value: :none:
+      - key: ENVIRONMENT
+        value: production
+
+  # Background Wallet Retry Worker (Cron Job)
+  - type: cron
+    name: wallet-retry-worker
+    env: python
+    region: oregon
+    schedule: "*/5 * * * *"  # Runs every 5 minutes
+    buildCommand: pip install --upgrade pip && pip install --only-binary :all: -r requirements.txt || pip install -r requirements.txt
+    startCommand: python backend/jobs/wallet_retry_worker.py
     runtime: python
     envVars:
       - key: PYTHON_VERSION

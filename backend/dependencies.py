@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from backend.services.algorand_service import AlgorandService
     from backend.services.oracle_service import OracleService
     from backend.services.fee_calculator import FeeCalculatorService
+    from backend.services.wallet_creation_service import WalletCreationService
+
 else:
     # Runtime imports for actual service instantiation
     try:
@@ -61,6 +63,7 @@ _algorand_service: Optional["AlgorandService"] = None
 _oracle_service: Optional["OracleService"] = None
 _multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
 _fee_calculator_service: Optional["FeeCalculatorService"] = None
+_wallet_creation_service: Optional["WalletCreationService"] = None
 
 # JWT caching
 jwks_cache: Dict[str, Any] = {}
@@ -103,6 +106,18 @@ def initialize_dependencies(
     _oracle_service = oracle_service
     _fee_calculator_service = fee_calculator_service
     
+    # Initialize wallet creation service
+    global _wallet_creation_service
+    _wallet_creation_service = WalletCreationService(
+        db_service=db_service,
+        algorand_service=algorand_service,
+        wdk_client=MultiChainWalletService(
+            db_service=db_service,
+            algorand_service=algorand_service,
+            fee_calculator=fee_calculator,
+            oracle_service=oracle_service
+        ).wdk_client if hasattr(multi_chain_wallet_service, 'wdk_client') else None
+    )
     logger.info("✅ All dependencies initialized successfully")
 
 def get_supabase_client() -> Client:
@@ -666,3 +681,14 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
 def get_db_service() -> Optional["DatabaseService"]:
     """Alias for get_database_service()"""
     return get_database_service()
+
+def get_wallet_creation_service() -> "WalletCreationService":
+    """Dependency injection for wallet creation service."""
+    global _wallet_creation_service
+    
+    if _wallet_creation_service is None:
+        raise HTTPException(
+            status_code=500,
+            detail="WalletCreationService not initialized"
+        )
+    return _wallet_creation_service
