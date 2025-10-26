@@ -89,6 +89,14 @@ except ImportError as e:
     logger.error(f"❌ MultiChainWalletService import failed: {e}")
     MultiChainWalletService = None
 
+# Register wallet creation routes
+try:
+    from backend.api.routes.wallet_creation_routes import router as wallet_creation_router
+    app.include_router(wallet_creation_router, prefix="/api/v1", tags=["Wallet Creation"])
+    logger.info("✅ Wallet creation routes registered at /api/v1/wallet-creation")
+except ImportError as e:
+    logger.warning(f"⚠️ Wallet creation routes unavailable: {e}")
+
 try:
     from backend.services.email_service import EmailService
     from backend.services.notification_service import NotificationService
@@ -351,6 +359,19 @@ async def lifespan(app: FastAPI):
                         oracle_service = MockOracleService()
                         logger.info("✅ Mock oracle service created")
                     
+                    # Initialize WalletCreationService
+                    try:
+                        from backend.services.wallet_creation_service import WalletCreationService
+                        wallet_creation_service = WalletCreationService(
+                            db_service=db_service,
+                            algorand_service=algorand_service,
+                            wdk_client=None  # Will initialize later
+                        )
+                        logger.info("✅ WalletCreationService initialized")
+                    except Exception as e:
+                        logger.warning(f"⚠️ WalletCreationService unavailable: {e}")
+                        wallet_creation_service = None
+
                     # Initialize Multi-Chain Wallet Service (UNIFIED NAME)
                     multi_chain_wallet_service = MultiChainWalletService(
                         db_service=db_service,

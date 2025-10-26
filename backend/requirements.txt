@@ -9,6 +9,7 @@ gunicorn==21.2.0
 # Database
 supabase==1.0.3  # ✅ COMPATIBLE VERSION - SUPPORTS PROXY PARAMETER
 asyncpg==0.29.0
+sqlalchemy==2.0.23
 
 # HTTP & Async
 aiohttp==3.9.1
