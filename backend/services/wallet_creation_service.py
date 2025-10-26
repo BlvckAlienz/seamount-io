@@ -162,8 +162,8 @@ class WalletCreationService:
     
     async def initialize_smart_wallet_status(self, user_id: str) -> Dict[str, any]:
         """
-        Smart initialization: only create tracking records for MISSING wallets
-        and mark existing wallets as 'success'
+        Smart initialization: detects existing wallets and only tracks missing ones
+        FIXED: Uses upsert instead of insert with on_conflict
         """
         try:
             logger.info(f"🔍 Smart initializing wallet status for user {user_id}")
@@ -183,15 +183,15 @@ class WalletCreationService:
                         'updated_at': datetime.utcnow().isoformat()
                     }
                     
-                    # Upsert the record
+                    # ✅ FIXED: Use upsert for existing wallets
                     await asyncio.to_thread(
                         lambda: self.db.supabase.table("wallet_creation_status")
-                        .upsert(status_data, on_conflict='user_id,chain')
+                        .upsert(status_data)
                         .execute()
                     )
                     logger.info(f"✅ Marked existing {chain} wallet as success")
                 else:
-                    # Wallet doesn't exist - create pending record if not exists
+                    # Wallet doesn't exist - create pending record
                     status_data = {
                         'user_id': user_id,
                         'chain': chain,
@@ -200,10 +200,10 @@ class WalletCreationService:
                         'updated_at': datetime.utcnow().isoformat()
                     }
                     
-                    # Insert only if not exists
+                    # ✅ FIXED: Use insert (without on_conflict) for new records
                     await asyncio.to_thread(
                         lambda: self.db.supabase.table("wallet_creation_status")
-                        .insert(status_data, on_conflict='user_id,chain')
+                        .insert(status_data)
                         .execute()
                     )
                     logger.info(f"📝 Created pending record for missing {chain} wallet")
@@ -239,7 +239,7 @@ class WalletCreationService:
     
     async def retry_missing_wallets(self, user_id: str, specific_chains: Optional[List[str]] = None) -> Dict[str, any]:
         """
-        Smart retry: Only retry wallets that are actually missing
+        Smart retry: Actually creates missing wallets with proper error handling
         """
         try:
             logger.info(f"🔄 Smart retry requested for user {user_id}")
@@ -274,16 +274,98 @@ class WalletCreationService:
             # Increment retry count
             await self._increment_retry_count(user_id)
             
-            # For now, return which wallets would be retried
-            # Later, implement actual wallet creation for these chains
+            # ✅ ACTUALLY CREATE THE MISSING WALLETS
+            results = {}
+            for chain in target_chains:
+                try:
+                    logger.info(f"🔄 Creating {chain} wallet for user {user_id}")
+                    
+                    if chain == 'algorand':
+                        # Create Algorand wallet
+                        wallet_result = await self.algorand_service.create_algorand_wallet(user_id)
+                        if wallet_result and wallet_result.get('wallet_address'):
+                            # Update tracking status
+                            update_data = {
+                                'status': 'success',
+                                'address': wallet_result['wallet_address'],
+                                'updated_at': datetime.utcnow().isoformat()
+                            }
+                            await asyncio.to_thread(
+                                lambda: self.db.supabase.table("wallet_creation_status")
+                                .update(update_data)
+                                .eq('user_id', user_id)
+                                .eq('chain', chain)
+                                .execute()
+                            )
+                            results[chain] = {'success': True, 'address': wallet_result['wallet_address']}
+                            logger.info(f"✅ {chain} wallet created successfully")
+                        else:
+                            raise Exception("Algorand wallet creation failed")
+                    else:
+                        # Create WDK wallet (Bitcoin, Ethereum, Polygon)
+                        if self.wdk_client:
+                            wdk_result = await self.wdk_client.create_wallet(chain)
+                            if wdk_result and wdk_result.get('success') and wdk_result.get('address'):
+                                # Update tracking status
+                                update_data = {
+                                    'status': 'success', 
+                                    'address': wdk_result['address'],
+                                    'updated_at': datetime.utcnow().isoformat()
+                                }
+                                await asyncio.to_thread(
+                                    lambda: self.db.supabase.table("wallet_creation_status")
+                                    .update(update_data)
+                                    .eq('user_id', user_id)
+                                    .eq('chain', chain)
+                                    .execute()
+                                )
+                                results[chain] = {'success': True, 'address': wdk_result['address']}
+                                logger.info(f"✅ {chain} wallet created successfully")
+                            else:
+                                error_msg = wdk_result.get('error', 'WDK wallet creation failed')
+                                raise Exception(error_msg)
+                        else:
+                            raise Exception("WDK client not available")
+                            
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"❌ Failed to create {chain} wallet: {error_msg}")
+                    
+                    # Update tracking status to failed
+                    update_data = {
+                        'status': 'failed',
+                        'error_message': error_msg,
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    await asyncio.to_thread(
+                        lambda: self.db.supabase.table("wallet_creation_status")
+                        .update(update_data)
+                        .eq('user_id', user_id)
+                        .eq('chain', chain)
+                        .execute()
+                    )
+                    results[chain] = {'success': False, 'error': error_msg}
+            
+            # Check if all succeeded
+            successful_creations = [r for r in results.values() if r.get('success')]
+            all_succeeded = len(successful_creations) == len(target_chains)
+            
+            # Update overall completion status if all succeeded
+            if all_succeeded:
+                profile_update = {
+                    'wallet_creation_complete': True,
+                    'wallet_creation_completed_at': datetime.utcnow().isoformat()
+                }
+                await self.db.update_user_profile(user_id, profile_update)
+            
             return {
                 'success': True,
                 'user_id': user_id,
-                'message': f'Ready to create missing wallets: {", ".join(target_chains)}',
+                'message': f'Created {len(successful_creations)}/{len(target_chains)} wallets successfully',
                 'missing_chains': missing_chains,
                 'retried_chains': target_chains,
-                'results': {},
-                'current_status': current_status
+                'results': results,
+                'all_succeeded': all_succeeded
             }
             
         except Exception as e:
