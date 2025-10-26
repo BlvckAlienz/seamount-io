@@ -1,34 +1,72 @@
 # File: backend/services/wallet_creation_service.py
-# COMPLETE FIXED VERSION - Uses your DatabaseService properly
+# COMPLETE FIXED VERSION WITH SMART DETECTION
 
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
-from uuid import UUID
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 class WalletCreationService:
-    """
-    Bulletproof multi-chain wallet creation service - FIXED FOR SUPABASE
-    Uses direct DatabaseService methods instead of SQLAlchemy sessions
-    """
+    """Smart multi-chain wallet creation service with existing wallet detection"""
     
     SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon']
-    MAX_CONCURRENT_RETRIES = 3
-    RETRY_INTERVALS = [30, 300, 900, 3600, 7200]  # 30s, 5m, 15m, 1h, 2h
     
     def __init__(self, db_service, algorand_service, wdk_client):
         self.db = db_service
         self.algorand_service = algorand_service
         self.wdk_client = wdk_client
-        logger.info("✅ WalletCreationService initialized with Supabase DatabaseService")
+        logger.info("✅ WalletCreationService initialized with smart detection")
+    
+    async def detect_existing_wallets(self, user_id: str) -> Dict[str, str]:
+        """
+        Detect which wallets already exist for this user by checking actual wallet tables
+        Returns: {chain: address} for existing wallets
+        """
+        existing_wallets = {}
+        
+        try:
+            # 1. Check Algorand wallet in user_wallets table
+            algo_wallet = await asyncio.to_thread(
+                lambda: self.db.supabase.table("user_wallets")
+                .select("algorand_address")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            if algo_wallet.data and len(algo_wallet.data) > 0 and algo_wallet.data[0].get('algorand_address'):
+                existing_wallets['algorand'] = algo_wallet.data[0]['algorand_address']
+                logger.info(f"✅ Detected existing Algorand wallet: {algo_wallet.data[0]['algorand_address'][:10]}...")
+            
+            # 2. Check multi_chain_addresses for other chains
+            multi_chain_wallets = await asyncio.to_thread(
+                lambda: self.db.supabase.table("multi_chain_addresses")
+                .select("blockchain, address")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            if multi_chain_wallets.data:
+                for wallet in multi_chain_wallets.data:
+                    chain = wallet['blockchain']
+                    address = wallet['address']
+                    if chain in self.SUPPORTED_CHAINS and address:
+                        existing_wallets[chain] = address
+                        logger.info(f"✅ Detected existing {chain} wallet: {address[:10]}...")
+            
+            logger.info(f"🔍 User {user_id} has {len(existing_wallets)} existing wallets: {list(existing_wallets.keys())}")
+            return existing_wallets
+            
+        except Exception as e:
+            logger.error(f"Error detecting existing wallets: {e}")
+            return {}
     
     async def get_wallet_status(self, user_id: str) -> Dict[str, any]:
-        """Get comprehensive wallet creation status for user - FIXED VERSION"""
+        """Get comprehensive wallet status with smart detection"""
         try:
-            # Get wallet creation status for all chains using Supabase
+            # First, detect what wallets actually exist
+            existing_wallets = await self.detect_existing_wallets(user_id)
+            
+            # Get current status from our tracking table
             status_response = await asyncio.to_thread(
                 lambda: self.db.supabase.table("wallet_creation_status")
                 .select("*")
@@ -37,45 +75,74 @@ class WalletCreationService:
             )
             statuses = status_response.data if status_response.data else []
             
-            # Get user profile using existing DatabaseService method
+            # Get user profile
             profile = await self.db.get_user_profile(user_id)
+            
+            # Build chains status - prioritize actual wallet detection over tracking table
+            chains_status = {}
+            for chain in self.SUPPORTED_CHAINS:
+                if chain in existing_wallets:
+                    # Wallet exists - mark as success regardless of tracking table
+                    chains_status[chain] = {
+                        'status': 'success',
+                        'address': existing_wallets[chain],
+                        'exists_in_database': True,
+                        'attempt_count': 0,
+                        'last_attempt': None,
+                        'error': None
+                    }
+                else:
+                    # Check tracking table for this chain
+                    chain_status = next((s for s in statuses if s['chain'] == chain), None)
+                    if chain_status:
+                        chains_status[chain] = {
+                            'status': chain_status['status'],
+                            'address': chain_status.get('address'),
+                            'exists_in_database': False,
+                            'attempt_count': chain_status.get('attempt_count', 0),
+                            'last_attempt': chain_status.get('last_attempt_at'),
+                            'error': chain_status.get('error_message')
+                        }
+                    else:
+                        # No wallet and no tracking record
+                        chains_status[chain] = {
+                            'status': 'not_started',
+                            'address': None,
+                            'exists_in_database': False,
+                            'attempt_count': 0,
+                            'last_attempt': None,
+                            'error': None
+                        }
+            
+            # Calculate summary based on ACTUAL wallet existence
+            successful_chains = [c for c, s in chains_status.items() if s['status'] == 'success']
+            failed_chains = [c for c, s in chains_status.items() if s['status'] == 'failed']
+            pending_chains = [c for c, s in chains_status.items() if s['status'] in ['pending', 'not_started']]
+            retrying_chains = [c for c, s in chains_status.items() if s['status'] == 'retrying']
+            
+            overall_complete = len(successful_chains) == len(self.SUPPORTED_CHAINS)
             
             status_dict = {
                 'user_id': user_id,
-                'overall_complete': profile.get('wallet_creation_complete', False) if profile else False,
+                'overall_complete': overall_complete,
                 'started_at': profile.get('wallet_creation_started_at') if profile else None,
                 'completed_at': profile.get('wallet_creation_completed_at') if profile else None,
                 'retry_count': profile.get('wallet_creation_retry_count', 0) if profile else 0,
-                'chains': {}
-            }
-            
-            for status in statuses:
-                status_dict['chains'][status['chain']] = {
-                    'status': status['status'],
-                    'address': status.get('address'),
-                    'attempt_count': status.get('attempt_count', 0),
-                    'last_attempt': status.get('last_attempt_at'),
-                    'error': status.get('error_message')
+                'chains': chains_status,
+                'summary': {
+                    'total': len(self.SUPPORTED_CHAINS),
+                    'successful': len(successful_chains),
+                    'failed': len(failed_chains),
+                    'pending': len(pending_chains),
+                    'retrying': len(retrying_chains),
+                    'missing_chains': [c for c in self.SUPPORTED_CHAINS if c not in successful_chains]
                 }
-            
-            # Add summary - FIXED: Use actual count from database
-            successful_count = sum(1 for s in statuses if s.get('status') == 'success')
-            failed_count = sum(1 for s in statuses if s.get('status') == 'failed')
-            pending_count = sum(1 for s in statuses if s.get('status') == 'pending')
-            retrying_count = sum(1 for s in statuses if s.get('status') == 'retrying')
-            
-            status_dict['summary'] = {
-                'total': len(statuses),  # ✅ FIXED: Use actual count, not hardcoded 4
-                'successful': successful_count,
-                'failed': failed_count,
-                'pending': pending_count,
-                'retrying': retrying_count
             }
             
-            # Add can_retry flag
+            # Add flags
             retry_count = status_dict.get('retry_count', 0)
-            status_dict['can_retry'] = (failed_count > 0 or pending_count > 0) and retry_count < 10
-            status_dict['needs_attention'] = not status_dict['overall_complete']
+            status_dict['can_retry'] = (len(failed_chains) > 0 or len(pending_chains) > 0) and retry_count < 10
+            status_dict['needs_attention'] = not overall_complete
             
             return {
                 "success": True,
@@ -90,120 +157,146 @@ class WalletCreationService:
                 'user_id': user_id,
                 'overall_complete': False,
                 'chains': {},
-                'summary': {'total': 0, 'successful': 0, 'failed': 0, 'pending': 0, 'retrying': 0}
+                'summary': {'total': 4, 'successful': 0, 'failed': 0, 'pending': 0, 'retrying': 0, 'missing_chains': self.SUPPORTED_CHAINS}
             }
     
-    async def create_all_wallets(self, user_id: str, background: bool = False) -> Dict[str, any]:
-        """Create wallets for all 4 chains - SIMPLIFIED FOR INITIAL TESTING"""
-        logger.info(f"🚀 Starting wallet creation for user {user_id}")
-        
+    async def initialize_smart_wallet_status(self, user_id: str) -> Dict[str, any]:
+        """
+        Smart initialization: only create tracking records for MISSING wallets
+        and mark existing wallets as 'success'
+        """
         try:
-            # Initialize wallet status tracking
-            await self._initialize_wallet_status(user_id)
+            logger.info(f"🔍 Smart initializing wallet status for user {user_id}")
             
-            # For initial testing, return basic status
+            # Detect existing wallets first
+            existing_wallets = await self.detect_existing_wallets(user_id)
+            
+            # Initialize or update tracking for each chain
+            for chain in self.SUPPORTED_CHAINS:
+                if chain in existing_wallets:
+                    # Wallet exists - ensure tracking record shows success
+                    status_data = {
+                        'user_id': user_id,
+                        'chain': chain,
+                        'status': 'success',
+                        'address': existing_wallets[chain],
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    
+                    # Upsert the record
+                    await asyncio.to_thread(
+                        lambda: self.db.supabase.table("wallet_creation_status")
+                        .upsert(status_data, on_conflict='user_id,chain')
+                        .execute()
+                    )
+                    logger.info(f"✅ Marked existing {chain} wallet as success")
+                else:
+                    # Wallet doesn't exist - create pending record if not exists
+                    status_data = {
+                        'user_id': user_id,
+                        'chain': chain,
+                        'status': 'pending',
+                        'created_at': datetime.utcnow().isoformat(),
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    
+                    # Insert only if not exists
+                    await asyncio.to_thread(
+                        lambda: self.db.supabase.table("wallet_creation_status")
+                        .insert(status_data, on_conflict='user_id,chain')
+                        .execute()
+                    )
+                    logger.info(f"📝 Created pending record for missing {chain} wallet")
+            
+            # Update user profile if not already set
+            profile = await self.db.get_user_profile(user_id)
+            if profile and not profile.get('wallet_creation_started_at'):
+                update_data = {
+                    'wallet_creation_started_at': datetime.utcnow().isoformat()
+                }
+                await self.db.update_user_profile(user_id, update_data)
+            
+            # Get final status
+            final_status = await self.get_wallet_status(user_id)
+            
+            logger.info(f"✅ Smart initialization complete. User has {final_status['summary']['successful']}/4 wallets")
             return {
-                'success': True,
-                'user_id': user_id,
-                'overall_success': False,
-                'message': 'Wallet creation system initialized - ready for implementation',
-                'chains': {
-                    'algorand': {'status': 'pending'},
-                    'bitcoin': {'status': 'pending'},
-                    'ethereum': {'status': 'pending'},
-                    'polygon': {'status': 'pending'}
-                },
-                'successful_count': 0,
-                'failed_count': 0,
-                'queued_for_retry': []
+                "success": True,
+                "message": f"Smart initialization complete. User has {final_status['summary']['successful']}/4 wallets",
+                "user_id": user_id,
+                "existing_wallets": list(existing_wallets.keys()),
+                "missing_wallets": final_status['summary']['missing_chains'],
+                "status": final_status
             }
+            
         except Exception as e:
-            logger.error(f"Error in create_all_wallets: {e}")
+            logger.error(f"Error in smart initialization: {e}")
             return {
-                'success': False,
-                'error': str(e),
-                'user_id': user_id
+                "success": False,
+                "error": str(e),
+                "user_id": user_id
             }
     
-    # In wallet_creation_service.py, MODIFY the retry_failed_wallets method:
-
-    async def retry_failed_wallets(self, user_id: str, chains: Optional[List[str]] = None) -> Dict[str, any]:
-        """Manual retry failed wallet creations - WITH AUTO-INITIALIZATION"""
-        logger.info(f"🔄 Manual retry requested by user {user_id}")
-        
+    async def retry_missing_wallets(self, user_id: str, specific_chains: Optional[List[str]] = None) -> Dict[str, any]:
+        """
+        Smart retry: Only retry wallets that are actually missing
+        """
         try:
-            # Get current status first
+            logger.info(f"🔄 Smart retry requested for user {user_id}")
+            
+            # Get current status to see what's actually missing
             current_status = await self.get_wallet_status(user_id)
+            missing_chains = current_status['summary']['missing_chains']
             
-            # ✅ AUTO-INITIALIZE if no wallet status exists
-            if current_status['summary']['total'] == 0:
-                logger.info(f"🔄 No wallet status found for user {user_id}, initializing...")
-                await self._initialize_wallet_status(user_id)
-                current_status = await self.get_wallet_status(user_id)
-            
-            if current_status['overall_complete']:
+            if not missing_chains:
                 return {
                     'success': True,
-                    'message': 'All wallets already created successfully!',
+                    'message': 'All wallets already exist! Nothing to retry.',
+                    'user_id': user_id,
                     'retried_chains': [],
                     'results': {}
                 }
             
-            # Rest of your existing retry logic...
+            # Filter to specific chains if provided
+            if specific_chains:
+                target_chains = [chain for chain in specific_chains if chain in missing_chains]
+                if not target_chains:
+                    return {
+                        'success': True,
+                        'message': 'Specified chains already exist or are not missing.',
+                        'user_id': user_id,
+                        'retried_chains': [],
+                        'results': {}
+                    }
+            else:
+                target_chains = missing_chains
+            
+            # Increment retry count
             await self._increment_retry_count(user_id)
             
+            # For now, return which wallets would be retried
+            # Later, implement actual wallet creation for these chains
             return {
                 'success': True,
                 'user_id': user_id,
-                'message': 'Wallet status initialized and ready for retry',
-                'retried_chains': chains or ['bitcoin', 'ethereum', 'polygon'],
+                'message': f'Ready to create missing wallets: {", ".join(target_chains)}',
+                'missing_chains': missing_chains,
+                'retried_chains': target_chains,
                 'results': {},
                 'current_status': current_status
             }
+            
         except Exception as e:
-            logger.error(f"Error in retry_failed_wallets: {e}")
+            logger.error(f"Error in smart retry: {e}")
             return {
                 'success': False,
                 'error': str(e),
                 'user_id': user_id
             }
     
-    async def _initialize_wallet_status(self, user_id: str):
-        """Initialize status tracking for all chains - FIXED VERSION"""
-        try:
-            # Insert status records for all chains
-            for chain in self.SUPPORTED_CHAINS:
-                status_data = {
-                    'user_id': user_id,
-                    'chain': chain,
-                    'status': 'pending',
-                    'created_at': datetime.utcnow().isoformat(),
-                    'updated_at': datetime.utcnow().isoformat()
-                }
-                
-                await asyncio.to_thread(
-                    lambda: self.db.supabase.table("wallet_creation_status")
-                    .insert(status_data)
-                    .execute()
-                )
-            
-            # Update user profile to mark wallet creation started
-            update_data = {
-                'wallet_creation_started_at': datetime.utcnow().isoformat()
-            }
-            
-            await self.db.update_user_profile(user_id, update_data)
-            
-            logger.info(f"✅ Wallet status initialized for user {user_id}")
-            
-        except Exception as e:
-            logger.error(f"Error initializing wallet status: {e}")
-            raise
-
     async def _increment_retry_count(self, user_id: str):
-        """Increment user's wallet creation retry count - FIXED VERSION"""
+        """Increment retry count in user profile"""
         try:
-            # Get current profile to find current retry count
             profile = await self.db.get_user_profile(user_id)
             current_count = profile.get('wallet_creation_retry_count', 0) if profile else 0
             
@@ -213,14 +306,8 @@ class WalletCreationService:
             }
             
             await self.db.update_user_profile(user_id, update_data)
-            logger.info(f"✅ Retry count incremented for user {user_id}: {current_count + 1}")
+            logger.info(f"✅ Retry count incremented to {current_count + 1} for user {user_id}")
             
         except Exception as e:
             logger.error(f"Error incrementing retry count: {e}")
             raise
-
-    async def process_retry_queue(self, batch_size: int = 10):
-        """Background job to process retry queue - SIMPLIFIED"""
-        logger.info("🔄 Wallet retry queue processing - ready for implementation")
-        # This will be implemented once basic status tracking is working
-        return {"message": "Retry queue processor ready"}

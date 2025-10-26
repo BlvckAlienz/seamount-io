@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 import logging
+import asyncio 
 
 from backend.dependencies import (
     get_current_user,
@@ -19,42 +20,46 @@ async def get_wallet_creation_status(
     current_user: dict = Depends(get_current_user),
     service: WalletCreationService = Depends(get_wallet_creation_service)
 ):
-    """
-    Get wallet creation status for current user.
-    Shows which chains succeeded/failed and retry information.
-    
-    Returns:
-        {
-            "overall_complete": bool,
-            "chains": {
-                "algorand": {"status": "success", "address": "..."},
-                "bitcoin": {"status": "failed", "error": "..."},
-                ...
-            },
-            "summary": {"total": 4, "successful": 1, "failed": 3},
-            "retry_count": 2,
-            "can_retry": true
-        }
-    """
+    """Get wallet creation status with smart detection"""
     try:
         user_id = current_user['id']
         status = await service.get_wallet_status(user_id)
-        
-        # Add can_retry flag
-        failed_count = status['summary']['failed']
-        pending_count = status['summary']['pending']
-        retry_count = status.get('retry_count', 0)
-        
-        status['can_retry'] = (failed_count > 0 or pending_count > 0) and retry_count < 10
-        status['needs_attention'] = not status['overall_complete']
-        
-        return {
-            "success": True,
-            **status
-        }
-        
+        return status
     except Exception as e:
         logger.error(f"Error fetching wallet creation status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/smart-initialize")
+async def smart_initialize_wallet_creation(
+    current_user: dict = Depends(get_current_user),
+    service: WalletCreationService = Depends(get_wallet_creation_service)
+):
+    """
+    Smart initialization: detects existing wallets and only tracks missing ones
+    """
+    try:
+        user_id = current_user['id']
+        result = await service.initialize_smart_wallet_status(user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error in smart initialization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/retry-missing")
+async def retry_missing_wallets(
+    chains: Optional[List[str]] = None,
+    current_user: dict = Depends(get_current_user),
+    service: WalletCreationService = Depends(get_wallet_creation_service)
+):
+    """
+    Smart retry: Only retry wallets that are actually missing
+    """
+    try:
+        user_id = current_user['id']
+        result = await service.retry_missing_wallets(user_id, chains)
+        return result
+    except Exception as e:
+        logger.error(f"Error retrying missing wallets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
