@@ -53,19 +53,27 @@ const WalletCreationStatusBanner: React.FC<WalletCreationStatusBannerProps> = ({
       const response = await apiClient.post('/api/v1/wallet-creation/retry');
 
       if (response.data.success) {
-        const successCount = Object.values(response.data.results).filter(
-          (r: any) => r.success
-        ).length;
-
-        if (successCount === failedChains.length) {
+        // ✅ FIXED: Only show success if ALL chains succeeded
+        if (response.data.all_succeeded) {
           toast.success('All wallets created successfully!', { id: 'wallet-retry' });
           setTimeout(() => onRetrySuccess(), 1500);
         } else {
-          toast.success(
-            `${successCount} wallet(s) created. ${failedChains.length - successCount} still pending.`,
-            { id: 'wallet-retry' }
-          );
-          onRetrySuccess();
+          const successCount = Object.values(response.data.results).filter(
+            (r: any) => r.success
+          ).length;
+          const totalAttempted = response.data.retried_chains?.length || failedChains.length;
+          
+          if (successCount === 0) {
+            toast.error('Wallet creation failed. Please try again later.', { 
+              id: 'wallet-retry' 
+            });
+          } else {
+            toast.success(
+              `${successCount} of ${totalAttempted} wallets created. ${totalAttempted - successCount} failed.`,
+              { id: 'wallet-retry' }
+            );
+            onRetrySuccess(); // Refresh status to show updated progress
+          }
         }
       } else {
         toast.error('Retry failed. Please try again later.', { id: 'wallet-retry' });

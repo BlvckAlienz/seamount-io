@@ -409,8 +409,8 @@ class WalletCreationService:
         
         creation_priority = [
             'algorand',  # Fastest - immediate UX
-            'polygon',   # Gasless - no user funding needed  
             'tron',      # USDT optimized
+            'polygon',   # Gasless - no user funding needed  
             'ethereum',  # Higher cost but established
             'bitcoin'    # Slowest but most established
         ]

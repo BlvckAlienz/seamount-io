@@ -213,10 +213,7 @@ class MultiChainWalletService:
             'bitcoin': 'BTC',
             'ethereum': 'ETH',
             'polygon': 'MATIC',
-            'arbitrum': 'ETH',
-            'ton': 'TON',
             'tron': 'TRX',
-            'solana': 'SOL',
             'algorand': 'ALGO'
         }
         return native_map.get(chain, 'UNKNOWN')
