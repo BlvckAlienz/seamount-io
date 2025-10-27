@@ -255,39 +255,42 @@ async def get_kyc_status(
     """
     Get user's KYC status and transaction limit info
     """
-    
     try:
         user_id = current_user['id']
         
         # Get user profile
-        profile = db_service.supabase.table('user_profiles')\
-            .select('kyc_status, cumulative_volume_30d')\
-            .eq('id', user_id)\
-            .execute()
+        profile = await db_service.get_user_profile(user_id)
         
-        if not profile.data or len(profile.data) == 0:
+        if not profile:
             return {
                 'status': 'not_started',
                 'cumulative_volume': 0.0,
-                'limit': float(KYCConfig.THRESHOLD_USD),
-                'remaining': float(KYCConfig.THRESHOLD_USD),
+                'limit': 5000.0,
+                'remaining': 5000.0,
                 'urgency': 'none'
             }
         
-        data = profile.data[0]
-        kyc_status = data.get('kyc_status', 'not_started')
-        cumulative = Decimal(str(data.get('cumulative_volume_30d', 0)))
+        kyc_status = profile.get('kyc_status', 'not_started')
+        cumulative = Decimal(str(profile.get('cumulative_volume_30d', 0)))
         
-        remaining = KYCConfig.calculate_remaining_limit(cumulative)
-        urgency = KYCConfig.get_urgency_level(cumulative)
+        # Simple urgency calculation (you can enhance this)
+        limit = 5000.0
+        remaining = limit - float(cumulative)
+        
+        if remaining <= 0:
+            urgency = 'critical'
+        elif remaining < 1000:
+            urgency = 'warning' 
+        else:
+            urgency = 'info'
         
         return {
             'status': kyc_status,
             'cumulative_volume': float(cumulative),
-            'limit': float(KYCConfig.THRESHOLD_USD),
-            'remaining': float(remaining),
+            'limit': limit,
+            'remaining': remaining,
             'urgency': urgency,
-            'percent_used': float((cumulative / KYCConfig.THRESHOLD_USD) * 100) if KYCConfig.THRESHOLD_USD > 0 else 0
+            'percent_used': float((cumulative / limit) * 100) if limit > 0 else 0
         }
         
     except Exception as e:

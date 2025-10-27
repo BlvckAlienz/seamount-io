@@ -173,7 +173,14 @@ const DashboardPage = () => {
     try {
       const response = await apiClient.get('/api/v1/wallet-creation/status');
       if (response.data.success) {
-        setMultiChainWallets(response.data.wallets || {});
+        // Extract wallets from the status response
+        const wallets = {};
+        Object.entries(response.data.chains || {}).forEach(([chain, data]: [string, any]) => {
+          if (data.address) {
+            wallets[chain] = { address: data.address };
+          }
+        });
+        setMultiChainWallets(wallets);
       }
     } catch (error) {
       console.error('Multi-chain wallet status fetch failed:', error);
