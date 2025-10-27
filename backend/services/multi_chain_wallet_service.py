@@ -27,13 +27,13 @@ class MultiChainWalletService:
         'USDCa': 'algorand',
         'goBTC': 'algorand',
         'goETH': 'algorand',
-        'USDT': 'polygon',
+        'USDT': 'tron',          # ✅ Optimized for TRC-20 USDT
         'BTC': 'bitcoin',
         'ETH': 'ethereum',
         'MATIC': 'polygon',
-        'TON': 'ton',
-        'TRX': 'tron',
-        'SOL': 'solana'
+        'TON': 'ton',            # ✅ NEW
+        'TRX': 'tron',           # ✅ NEW
+        'SOL': 'solana'          # ✅ NEW
     }
     
     def __init__(self, db_service: DatabaseService, algorand_service: AlgorandService, 
@@ -540,8 +540,9 @@ class MultiChainWalletService:
     
     # ========== HELPER METHODS ==========
     
+    # UPDATED AUTO-ROUTING LOGIC
     async def auto_route_transaction(self, asset: str, amount: Decimal, recipient: str) -> str:
-        """Smart chain selection"""
+        """Smart chain selection for 8 chains"""
         
         # Algorand assets
         if asset in ['ALGO', 'USDCa', 'goBTC', 'goETH']:
@@ -549,19 +550,28 @@ class MultiChainWalletService:
         
         # Bitcoin
         if asset == 'BTC':
-            if amount < Decimal('100') and recipient.lower().startswith('lnbc'):
-                return 'lightning'
             return 'bitcoin'
         
-        # USDT
+        # USDT - Optimized routing
         if asset == 'USDT':
             if amount < Decimal('500'):
                 return 'polygon'  # Gasless
-            return 'tron'  # Best liquidity
+            elif amount < Decimal('5000'):
+                return 'arbitrum'  # Low cost
+            else:
+                return 'tron'  # Best liquidity for large amounts
         
         # ETH
         if asset == 'ETH':
-            return 'arbitrum'
+            return 'arbitrum'  # Lower fees
+        
+        # New chain native assets
+        if asset == 'TON':
+            return 'ton'
+        if asset == 'TRX':
+            return 'tron' 
+        if asset == 'SOL':
+            return 'solana'
         
         return self.ASSET_CHAIN_MAP.get(asset, 'algorand')
     
@@ -646,3 +656,35 @@ class MultiChainWalletService:
             'solana': '<1 second'
         }
         return times.get(chain, '1-5 minutes')
+    
+    # Enhanced auto-routing with cost optimization
+    async def get_optimal_chain_for_asset(self, asset: str, amount: Decimal) -> str:
+        """Cost-optimized chain selection"""
+        
+        routing_rules = {
+            'USDT': {
+                'small': ('polygon', 'Gasless under $500'),
+                'medium': ('arbitrum', 'Low cost $500-$5000'), 
+                'large': ('tron', 'Best liquidity over $5000')
+            },
+            'ETH': {
+                'all': ('arbitrum', 'Lower fees than mainnet')
+            },
+            'BTC': {
+                'all': ('bitcoin', 'Native chain')
+            }
+        }
+        
+        if asset in routing_rules:
+            rules = routing_rules[asset]
+            if asset == 'USDT':
+                if amount < Decimal('500'):
+                    return rules['small'][0]
+                elif amount < Decimal('5000'):
+                    return rules['medium'][0]
+                else:
+                    return rules['large'][0]
+            else:
+                return rules['all'][0]
+        
+        return self.ASSET_CHAIN_MAP.get(asset, 'algorand')

@@ -58,14 +58,6 @@ SUPPORTED_CHAINS = {
         "cost": "Variable",
         "address_pattern": r'^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$'
     },
-    "lightning": {
-        "name": "Lightning Network",
-        "native_asset": "BTC", 
-        "supported_assets": ["BTC"],
-        "speed": "Instant",
-        "cost": "<$0.01",
-        "address_pattern": r'^lnbc[a-z0-9]+$'
-    },
     "ethereum": {
         "name": "Ethereum",
         "native_asset": "ETH",

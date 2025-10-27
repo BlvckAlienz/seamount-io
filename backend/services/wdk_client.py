@@ -54,17 +54,17 @@ class WDKClient:
     
     # Supported chains (from Tether docs)
     SUPPORTED_CHAINS = [
-        'bitcoin',      # SegWit native transfers
-        'ethereum',     # Gasless with sponsored gas
-        'polygon',      # Gasless with sponsored gas
-        'arbitrum',     # Gasless with sponsored gas
-        'ton',          # Native transfers
-        'tron',         # USDT native
-        'solana'        # High-speed
+        'bitcoin',      # ✅ Available via @tetherto/wdk-wallet-btc
+        'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
+        'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
+        'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
+        # 'arbitrum',   # ❌ Commented out - no package yet
+        # 'ton',        # ❌ Commented out - no package yet  
+        # 'solana'      # ❌ Commented out - no package yet
     ]
     
-    # Gasless-enabled chains (Account Abstraction)
-    GASLESS_CHAINS = ['ethereum', 'polygon', 'arbitrum']
+    # EVM gasless chains that use the same wallet manager
+    GASLESS_CHAINS = ['ethereum', 'polygon']  # Add arbitrum later when available
     
     def __init__(self):
         self.settings = get_settings()

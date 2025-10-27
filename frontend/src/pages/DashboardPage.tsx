@@ -137,11 +137,43 @@ const DashboardPage = () => {
   const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
   
   const SUPPORTED_CHAINS = [
-    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
-    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
-    { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
-    { id: 'algorand', name: 'Algorand', symbol: 'ALGO' }
-  ];
+  { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
+  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
+  { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
+  { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
+  { id: 'tron', name: 'TRON', symbol: 'TRX' } // ✅ Newly added
+  // { id: 'arbitrum', name: 'Arbitrum', symbol: 'ETH' }, // ❌ Commented out
+  // { id: 'ton', name: 'TON', symbol: 'TON' }, // ❌ Commented out  
+  // { id: 'solana', name: 'Solana', symbol: 'SOL' } // ❌ Commented out
+];
+
+  // Add this useEffect to verify chain integration
+  useEffect(() => {
+    const verifyChainIntegration = async () => {
+      try {
+        const response = await apiClient.get('/api/v1/wallet/multi-chain-status');
+        const chains = Object.keys(response.data.wallets || {});
+        
+        console.log('✅ ACTIVE CHAINS:', chains);
+        
+        // Verify we have all 8 chains
+        const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'arbitrum', 'ton', 'tron', 'solana'];
+        const missingChains = expectedChains.filter(chain => !chains.includes(chain));
+        
+        if (missingChains.length > 0) {
+          console.warn('⚠️ Missing chains:', missingChains);
+        } else {
+          console.log('🎯 ALL 8 CHAINS ACTIVE!');
+        }
+      } catch (error) {
+        console.error('Chain verification failed:', error);
+      }
+    };
+    
+    if (user) {
+      verifyChainIntegration();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user && userProfile) {

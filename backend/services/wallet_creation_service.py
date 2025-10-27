@@ -11,7 +11,16 @@ logger = logging.getLogger(__name__)
 class WalletCreationService:
     """Smart multi-chain wallet creation service with existing wallet detection"""
     
-    SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon']
+    SUPPORTED_CHAINS = [
+    'algorand',     # ✅ Your existing working integration
+    'bitcoin',      # ✅ Available via @tetherto/wdk-wallet-btc
+    'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
+    'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
+    'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
+    # 'arbitrum',   # ❌ Commented out - no package yet
+    # 'ton',        # ❌ Commented out - no package yet
+    # 'solana'      # ❌ Commented out - no package yet
+]
     
     def __init__(self, db_service, algorand_service, wdk_client):
         self.db = db_service
@@ -395,6 +404,38 @@ class WalletCreationService:
                 'user_id': user_id
             }
     
+    async def create_8_chain_wallet_batch(self, user_id: str) -> Dict[str, Any]:
+        """Optimized batch creation for 8 chains"""
+        
+        creation_priority = [
+            'algorand',  # Fastest - immediate UX
+            'polygon',   # Gasless - no user funding needed  
+            'solana',    # Very fast
+            'arbitrum',  # Low cost
+            'ton',       # Medium speed
+            'tron',      # USDT optimized
+            'ethereum',  # Higher cost but established
+            'bitcoin'    # Slowest but most established
+        ]
+        
+        results = {}
+        for chain in creation_priority:
+            try:
+                # Use the existing single chain creation
+                result = await self.create_single_chain_wallet(user_id, chain)
+                results[chain] = result
+                logger.info(f"✅ {chain} wallet created")
+            except Exception as e:
+                logger.error(f"❌ {chain} wallet failed: {e}")
+                results[chain] = {'success': False, 'error': str(e)}
+        
+        return {
+            'user_id': user_id,
+            'total_chains': len(creation_priority),
+            'successful': sum(1 for r in results.values() if r.get('success')),
+            'results': results
+        }
+
     # ADD TO: wallet_creation_service.py
     async def process_retry_queue(self, batch_size: int = 20):
         """

@@ -56,6 +56,24 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       { symbol: 'USDT', name: 'Tether' },
       { symbol: 'goBTC', name: 'Wrapped Bitcoin' },
       { symbol: 'goETH', name: 'Wrapped Ethereum' }
+    ],
+    arbitrum: [
+    { symbol: 'ETH', name: 'Ethereum' },
+    { symbol: 'USDT', name: 'Tether' },
+    { symbol: 'USDC', name: 'USD Coin' }
+    ],
+    ton: [
+      { symbol: 'TON', name: 'TON Coin' },
+      { symbol: 'USDT', name: 'Tether' }
+    ],
+    tron: [
+      { symbol: 'TRX', name: 'TRON' },
+      { symbol: 'USDT', name: 'Tether' }
+    ],
+    solana: [
+      { symbol: 'SOL', name: 'Solana' },
+      { symbol: 'USDT', name: 'Tether' },
+      { symbol: 'USDC', name: 'USD Coin' }
     ]
   };
 

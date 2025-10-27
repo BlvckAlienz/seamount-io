@@ -18,7 +18,7 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   status, 
   onCardClick
 }) => {
-  const getChainConfig = (chain: string) => {
+    const getChainConfig = (chain: string) => {
     const configs = {
       bitcoin: {
         name: 'Bitcoin',
@@ -43,6 +43,12 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         icon: 'https://cdn-icons-png.flaticon.com/512/6250/6250945.png',
         color: 'from-blue-500 to-cyan-600',
         symbol: 'ALGO'
+      },
+      tron: { // ✅ ADD THIS NEW CONFIG
+        name: 'TRON',
+        icon: 'https://cryptologos.cc/logos/tron-trx-logo.png',
+        color: 'from-red-500 to-red-700',
+        symbol: 'TRX'
       }
     };
     return configs[chain as keyof typeof configs] || configs.algorand;

@@ -14,6 +14,9 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "@tetherto/wdk": "^1.0.0-beta.3",
+    "@tetherto/wdk-wallet-btc": "^1.0.0-beta.3",
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.3",
+    "@tetherto/wdk-wallet-tron": "^1.0.0-beta.2",
     "@txnlab/use-wallet-react": "^4.3.1",
     "dotenv": "^17.2.2",
     "vercel": "^28.18.5"
