@@ -4,7 +4,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -404,15 +404,12 @@ class WalletCreationService:
                 'user_id': user_id
             }
     
-    async def create_8_chain_wallet_batch(self, user_id: str) -> Dict[str, Any]:
-        """Optimized batch creation for 8 chains"""
+    async def create_5_chain_wallet_batch(self, user_id: str) -> Dict[str, Any]:
+        """Optimized batch creation for 5 chains"""
         
         creation_priority = [
             'algorand',  # Fastest - immediate UX
             'polygon',   # Gasless - no user funding needed  
-            'solana',    # Very fast
-            'arbitrum',  # Low cost
-            'ton',       # Medium speed
             'tron',      # USDT optimized
             'ethereum',  # Higher cost but established
             'bitcoin'    # Slowest but most established
