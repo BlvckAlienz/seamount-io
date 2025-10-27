@@ -3,11 +3,8 @@ import logging
 import sys
 import os
 
-# Add backend to path so we can import our services
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from backend.services.multi_chain_wallet_service import MultiChainWalletService
-from backend.dependencies import get_multi_chain_wallet_service
+# Add the parent directory to Python path so we can import backend
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,9 +12,12 @@ logger = logging.getLogger(__name__)
 async def validate_5_chains():
     """Validate all 5 chains are operational"""
     try:
+        # Import inside function to avoid circular imports
+        from backend.dependencies import get_multi_chain_wallet_service
+        
         wallet_service = get_multi_chain_wallet_service()
         
-        # Test chain support - UPDATED FOR 5 CHAINS
+        # Test chain support - 5 CHAINS
         expected_chains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
         
         logger.info("🔍 Validating 5-chain support...")
