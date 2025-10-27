@@ -177,8 +177,8 @@ class MultiChainWalletService:
         if chains:
             wdk_chains = [c for c in chains if c != 'algorand']
         else:
-            # Default: Essential chains
-            wdk_chains = ['bitcoin', 'ethereum', 'polygon']
+            # Default: Essential chains - NOW INCLUDING TRON
+            wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'tron']  # ✅ ADDED TRON
         
         # 3. Create WDK wallets sequentially
         for chain in wdk_chains:
