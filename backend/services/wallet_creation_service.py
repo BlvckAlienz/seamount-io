@@ -346,6 +346,25 @@ class WalletCreationService:
                     )
                     results[chain] = {'success': False, 'error': error_msg}
             
+            # Add to retry queue for background processing
+            queue_data = {
+                'user_id': user_id,
+                'chain': chain,
+                'priority': 5,
+                'scheduled_for': datetime.utcnow().isoformat(),
+                'retry_count': 0,
+                'max_retries': 10,
+                'error_message': error_msg,
+                'created_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+
+            await asyncio.to_thread(
+                lambda: self.db.supabase.table("wallet_creation_queue")
+                .upsert(queue_data, on_conflict='user_id,chain')
+                .execute()
+            )
+
             # Check if all succeeded
             successful_creations = [r for r in results.values() if r.get('success')]
             all_succeeded = len(successful_creations) == len(target_chains)
@@ -375,6 +394,155 @@ class WalletCreationService:
                 'error': str(e),
                 'user_id': user_id
             }
+    
+    # ADD TO: wallet_creation_service.py
+    async def process_retry_queue(self, batch_size: int = 20):
+        """
+        Background process to retry failed wallet creations from the queue
+        Called by admin endpoint and scheduled jobs
+        """
+        try:
+            logger.info(f"🔄 Processing wallet creation retry queue, batch size: {batch_size}")
+            
+            # Get queued items that are due for retry
+            queue_items = await asyncio.to_thread(
+                lambda: self.db.supabase.table("wallet_creation_queue")
+                .select("*")
+                .lte("scheduled_for", datetime.utcnow().isoformat())
+                .is_("locked_at", "null")  # Not currently locked
+                .limit(batch_size)
+                .execute()
+            )
+            
+            if not queue_items.data:
+                logger.info("✅ No items in retry queue")
+                return {"processed": 0, "successful": 0, "failed": 0}
+            
+            processed = 0
+            successful = 0
+            failed = 0
+            
+            for item in queue_items.data:
+                try:
+                    # Lock the item to prevent duplicate processing
+                    await asyncio.to_thread(
+                        lambda: self.db.supabase.table("wallet_creation_queue")
+                        .update({
+                            "locked_at": datetime.utcnow().isoformat(),
+                            "locked_by": "background_worker"
+                        })
+                        .eq("id", item["id"])
+                        .execute()
+                    )
+                    
+                    # Retry this specific chain for the user
+                    user_id = item["user_id"]
+                    chain = item["chain"]
+                    
+                    logger.info(f"🔄 Retrying {chain} wallet for user {user_id}")
+                    
+                    # Use the same logic as retry_missing_wallets but for single chain
+                    if chain == 'algorand':
+                        wallet_result = await self.algorand_service.create_algorand_wallet(user_id)
+                        if wallet_result and wallet_result.get('wallet_address'):
+                            # Mark as success
+                            await asyncio.to_thread(
+                                lambda: self.db.supabase.table("wallet_creation_status")
+                                .update({
+                                    'status': 'success',
+                                    'address': wallet_result['wallet_address'],
+                                    'updated_at': datetime.utcnow().isoformat()
+                                })
+                                .eq('user_id', user_id)
+                                .eq('chain', chain)
+                                .execute()
+                            )
+                            successful += 1
+                            
+                            # Remove from queue
+                            await asyncio.to_thread(
+                                lambda: self.db.supabase.table("wallet_creation_queue")
+                                .delete()
+                                .eq("id", item["id"])
+                                .execute()
+                            )
+                        else:
+                            raise Exception("Algorand wallet creation failed")
+                    else:
+                        # Handle WDK chains (Bitcoin, Ethereum, Polygon)
+                        if self.wdk_client:
+                            wdk_result = await self.wdk_client.create_wallet(chain)
+                            if wdk_result and wdk_result.get('success') and wdk_result.get('address'):
+                                # Mark as success
+                                await asyncio.to_thread(
+                                    lambda: self.db.supabase.table("wallet_creation_status")
+                                    .update({
+                                        'status': 'success',
+                                        'address': wdk_result['address'],
+                                        'updated_at': datetime.utcnow().isoformat()
+                                    })
+                                    .eq('user_id', user_id)
+                                    .eq('chain', chain)
+                                    .execute()
+                                )
+                                successful += 1
+                                
+                                # Remove from queue
+                                await asyncio.to_thread(
+                                    lambda: self.db.supabase.table("wallet_creation_queue")
+                                    .delete()
+                                    .eq("id", item["id"])
+                                    .execute()
+                                )
+                            else:
+                                error_msg = wdk_result.get('error', 'WDK wallet creation failed')
+                                raise Exception(error_msg)
+                        else:
+                            raise Exception("WDK client not available")
+                    
+                    processed += 1
+                    
+                except Exception as e:
+                    logger.error(f"❌ Failed to process queue item {item['id']}: {e}")
+                    failed += 1
+                    
+                    # Update retry count and schedule for later
+                    retry_count = item.get('retry_count', 0) + 1
+                    if retry_count >= item.get('max_retries', 10):
+                        # Max retries reached - give up
+                        await asyncio.to_thread(
+                            lambda: self.db.supabase.table("wallet_creation_queue")
+                            .delete()
+                            .eq("id", item["id"])
+                            .execute()
+                        )
+                        logger.error(f"🚨 Max retries reached for {chain} wallet, user {user_id}")
+                    else:
+                        # Schedule next retry with exponential backoff
+                        next_retry = datetime.utcnow() + timedelta(minutes=5 * retry_count)
+                        await asyncio.to_thread(
+                            lambda: self.db.supabase.table("wallet_creation_queue")
+                            .update({
+                                "retry_count": retry_count,
+                                "scheduled_for": next_retry.isoformat(),
+                                "locked_at": None,  # Unlock for next attempt
+                                "error_message": str(e),
+                                "updated_at": datetime.utcnow().isoformat()
+                            })
+                            .eq("id", item["id"])
+                            .execute()
+                        )
+            
+            logger.info(f"✅ Retry queue processed: {processed} items, {successful} successful, {failed} failed")
+            return {
+                "processed": processed,
+                "successful": successful, 
+                "failed": failed
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing retry queue: {e}")
+            return {"processed": 0, "successful": 0, "failed": 0, "error": str(e)}
     
     async def _increment_retry_count(self, user_id: str):
         """Increment retry count in user profile"""

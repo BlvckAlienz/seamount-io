@@ -120,7 +120,7 @@ async def retry_wallet_creation(
                 )
         
         # Perform retry
-        result = await service.retry_failed_wallets(user_id, chains)
+        result = await service.retry_missing_wallets(user_id, chains)
         
         return {
             "success": True,

@@ -366,7 +366,7 @@ async def lifespan(app: FastAPI):
                         wallet_creation_service = WalletCreationService(
                             db_service=db_service,
                             algorand_service=algorand_service,
-                            wdk_client=None
+                            wdk_client=multi_chain_wallet_service.wdk  # Use actual WDK client
                         )
                         logger.info("✅ WalletCreationService initialized")
                     except Exception as e:

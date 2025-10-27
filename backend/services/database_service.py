@@ -1,5 +1,5 @@
 # File Location: backend/services/database_service.py
-# PRODUCTION READY: Fixed indentation errors
+# 🚀 DEFINITIVE PRODUCTION READY VERSION
 
 import asyncio
 import logging
@@ -21,7 +21,7 @@ from backend.config import get_settings
 logger = logging.getLogger(__name__)
 
 class DatabaseService:
-    """Production-ready database service with optimal error handling"""
+    """Production-ready database service with wallet creation support"""
     
     def __init__(self, supabase_client: Optional[Client] = None):
         self.settings = get_settings()
@@ -32,7 +32,6 @@ class DatabaseService:
             if not self.settings.SUPABASE_URL or not self.settings.SUPABASE_SERVICE_KEY:
                 raise ValueError("Supabase URL and Service Key must be configured")
             
-            # ✅ FIX: Remove proxy parameter
             self.supabase: Client = create_client(
                 self.settings.SUPABASE_URL,
                 self.settings.SUPABASE_SERVICE_KEY.get_secret_value()
@@ -45,7 +44,221 @@ class DatabaseService:
         self.circuit_breaker_threshold = 5
         
         logger.info("✅ DatabaseService initialized successfully")
-    
+
+    # 🆕 NEW METHODS FOR WALLET CREATION SERVICE
+    async def get_user_wallet_response(self, user_id: str) -> Any:
+        """
+        Get user wallet in Supabase response format for wallet_creation_service
+        Returns response with .data attribute for compatibility
+        """
+        try:
+            logger.debug(f"[DB] Fetching user wallet response: {user_id}")
+            
+            # Use asyncio.to_thread to keep consistent pattern
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("user_wallets")
+                .select("algorand_address")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"[DB] Error fetching user wallet response {user_id}: {str(e)}")
+            # Return empty response structure for error handling
+            class EmptyResponse:
+                def __init__(self):
+                    self.data = []
+            return EmptyResponse()
+
+    async def get_multi_chain_addresses_response(self, user_id: str) -> Any:
+        """
+        Get multi-chain addresses in Supabase response format for wallet_creation_service
+        Returns response with .data attribute for compatibility
+        """
+        try:
+            logger.debug(f"[DB] Fetching multi-chain addresses response: {user_id}")
+            
+            # Use asyncio.to_thread to keep consistent pattern
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("multi_chain_addresses")
+                .select("blockchain, address")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"[DB] Error fetching multi-chain addresses response {user_id}: {str(e)}")
+            # Return empty response structure for error handling
+            class EmptyResponse:
+                def __init__(self):
+                    self.data = []
+            return EmptyResponse()
+
+    async def get_wallet_creation_status(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Get wallet creation status records for a user
+        """
+        try:
+            logger.debug(f"[DB] Fetching wallet creation status: {user_id}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_status")
+                .select("*")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            
+            return response.data if response.data else []
+            
+        except Exception as e:
+            logger.error(f"[DB] Error fetching wallet creation status {user_id}: {str(e)}")
+            return []
+
+    async def upsert_wallet_creation_status(self, status_data: Dict[str, Any]) -> bool:
+        """
+        Upsert wallet creation status record
+        """
+        try:
+            logger.debug(f"[DB] Upserting wallet creation status: {status_data.get('user_id')}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_status")
+                .upsert(status_data)
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error upserting wallet creation status: {str(e)}")
+            return False
+
+    async def insert_wallet_creation_status(self, status_data: Dict[str, Any]) -> bool:
+        """
+        Insert new wallet creation status record
+        """
+        try:
+            logger.debug(f"[DB] Inserting wallet creation status: {status_data.get('user_id')}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_status")
+                .insert(status_data)
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error inserting wallet creation status: {str(e)}")
+            return False
+
+    async def update_wallet_creation_status(self, user_id: str, chain: str, update_data: Dict[str, Any]) -> bool:
+        """
+        Update wallet creation status for specific user and chain
+        """
+        try:
+            logger.debug(f"[DB] Updating wallet creation status: {user_id}, {chain}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_status")
+                .update(update_data)
+                .eq("user_id", user_id)
+                .eq("chain", chain)
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error updating wallet creation status {user_id}, {chain}: {str(e)}")
+            return False
+
+    async def get_wallet_creation_queue_items(self, batch_size: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get wallet creation queue items ready for processing
+        """
+        try:
+            logger.debug(f"[DB] Fetching wallet creation queue items, batch: {batch_size}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_queue")
+                .select("*")
+                .lte("scheduled_for", datetime.utcnow().isoformat())
+                .is_("locked_at", "null")
+                .limit(batch_size)
+                .execute()
+            )
+            
+            return response.data if response.data else []
+            
+        except Exception as e:
+            logger.error(f"[DB] Error fetching wallet creation queue: {str(e)}")
+            return []
+
+    async def upsert_wallet_creation_queue(self, queue_data: Dict[str, Any]) -> bool:
+        """
+        Upsert wallet creation queue item
+        """
+        try:
+            logger.debug(f"[DB] Upserting wallet creation queue: {queue_data.get('user_id')}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_queue")
+                .upsert(queue_data, on_conflict='user_id,chain')
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error upserting wallet creation queue: {str(e)}")
+            return False
+
+    async def update_wallet_creation_queue(self, item_id: str, update_data: Dict[str, Any]) -> bool:
+        """
+        Update wallet creation queue item
+        """
+        try:
+            logger.debug(f"[DB] Updating wallet creation queue item: {item_id}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_queue")
+                .update(update_data)
+                .eq("id", item_id)
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error updating wallet creation queue item {item_id}: {str(e)}")
+            return False
+
+    async def delete_wallet_creation_queue_item(self, item_id: str) -> bool:
+        """
+        Delete wallet creation queue item
+        """
+        try:
+            logger.debug(f"[DB] Deleting wallet creation queue item: {item_id}")
+            
+            response = await asyncio.to_thread(
+                lambda: self.supabase.table("wallet_creation_queue")
+                .delete()
+                .eq("id", item_id)
+                .execute()
+            )
+            
+            return bool(response.data)
+            
+        except Exception as e:
+            logger.error(f"[DB] Error deleting wallet creation queue item {item_id}: {str(e)}")
+            return False
+
+    # EXISTING METHODS (KEEP ALL YOUR CURRENT FUNCTIONALITY)
     async def create_user_profile(self, profile_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Create user profile with proper user_id population"""
         try:

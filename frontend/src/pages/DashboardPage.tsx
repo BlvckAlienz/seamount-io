@@ -171,7 +171,7 @@ const DashboardPage = () => {
 
   const fetchMultiChainWallets = async () => {
     try {
-      const response = await apiClient.get('/api/v1/wallet/multi-chain-status');
+      const response = await apiClient.get('/api/v1/wallet-creation/status');
       if (response.data.success) {
         setMultiChainWallets(response.data.wallets || {});
       }

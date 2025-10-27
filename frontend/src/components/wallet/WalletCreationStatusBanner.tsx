@@ -33,7 +33,8 @@ const WalletCreationStatusBanner: React.FC<WalletCreationStatusBannerProps> = ({
 }) => {
   const [retrying, setRetrying] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  
   // Don't show if complete or dismissed
   if (status.overall_complete || dismissed) {
     return null;
