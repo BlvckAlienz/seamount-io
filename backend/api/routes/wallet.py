@@ -2,7 +2,7 @@
 """
 🎯 ULTIMATE Multi-Chain Wallet API Routes
 Merged for Maximum Efficiency & Supremacy
-Unified endpoints for Algorand + 9 WDK chains
+Unified endpoints for Algorand + 4 WDK chains
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,7 +20,7 @@ class ValidateAddressRequest(BaseModel):
 
 class WalletCreateRequest(BaseModel):
     chains: Optional[List[str]] = None  # None = default essential chains
-    create_all: bool = False  # True = create on all 9 chains
+    create_all: bool = False  # True = create on all 5 chains
 
 class SendPaymentRequest(BaseModel):
     recipient: str
@@ -301,14 +301,14 @@ async def get_multi_chain_status(
         db = DatabaseService()
         
         # ✅ ONLY CHECK FOR 5 SUPPORTED CHAINS
-        SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+        SUPPORTED_CHAIN_IDS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
         
         # Get WDK chain wallets - ONLY from supported chains
-        wdk_wallets = db.supabase.table("multi_chain_addresses")\
-            .select("blockchain, address, created_at")\
-            .eq("user_id", user_id)\
-            .in_("blockchain", SUPPORTED_CHAINS) # ✅ CRITICAL FILTER
-            .execute()
+        wdk_wallets = db.supabase.table("multi_chain_addresses") \
+            .select("blockchain, address, created_at") \
+            .eq("user_id", user_id) \
+            .in_("blockchain", SUPPORTED_CHAIN_IDS) \
+            .execute()  # ✅ FIXED: Removed line continuation character issue
         
         wallets = {}
         if wdk_wallets.data:
@@ -325,9 +325,9 @@ async def get_multi_chain_status(
                 }
         
         # Get Algorand wallet (legacy)
-        algo_wallet = db.supabase.table("user_wallets")\
-            .select("algorand_address")\
-            .eq("user_id", user_id)\
+        algo_wallet = db.supabase.table("user_wallets") \
+            .select("algorand_address") \
+            .eq("user_id", user_id) \
             .execute()
             
         if algo_wallet.data and len(algo_wallet.data) > 0 and algo_wallet.data[0].get("algorand_address"):
