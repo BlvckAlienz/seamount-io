@@ -26,7 +26,7 @@ class WalletCreationService:
         self.db = db_service
         self.algorand_service = algorand_service
         self.wdk_client = wdk_client
-        logger.info("✅ WalletCreationService initialized with smart detection")
+        logger.info("✅ WalletCreationService initialized with 5-chain hard limit")
     
     async def detect_existing_wallets(self, user_id: str) -> Dict[str, str]:
         """

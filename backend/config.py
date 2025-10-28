@@ -31,12 +31,8 @@ class BlockchainNetwork(str, Enum):
     ALGORAND = "algorand"
     ETHEREUM = "ethereum"
     POLYGON = "polygon"
-    ARBITRUM = "arbitrum"
     BITCOIN = "bitcoin"
-    LIGHTNING = "lightning"  # Bitcoin Lightning Network
-    TON = "ton"
-    SOLANA = "solana"        # Future
-    TRON = "tron"            # Future
+    TRON = "tron"  
 
 class TransactionType(str, Enum):
     """Transaction Types with Different Fee Structures"""
@@ -106,10 +102,7 @@ class MultiChainBusinessModel:
         BlockchainNetwork.ALGORAND: Decimal("0.50"),    # 50% markup ($0.001 → $0.0015)
         BlockchainNetwork.ETHEREUM: Decimal("0.25"),    # 25% markup (high base cost)
         BlockchainNetwork.POLYGON: Decimal("0.40"),     # 40% markup
-        BlockchainNetwork.ARBITRUM: Decimal("0.35"),    # 35% markup
-        BlockchainNetwork.BITCOIN: Decimal("0.30"),     # 30% markup
-        BlockchainNetwork.LIGHTNING: Decimal("0.60"),   # 60% markup (tiny amounts)
-        BlockchainNetwork.TON: Decimal("0.45")          # 45% markup
+        BlockchainNetwork.BITCOIN: Decimal("0.30")      # 30% markup
     }
     
     # Base Gas Costs (Actual blockchain costs - we add markup on top)
@@ -117,10 +110,7 @@ class MultiChainBusinessModel:
         BlockchainNetwork.ALGORAND: Decimal("0.001"),
         BlockchainNetwork.ETHEREUM: Decimal("0.50"),    # Variable, this is conservative
         BlockchainNetwork.POLYGON: Decimal("0.01"),
-        BlockchainNetwork.ARBITRUM: Decimal("0.05"),
-        BlockchainNetwork.BITCOIN: Decimal("0.25"),     # Variable
-        BlockchainNetwork.LIGHTNING: Decimal("0.001"),  # Micropayment fees
-        BlockchainNetwork.TON: Decimal("0.01")
+        BlockchainNetwork.BITCOIN: Decimal("0.25")      # Variable
     }
     
     # FX Spread Capture (Hidden in exchange rates)

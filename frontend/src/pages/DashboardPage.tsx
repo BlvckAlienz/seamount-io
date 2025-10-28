@@ -144,7 +144,7 @@ const DashboardPage = () => {
   { id: 'tron', name: 'TRON', symbol: 'TRX' } // ✅ Newly added
 ];
 
-  // Add this useEffect to verify chain integration
+  // Update the validation useEffect to only expect 5 chains
   useEffect(() => {
     const verifyChainIntegration = async () => {
       try {
@@ -153,14 +153,14 @@ const DashboardPage = () => {
         
         console.log('✅ ACTIVE CHAINS:', chains);
         
-        // Verify we have all 5 chains
+        // ✅ ONLY EXPECT 5 CHAINS
         const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron'];
         const missingChains = expectedChains.filter(chain => !chains.includes(chain));
         
         if (missingChains.length > 0) {
           console.warn('⚠️ Missing chains:', missingChains);
         } else {
-          console.log('🎯 ALL 8 CHAINS ACTIVE!');
+          console.log('🎯 5 CHAINS ACTIVE!');
         }
       } catch (error) {
         console.error('Chain verification failed:', error);
