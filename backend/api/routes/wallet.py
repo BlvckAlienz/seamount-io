@@ -74,22 +74,6 @@ SUPPORTED_CHAINS = {
         "cost": "Gasless (USDT pays)",
         "address_pattern": r'^0x[a-fA-F0-9]{40}$'
     },
-    "arbitrum": {
-        "name": "Arbitrum",
-        "native_asset": "ETH",
-        "supported_assets": ["ETH", "USDT", "USDC"], 
-        "speed": "1 second",
-        "cost": "Gasless (USDT pays)",
-        "address_pattern": r'^0x[a-fA-F0-9]{40}$'
-    },
-    "ton": {
-        "name": "TON",
-        "native_asset": "TON",
-        "supported_assets": ["TON", "USDT"],
-        "speed": "5 seconds",
-        "cost": "~$0.01",
-        "address_pattern": r'^[a-zA-Z0-9_-]{48}$'
-    },
     "tron": {
         "name": "TRON",
         "native_asset": "TRX", 
@@ -97,18 +81,10 @@ SUPPORTED_CHAINS = {
         "speed": "3 seconds",
         "cost": "~$0.05",
         "address_pattern": r'^T[A-Za-z1-9]{33}$'
-    },
-    "solana": {
-        "name": "Solana",
-        "native_asset": "SOL",
-        "supported_assets": ["SOL", "USDT", "USDC"],
-        "speed": "<1 second", 
-        "cost": "~$0.001",
-        "address_pattern": r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'
     }
 }
 
-GASLESS_CHAINS = ["ethereum", "polygon", "arbitrum"]
+GASLESS_CHAINS = ["ethereum", "polygon"]
 
 # ========== ENDPOINTS ==========
 
@@ -138,7 +114,7 @@ async def create_multi_chain_wallet(
                     logger.warning(f"Unsupported chain requested: {chain}")
         else:
             # Default essential chains
-            chains = ["algorand", "bitcoin", "ethereum", "polygon"]
+            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
         
         logger.info(f"Creating multi-chain wallet for user {user_id} on chains: {chains}")
         
@@ -199,7 +175,7 @@ async def create_multi_chain_wallet_legacy(
         elif request and request.chains:
             chains = [chain for chain in request.chains if chain in SUPPORTED_CHAINS]
         else:
-            chains = ["algorand", "bitcoin", "ethereum", "polygon"]
+            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
         
         logger.info(f"Creating multi-chain wallet via legacy endpoint for user {user_id}")
         
@@ -315,7 +291,7 @@ async def get_multi_chain_status(
     wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
 ):
     """
-    📊 GET MULTI-CHAIN WALLET STATUS
+    📊 GET MULTI-CHAIN WALLET STATUS - FIXED FOR 5 CHAINS ONLY
     """
     try:
         user_id = current_user["id"]
@@ -324,10 +300,14 @@ async def get_multi_chain_status(
         from backend.services.database_service import DatabaseService
         db = DatabaseService()
         
-        # Get WDK chain wallets
+        # ✅ ONLY CHECK FOR 5 SUPPORTED CHAINS
+        SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+        
+        # Get WDK chain wallets - ONLY from supported chains
         wdk_wallets = db.supabase.table("multi_chain_addresses")\
             .select("blockchain, address, created_at")\
             .eq("user_id", user_id)\
+            .in_("blockchain", SUPPORTED_CHAINS)\  # ✅ CRITICAL FILTER
             .execute()
         
         wallets = {}
@@ -528,7 +508,7 @@ async def get_supported_chains():
             "chains": chains_list,
             "total_chains": len(chains_list),
             "gasless_chains": GASLESS_CHAINS,
-            "default_chains": ["algorand", "bitcoin", "ethereum", "polygon"]
+            "default_chains": ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
         }
         
     except Exception as e:

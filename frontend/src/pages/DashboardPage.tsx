@@ -142,9 +142,6 @@ const DashboardPage = () => {
   { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
   { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
   { id: 'tron', name: 'TRON', symbol: 'TRX' } // ✅ Newly added
-  // { id: 'arbitrum', name: 'Arbitrum', symbol: 'ETH' }, // ❌ Commented out
-  // { id: 'ton', name: 'TON', symbol: 'TON' }, // ❌ Commented out  
-  // { id: 'solana', name: 'Solana', symbol: 'SOL' } // ❌ Commented out
 ];
 
   // Add this useEffect to verify chain integration
@@ -156,8 +153,8 @@ const DashboardPage = () => {
         
         console.log('✅ ACTIVE CHAINS:', chains);
         
-        // Verify we have all 8 chains
-        const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'arbitrum', 'ton', 'tron', 'solana'];
+        // Verify we have all 5 chains
+        const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron'];
         const missingChains = expectedChains.filter(chain => !chains.includes(chain));
         
         if (missingChains.length > 0) {
