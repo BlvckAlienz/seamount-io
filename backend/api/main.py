@@ -228,6 +228,14 @@ except ImportError as e:
     logger.error(f"❌ Yield router import error: {e}")
     routers_available['yield'] = None
 
+# 🔒 ADD WALLET RECOVERY ROUTER IMPORT
+try:
+    from backend.api.routes.wallet_recovery import router as wallet_recovery_router
+    routers_available['wallet_recovery'] = wallet_recovery_router
+    logger.info("✅ Wallet recovery router imported")
+except ImportError as e:
+    logger.error(f"❌ Wallet recovery router import error: {e}")
+    routers_available['wallet_recovery'] = None
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
@@ -541,6 +549,11 @@ if routers_available.get('wallet_connect'):
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
+
+# 🔒 ADD WALLET RECOVERY ROUTE REGISTRATION
+if routers_available.get('wallet_recovery'):
+    app.include_router(routers_available['wallet_recovery'], prefix="/api/wallet-recovery", tags=["Wallet Recovery"])
+    logger.info("✅ Wallet recovery router registered at /api/wallet-recovery")
 
 # ===== CORE API ENDPOINTS =====
 
