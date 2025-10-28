@@ -31,9 +31,7 @@ class MultiChainWalletService:
         'BTC': 'bitcoin',
         'ETH': 'ethereum',
         'MATIC': 'polygon',
-        'TON': 'ton',            # ✅ NEW
-        'TRX': 'tron',           # ✅ NEW
-        'SOL': 'solana'          # ✅ NEW
+        'TRX': 'tron'           # ✅ NEW
     }
     
     def __init__(self, db_service: DatabaseService, algorand_service: AlgorandService, 
