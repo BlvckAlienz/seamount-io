@@ -246,21 +246,24 @@ class WalletCreationService:
                 "user_id": user_id
             }
     
-    async def retry_missing_wallets(self, user_id: str, specific_chains: Optional[List[str]] = None) -> Dict[str, any]:
-        """
-        Smart retry: Actually creates missing wallets with proper error handling
-        """
+    async def retry_missing_wallets(self, user_id: str, specific_chains: Optional[List[str]] = None):
+        """Smart retry: Actually creates missing wallets with proper error handling"""
         try:
-            logger.info(f"🔄 Smart retry requested for user {user_id}")
+            # 🔥 NUCLEAR FIX: FORCE ONLY 5 SUPPORTED CHAINS
+            SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
             
-            # Get current status to see what's actually missing
             current_status = await self.get_wallet_status(user_id)
             missing_chains = current_status['summary']['missing_chains']
+            
+            # 🔥 CRITICAL: FILTER OUT ANY NON-SUPPORTED CHAINS
+            missing_chains = [chain for chain in missing_chains if chain in SUPPORTED_CHAINS]
+            
+            logger.info(f"🔄 FILTERED missing_chains: {missing_chains}")
             
             if not missing_chains:
                 return {
                     'success': True,
-                    'message': 'All wallets already exist! Nothing to retry.',
+                    'message': 'All supported wallets already exist!',
                     'user_id': user_id,
                     'retried_chains': [],
                     'results': {}
