@@ -169,7 +169,7 @@ async def send_cross_border_payment(
             user_id=user_id,
             transaction_type="cross_border",
             amount=amount,
-            fee_rate=Decimal("0.029"),  # 2.9%
+            fee_rate=Decimal("0.012"),  # 1.2% (was 0.029)
             platform_fee=Decimal(str(fee_calculation["total_fee"])),
             network_fee=Decimal("0.01"),
             blockchain="algorand",
@@ -308,7 +308,7 @@ async def create_fiat_onramp(
             user_id=user_id,
             transaction_type="on_ramp",
             amount=amount,
-            fee_rate=Decimal("0.025"),  # 2.5%
+            fee_rate=Decimal("0.018"),  # 1.8%
             platform_fee=Decimal(str(fee_calculation["total_fee"])),
             network_fee=Decimal("0.01"),
             blockchain="algorand",

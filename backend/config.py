@@ -1,7 +1,7 @@
 # File: backend/config.py
 """
 SEAMOUNT MULTI-CHAIN BUSINESS MODEL CONFIGURATION
-Post-WDK Integration: Algorand + Bitcoin + Ethereum + TON + Lightning Network
+Post-WDK Integration: Algorand + Bitcoin + Ethereum + Tron + Polygon
 Revenue Optimization: B2C + B2B API Licensing
 """
 
@@ -32,7 +32,7 @@ class BlockchainNetwork(str, Enum):
     ETHEREUM = "ethereum"
     POLYGON = "polygon"
     BITCOIN = "bitcoin"
-    TRON = "tron"  
+    TRON = "tron"
 
 class TransactionType(str, Enum):
     """Transaction Types with Different Fee Structures"""
@@ -41,7 +41,6 @@ class TransactionType(str, Enum):
     OFF_RAMP = "off_ramp"
     P2P_LOCAL = "p2p_local"
     ASSET_SWAP = "asset_swap"
-    LIGHTNING_PAYMENT = "lightning_payment"
     MULTI_CHAIN_BRIDGE = "multi_chain_bridge"
 
 class PricingRegion(str, Enum):
@@ -64,33 +63,31 @@ class MultiChainBusinessModel:
     1. Abstract ALL blockchain complexity from users
     2. Optimize routing for lowest cost + fastest settlement
     3. Premium B2B API pricing ($3.5k-$15k/month)
-    4. Competitive B2C transaction fees (2.5-2.9%)
+    4. Competitive B2C transaction fees (1.2-1.8%)
     5. Hidden revenue optimization (gas markups, spreads)
     """
     
     # ========================================================================
-    # B2C TRANSACTION FEES (User-Facing)
+    # B2C TRANSACTION FEES (User-Facing) - UPDATED COMPETITIVE PRICING
     # ========================================================================
     
     TRANSACTION_FEES = {
-        TransactionType.CROSS_BORDER: Decimal("0.029"),      # 2.9% (competitive)
-        TransactionType.ON_RAMP: Decimal("0.025"),           # 2.5% (premium justified)
-        TransactionType.OFF_RAMP: Decimal("0.028"),          # 2.8% (bank withdrawal)
-        TransactionType.P2P_LOCAL: Decimal("0.008"),         # 0.8% (speed premium)
-        TransactionType.ASSET_SWAP: Decimal("0.012"),        # 1.2% (average)
-        TransactionType.LIGHTNING_PAYMENT: Decimal("0.005"), # 0.5% (micropayments)
-        TransactionType.MULTI_CHAIN_BRIDGE: Decimal("0.015") # 1.5% (bridge fee)
+        TransactionType.CROSS_BORDER: Decimal("0.012"),     # 1.2% (was 2.9%)
+        TransactionType.ON_RAMP: Decimal("0.018"),          # 1.8% (was 2.5%)
+        TransactionType.OFF_RAMP: Decimal("0.018"),         # 1.8% (was 2.8%)
+        TransactionType.P2P_LOCAL: Decimal("0.007"),        # 0.7% (was 0.8%)
+        TransactionType.ASSET_SWAP: Decimal("0.012"),       # 1.2% (unchanged)
+        TransactionType.MULTI_CHAIN_BRIDGE: Decimal("0.015") # 1.5% (unchanged)
     }
     
-    # Minimum Fees (Prevent dust transactions)
+    # Updated Minimum Fees - KEEP $2.00 FOR CASH-RAMP DEPENDENT TRANSACTIONS
     MINIMUM_FEES = {
-        TransactionType.CROSS_BORDER: Decimal("2.50"),
-        TransactionType.ON_RAMP: Decimal("1.50"),
-        TransactionType.OFF_RAMP: Decimal("2.00"),
-        TransactionType.P2P_LOCAL: Decimal("0.50"),
-        TransactionType.ASSET_SWAP: Decimal("0.75"),
-        TransactionType.LIGHTNING_PAYMENT: Decimal("0.10"),
-        TransactionType.MULTI_CHAIN_BRIDGE: Decimal("1.00")
+        TransactionType.CROSS_BORDER: Decimal("2.00"),      # $2.00 min (Cashramp cap hedge)
+        TransactionType.ON_RAMP: Decimal("0.75"),           # $0.75 min (was $1.50)
+        TransactionType.OFF_RAMP: Decimal("2.00"),          # $2.00 min (Cashramp cap hedge)
+        TransactionType.P2P_LOCAL: Decimal("0.25"),         # $0.25 min (was $0.50)
+        TransactionType.ASSET_SWAP: Decimal("0.50"),        # $0.50 min (was $0.75)
+        TransactionType.MULTI_CHAIN_BRIDGE: Decimal("0.75") # $0.75 min (was $1.00)
     }
     
     # ========================================================================
@@ -102,7 +99,8 @@ class MultiChainBusinessModel:
         BlockchainNetwork.ALGORAND: Decimal("0.50"),    # 50% markup ($0.001 → $0.0015)
         BlockchainNetwork.ETHEREUM: Decimal("0.25"),    # 25% markup (high base cost)
         BlockchainNetwork.POLYGON: Decimal("0.40"),     # 40% markup
-        BlockchainNetwork.BITCOIN: Decimal("0.30")      # 30% markup
+        BlockchainNetwork.BITCOIN: Decimal("0.30"),     # 30% markup
+        BlockchainNetwork.TRON: Decimal("0.35")         # 35% markup
     }
     
     # Base Gas Costs (Actual blockchain costs - we add markup on top)
@@ -110,7 +108,8 @@ class MultiChainBusinessModel:
         BlockchainNetwork.ALGORAND: Decimal("0.001"),
         BlockchainNetwork.ETHEREUM: Decimal("0.50"),    # Variable, this is conservative
         BlockchainNetwork.POLYGON: Decimal("0.01"),
-        BlockchainNetwork.BITCOIN: Decimal("0.25")      # Variable
+        BlockchainNetwork.BITCOIN: Decimal("0.25"),     # Variable
+        BlockchainNetwork.TRON: Decimal("0.001")
     }
     
     # FX Spread Capture (Hidden in exchange rates)
@@ -205,8 +204,8 @@ class MultiChainBusinessModel:
     BRIDGE_FEES = {
         "algorand_to_ethereum": Decimal("0.015"),
         "ethereum_to_algorand": Decimal("0.015"),
-        "bitcoin_to_lightning": Decimal("0.005"),
-        "lightning_to_bitcoin": Decimal("0.005"),
+        "algorand_to_tron": Decimal("0.015"),
+        "tron_to_algorand": Decimal("0.015"),
         "default": Decimal("0.015")
     }
     
@@ -220,7 +219,6 @@ class MultiChainBusinessModel:
         "cashramp_p2p": Decimal("0.012"),
         "paystack_onramp": Decimal("0.015"),
         "kyc_per_user": Decimal("2.00"),
-        "lightning_node": Decimal("0.0005"),
         "operational_buffer": Decimal("0.003")
     }
     
@@ -232,7 +230,6 @@ class MultiChainBusinessModel:
     def calculate_total_fee(
         transaction_type: TransactionType,
         amount: Decimal,
-        # ❌ REMOVED: user_tier: UserTier = UserTier.STANDARD,
         from_asset: Optional[str] = None,
         to_asset: Optional[str] = None,
         blockchain: Optional[BlockchainNetwork] = None
@@ -415,8 +412,6 @@ class MultiChainBusinessModel:
             return amount * MultiChainBusinessModel.PROVIDER_COSTS["cashramp_p2p"]
         elif transaction_type == TransactionType.ON_RAMP:
             return amount * MultiChainBusinessModel.PROVIDER_COSTS["paystack_onramp"]
-        elif transaction_type == TransactionType.LIGHTNING_PAYMENT:
-            return MultiChainBusinessModel.PROVIDER_COSTS["lightning_node"]
         else:
             return amount * MultiChainBusinessModel.PROVIDER_COSTS["operational_buffer"]
     
@@ -583,14 +578,14 @@ class Settings(BaseSettings):
         description="Tether WDK API Key from https://wdk-api.tether.io"
     )
 
+    # UPDATED: Only include our 5 supported chains
     WDK_ENABLED_CHAINS: List[str] = Field(default=[
-        "bitcoin", "lightning", "ethereum", "polygon", 
-        "arbitrum", "ton", "tron", "solana"
+        "bitcoin", "ethereum", "polygon", "tron"
     ])
 
     WDK_DEFAULT_CHAIN: str = Field(default="ethereum")
 
-    # Alchemy Configuration (for Ethereum, Polygon, Arbitrum)
+    # Alchemy Configuration (for Ethereum, Polygon)
     ALCHEMY_API_KEY_ETHEREUM: Optional[SecretStr] = Field(
         default=None,
         description="Alchemy API key for Ethereum mainnet"
@@ -599,11 +594,6 @@ class Settings(BaseSettings):
     ALCHEMY_API_KEY_POLYGON: Optional[SecretStr] = Field(
         default=None,
         description="Alchemy API key for Polygon"
-    )
-
-    ALCHEMY_API_KEY_ARBITRUM: Optional[SecretStr] = Field(
-        default=None,
-        description="Alchemy API key for Arbitrum"
     )
     
     # ========================================================================
@@ -616,7 +606,13 @@ class Settings(BaseSettings):
     ALGORAND_CREATOR_MNEMONIC: Optional[SecretStr] = None
     ALGORAND_NETWORK: str = Field(default="mainnet")
 
-    # Supported Assets (Multi-Chain)
+    # ========================================================================
+    # TRON CONFIGURATION
+    # ========================================================================
+    TRON_NETWORK_URL: str = Field(default="https://api.trongrid.io")
+    TRON_API_KEY: Optional[SecretStr] = Field(default=None)
+
+    # Supported Assets (Multi-Chain) - UPDATED for our 5 chains
     SUPPORTED_ASSETS: Dict[str, Dict[str, Any]] = {
         # Algorand Assets
         "USDS": {
@@ -658,6 +654,29 @@ class Settings(BaseSettings):
             "decimals": 6,
             "is_stable": True
         },
+        # Polygon Assets
+        "USDT_POLYGON": {
+            "blockchain": "polygon",
+            "contract_address": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+            "name": "Tether USD (Polygon)",
+            "decimals": 6,
+            "is_stable": True
+        },
+        "USDC_POLYGON": {
+            "blockchain": "polygon",
+            "contract_address": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+            "name": "USD Coin (Polygon)",
+            "decimals": 6,
+            "is_stable": True
+        },
+        # Tron Assets
+        "USDT_TRON": {
+            "blockchain": "tron",
+            "contract_address": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+            "name": "Tether USD (Tron)",
+            "decimals": 6,
+            "is_stable": True
+        },
         # Bitcoin (via WDK)
         "BTC": {
             "blockchain": "bitcoin",
@@ -670,6 +689,13 @@ class Settings(BaseSettings):
             "blockchain": "ethereum",
             "name": "Ethereum",
             "decimals": 18,
+            "is_stable": False
+        },
+        # Tron native
+        "TRX": {
+            "blockchain": "tron",
+            "name": "Tron",
+            "decimals": 6,
             "is_stable": False
         }
     }
@@ -768,9 +794,6 @@ class Settings(BaseSettings):
         if not self.WHITELISTED_API_KEYS_STR:
             return set()
         return {key.strip() for key in self.WHITELISTED_API_KEYS_STR.split(',')}
-
-# ❌ REMOVED: Duplicate Config class (Pydantic v1)
-# This was causing the error
 
 # Create settings instance
 try:

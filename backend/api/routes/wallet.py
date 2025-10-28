@@ -307,7 +307,7 @@ async def get_multi_chain_status(
         wdk_wallets = db.supabase.table("multi_chain_addresses")\
             .select("blockchain, address, created_at")\
             .eq("user_id", user_id)\
-            .in_("blockchain", SUPPORTED_CHAINS)\  # ✅ CRITICAL FILTER
+            .in_("blockchain", SUPPORTED_CHAINS) # ✅ CRITICAL FILTER
             .execute()
         
         wallets = {}

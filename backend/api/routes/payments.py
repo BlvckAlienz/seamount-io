@@ -184,9 +184,9 @@ async def initialize_ngn_onramp(
         amount_ngn = Decimal(str(data.get("amount_fiat", 0)))
         asset = data.get("asset", "USDT")
         
-        # Calculate USDT (2.9% fee)
+        # Calculate USDT (1.8% fee)
         amount_usd = amount_ngn / Decimal("1620")  # NGN rate
-        fee = amount_usd * Decimal("0.029")
+        fee = amount_usd * Decimal("0.018") # 1.8% (was 0.029)
         usdt_to_mint = amount_usd - fee
         
         # Initialize Paystack

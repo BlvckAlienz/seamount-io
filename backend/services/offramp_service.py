@@ -47,7 +47,7 @@ class OfframpService:
         self.oracle = oracle
         
         # Revenue configuration
-        self.fee_rate = Decimal("0.028")  # 2.8%
+        self.fee_rate = Decimal("0.018")  # 1.8%
         self.min_fee = Decimal("2.00")  # $2.00 minimum
         
         # Channel configurations
