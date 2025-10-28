@@ -229,7 +229,7 @@ class WDKClient:
         
         if chains is None:
             # Default: Essential chains from Tether docs
-            chains = ['bitcoin', 'ethereum', 'polygon', 'ton']
+            chains = ['bitcoin', 'ethereum', 'polygon', 'tron']
         
         # Validate chains
         invalid_chains = [c for c in chains if c not in self.SUPPORTED_CHAINS]
