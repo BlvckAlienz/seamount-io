@@ -390,6 +390,28 @@ const DashboardPage = () => {
               <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
             ))}
           </div>
+
+          {/* 🔒 ADD THIS SECURITY CARD - Backup Wallet Seeds */}
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mt-4">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-3 rounded-lg mr-4">
+                <span className="text-2xl">🔒</span>
+              </div>
+              <div>
+                <h3 className="font-semibold text-red-800">Wallet Security</h3>
+                <p className="text-red-600 text-sm">Backup your seed phrases</p>
+              </div>
+            </div>
+            <p className="text-red-700 text-sm mb-4">
+              Secure your assets by backing up your wallet recovery seeds. Required for fund recovery.
+            </p>
+            <button 
+              onClick={handleViewSeedPhrases}
+              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-center"
+            >
+              Backup Seeds Now
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -421,7 +443,7 @@ const DashboardPage = () => {
             </div>
           </div>
         </div>
-
+        
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

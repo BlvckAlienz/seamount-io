@@ -80,31 +80,26 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   const getReliableIcons = (chain: string) => {
     const iconFallbacks: { [key: string]: string[] } = {
       bitcoin: [
-        'https://cryptologos.cc/logos/bitcoin-btc-logo.svg',
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/btc.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/btc.png',
         'https://cryptoicon-api.vercel.app/api/icon/btc'
       ],
       ethereum: [
-        'https://cryptologos.cc/logos/ethereum-eth-logo.svg',
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/eth.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/eth.png',
         'https://cryptoicon-api.vercel.app/api/icon/eth'
       ],
       polygon: [
-        'https://cryptologos.cc/logos/polygon-matic-logo.svg',
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/matic.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/matic.png',
         'https://cryptoicon-api.vercel.app/api/icon/matic'
       ],
       algorand: [
-        'https://cryptologos.cc/logos/algorand-algo-logo.svg',
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/algo.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/algo.png',
         'https://cryptoicon-api.vercel.app/api/icon/algo'
       ],
       tron: [
-        'https://cryptologos.cc/logos/tron-trx-logo.svg',
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/trx.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/trx.png',
         'https://cryptoicon-api.vercel.app/api/icon/trx'

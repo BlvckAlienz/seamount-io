@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff, Settings, LogOut } from 'lucide-react';
+import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff, Settings, LogOut, Key } from 'lucide-react';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -126,6 +126,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     <Settings className="h-4 w-4" />
                     <span>Settings</span>
                   </button>
+                  {/* 🔒 ADD THIS EXACTLY HERE - Backup Wallet Seeds */}
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/wallet-recovery');
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors text-left"
+                  >
+                    <Key className="h-4 w-4" />
+                    <span>Backup Wallet Seeds</span>
+                  </button>
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
@@ -135,6 +146,16 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/wallet-recovery');
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors text-left"
+                  >
+                    <Key className="h-4 w-4" />
+                    <span>Backup Wallet Seeds</span>
                   </button>
                 </div>
               </>

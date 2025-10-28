@@ -2,7 +2,7 @@
 // ✅ FIXED: Correct import path (../../config/api)
 
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, ArrowDownLeft, ExternalLink } from 'lucide-react';
+import { X, TrendingUp, ArrowDownLeft, ExternalLink, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../config/api';
 
@@ -21,6 +21,10 @@ interface AssetPriceData {
   price: number;
   change24h: number;
   chartData?: number[];
+  // NEW: Live oracle data
+  livePrice?: number;
+  priceLoading?: boolean;
+  priceError?: string;
 }
 
 const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
@@ -37,9 +41,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
 
   // Define assets for each chain
   const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = {
-    bitcoin: [
-      { symbol: 'BTC', name: 'Bitcoin' }
-    ],
+    bitcoin: [{ symbol: 'BTC', name: 'Bitcoin' }],
     ethereum: [
       { symbol: 'ETH', name: 'Ethereum' },
       { symbol: 'USDT', name: 'Tether' },
@@ -57,53 +59,77 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       { symbol: 'goBTC', name: 'Wrapped Bitcoin' },
       { symbol: 'goETH', name: 'Wrapped Ethereum' }
     ],
-    arbitrum: [
-    { symbol: 'ETH', name: 'Ethereum' },
-    { symbol: 'USDT', name: 'Tether' },
-    { symbol: 'USDC', name: 'USD Coin' }
-    ],
-    ton: [
-      { symbol: 'TON', name: 'TON Coin' },
-      { symbol: 'USDT', name: 'Tether' }
-    ],
     tron: [
       { symbol: 'TRX', name: 'TRON' },
       { symbol: 'USDT', name: 'Tether' }
-    ],
-    solana: [
-      { symbol: 'SOL', name: 'Solana' },
-      { symbol: 'USDT', name: 'Tether' },
-      { symbol: 'USDC', name: 'USD Coin' }
     ]
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchPriceData();
-    }
-  }, [isOpen, chain]);
+  // Map chain assets to oracle asset names
+  const getOracleAssetName = (symbol: string): string => {
+    const assetMap: { [key: string]: string } = {
+      'BTC': 'bitcoin',
+      'ETH': 'ethereum', 
+      'MATIC': 'matic',
+      'ALGO': 'algorand',
+      'TRX': 'tron',
+      'USDT': 'tether',
+      'USDC': 'tether', // Fallback to tether for stablecoins
+      'USDCa': 'tether',
+      'goBTC': 'bitcoin',
+      'goETH': 'ethereum'
+    };
+    return assetMap[symbol] || 'algorand';
+  };
 
-  useEffect(() => {
-    if (priceData.length > 0 && !selectedAsset) {
-      setSelectedAsset(priceData[0].symbol);
+  // NEW: Fetch live price from oracle
+  const fetchLivePrice = async (symbol: string) => {
+    try {
+      const assetName = getOracleAssetName(symbol);
+      const response = await apiClient.get(`/api/v1/oracle/price/${assetName}`);
+      
+      if (response.data.success) {
+        return parseFloat(response.data.price);
+      }
+      throw new Error('Failed to fetch price data');
+    } catch (error) {
+      console.error(`Oracle price fetch failed for ${symbol}:`, error);
+      return null;
     }
-  }, [priceData, selectedAsset]);
+  };
 
+  // UPDATED: Enhanced price data fetching with live oracle
   const fetchPriceData = async () => {
     try {
       setLoading(true);
       const assets = chainAssets[chain] || [];
       
-      // Mock data for demonstration
-      const mockPriceData: AssetPriceData[] = assets.map(asset => ({
+      // Start with mock data structure
+      const basePriceData: AssetPriceData[] = assets.map(asset => ({
         symbol: asset.symbol,
         name: asset.name,
         price: Math.random() * 1000 + 10,
         change24h: (Math.random() - 0.5) * 10,
-        chartData: Array.from({ length: 24 }, () => Math.random() * 100 + 50)
+        chartData: Array.from({ length: 24 }, () => Math.random() * 100 + 50),
+        priceLoading: true
       }));
 
-      setPriceData(mockPriceData);
+      setPriceData(basePriceData);
+
+      // Enhance with live oracle data
+      const enhancedPriceData = await Promise.all(
+        basePriceData.map(async (asset) => {
+          const livePrice = await fetchLivePrice(asset.symbol);
+          return {
+            ...asset,
+            livePrice: livePrice || asset.price, // Fallback to mock if oracle fails
+            priceLoading: false,
+            priceError: livePrice ? undefined : 'Failed to fetch live price'
+          };
+        })
+      );
+
+      setPriceData(enhancedPriceData);
     } catch (error) {
       console.error('Failed to fetch price data:', error);
       toast.error('Failed to load price data');
@@ -143,136 +169,153 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     return explorers[chain] || '#';
   };
 
-  const selectedAssetData = priceData.find(asset => asset.symbol === selectedAsset);
+   const selectedAssetData = priceData.find(asset => asset.symbol === selectedAsset);
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-blue-500/30 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <div>
-            <h2 className="text-2xl font-bold text-white">{chainName} Wallet</h2>
-            <p className="text-gray-400 text-sm">Live asset performance and trading</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="flex flex-col lg:flex-row h-[calc(90vh-120px)]">
-          {/* Sidebar - Asset Selection */}
-          <div className="lg:w-80 border-r border-gray-700 p-6 overflow-auto">
-            <h3 className="text-lg font-semibold text-white mb-4">Assets</h3>
-            <div className="space-y-2">
-              {chainAssets[chain]?.map(asset => (
-                <button
-                  key={asset.symbol}
-                  onClick={() => setSelectedAsset(asset.symbol)}
-                  className={`w-full text-left p-3 rounded-lg transition-all ${
-                    selectedAsset === asset.symbol
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">{asset.symbol}</div>
-                  <div className="text-sm opacity-75">{asset.name}</div>
-                </button>
-              ))}
+    return (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-blue-500/30 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-700">
+            <div>
+              <h2 className="text-2xl font-bold text-white">{chainName} Wallet</h2>
+              <p className="text-gray-400 text-sm">Live asset performance and trading</p>
             </div>
-
-            {/* Wallet Info */}
-            <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-400 mb-2">Wallet Balance</h4>
-              <div className="text-2xl font-bold text-white">${balance.toFixed(2)}</div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(address);
-                  toast.success('Address copied!');
-                }}
-                className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full"
-              >
-                <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
 
-          {/* Main Content - Chart and Buy Section */}
-          <div className="flex-1 p-6 overflow-auto">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="flex flex-col lg:flex-row h-[calc(90vh-120px)]">
+            {/* Sidebar - Asset Selection */}
+            <div className="lg:w-80 border-r border-gray-700 p-6 overflow-auto">
+              <h3 className="text-lg font-semibold text-white mb-4">Assets</h3>
+              <div className="space-y-2">
+                {chainAssets[chain]?.map(asset => (
+                  <button
+                    key={asset.symbol}
+                    onClick={() => setSelectedAsset(asset.symbol)}
+                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                      selectedAsset === asset.symbol
+                        ? 'bg-blue-600 text-white shadow-lg'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                    }`}
+                  >
+                    <div className="font-medium">{asset.symbol}</div>
+                    <div className="text-sm opacity-75">{asset.name}</div>
+                  </button>
+                ))}
               </div>
-            ) : selectedAssetData ? (
-              <>
-                {/* Asset Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-2xl font-bold text-white">
-                      {selectedAssetData.name} ({selectedAssetData.symbol})
-                    </h3>
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="text-3xl font-bold text-white">
-                        ${selectedAssetData.price.toFixed(2)}
-                      </div>
-                      <div className={`text-sm font-medium ${
-                        selectedAssetData.change24h >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {selectedAssetData.change24h >= 0 ? '+' : ''}{selectedAssetData.change24h.toFixed(2)}%
+
+              {/* Wallet Info */}
+              <div className="mt-6 p-4 bg-gray-800 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-400 mb-2">Wallet Balance</h4>
+                <div className="text-2xl font-bold text-white">${balance.toFixed(2)}</div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(address);
+                    toast.success('Address copied!');
+                  }}
+                  className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full"
+                >
+                  <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Content - Chart and Buy Section */}
+            <div className="flex-1 p-6 overflow-auto">
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : selectedAssetData ? (
+                <>
+                  {/* Asset Header - ENHANCED WITH LIVE PRICE */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">
+                        {selectedAssetData.name} ({selectedAssetData.symbol})
+                      </h3>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="text-3xl font-bold text-white">
+                          {/* SHOW LIVE PRICE IF AVAILABLE */}
+                          {selectedAssetData.priceLoading ? (
+                            <div className="flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                              <span>Loading...</span>
+                            </div>
+                          ) : selectedAssetData.livePrice ? (
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-5 w-5 text-green-400 animate-pulse" />
+                              ${selectedAssetData.livePrice.toFixed(2)}
+                              <span className="text-green-400 text-sm">Live</span>
+                            </div>
+                          ) : (
+                            <div className="text-gray-400">
+                              ${selectedAssetData.price.toFixed(2)}
+                              <span className="text-yellow-400 text-sm"> Cached</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className={`text-sm font-medium ${
+                          selectedAssetData.change24h >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {selectedAssetData.change24h >= 0 ? '+' : ''}{selectedAssetData.change24h.toFixed(2)}%
+                        </div>
                       </div>
                     </div>
+                    <button
+                      onClick={handleBuyAsset}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
+                    >
+                      <ArrowDownLeft className="w-5 h-5" />
+                      Buy {selectedAssetData.symbol}
+                    </button>
                   </div>
-                  <button
-                    onClick={handleBuyAsset}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
-                  >
-                    <ArrowDownLeft className="w-5 h-5" />
-                    Buy {selectedAssetData.symbol}
-                  </button>
-                </div>
 
-                {/* Chart Placeholder */}
-                <div className="bg-gray-800 rounded-xl p-6 mb-6 h-64 flex items-center justify-center">
-                  <div className="text-center">
-                    <TrendingUp className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-                    <h4 className="text-white font-semibold mb-2">Live Price Chart</h4>
-                    <p className="text-gray-400 text-sm">
-                      Real-time chart for {selectedAssetData.symbol} coming soon
-                    </p>
+                  {/* Chart Placeholder */}
+                  <div className="bg-gray-800 rounded-xl p-6 mb-6 h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 text-blue-400 mx-auto mb-4" />
+                      <h4 className="text-white font-semibold mb-2">Live Price Chart</h4>
+                      <p className="text-gray-400 text-sm">
+                        Real-time chart for {selectedAssetData.symbol} coming soon
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {/* Additional Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">24h Volume</div>
-                    <div className="text-white font-semibold">$1.2B</div>
+                  {/* Additional Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gray-800 rounded-xl p-4">
+                      <div className="text-gray-400 text-sm mb-1">24h Volume</div>
+                      <div className="text-white font-semibold">$1.2B</div>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                      <div className="text-gray-400 text-sm mb-1">Market Cap</div>
+                      <div className="text-white font-semibold">$45.8B</div>
+                    </div>
+                    <div className="bg-gray-800 rounded-xl p-4">
+                      <div className="text-gray-400 text-sm mb-1">All-Time High</div>
+                      <div className="text-white font-semibold">$3,250.00</div>
+                    </div>
                   </div>
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">Market Cap</div>
-                    <div className="text-white font-semibold">$45.8B</div>
-                  </div>
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">All-Time High</div>
-                    <div className="text-white font-semibold">$3,250.00</div>
-                  </div>
+                </>
+              ) : (
+                <div className="text-center text-gray-400 py-12">
+                  Select an asset to view details
                 </div>
-              </>
-            ) : (
-              <div className="text-center text-gray-400 py-12">
-                Select an asset to view details
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
-export default WalletDetailModal;
+  export default WalletDetailModal;

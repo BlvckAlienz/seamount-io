@@ -40,7 +40,7 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
         {[
           "Multi-chain wallet (Bitcoin, Ethereum, Polygon, Algorand)",
           "Lightning-fast settlement (sub-5 seconds)",
-          "Cross-border transfers at 2.9% (vs 8% traditional)",
+          "Cross-border transfers at 1.2% (vs 6-8% traditional)",
           "Bank-grade security with Web3 freedom"
         ].map((item, idx) => (
           <div key={idx} className="flex items-start transform transition-transform hover:translate-x-2">
