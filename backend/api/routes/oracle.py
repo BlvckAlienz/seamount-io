@@ -5,7 +5,7 @@ from backend.dependencies import get_db_service, get_oracle_service
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/v1")
+router = APIRouter()
 
 @router.get("/oracle/price/{asset_name}")
 async def get_asset_price(asset_name: str):
