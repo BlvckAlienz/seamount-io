@@ -39,6 +39,16 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   const [priceData, setPriceData] = useState<AssetPriceData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  // Enhanced loading states for better UX
+  useEffect(() => {
+    if (initialLoad) {
+      const timer = setTimeout(() => setInitialLoad(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [initialLoad]);
+
   // Define assets for each chain
   const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = {
     bitcoin: [{ symbol: 'BTC', name: 'Bitcoin' }],

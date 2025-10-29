@@ -64,7 +64,7 @@ async def get_wallet_seeds(
                 logger.error(f"Failed to decrypt Algorand seed: {e}")
                 seeds_data['algorand_seed'] = "🔴 DECRYPTION FAILED - CONTACT SUPPORT"
         
-        # Decrypt WDK seed (use first available)
+        # ✅ ENHANCE the WDK service detection
         if wdk_wallets.data:
             for wallet in wdk_wallets.data:
                 seeds_data['wallet_addresses'][wallet['blockchain']] = wallet['address']
@@ -74,14 +74,22 @@ async def get_wallet_seeds(
                     try:
                         encrypted_wdk_seed = wallet['encrypted_seed']
                         seeds_data['wdk_seed'] = fernet.decrypt(encrypted_wdk_seed.encode()).decode()
+                        logger.info(f"✅ Successfully decrypted WDK seed for user {user_id}")
                     except Exception as e:
                         logger.error(f"Failed to decrypt WDK seed for {wallet['blockchain']}: {e}")
             
+            # ✅ IMPROVED service status detection
             if not seeds_data['wdk_seed']:
-                seeds_data['wdk_seed'] = "🔴 DECRYPTION FAILED - CONTACT SUPPORT"
-        
-        return seeds_data
-        
-    except Exception as e:
-        logger.error(f"Seed recovery failed for user {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve wallet seeds")
+                # Test if WDK service is actually down
+                try:
+                    from backend.services.wdk_client import WDKClient
+                    wdk = WDKClient()
+                    health = await wdk.health_check()
+                    if health.get('status') != 'healthy':
+                        seeds_data['wdk_seed'] = "⏳ WDK Service Temporarily Unavailable - Please try again in a few minutes"
+                        seeds_data['wdk_service_status'] = 'degraded'
+                    else:
+                        seeds_data['wdk_seed'] = "🔴 No WDK seed found - Contact support@seamount.io if this persists"
+                except Exception as e:
+                    seeds_data['wdk_seed'] = "⏳ WDK Service Unavailable - Seeds will appear when service is restored"
+                    seeds_data['wdk_service_status'] = 'offline'

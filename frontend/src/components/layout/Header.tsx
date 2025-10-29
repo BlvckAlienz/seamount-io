@@ -147,16 +147,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      navigate('/wallet-recovery');
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors text-left"
-                  >
-                    <Key className="h-4 w-4" />
-                    <span>Backup Wallet Seeds</span>
-                  </button>
                 </div>
               </>
             )}

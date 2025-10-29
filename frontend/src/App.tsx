@@ -23,6 +23,7 @@ import SettingsPage from './pages/SettingsPage';
 import UserProfilePage from './pages/UserProfilePage';
 import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 import AuthDebugPage from './pages/AuthDebugPage';
+import WalletRecovery from './pages/wallet-recovery';
 
 // --- Context ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -95,7 +96,8 @@ const AppContent: React.FC = () => {
         <Route path="/trading" element={<ProtectedRoute><TradingPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
         <Route path="/portfolio" element={<ProtectedRoute><PortfolioPage /></ProtectedRoute>} />
-        
+        <Route path="/wallet-recovery" element={<ProtectedRoute><WalletRecovery /></ProtectedRoute>} />
+
         {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
 

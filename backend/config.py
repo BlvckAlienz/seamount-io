@@ -746,7 +746,7 @@ class Settings(BaseSettings):
     DEFAULT_PRICING_REGION: PricingRegion = PricingRegion.NIGERIA
     ENABLE_DYNAMIC_PRICING: bool = True
     TRACK_REVENUE_METRICS: bool = True
-    
+
     def validate_supabase_credentials(self) -> bool:
         """Validate Supabase credentials are present and properly formatted"""
         if not self.SUPABASE_URL or not self.SUPABASE_SERVICE_KEY:
@@ -765,6 +765,12 @@ class Settings(BaseSettings):
             return False
         
         logger.info("✅ Supabase credentials validated")
+        return True
+
+    def validate_wdk_configuration(self) -> bool:
+        """Validate WDK configuration on startup"""
+        if not self.WDK_API_KEY:
+            logger.warning("WDK_API_KEY not configured - indexer features disabled")
         return True
 
     @computed_field

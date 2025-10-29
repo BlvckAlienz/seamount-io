@@ -1,8 +1,8 @@
 // File: frontend/src/pages/wallet-recovery.tsx
+// ✅ PRODUCTION READY - React Router Version
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useRouter } from 'next/router'
-import { NextPage } from 'next'
+import { useNavigate } from 'react-router-dom' // ✅ React Router navigation
 
 interface WalletSeeds {
   user_id: string
@@ -13,22 +13,23 @@ interface WalletSeeds {
   wallet_addresses: {
     [chain: string]: string
   }
+  wdk_service_status?: string // ✅ Added service status
 }
 
-const WalletRecovery: NextPage = () => {
+const WalletRecovery = () => {
   const { user } = useAuth()
-  const router = useRouter()
+  const navigate = useNavigate() // ✅ React Router navigation
   const [seeds, setSeeds] = useState<WalletSeeds | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!user) {
-      router.push('/login')
+      navigate('/login')
       return
     }
     fetchSeeds()
-  }, [user, router])
+  }, [user, navigate])
 
   const fetchSeeds = async () => {
     try {
@@ -42,11 +43,16 @@ const WalletRecovery: NextPage = () => {
       
       const data: WalletSeeds = await response.json()
       setSeeds(data)
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  // ✅ Fixed navigation handler
+  const handleReturnToDashboard = () => {
+    navigate('/dashboard')
   }
 
   if (loading) return <div className="p-8 text-center">Loading your wallet seeds...</div>
@@ -92,9 +98,24 @@ const WalletRecovery: NextPage = () => {
           <div className="bg-white shadow rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🔗 Multi-Chain Seed (WDK)</h2>
             <p className="text-gray-600 mb-4">This single seed controls your Bitcoin, Ethereum, Polygon, and Tron wallets.</p>
-            <div className="bg-gray-50 p-4 rounded border">
-              <p className="text-lg font-mono select-all">{seeds.wdk_seed}</p>
-            </div>
+            
+            {/* ✅ Service Status Indicator */}
+            {seeds.wdk_service_status && (
+              <div className={`mb-4 p-3 rounded-lg text-sm ${
+                seeds.wdk_service_status === 'offline' 
+                  ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                  : 'bg-blue-50 border border-blue-200 text-blue-800'
+              }`}>
+                {seeds.wdk_service_status === 'offline' ? '⚠️' : '🔄'} {seeds.wdk_seed}
+              </div>
+            )}
+            
+            {!seeds.wdk_service_status && (
+              <div className="bg-gray-50 p-4 rounded border">
+                <p className="text-lg font-mono select-all">{seeds.wdk_seed}</p>
+              </div>
+            )}
+            
             <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
               {Object.entries(seeds.wallet_addresses || {}).map(([chain, address]) => 
                 chain !== 'algorand' && (
@@ -108,12 +129,30 @@ const WalletRecovery: NextPage = () => {
           </div>
         )}
 
+        {/* No Seeds Available */}
+        {(!seeds?.algorand_seed && !seeds?.wdk_seed) && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-yellow-800 mb-2">No Seeds Available</h2>
+            <p className="text-yellow-700">
+              Your wallet seeds are not available at the moment. This could be because:
+            </p>
+            <ul className="list-disc list-inside mt-2 text-yellow-700">
+              <li>Your wallets are still being created</li>
+              <li>The seed recovery service is temporarily unavailable</li>
+              <li>There was an issue decrypting your seeds</li>
+            </ul>
+            <p className="mt-3 text-yellow-700 font-medium">
+              Please try again in a few minutes or contact support if this persists.
+            </p>
+          </div>
+        )}
+
         {/* Backup Confirmation */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-medium text-blue-800 mb-2">✅ Backup Confirmation</h3>
           <p className="text-blue-700 mb-4">I have securely stored both seed phrases and understand that losing them means permanent loss of my funds.</p>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={handleReturnToDashboard} // ✅ Fixed navigation
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             I've Saved My Seeds - Return to Dashboard

@@ -1,7 +1,6 @@
-# File: backend/services/wdk_client.py
 """
-ROCK SOLID WDK Client - Follows Tether's Official Patterns
-With comprehensive retry logic and circuit breaker pattern
+ROCK SOLID WDK Client - PRODUCTION READY
+With comprehensive retry logic, circuit breaker pattern, and ENV enforcement
 """
 
 import logging
@@ -48,8 +47,7 @@ class CircuitBreaker:
 
 class WDKClient:
     """
-    Production-ready Tether WDK client with comprehensive resilience
-    Implements patterns from official React Native starter
+    PRODUCTION-READY Tether WDK client with comprehensive resilience
     """
     
     # Supported chains (from Tether docs)
@@ -58,19 +56,21 @@ class WDKClient:
         'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
         'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
         'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
-        # 'arbitrum',   # ❌ Commented out - no package yet
-        # 'ton',        # ❌ Commented out - no package yet  
-        # 'solana'      # ❌ Commented out - no package yet
     ]
     
     # EVM gasless chains that use the same wallet manager
-    GASLESS_CHAINS = ['ethereum', 'polygon']  # Add arbitrum later when available
+    GASLESS_CHAINS = ['ethereum', 'polygon']
     
     def __init__(self):
         self.settings = get_settings()
         
-        # Your WDK microservice (handles wallet ops)
-        self.base_url = self.settings.WDK_SERVICE_URL or "http://localhost:3001"
+        # ✅ CRITICAL FIX: FORCE use of environment variable with fallback
+        self.base_url = self.settings.WDK_SERVICE_URL
+        if not self.base_url or "localhost" in str(self.base_url):
+            self.base_url = "https://seamount-wdk.onrender.com"  # Hardcode as fallback
+            logger.warning("⚠️ Using fallback WDK URL - ENV variable not set properly")
+        
+        logger.info(f"🎯 WDK Service URL configured: {self.base_url}")
         
         # ✅ CRITICAL: Get API key from environment (no fallback)
         if not self.settings.WDK_API_KEY:
@@ -90,12 +90,33 @@ class WDKClient:
         self.service_healthy = True
         self.last_health_check = None
         
+        # ✅ Validate service connection on startup
+        asyncio.create_task(self._validate_service_connection())
+        
         if self.indexer_url:
             logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: ON")
             logger.info(f"   Using API Key: {self.api_key[:10]}...")
         else:
             logger.warning(f"⚠️ WDK Client initialized WITHOUT Indexer API key")
             logger.warning(f"   Get key from: https://wdk-api.tether.io")
+    
+    async def _validate_service_connection(self):
+        """Validate WDK service is reachable on startup"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url}/health", timeout=10) as response:
+                    if response.status == 200:
+                        logger.info("✅ WDK Service is ONLINE and reachable")
+                        self.service_healthy = True
+                        health_data = await response.json()
+                        logger.info(f"   Service health: {health_data}")
+                    else:
+                        logger.warning(f"⚠️ WDK Service returned {response.status}")
+                        self.service_healthy = False
+        except Exception as e:
+            logger.error(f"❌ WDK Service OFFLINE: {e}")
+            self.service_healthy = False
+            # Don't raise - allow graceful degradation
     
     async def _make_request_with_retry(
         self, 
@@ -110,7 +131,14 @@ class WDKClient:
         
         # Check circuit breaker first
         if not self.circuit_breaker.can_execute():
-            raise Exception("WDK service temporarily unavailable (circuit breaker open)")
+            logger.warning("⚠️ Circuit breaker open, attempting graceful degradation")
+            # Return empty/fallback response instead of hard failure
+            return {
+                'success': False,
+                'error': 'WDK service temporarily unavailable',
+                'fallback': True,
+                'retry_after': 60
+            }
         
         last_exception = None
         
@@ -204,7 +232,7 @@ class WDKClient:
         except Exception as e:
             logger.error(f"❌ Seed generation failed: {e}")
             # Fallback: generate locally (for development)
-            if self.settings.ENVIRONMENT == "development":
+            if hasattr(self.settings, 'ENVIRONMENT') and self.settings.ENVIRONMENT == "development":
                 return self._generate_seed_fallback()
             raise
     
@@ -275,7 +303,7 @@ class WDKClient:
             except Exception as e:
                 logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
         
-        # ✅ FIXED: Use GET request with query params (not POST with body)
+        # Direct query to WDK service
         try:
             async with aiohttp.ClientSession() as session:
                 headers = {

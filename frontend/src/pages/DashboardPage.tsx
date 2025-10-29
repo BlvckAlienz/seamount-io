@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { apiClient } from '../config/api';
+import { useNavigate } from 'react-router-dom';
 import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
@@ -37,6 +38,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   
   const remaining = Math.max(0, limit - cumulativeVolume);
   const percentUsed = (cumulativeVolume / limit) * 100;
+  const navigate = useNavigate();
   
   const urgencyConfig = {
     info: {
@@ -136,6 +138,18 @@ const DashboardPage = () => {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
   
+  const [serviceStatus, setServiceStatus] = useState<any>(null);
+
+  // Enhanced health monitoring
+  const checkServiceHealth = async () => {
+    try {
+      const response = await apiClient.get('/api/v1/health');
+      setServiceStatus(response.data);
+    } catch (error) {
+      setServiceStatus({ status: 'degraded', wdk: 'offline' });
+    }
+  };
+
   const SUPPORTED_CHAINS = [
   { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
   { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
@@ -297,7 +311,7 @@ const DashboardPage = () => {
   };
 
   const handleViewSeedPhrases = () => {
-    window.location.href = '/wallet-recovery';
+    navigate('/wallet-recovery');  // ✅ Uses React Router, no reload
   };
 
   const handleLogout = async () => {
