@@ -229,22 +229,13 @@ except ImportError as e:
     routers_available['yield'] = None
 
 # 🔒 ADD WALLET RECOVERY ROUTER IMPORT
-# 🔒 FIX: Force wallet recovery route registration
 try:
     from backend.api.routes.wallet_recovery import router as wallet_recovery_router
-    app.include_router(wallet_recovery_router, prefix="/api/wallet-recovery", tags=["Wallet Recovery"])
-    logger.info("✅ Wallet recovery router REGISTERED at /api/wallet-recovery")
+    routers_available['wallet_recovery'] = wallet_recovery_router
+    logger.info("✅ Wallet recovery router imported")
 except ImportError as e:
-    logger.error(f"❌ Wallet recovery router import failed: {e}")
-    # Create fallback route
-    from fastapi import APIRouter
-    wallet_recovery_router = APIRouter()
-    
-    @wallet_recovery_router.get("/seeds")
-    async def fallback_seeds():
-        return {"error": "Wallet recovery service temporarily unavailable"}
-    
-    app.include_router(wallet_recovery_router, prefix="/api/wallet-recovery", tags=["Wallet Recovery"])
+    logger.error(f"❌ Wallet recovery router import error: {e}")
+    routers_available['wallet_recovery'] = None
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
