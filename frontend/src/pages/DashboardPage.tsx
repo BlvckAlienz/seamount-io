@@ -124,6 +124,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
 // Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
+  const navigate = useNavigate(); // 🔥 ADD THIS LINE - useNavigate MUST be called here
   const [loading, setLoading] = useState(true);
   const [portfolioData, setPortfolioData] = useState<any>(null);
   const [kycInfo, setKycInfo] = useState({
@@ -310,8 +311,10 @@ const DashboardPage = () => {
     }
   };
 
+  const navigate = useNavigate(); // ✅ ADD THIS LINE
+
   const handleViewSeedPhrases = () => {
-    navigate('/wallet-recovery');  // ✅ Uses React Router, no reload
+    navigate('/wallet-recovery');
   };
 
   const handleLogout = async () => {

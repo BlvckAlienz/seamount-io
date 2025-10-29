@@ -92,57 +92,99 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     return assetMap[symbol] || 'algorand';
   };
 
-  // NEW: Fetch live price from oracle
-  const fetchLivePrice = async (symbol: string) => {
+  // REAL Oracle Integration - No Mock Data
+  const fetchLivePrice = async (symbol: string): Promise<number | null> => {
     try {
+      // 🔥 TIER 1: Primary Oracle API
       const assetName = getOracleAssetName(symbol);
-      const response = await apiClient.get(`/api/v1/oracle/price/${assetName}`);
+      const response = await apiClient.get(`/api/oracle/price/${assetName}`);
       
       if (response.data.success) {
         return parseFloat(response.data.price);
       }
-      throw new Error('Failed to fetch price data');
     } catch (error) {
-      console.error(`Oracle price fetch failed for ${symbol}:`, error);
-      return null;
+      console.warn(`Primary oracle failed for ${symbol}:`, error);
     }
+
+    // 🔥 TIER 2: Backup Oracle Endpoint
+    try {
+      const backupResponse = await apiClient.get(`/api/v1/oracle/price/${symbol.toLowerCase()}`);
+      if (backupResponse.data.success) {
+        return parseFloat(backupResponse.data.price);
+      }
+    } catch (error) {
+      console.warn(`Backup oracle failed for ${symbol}:`, error);
+    }
+
+    // 🔥 TIER 3: Direct Binance API Fallback
+    try {
+      const binanceSymbol = `${symbol}USDT`;
+      const binanceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`);
+      if (binanceResponse.ok) {
+        const binanceData = await binanceResponse.json();
+        return parseFloat(binanceData.price);
+      }
+    } catch (error) {
+      console.warn(`Binance API failed for ${symbol}:`, error);
+    }
+
+    console.error(`All price sources failed for ${symbol}`);
+    return null;
   };
 
-  // UPDATED: Enhanced price data fetching with live oracle
   const fetchPriceData = async () => {
     try {
       setLoading(true);
       const assets = chainAssets[chain] || [];
       
-      // Start with mock data structure
+      // Start with basic asset data
       const basePriceData: AssetPriceData[] = assets.map(asset => ({
         symbol: asset.symbol,
         name: asset.name,
-        price: Math.random() * 1000 + 10,
-        change24h: (Math.random() - 0.5) * 10,
-        chartData: Array.from({ length: 24 }, () => Math.random() * 100 + 50),
-        priceLoading: true
+        price: 0, // Will be populated by real data
+        change24h: 0,
+        priceLoading: true,
+        priceError: null
       }));
 
       setPriceData(basePriceData);
 
-      // Enhance with live oracle data
+      // 🔥 ENHANCE with REAL oracle data
       const enhancedPriceData = await Promise.all(
         basePriceData.map(async (asset) => {
-          const livePrice = await fetchLivePrice(asset.symbol);
-          return {
-            ...asset,
-            livePrice: livePrice || asset.price, // Fallback to mock if oracle fails
-            priceLoading: false,
-            priceError: livePrice ? undefined : 'Failed to fetch live price'
-          };
+          try {
+            const livePrice = await fetchLivePrice(asset.symbol);
+            
+            if (livePrice !== null) {
+              return {
+                ...asset,
+                price: livePrice,
+                livePrice: livePrice,
+                priceLoading: false,
+                priceError: null
+              };
+            } else {
+              return {
+                ...asset,
+                priceLoading: false,
+                priceError: 'All price sources unavailable'
+              };
+            }
+          } catch (error) {
+            console.error(`Price fetch error for ${asset.symbol}:`, error);
+            return {
+              ...asset,
+              priceLoading: false,
+              priceError: 'Price fetch failed'
+            };
+          }
         })
       );
 
       setPriceData(enhancedPriceData);
     } catch (error) {
       console.error('Failed to fetch price data:', error);
-      toast.error('Failed to load price data');
+      toast.error('Failed to load live price data');
     } finally {
       setLoading(false);
     }
