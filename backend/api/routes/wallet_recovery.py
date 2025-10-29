@@ -93,3 +93,9 @@ async def get_wallet_seeds(
                 except Exception as e:
                     seeds_data['wdk_seed'] = "⏳ WDK Service Unavailable - Seeds will appear when service is restored"
                     seeds_data['wdk_service_status'] = 'offline'
+        
+        return seeds_data
+        
+    except Exception as e:
+        logger.error(f"Error retrieving wallet seeds: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
