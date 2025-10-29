@@ -92,43 +92,96 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     return assetMap[symbol] || 'algorand';
   };
 
-  // REAL Oracle Integration - No Mock Data
+  // 🔥 PRODUCTION: REAL LIVE DATA ONLY - NO MOCKS, NO FALLBACKS
   const fetchLivePrice = async (symbol: string): Promise<number | null> => {
+    const assetName = getOracleAssetName(symbol);
+    
+    // 🎯 TIER 1: Your Backend Oracle (Primary)
     try {
-      // 🔥 TIER 1: Primary Oracle API
-      const assetName = getOracleAssetName(symbol);
-      const response = await apiClient.get(`/api/oracle/price/${assetName}`);
+      const response = await apiClient.get(`/api/v1/oracle/price/${assetName}`);
+      if (response.data.success && response.data.price) {
+        const price = parseFloat(response.data.price);
+        console.log(`✅ [Backend Oracle] ${symbol}: $${price}`);
+        return price;
+      }
+    } catch (error) {
+      console.warn(`⚠️ [Backend Oracle] Failed for ${symbol}:`, error);
+    }
+
+    // 🎯 TIER 2: Binance Public API (Free, Real-Time)
+    try {
+      const binanceSymbols: { [key: string]: string } = {
+        'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'MATIC': 'MATICUSDT',
+        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'USDT': 'USDCUSDT',
+        'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT', 'goBTC': 'BTCUSDT',
+        'goETH': 'ETHUSDT'
+      };
       
-      if (response.data.success) {
-        return parseFloat(response.data.price);
+      const binanceSymbol = binanceSymbols[symbol];
+      if (!binanceSymbol) {
+        console.warn(`⚠️ [Binance] No mapping for ${symbol}`);
+        return null;
+      }
+      
+      const binanceUrl = `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`;
+      const response = await fetch(binanceUrl, { 
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const price = parseFloat(data.price);
+        console.log(`✅ [Binance] ${symbol}: $${price}`);
+        return price;
+      } else {
+        console.warn(`⚠️ [Binance] HTTP ${response.status} for ${symbol}`);
       }
     } catch (error) {
-      console.warn(`Primary oracle failed for ${symbol}:`, error);
+      console.warn(`⚠️ [Binance] Network error for ${symbol}:`, error);
     }
 
-    // 🔥 TIER 2: Backup Oracle Endpoint
+    // 🎯 TIER 3: CoinGecko Free API (Real-Time, No Auth)
     try {
-      const backupResponse = await apiClient.get(`/api/v1/oracle/price/${symbol.toLowerCase()}`);
-      if (backupResponse.data.success) {
-        return parseFloat(backupResponse.data.price);
+      const coinGeckoIds: { [key: string]: string } = {
+        'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic-network',
+        'ALGO': 'algorand', 'TRX': 'tron', 'USDT': 'tether',
+        'USDC': 'usd-coin', 'USDCa': 'usd-coin', 'goBTC': 'bitcoin',
+        'goETH': 'ethereum'
+      };
+      
+      const coinId = coinGeckoIds[symbol];
+      if (!coinId) {
+        console.warn(`⚠️ [CoinGecko] No mapping for ${symbol}`);
+        return null;
+      }
+      
+      const cgUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
+      const response = await fetch(cgUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const price = data[coinId]?.usd;
+        if (price) {
+          console.log(`✅ [CoinGecko] ${symbol}: $${price}`);
+          return price;
+        }
+      } else {
+        console.warn(`⚠️ [CoinGecko] HTTP ${response.status} for ${symbol}`);
       }
     } catch (error) {
-      console.warn(`Backup oracle failed for ${symbol}:`, error);
+      console.warn(`⚠️ [CoinGecko] Network error for ${symbol}:`, error);
     }
 
-    // 🔥 TIER 3: Direct Binance API Fallback
-    try {
-      const binanceSymbol = `${symbol}USDT`;
-      const binanceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`);
-      if (binanceResponse.ok) {
-        const binanceData = await binanceResponse.json();
-        return parseFloat(binanceData.price);
-      }
-    } catch (error) {
-      console.warn(`Binance API failed for ${symbol}:`, error);
-    }
-
-    console.error(`All price sources failed for ${symbol}`);
+    // ❌ ALL LIVE SOURCES FAILED - Return null (show error to user)
+    console.error(`❌ All live data sources failed for ${symbol}`);
+    toast.error(`Unable to fetch live price for ${symbol}. Please try again later.`, {
+      duration: 5000,
+      icon: '❌'
+    });
     return null;
   };
 
@@ -137,54 +190,57 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       setLoading(true);
       const assets = chainAssets[chain] || [];
       
-      // Start with basic asset data
-      const basePriceData: AssetPriceData[] = assets.map(asset => ({
+      if (assets.length === 0) {
+        console.warn(`No assets configured for chain: ${chain}`);
+        setPriceData([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Start with placeholder data showing loading state
+      const loadingPriceData: AssetPriceData[] = assets.map(asset => ({
         symbol: asset.symbol,
         name: asset.name,
-        price: 0, // Will be populated by real data
+        price: 0,
         change24h: 0,
         priceLoading: true,
-        priceError: null
+        priceError: undefined
       }));
 
-      setPriceData(basePriceData);
+      setPriceData(loadingPriceData);
 
-      // 🔥 ENHANCE with REAL oracle data
-      const enhancedPriceData = await Promise.all(
-        basePriceData.map(async (asset) => {
-          try {
-            const livePrice = await fetchLivePrice(asset.symbol);
-            
-            if (livePrice !== null) {
-              return {
-                ...asset,
-                price: livePrice,
-                livePrice: livePrice,
-                priceLoading: false,
-                priceError: null
-              };
-            } else {
-              return {
-                ...asset,
-                priceLoading: false,
-                priceError: 'All price sources unavailable'
-              };
-            }
-          } catch (error) {
-            console.error(`Price fetch error for ${asset.symbol}:`, error);
-            return {
-              ...asset,
-              priceLoading: false,
-              priceError: 'Price fetch failed'
-            };
-          }
-        })
-      );
+      // 🔥 Fetch REAL live prices in parallel
+      const pricePromises = assets.map(async (asset) => {
+        const livePrice = await fetchLivePrice(asset.symbol);
+        
+        return {
+          symbol: asset.symbol,
+          name: asset.name,
+          price: livePrice || 0,
+          livePrice: livePrice || undefined,
+          change24h: 0, // TODO: Implement 24h change from real API
+          priceLoading: false,
+          priceError: livePrice === null ? 'Unable to fetch live price' : undefined
+        };
+      });
 
+      const enhancedPriceData = await Promise.all(pricePromises);
       setPriceData(enhancedPriceData);
+      
+      // Log success/failure summary
+      const successCount = enhancedPriceData.filter(d => d.livePrice !== undefined).length;
+      console.log(`✅ Price fetch complete: ${successCount}/${assets.length} successful`);
+      
+      if (successCount === 0) {
+        toast.error('Unable to load any live prices. Please check your connection.', {
+          duration: 5000
+        });
+      }
+      
     } catch (error) {
       console.error('Failed to fetch price data:', error);
-      toast.error('Failed to load live price data');
+      toast.error('Price data fetch failed. Please refresh the page.');
+      setPriceData([]);
     } finally {
       setLoading(false);
     }
@@ -296,22 +352,38 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                       </h3>
                       <div className="flex items-center gap-4 mt-2">
                         <div className="text-3xl font-bold text-white">
-                          {/* SHOW LIVE PRICE IF AVAILABLE */}
+                          // 🔥 REAL DATA ONLY - Show loading, live price, or error
                           {selectedAssetData.priceLoading ? (
                             <div className="flex items-center gap-2">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                              <span>Loading...</span>
+                              <span className="text-gray-400">Fetching live price...</span>
+                            </div>
+                          ) : selectedAssetData.priceError ? (
+                            <div className="flex flex-col gap-1">
+                              <div className="text-red-400 flex items-center gap-2">
+                                <span className="text-2xl">❌</span>
+                                <span>Price Unavailable</span>
+                              </div>
+                              <p className="text-sm text-gray-400">{selectedAssetData.priceError}</p>
+                              <button
+                                onClick={() => fetchPriceData()}
+                                className="mt-2 text-sm text-blue-400 hover:text-blue-300 underline"
+                              >
+                                Retry
+                              </button>
                             </div>
                           ) : selectedAssetData.livePrice ? (
                             <div className="flex items-center gap-2">
                               <Activity className="h-5 w-5 text-green-400 animate-pulse" />
-                              ${selectedAssetData.livePrice.toFixed(2)}
-                              <span className="text-green-400 text-sm">Live</span>
+                              <span className="text-3xl font-bold text-white">
+                                ${selectedAssetData.livePrice.toFixed(2)}
+                              </span>
+                              <span className="text-green-400 text-sm font-medium">Live</span>
                             </div>
                           ) : (
-                            <div className="text-gray-400">
-                              ${selectedAssetData.price.toFixed(2)}
-                              <span className="text-yellow-400 text-sm"> Cached</span>
+                            <div className="text-gray-400 flex items-center gap-2">
+                              <span className="text-2xl">⚠️</span>
+                              <span>No price data available</span>
                             </div>
                           )}
                         </div>

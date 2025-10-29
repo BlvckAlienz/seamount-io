@@ -311,8 +311,6 @@ const DashboardPage = () => {
     }
   };
 
-  const navigate = useNavigate(); // ✅ ADD THIS LINE
-
   const handleViewSeedPhrases = () => {
     navigate('/wallet-recovery');
   };
