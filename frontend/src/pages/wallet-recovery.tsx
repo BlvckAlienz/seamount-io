@@ -42,7 +42,7 @@ const WalletRecovery = () => {
       
       console.log('🔄 Fetching wallet recovery seeds from:', '/v1/wallet/recovery-seeds')
       
-      const response = await apiClient.get('/v1/wallet/recovery-seeds')
+      const response = await apiClient.get('/api/v1/wallet/recovery-seeds')
       
       console.log('✅ Seeds API Response:', response.data)
       
