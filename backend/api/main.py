@@ -23,9 +23,6 @@ import sys
 from pathlib import Path
 from decimal import Decimal
 
-# In your imports section, add:
-from backend.api.routes import wallet_recovery
-
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -556,10 +553,18 @@ if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
 
-# 🔒 UPDATE WALLET RECOVERY ROUTE REGISTRATION - CHANGE PREFIX
+# ✅ FIXED WALLET RECOVERY ROUTE REGISTRATION
 if routers_available.get('wallet_recovery'):
     app.include_router(routers_available['wallet_recovery'], prefix="/api/v1", tags=["Wallet Recovery"])
-    logger.info("✅ Wallet recovery router registered at /api/v1/wallet/recovery-seeds")
+    logger.info("✅ Wallet recovery router registered - endpoints: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
+
+# 🚨 TEMPORARY FIX - Add this after your existing wallet recovery registration
+try:
+    from backend.api.routes.wallet_recovery import router as temp_wallet_recovery_router
+    app.include_router(temp_wallet_recovery_router, prefix="/api/v1", tags=["Wallet-Recovery-Temp"])
+    logger.info("🚨 TEMP: Wallet recovery router directly registered at /api/v1/wallet/recovery-seeds")
+except Exception as e:
+    logger.error(f"❌ TEMP wallet recovery registration failed: {e}")
 
 # ===== CORE API ENDPOINTS =====
 
