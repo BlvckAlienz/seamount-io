@@ -149,3 +149,13 @@ async def get_recovery_seeds(
             status_code=500, 
             detail="System error: Unable to retrieve recovery seeds. Please contact support."
         )
+    
+@router.get("/test")
+async def test_wallet_recovery():
+    """Test endpoint to verify route is working"""
+    return {
+        "success": True,
+        "message": "✅ Wallet recovery route is working!",
+        "endpoint": "/api/v1/wallet/recovery-seeds", 
+        "timestamp": "2024-01-01T00:00:00Z"
+    }
