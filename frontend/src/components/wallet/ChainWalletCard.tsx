@@ -42,6 +42,12 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   // Primary icon configuration
   const getChainConfig = (chain: string) => {
     const configs = {
+      algorand: {
+        name: 'Algorand',
+        icon: 'https://cryptologos.cc/logos/algorand-algo-logo.svg',
+        color: 'from-blue-500 to-cyan-600',
+        symbol: 'ALGO'
+      },
       bitcoin: {
         name: 'Bitcoin',
         icon: 'https://cryptologos.cc/logos/bitcoin-btc-logo.svg',
@@ -59,12 +65,6 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         icon: 'https://cryptologos.cc/logos/polygon-matic-logo.svg',
         color: 'from-purple-500 to-indigo-600',
         symbol: 'MATIC'
-      },
-      algorand: {
-        name: 'Algorand',
-        icon: 'https://cryptologos.cc/logos/algorand-algo-logo.svg',
-        color: 'from-blue-500 to-cyan-600',
-        symbol: 'ALGO'
       },
       tron: {
         name: 'TRON',

@@ -309,31 +309,78 @@ class DatabaseService:
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
 
-    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Enhanced user profile retrieval with proper error handling"""
+    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
+        """
+        Get user profile with fallback creation if missing
+        Handles orphaned profile records by recreating them
+        """
         try:
-            logger.debug(f"[DB] Fetching user profile: {user_id}")
+            # First, verify user exists
+            user_query = "SELECT id, email, full_name FROM users WHERE id = $1"
+            user_row = await self.connection.fetchrow(user_query, user_id)
             
-            try:
-                user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-            except ValueError:
-                logger.error(f"[DB] Invalid UUID format: {user_id}")
+            if not user_row:
+                logger.warning(f"User {user_id} not found in users table")
                 return None
             
-            response = self.supabase.table("user_profiles").select("*").eq("id", str(user_uuid)).maybe_single().execute()
+            # Try to get existing profile
+            profile_query = "SELECT * FROM user_profiles WHERE user_id = $1"
+            profile_row = await self.connection.fetchrow(profile_query, user_id)
             
-            if response.data:
-                logger.debug(f"[DB] User profile found: {user_id}")
-                return self._format_user_profile(response.data)
+            if profile_row:
+                return UserProfile(**profile_row)
+            
+            # Create profile if missing
+            logger.info(f"Creating missing user profile for {user_id}")
+            insert_query = """
+                INSERT INTO user_profiles (
+                    user_id, email, first_name, last_name, 
+                    country_code, role, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                RETURNING *
+            """
+            
+            # Extract name parts from full_name
+            full_name = user_row['full_name'] or 'User'
+            name_parts = full_name.split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            new_profile = await self.connection.fetchrow(
+                insert_query,
+                user_id,
+                user_row['email'],
+                first_name,
+                last_name,
+                'US',  # Default country code
+                'user'  # Default role
+            )
+            
+            if new_profile:
+                logger.info(f"Successfully created user profile for {user_id}")
+                return UserProfile(**new_profile)
             else:
-                logger.warning(f"[DB] User profile not found: {user_id}")
+                logger.error(f"Failed to create user profile for {user_id}")
                 return None
-                
-        except Exception as e:
-            logger.error(f"[DB] Error fetching user profile {user_id}: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise HTTPException(status_code=500, detail="Failed to fetch user profile")
+            
+    except Exception as e:
+        logger.error(f"Error in get_user_profile for {user_id}: {str(e)}")
+        return None
 
+    async def get_encrypted_seeds(self, user_id: str) -> List[EncryptedSeed]:
+        try:
+            # Query multi_chain_addresses table which has the encrypted seeds
+            query = """
+                SELECT blockchain, encrypted_seed, encrypted_private_key
+                FROM multi_chain_addresses 
+                WHERE user_id = $1 AND encrypted_seed IS NOT NULL
+            """
+            rows = await self.connection.fetch(query, user_id)
+            return [EncryptedSeed(**row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error fetching encrypted seeds for user {user_id}: {str(e)}")
+            return []
+        
     async def get_user_profile_raw(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get UNFILTERED user profile for internal operations (KYC, compliance)
