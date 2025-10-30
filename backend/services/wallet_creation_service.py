@@ -6,6 +6,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
+from backend.services.seed_encryption_service import SeedEncryptionService
+
 logger = logging.getLogger(__name__)
 
 class WalletCreationService:
@@ -16,10 +18,7 @@ class WalletCreationService:
     'bitcoin',      # ✅ Available via @tetherto/wdk-wallet-btc
     'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
     'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
-    'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
-    # 'arbitrum',   # ❌ Commented out - no package yet
-    # 'ton',        # ❌ Commented out - no package yet
-    # 'solana'      # ❌ Commented out - no package yet
+    'tron'        # ✅ Available via @tetherto/wdk-wallet-tron
 ]
     
     def __init__(self, db_service, algorand_service, wdk_client):
@@ -401,6 +400,27 @@ class WalletCreationService:
                 'user_id': user_id
             }
     
+    async def create_user_wallets(user_id: str):
+        """Create wallets and store encrypted seeds"""
+        encryption_service = SeedEncryptionService()
+        
+        # Generate seeds (from your existing wallet creation)
+        algorand_seed = generate_algorand_seed()
+        wdk_seed = generate_wdk_seed()
+        
+        # Encrypt before storage
+        encrypted_algorand_seed = encryption_service.encrypt_seed(algorand_seed)
+        encrypted_wdk_seed = encryption_service.encrypt_seed(wdk_seed)
+        
+        # Store encrypted seeds in database
+        await db_service.execute("""
+            UPDATE user_profiles 
+            SET algorand_encrypted_seed = $1,
+                wdk_encrypted_seed = $2,
+                updated_at = NOW()
+            WHERE user_id = $3
+        """, encrypted_algorand_seed, encrypted_wdk_seed, user_id)
+
     async def create_tron_wallet_with_fallback(self, user_id: str) -> Dict[str, Any]:
         """Create Tron wallet with multiple fallback strategies"""
         

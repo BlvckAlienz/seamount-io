@@ -1,8 +1,11 @@
 // File: frontend/src/pages/wallet-recovery.tsx
-// ✅ PRODUCTION READY - React Router Version
+// ✅ PRODUCTION READY - WITH PROPER API INTEGRATION
+
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom' // ✅ React Router navigation
+import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../config/api' // ✅ ADD THIS IMPORT
+import toast from 'react-hot-toast' // ✅ ADD FOR ERROR HANDLING
 
 interface WalletSeeds {
   user_id: string
@@ -13,12 +16,12 @@ interface WalletSeeds {
   wallet_addresses: {
     [chain: string]: string
   }
-  wdk_service_status?: string // ✅ Added service status
+  wdk_service_status?: string
 }
 
 const WalletRecovery = () => {
   const { user } = useAuth()
-  const navigate = useNavigate() // ✅ React Router navigation
+  const navigate = useNavigate()
   const [seeds, setSeeds] = useState<WalletSeeds | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,40 +34,84 @@ const WalletRecovery = () => {
     fetchSeeds()
   }, [user, navigate])
 
+  // ✅ FIXED: Use proper apiClient with correct endpoint
   const fetchSeeds = async () => {
     try {
-      const response = await fetch('/api/wallet-recovery/seeds', {
-        headers: {
-          'Authorization': `Bearer ${user.access_token}`
-        }
-      })
+      setLoading(true)
+      setError('')
       
-      if (!response.ok) throw new Error('Failed to fetch seeds')
+      // ✅ CORRECT ENDPOINT: Use your actual API endpoint
+      const response = await apiClient.get('/api/v1/wallet/recovery-seeds')
       
-      const data: WalletSeeds = await response.json()
-      setSeeds(data)
+      if (response.data.success) {
+        setSeeds(response.data)
+        toast.success('Recovery seeds loaded successfully')
+      } else {
+        throw new Error(response.data.error || 'Failed to fetch seeds')
+      }
     } catch (err: any) {
-      setError(err.message)
+      console.error('Seed fetch error:', err)
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch seeds'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  // ✅ Fixed navigation handler
+  // ✅ FIXED: Proper navigation
   const handleReturnToDashboard = () => {
     navigate('/dashboard')
   }
 
-  if (loading) return <div className="p-8 text-center">Loading your wallet seeds...</div>
-  if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>
+  // ✅ ADD: Retry function for failed loads
+  const handleRetry = () => {
+    fetchSeeds()
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your wallet seeds...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !seeds) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-4">
+            <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Seeds</h3>
+            <p className="text-red-700 mb-4">{error}</p>
+            <button
+              onClick={handleRetry}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+          <button
+            onClick={handleReturnToDashboard}
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Security Warning */}
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
               <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
@@ -86,10 +133,12 @@ const WalletRecovery = () => {
         {seeds?.algorand_seed && (
           <div className="bg-white shadow rounded-lg p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🌐 Algorand Seed Phrase</h2>
-            <div className="bg-gray-50 p-4 rounded border">
-              <p className="text-lg font-mono select-all">{seeds.algorand_seed}</p>
+            <div className="bg-gray-50 p-4 rounded border font-mono text-lg">
+              {seeds.algorand_seed}
             </div>
-            <p className="text-sm text-gray-500 mt-2">Address: {seeds.wallet_addresses?.algorand}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Address: {seeds.wallet_addresses?.algorand || 'Not available'}
+            </p>
           </div>
         )}
 
@@ -99,29 +148,16 @@ const WalletRecovery = () => {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">🔗 Multi-Chain Seed (WDK)</h2>
             <p className="text-gray-600 mb-4">This single seed controls your Bitcoin, Ethereum, Polygon, and Tron wallets.</p>
             
-            {/* ✅ Service Status Indicator */}
-            {seeds.wdk_service_status && (
-              <div className={`mb-4 p-3 rounded-lg text-sm ${
-                seeds.wdk_service_status === 'offline' 
-                  ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-                  : 'bg-blue-50 border border-blue-200 text-blue-800'
-              }`}>
-                {seeds.wdk_service_status === 'offline' ? '⚠️' : '🔄'} {seeds.wdk_seed}
-              </div>
-            )}
+            <div className="bg-gray-50 p-4 rounded border font-mono text-lg">
+              {seeds.wdk_seed}
+            </div>
             
-            {!seeds.wdk_service_status && (
-              <div className="bg-gray-50 p-4 rounded border">
-                <p className="text-lg font-mono select-all">{seeds.wdk_seed}</p>
-              </div>
-            )}
-            
-            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               {Object.entries(seeds.wallet_addresses || {}).map(([chain, address]) => 
                 chain !== 'algorand' && (
-                  <div key={chain} className="flex justify-between">
-                    <span className="font-medium capitalize">{chain}:</span>
-                    <span className="text-gray-600 font-mono text-xs">{address}</span>
+                  <div key={chain} className="flex flex-col">
+                    <span className="font-medium capitalize text-gray-700">{chain}:</span>
+                    <span className="text-gray-600 font-mono text-xs break-all">{address}</span>
                   </div>
                 )
               )}
@@ -141,23 +177,38 @@ const WalletRecovery = () => {
               <li>The seed recovery service is temporarily unavailable</li>
               <li>There was an issue decrypting your seeds</li>
             </ul>
-            <p className="mt-3 text-yellow-700 font-medium">
-              Please try again in a few minutes or contact support if this persists.
-            </p>
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={handleRetry}
+                className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={handleReturnToDashboard}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Return to Dashboard
+              </button>
+            </div>
           </div>
         )}
 
         {/* Backup Confirmation */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-blue-800 mb-2">✅ Backup Confirmation</h3>
-          <p className="text-blue-700 mb-4">I have securely stored both seed phrases and understand that losing them means permanent loss of my funds.</p>
-          <button
-            onClick={handleReturnToDashboard} // ✅ Fixed navigation
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            I've Saved My Seeds - Return to Dashboard
-          </button>
-        </div>
+        {(seeds?.algorand_seed || seeds?.wdk_seed) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 className="text-lg font-medium text-blue-800 mb-2">✅ Backup Confirmation</h3>
+            <p className="text-blue-700 mb-4">
+              I have securely stored my seed phrases and understand that losing them means permanent loss of my funds.
+            </p>
+            <button
+              onClick={handleReturnToDashboard}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              I've Saved My Seeds - Return to Dashboard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
