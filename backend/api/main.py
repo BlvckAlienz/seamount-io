@@ -564,7 +564,7 @@ try:
     app.include_router(wallet_recovery_router, prefix="/api/v1")
     logger.info("🎯 WALLET RECOVERY ROUTES REGISTERED: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
 except Exception as e:
-    logger.error(f"💥 CRITICAL: Wallet recovery route registration failed: {e}"
+    logger.error(f"💥 CRITICAL: Wallet recovery route registration failed: {e}")
 
 # ===== CORE API ENDPOINTS =====
 
