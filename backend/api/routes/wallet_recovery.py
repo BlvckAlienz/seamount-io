@@ -57,21 +57,51 @@ async def get_recovery_seeds(
         available_methods = [method for method in dir(db_service) if not method.startswith('_')]
         logger.info(f"🔍 DEBUG: DatabaseService methods: {available_methods}")
         
-        # ✅ SIMPLE DIRECT SUPABASE APPROACH - NO COMPLEX FALLBACKS
+        # ✅ SIMPLE DIRECT SUPABASE APPROACH
         try:
-            # Get the supabase client directly
             supabase_client = db_service.supabase
             logger.info("✅ Using direct Supabase client")
             
-            # Query user_profiles table directly
+            # First, try user_profiles table
             profile_response = supabase_client.from_("user_profiles").select("*").eq("user_id", user_id).execute()
             
-            if not profile_response.data:
-                logger.warning(f"No user profile found for user_id: {user_id}")
-                raise HTTPException(status_code=404, detail="User profile not found")
-            
-            user_result = profile_response.data[0]
-            logger.info(f"✅ Retrieved user profile data")
+            if profile_response.data:
+                user_result = profile_response.data[0]
+                logger.info(f"✅ Found user profile with {len(user_result.keys())} fields")
+                
+                # Check if we have the required seed fields
+                has_algorand_seed = user_result.get('algorand_encrypted_seed') is not None
+                has_wdk_seed = user_result.get('wdk_encrypted_seed') is not None
+                
+                logger.info(f"🔍 Profile has Algorand seed: {has_algorand_seed}, WDK seed: {has_wdk_seed}")
+                
+            else:
+                # If no user_profile, try wallets table as fallback
+                logger.info("🔄 No user profile found, checking wallets table...")
+                wallets_response = supabase_client.from_("wallets").select("*").eq("user_id", user_id).execute()
+                
+                if wallets_response.data:
+                    logger.info(f"✅ Found {len(wallets_response.data)} wallets for user")
+                    
+                    # Create a mock user_result from wallets data
+                    user_result = {"user_id": user_id}
+                    
+                    # Extract seeds from wallets
+                    for wallet in wallets_response.data:
+                        if wallet.get('encrypted_seed'):
+                            if wallet.get('blockchain') == 'algorand':
+                                user_result['algorand_encrypted_seed'] = wallet['encrypted_seed']
+                            elif wallet.get('wallet_type') == 'wdk':
+                                user_result['wdk_encrypted_seed'] = wallet['encrypted_seed']
+                            
+                        # Collect addresses
+                        if wallet.get('address') and wallet.get('blockchain'):
+                            user_result[f"{wallet['blockchain']}_address"] = wallet['address']
+                    
+                    logger.info(f"✅ Built user result from {len(wallets_response.data)} wallets")
+                else:
+                    logger.warning(f"No user profile or wallets found for user_id: {user_id}")
+                    raise HTTPException(status_code=404, detail="User profile not found. Please complete wallet setup first.")
             
         except Exception as db_error:
             logger.error(f"Database query failed: {db_error}")
