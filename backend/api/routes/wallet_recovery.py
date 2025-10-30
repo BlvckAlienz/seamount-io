@@ -51,9 +51,11 @@ async def get_recovery_seeds(
     """PRODUCTION: Retrieve and decrypt wallet seeds"""
     try:
         user_id = current_user["id"]
+        # TEMPORARY DEBUG - Add this right after the user_id line
+        logger.info(f"🔍 DEBUG: DatabaseService methods: {[method for method in dir(db_service) if not method.startswith('_')]}")
         logger.info(f"🔐 Retrieving recovery seeds for user: {user_id}")
         
-        # ✅ REAL DATABASE QUERY
+        # ✅ FIXED DATABASE QUERY - Use correct DatabaseService methods
         user_query = """
         SELECT 
             u.id as user_id,
@@ -72,12 +74,49 @@ async def get_recovery_seeds(
         WHERE u.id = $1
         """
         
-        user_result = await db_service.fetch_one(user_query, user_id)
+        # 🔥 FIX: Use the CORRECT database method
+        # Try different possible method names used by DatabaseService
+        user_result = None
+        
+        # Method 1: Try execute_sql (most common)
+        try:
+            result = await db_service.execute_sql(user_query, [user_id])
+            if result and len(result) > 0:
+                user_result = result[0]  # Get first row
+        except AttributeError:
+            pass
+        
+        # Method 2: Try execute (fallback)
+        if user_result is None:
+            try:
+                result = await db_service.execute(user_query, [user_id])
+                if result and len(result) > 0:
+                    user_result = result[0]
+            except AttributeError:
+                pass
+        
+        # Method 3: Try direct supabase client (last resort)
+        if user_result is None:
+            try:
+                # Get the supabase client from db_service
+                supabase_client = db_service.supabase
+                result = supabase_client.from_("users").select("*, user_profiles(*)").eq("id", user_id).execute()
+                if result.data and len(result.data) > 0:
+                    user_data = result.data[0]
+                    # Extract user_profiles data if it exists
+                    user_profiles = user_data.get('user_profiles', [])
+                    if user_profiles and len(user_profiles) > 0:
+                        user_result = {**user_data, **user_profiles[0]}
+                    else:
+                        user_result = user_data
+            except Exception as e:
+                logger.error(f"Direct supabase query failed: {e}")
         
         if not user_result:
             logger.warning(f"No user profile found for user_id: {user_id}")
             raise HTTPException(status_code=404, detail="User profile not found")
         
+        # ✅ Continue with the rest of your existing code...
         # Initialize decryption service
         decryption_service = SeedDecryptionService()
         
