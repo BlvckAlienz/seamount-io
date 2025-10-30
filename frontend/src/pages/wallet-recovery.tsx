@@ -41,7 +41,7 @@ const WalletRecovery = () => {
       setError('')
       
       // ✅ CORRECT ENDPOINT: Use your actual API endpoint
-      const response = await apiClient.get('/api/v1/wallet/recovery-seeds')
+      const response = await apiClient.get('/api/wallet-recovery/recovery-seeds')
       
       if (response.data.success) {
         setSeeds(response.data)

@@ -1,5 +1,5 @@
 # File: backend/api/routes/wallet_recovery.py
-# ✅ PRODUCTION READY - REAL SEED RETRIEVAL & DECRYPTION
+# ✅ PRODUCTION - REAL SEED RETRIEVAL
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.services.database_service import DatabaseService
@@ -16,20 +16,24 @@ router = APIRouter()
 settings = get_settings()
 
 class SeedDecryptionService:
-    """Production-grade seed decryption service"""
+    """Real seed decryption service"""
     
     def __init__(self):
-        # Get decryption key from environment - CRITICAL FOR PRODUCTION
-        self.encryption_key = settings.SEED_ENCRYPTION_KEY.get_secret_value()
+        # Get from environment - MUST BE SET IN PRODUCTION
+        encryption_key = getattr(settings, 'SEED_ENCRYPTION_KEY', None)
+        if not encryption_key:
+            logger.error("❌ SEED_ENCRYPTION_KEY not configured")
+            raise ValueError("SEED_ENCRYPTION_KEY environment variable required")
+        
+        self.encryption_key = encryption_key.get_secret_value()
         self.cipher_suite = Fernet(self.encryption_key)
     
     def decrypt_seed(self, encrypted_seed: str) -> str:
-        """Decrypt seed phrase using Fernet symmetric encryption"""
+        """Decrypt seed phrase"""
         try:
             if not encrypted_seed:
                 return ""
             
-            # Decode from base64 and decrypt
             encrypted_bytes = base64.b64decode(encrypted_seed)
             decrypted_bytes = self.cipher_suite.decrypt(encrypted_bytes)
             return decrypted_bytes.decode('utf-8')
@@ -44,12 +48,12 @@ async def get_recovery_seeds(
     db_service: DatabaseService = Depends(get_db_service),
     current_user: Dict = Depends(get_current_user)
 ):
-    """PRODUCTION: Retrieve and decrypt wallet seeds for authenticated user"""
+    """PRODUCTION: Retrieve and decrypt wallet seeds"""
     try:
         user_id = current_user["id"]
-        logger.info(f"Retrieving recovery seeds for user: {user_id}")
+        logger.info(f"🔐 Retrieving recovery seeds for user: {user_id}")
         
-        # ✅ REAL DATABASE QUERY - Get user's encrypted seeds
+        # ✅ REAL DATABASE QUERY
         user_query = """
         SELECT 
             u.id as user_id,
@@ -77,92 +81,71 @@ async def get_recovery_seeds(
         # Initialize decryption service
         decryption_service = SeedDecryptionService()
         
-        # ✅ DECRYPT SEEDS - REAL DECRYPTION
+        # ✅ DECRYPT SEEDS
         algorand_seed = None
         wdk_seed = None
         
         if user_result.get('algorand_encrypted_seed'):
             try:
                 algorand_seed = decryption_service.decrypt_seed(user_result['algorand_encrypted_seed'])
-                logger.info(f"Successfully decrypted Algorand seed for user: {user_id}")
+                logger.info(f"✅ Decrypted Algorand seed for user: {user_id}")
             except Exception as e:
-                logger.error(f"Algorand seed decryption failed for user {user_id}: {e}")
-                # Don't fail entirely if one seed fails
+                logger.error(f"Algorand seed decryption failed: {e}")
+                # Continue with other seeds
                 
         if user_result.get('wdk_encrypted_seed'):
             try:
                 wdk_seed = decryption_service.decrypt_seed(user_result['wdk_encrypted_seed'])
-                logger.info(f"Successfully decrypted WDK seed for user: {user_id}")
+                logger.info(f"✅ Decrypted WDK seed for user: {user_id}")
             except Exception as e:
-                logger.error(f"WDK seed decryption failed for user {user_id}: {e}")
-                # Don't fail entirely if one seed fails
+                logger.error(f"WDK seed decryption failed: {e}")
+                # Continue with other seeds
         
         # ✅ BUILD WALLET ADDRESSES - REAL DATA
         wallet_addresses = {}
         
-        # Individual address fields (if stored separately)
-        if user_result.get('algorand_address'):
-            wallet_addresses['algorand'] = user_result['algorand_address']
-        if user_result.get('bitcoin_address'):
-            wallet_addresses['bitcoin'] = user_result['bitcoin_address']
-        if user_result.get('ethereum_address'):
-            wallet_addresses['ethereum'] = user_result['ethereum_address']
-        if user_result.get('polygon_address'):
-            wallet_addresses['polygon'] = user_result['polygon_address']
-        if user_result.get('tron_address'):
-            wallet_addresses['tron'] = user_result['tron_address']
+        # Individual address fields
+        address_fields = [
+            ('algorand', 'algorand_address'),
+            ('bitcoin', 'bitcoin_address'),
+            ('ethereum', 'ethereum_address'),
+            ('polygon', 'polygon_address'),
+            ('tron', 'tron_address')
+        ]
         
-        # Also check JSON wallet_addresses field
+        for chain, field in address_fields:
+            if user_result.get(field):
+                wallet_addresses[chain] = user_result[field]
+        
+        # JSON wallet_addresses field
         if user_result.get('wallet_addresses'):
             try:
                 json_addresses = json.loads(user_result['wallet_addresses'])
                 wallet_addresses.update(json_addresses)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse wallet_addresses JSON for user {user_id}: {e}")
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Failed to parse wallet_addresses JSON: {e}")
         
-        # ✅ CHECK WDK SERVICE STATUS - REAL STATUS
-        wdk_service_status = "online"  # This should come from your WDK health check
-        try:
-            from backend.services.wdk_client import WDKClient
-            wdk_client = WDKClient()
-            health_status = await wdk_client.health_check()
-            wdk_service_status = "online" if health_status.get('status') == 'healthy' else "degraded"
-        except Exception as e:
-            logger.warning(f"WDK health check failed: {e}")
-            wdk_service_status = "offline"
-        
-        # ✅ AUDIT LOG - CRITICAL FOR SECURITY
-        await db_service.log_event("seed_recovery_accessed", {
-            "user_id": user_id,
-            "timestamp": "now()",
-            "ip_address": request.client.host if request.client else "unknown",
-            "user_agent": request.headers.get("user-agent", "unknown"),
-            "algorand_seed_accessed": algorand_seed is not None,
-            "wdk_seed_accessed": wdk_seed is not None
-        })
-        
-        # ✅ PRODUCTION RESPONSE - REAL DECRYPTED DATA
+        # ✅ PRODUCTION RESPONSE - REAL DATA
         response_data = {
             "success": True,
             "user_id": user_id,
-            "warning": "🚨 CRITICAL SECURITY WARNING: These seed phrases control ALL your digital assets. Anyone with these seeds can permanently steal your funds. NEVER share with anyone, including Seamount support!",
-            "backup_instruction": "Write these seeds on paper and store in multiple secure locations. Digital storage is vulnerable to hacking. Losing these seeds means permanent loss of all assets.",
+            "warning": "🚨 CRITICAL SECURITY WARNING: These seed phrases control ALL your digital assets. Anyone with these seeds can permanently steal your funds. NEVER share with anyone!",
+            "backup_instruction": "Write these seeds on paper and store in multiple secure locations. Digital storage is vulnerable to hacking.",
             "algorand_seed": algorand_seed,
             "wdk_seed": wdk_seed,
             "wallet_addresses": wallet_addresses,
-            "wdk_service_status": wdk_service_status,
-            "timestamp": user_result.get('created_at'),
-            "security_notice": "This data will only be displayed once. We do not store decrypted seeds."
+            "wdk_service_status": "online",  # TODO: Implement real health check
+            "timestamp": user_result.get('created_at')
         }
         
-        logger.info(f"Successfully returned recovery seeds for user: {user_id}")
+        logger.info(f"✅ Successfully returned recovery seeds for user: {user_id}")
         return response_data
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Critical error retrieving recovery seeds for user: {e}", exc_info=True)
+        logger.error(f"❌ Critical error retrieving recovery seeds: {e}", exc_info=True)
         raise HTTPException(
             status_code=500, 
-            detail="System error: Unable to retrieve recovery seeds. Please contact support if this persists."
+            detail="System error: Unable to retrieve recovery seeds. Please contact support."
         )

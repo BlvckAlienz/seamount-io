@@ -23,6 +23,9 @@ import sys
 from pathlib import Path
 from decimal import Decimal
 
+# In your imports section, add:
+from backend.api.routes import wallet_recovery
+
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -553,10 +556,10 @@ if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
 
-# 🔒 ADD WALLET RECOVERY ROUTE REGISTRATION
+# 🔒 UPDATE WALLET RECOVERY ROUTE REGISTRATION - CHANGE PREFIX
 if routers_available.get('wallet_recovery'):
-    app.include_router(routers_available['wallet_recovery'], prefix="/api/wallet-recovery", tags=["Wallet Recovery"])
-    logger.info("✅ Wallet recovery router registered at /api/wallet-recovery")
+    app.include_router(routers_available['wallet_recovery'], prefix="/api/v1", tags=["Wallet Recovery"])
+    logger.info("✅ Wallet recovery router registered at /api/v1/wallet/recovery-seeds")
 
 # ===== CORE API ENDPOINTS =====
 

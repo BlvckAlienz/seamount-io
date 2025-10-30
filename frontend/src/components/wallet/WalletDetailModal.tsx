@@ -21,11 +21,53 @@ interface AssetPriceData {
   price: number;
   change24h: number;
   chartData?: number[];
-  // NEW: Live oracle data
   livePrice?: number;
   priceLoading?: boolean;
   priceError?: string;
 }
+
+// ✅ FIXED: Define chainAssets OUTSIDE component to avoid scope issues
+const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = {
+  bitcoin: [{ symbol: 'BTC', name: 'Bitcoin' }],
+  ethereum: [
+    { symbol: 'ETH', name: 'Ethereum' },
+    { symbol: 'USDT', name: 'Tether' },
+    { symbol: 'USDC', name: 'USD Coin' }
+  ],
+  polygon: [
+    { symbol: 'MATIC', name: 'Polygon' },
+    { symbol: 'USDT', name: 'Tether' },
+    { symbol: 'USDC', name: 'USD Coin' }
+  ],
+  algorand: [
+    { symbol: 'ALGO', name: 'Algorand' },
+    { symbol: 'USDCa', name: 'USD Coin' },
+    { symbol: 'USDT', name: 'Tether' },
+    { symbol: 'goBTC', name: 'Wrapped Bitcoin' },
+    { symbol: 'goETH', name: 'Wrapped Ethereum' }
+  ],
+  tron: [
+    { symbol: 'TRX', name: 'TRON' },
+    { symbol: 'USDT', name: 'Tether' }
+  ]
+};
+
+// ✅ FIXED: Define helper functions OUTSIDE component
+const getOracleAssetName = (symbol: string): string => {
+  const assetMap: { [key: string]: string } = {
+    'BTC': 'bitcoin',
+    'ETH': 'ethereum', 
+    'MATIC': 'matic',
+    'ALGO': 'algorand',
+    'TRX': 'tron',
+    'USDT': 'tether',
+    'USDC': 'tether',
+    'USDCa': 'tether',
+    'goBTC': 'bitcoin',
+    'goETH': 'ethereum'
+  };
+  return assetMap[symbol] || 'algorand';
+};
 
 const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   isOpen,
@@ -40,29 +82,33 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
 
-  // ✅ ENHANCED: Real data fetch with exponential backoff
+   // ✅ FIXED: Enhanced live price fetch with proper error boundaries
   const fetchLivePrice = async (symbol: string): Promise<number | null> => {
     const assetName = getOracleAssetName(symbol);
     
-    // 🎯 TIER 1: Your Backend Oracle (Primary)
+    console.log(`🔄 Fetching live price for ${symbol} (${assetName})`);
+    
+    // 🎯 TIER 1: Your Backend Oracle
     try {
-      console.log(`🔄 [Tier 1] Fetching ${symbol} from backend oracle...`);
       const response = await apiClient.get(`/api/v1/oracle/price/${assetName}`);
+      console.log('✅ Oracle response:', response.data);
+      
       if (response.data.success && response.data.price) {
         const price = parseFloat(response.data.price);
         console.log(`✅ [Backend Oracle] ${symbol}: $${price}`);
         return price;
+      } else {
+        console.warn(`⚠️ [Backend Oracle] No price data for ${symbol}`);
       }
     } catch (error) {
       console.warn(`⚠️ [Backend Oracle] Failed for ${symbol}:`, error);
     }
 
-    // 🎯 TIER 2: Binance Public API (Free, Real-Time)
+    // 🎯 TIER 2: Binance Public API
     try {
-      console.log(`🔄 [Tier 2] Fetching ${symbol} from Binance...`);
       const binanceSymbols: { [key: string]: string } = {
         'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'MATIC': 'MATICUSDT',
-        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'USDT': 'USDTUSDC',
+        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'USDT': 'USDCUSDT',
         'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT', 'goBTC': 'BTCUSDT',
         'goETH': 'ETHUSDT'
       };
@@ -70,30 +116,26 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       const binanceSymbol = binanceSymbols[symbol];
       if (!binanceSymbol) {
         console.warn(`⚠️ [Binance] No mapping for ${symbol}`);
-        return null;
-      }
-      
-      const binanceUrl = `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`;
-      const response = await fetch(binanceUrl, { 
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const price = parseFloat(data.price);
-        console.log(`✅ [Binance] ${symbol}: $${price}`);
-        return price;
       } else {
-        console.warn(`⚠️ [Binance] HTTP ${response.status} for ${symbol}`);
+        const binanceUrl = `https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`;
+        const response = await fetch(binanceUrl, { 
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const price = parseFloat(data.price);
+          console.log(`✅ [Binance] ${symbol}: $${price}`);
+          return price;
+        }
       }
     } catch (error) {
       console.warn(`⚠️ [Binance] Network error for ${symbol}:`, error);
     }
 
-    // 🎯 TIER 3: CoinGecko Free API (Real-Time, No Auth)
+    // 🎯 TIER 3: CoinGecko Free API
     try {
-      console.log(`🔄 [Tier 3] Fetching ${symbol} from CoinGecko...`);
       const coinGeckoIds: { [key: string]: string } = {
         'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic-network',
         'ALGO': 'algorand', 'TRX': 'tron', 'USDT': 'tether',
@@ -102,51 +144,52 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       };
       
       const coinId = coinGeckoIds[symbol];
-      if (!coinId) {
-        console.warn(`⚠️ [CoinGecko] No mapping for ${symbol}`);
-        return null;
-      }
-      
-      const cgUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
-      const response = await fetch(cgUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const price = data[coinId]?.usd;
-        if (price) {
-          console.log(`✅ [CoinGecko] ${symbol}: $${price}`);
-          return price;
+      if (coinId) {
+        const cgUrl = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
+        const response = await fetch(cgUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const price = data[coinId]?.usd;
+          if (price) {
+            console.log(`✅ [CoinGecko] ${symbol}: $${price}`);
+            return price;
+          }
         }
-      } else {
-        console.warn(`⚠️ [CoinGecko] HTTP ${response.status} for ${symbol}`);
       }
     } catch (error) {
       console.warn(`⚠️ [CoinGecko] Network error for ${symbol}:`, error);
     }
 
-    // ❌ ALL LIVE SOURCES FAILED
-    console.error(`❌ All live data sources failed for ${symbol}`);
+    console.error(`❌ All price sources failed for ${symbol}`);
     return null;
   };
 
-  // ✅ ENHANCED: Robust price data fetching
+  // ✅ FIXED: Robust price data fetching with proper chainAssets access
   const fetchPriceData = async () => {
+    if (!isOpen) return;
+    
     try {
       setLoading(true);
-      const assets = chainAssets[chain] || [];
+      console.log(`🔄 Fetching price data for chain: ${chain}`);
       
-      if (assets.length === 0) {
+      // ✅ FIXED: Safely access chainAssets
+      const currentChainAssets = chainAssets[chain] || [];
+      
+      if (currentChainAssets.length === 0) {
         console.warn(`No assets configured for chain: ${chain}`);
         setPriceData([]);
         setLoading(false);
         return;
       }
       
+      console.log(`📊 Found ${currentChainAssets.length} assets for ${chain}`);
+      
       // Start with loading state
-      const loadingPriceData: AssetPriceData[] = assets.map(asset => ({
+      const loadingPriceData: AssetPriceData[] = currentChainAssets.map(asset => ({
         symbol: asset.symbol,
         name: asset.name,
         price: 0,
@@ -157,12 +200,15 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
 
       setPriceData(loadingPriceData);
 
-      // 🔥 Fetch REAL live prices in parallel with timeout
-      const pricePromises = assets.map(async (asset) => {
+      // Fetch prices in parallel with timeout
+      const pricePromises = currentChainAssets.map(async (asset) => {
         try {
           const livePrice = await Promise.race([
             fetchLivePrice(asset.symbol),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)) // 10s timeout
+            new Promise<null>((resolve) => setTimeout(() => {
+              console.log(`⏰ Timeout fetching price for ${asset.symbol}`);
+              resolve(null);
+            }, 10000))
           ]);
           
           return {
@@ -170,11 +216,12 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
             name: asset.name,
             price: livePrice || 0,
             livePrice: livePrice || undefined,
-            change24h: 0, // TODO: Implement 24h change from real API
+            change24h: 0,
             priceLoading: false,
-            priceError: livePrice === null ? 'Unable to fetch live price from any source' : undefined
+            priceError: livePrice === null ? 'Price fetch timeout or unavailable' : undefined
           };
         } catch (error) {
+          console.error(`❌ Error fetching ${asset.symbol}:`, error);
           return {
             symbol: asset.symbol,
             name: asset.name,
@@ -190,27 +237,25 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       const enhancedPriceData = await Promise.all(pricePromises);
       setPriceData(enhancedPriceData);
       
-      // Log success/failure summary
+      // Log results
       const successCount = enhancedPriceData.filter(d => d.livePrice !== undefined).length;
-      console.log(`✅ Price fetch complete: ${successCount}/${assets.length} successful`);
+      console.log(`✅ Price fetch complete: ${successCount}/${currentChainAssets.length} successful`);
       
       if (successCount === 0 && retryCount < 2) {
-        // Auto-retry once
+        console.log(`🔄 Auto-retry ${retryCount + 1}/2`);
         setRetryCount(prev => prev + 1);
         setTimeout(() => fetchPriceData(), 2000);
       } else if (successCount === 0) {
-        toast.error('Unable to load live prices. Please check your connection.', {
-          duration: 5000
-        });
+        toast.error('Unable to load live prices from any source', { duration: 5000 });
       }
       
     } catch (error) {
-      console.error('Failed to fetch price data:', error);
+      console.error('❌ Critical error in fetchPriceData:', error);
       if (retryCount < 2) {
         setRetryCount(prev => prev + 1);
         setTimeout(() => fetchPriceData(), 2000);
       } else {
-        toast.error('Price data fetch failed. Please refresh the page.');
+        toast.error('Price data service unavailable');
         setPriceData([]);
       }
     } finally {
@@ -218,10 +263,11 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     }
   };
 
-  // ✅ Reset retry count when modal opens
+  // ✅ Reset and fetch when modal opens or chain changes
   useEffect(() => {
     if (isOpen) {
       setRetryCount(0);
+      setSelectedAsset('');
       fetchPriceData();
     }
   }, [isOpen, chain]);
