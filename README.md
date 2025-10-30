@@ -1,6 +1,6 @@
 # 🌊 Seamount.io - Digital Assets & Yield-Farming Gateway
 
-**Production-ready cross-border payment platform with one-click multi-chain wallet generation across 4+ chains (Algorand, Bitcoin, Ethereum, and Polygon)**
+**Production-ready cross-border payment platform with one-click multi-chain wallet generation across 5+ chains [Algorand, Bitcoin, Ethereum, Polygon, Tron, Solana (coming soon)]**
 
 ## 🚀 Quick Setup
 
@@ -34,13 +34,13 @@ cp .env.example .env
 
 - ✅ **Authentication** - Full login/signup flow with Supabase
 - ✅ **KYC Verification** - Regfyl integration for identity verification
-- ✅ **One-Click Wallet Creation** - Algorand + Bitcoin + Ethereum + Ploygon compatible addresses
+- ✅ **One-Click Wallet Creation** - Algorand + Bitcoin + Ethereum + Ploygon + Tron compatible addresses
 - ✅ **Local Payment Channel Integration** - Pan-African payment processing
 - ✅ **Cross-Border Payments** - 10+ African countries supported
 
 ## 🚀 Enterprise Features
 
-- **Tight FX Spreads** - Low volatility and improved access to FX
+- **Tight FX Spreads** - Low volatility and improved access to FX - USD/GBP/EUR
 - **Cross-border Payments + Access to DeFi** - Fast settlements + Cost savings vs traditional banking
 - **Multi-currency Support** - KES, USD, NGN, ZAR
 - **Real-time Analytics** - Monitor assets performance in real-time
@@ -48,7 +48,7 @@ cp .env.example .env
 
 ## 💰 Revenue Model
 
-- **2.9%** transaction fees
+- **1.2%** cross-border payment transaction fees
 - **$3,500-15K/month** B2B infrastructure licensing
 - **1-2% mgt. + 20% on upside** staking fees  
   
@@ -62,7 +62,7 @@ cp .env.example .env
 
 - **Frontend:** React 18 + TypeScript + Tailwind
 - **Backend:** Python FastAPI + SQLite/PostgreSQL
-- **Blockchain:** Algorand + Bitcoin + Ethereum + Polygon
+- **Blockchain:** Algorand + Bitcoin + Ethereum + Polygon + Tron
 - **Payments:** Cashramp + Paystack + Flutterwave + M-Pesa integration
 - **Deploy:** Vercel (frontend) + Render (backend)
 - **Auth & Database:** Supabase
