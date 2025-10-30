@@ -1,5 +1,5 @@
 # File Location: backend/services/database_service.py
-# 🚀 DEFINITIVE PRODUCTION READY VERSION
+# 🚀 MINIMAL FIX - ONLY ADD MISSING CLASS DEFINITIONS
 
 import asyncio
 import logging
@@ -19,6 +19,20 @@ from fastapi import HTTPException
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# ✅ MINIMAL FIX: Add ONLY the missing class definitions
+class UserProfile:
+    """User profile data class - MINIMAL DEFINITION TO FIX IMPORT"""
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+class EncryptedSeed:
+    """Encrypted seed data class - MINIMAL DEFINITION TO FIX IMPORT"""
+    def __init__(self, blockchain: str, encrypted_seed: str, encrypted_private_key: str):
+        self.blockchain = blockchain
+        self.encrypted_seed = encrypted_seed
+        self.encrypted_private_key = encrypted_private_key
 
 class DatabaseService:
     """Production-ready database service with wallet creation support"""
