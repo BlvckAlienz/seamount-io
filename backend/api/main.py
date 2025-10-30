@@ -558,13 +558,13 @@ if routers_available.get('wallet_recovery'):
     app.include_router(routers_available['wallet_recovery'], prefix="/api/v1", tags=["Wallet Recovery"])
     logger.info("✅ Wallet recovery router registered - endpoints: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
 
-# 🚨 TEMPORARY FIX - Add this after your existing wallet recovery registration
+# ✅ SIMPLE, DIRECT WALLET RECOVERY REGISTRATION (NO COMPLEX LOGIC)
 try:
-    from backend.api.routes.wallet_recovery import router as temp_wallet_recovery_router
-    app.include_router(temp_wallet_recovery_router, prefix="/api/v1", tags=["Wallet-Recovery-Temp"])
-    logger.info("🚨 TEMP: Wallet recovery router directly registered at /api/v1/wallet/recovery-seeds")
+    from backend.api.routes.wallet_recovery import router as wallet_recovery_router
+    app.include_router(wallet_recovery_router, prefix="/api/v1")
+    logger.info("🎯 WALLET RECOVERY ROUTES REGISTERED: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
 except Exception as e:
-    logger.error(f"❌ TEMP wallet recovery registration failed: {e}")
+    logger.error(f"💥 CRITICAL: Wallet recovery route registration failed: {e}"
 
 # ===== CORE API ENDPOINTS =====
 
@@ -826,6 +826,27 @@ async def debug_oracle_test(asset_name: str):
             "error": str(e),
             "message": "Oracle service test failed"
         }
+
+@app.get("/api/debug/all-routes")
+async def debug_all_routes():
+    """Debug endpoint to see ALL registered routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            route_info = {
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": getattr(route, "name", "N/A")
+            }
+            routes.append(route_info)
+    
+    # Sort by path for easier reading
+    routes.sort(key=lambda x: x["path"])
+    
+    return {
+        "total_routes": len(routes),
+        "registered_routes": routes
+    }
 
 # ===== ADMIN ENDPOINTS =====
 
