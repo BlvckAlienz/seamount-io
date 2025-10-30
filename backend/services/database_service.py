@@ -1,5 +1,5 @@
 # File Location: backend/services/database_service.py
-# 🚀 DEFINITIVE PRODUCTION READY VERSION - SYNTAX FIXED
+# 🚀 DEFINITIVE PRODUCTION READY VERSION
 
 import asyncio
 import logging
@@ -19,20 +19,6 @@ from fastapi import HTTPException
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-# ✅ ADDED: Missing class definitions
-class UserProfile:
-    """User profile data class"""
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-class EncryptedSeed:
-    """Encrypted seed data class"""
-    def __init__(self, blockchain: str, encrypted_seed: str, encrypted_private_key: str):
-        self.blockchain = blockchain
-        self.encrypted_seed = encrypted_seed
-        self.encrypted_private_key = encrypted_private_key
 
 class DatabaseService:
     """Production-ready database service with wallet creation support"""
@@ -272,75 +258,6 @@ class DatabaseService:
             logger.error(f"[DB] Error deleting wallet creation queue item {item_id}: {str(e)}")
             return False
 
-    # ✅ FIXED: get_user_profile method with proper syntax
-    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
-        """
-        Get user profile using Supabase (consistent with class design)
-        """
-        try:
-            logger.debug(f"[DB] Fetching user profile: {user_id}")
-            
-            try:
-                user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-            except ValueError:
-                logger.error(f"[DB] Invalid UUID format: {user_id}")
-                return None
-            
-            # Use asyncio.to_thread for Supabase operations
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .select("*")
-                .eq("id", str(user_uuid))
-                .maybe_single()
-                .execute()
-            )
-            
-            if response.data:
-                logger.debug(f"[DB] User profile found: {user_id}")
-                return UserProfile(**response.data)
-            else:
-                logger.warning(f"[DB] User profile not found: {user_id}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"[DB] Error in get_user_profile for {user_id}: {str(e)}")
-            return None
-
-    # ✅ FIXED: get_encrypted_seeds method with proper syntax
-    async def get_encrypted_seeds(self, user_id: str) -> List[EncryptedSeed]:
-        """
-        Get encrypted seeds using Supabase (consistent with class design)
-        """
-        try:
-            logger.debug(f"[DB] Fetching encrypted seeds for user: {user_id}")
-            
-            # Use asyncio.to_thread for Supabase operations
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("multi_chain_addresses")
-                .select("blockchain, encrypted_seed, encrypted_private_key")
-                .eq("user_id", user_id)
-                .not_.is_("encrypted_seed", "null")
-                .execute()
-            )
-            
-            seeds = []
-            if response.data:
-                for row in response.data:
-                    seeds.append(EncryptedSeed(
-                        blockchain=row['blockchain'],
-                        encrypted_seed=row['encrypted_seed'],
-                        encrypted_private_key=row['encrypted_private_key']
-                    ))
-                logger.debug(f"[DB] Found {len(seeds)} encrypted seeds for user {user_id}")
-            else:
-                logger.debug(f"[DB] No encrypted seeds found for user {user_id}")
-                
-            return seeds
-            
-        except Exception as e:
-            logger.error(f"[DB] Error fetching encrypted seeds for user {user_id}: {str(e)}")
-            return []
-
     # EXISTING METHODS (KEEP ALL YOUR CURRENT FUNCTIONALITY)
     async def create_user_profile(self, profile_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Create user profile with proper user_id population"""
@@ -375,12 +292,10 @@ class DatabaseService:
             
             logger.info(f"[DB] Creating user profile: {user_uuid}")
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles").upsert(
-                    clean_data, 
-                    on_conflict="id"
-                ).execute()
-            )
+            response = self.supabase.table("user_profiles").upsert(
+                clean_data, 
+                on_conflict="id"
+            ).execute()
             
             if response.data and len(response.data) > 0:
                 logger.info(f"[DB] User profile created successfully: {user_uuid}")
@@ -393,7 +308,79 @@ class DatabaseService:
             logger.error(f"[DB] Error creating user profile: {str(e)}")
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
-    
+
+    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
+        """
+        Get user profile with fallback creation if missing
+        Handles orphaned profile records by recreating them
+        """
+        try:
+            # First, verify user exists
+            user_query = "SELECT id, email, full_name FROM users WHERE id = $1"
+            user_row = await self.connection.fetchrow(user_query, user_id)
+            
+            if not user_row:
+                logger.warning(f"User {user_id} not found in users table")
+                return None
+            
+            # Try to get existing profile
+            profile_query = "SELECT * FROM user_profiles WHERE user_id = $1"
+            profile_row = await self.connection.fetchrow(profile_query, user_id)
+            
+            if profile_row:
+                return UserProfile(**profile_row)
+            
+            # Create profile if missing
+            logger.info(f"Creating missing user profile for {user_id}")
+            insert_query = """
+                INSERT INTO user_profiles (
+                    user_id, email, first_name, last_name, 
+                    country_code, role, created_at, updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                RETURNING *
+            """
+            
+            # Extract name parts from full_name
+            full_name = user_row['full_name'] or 'User'
+            name_parts = full_name.split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            new_profile = await self.connection.fetchrow(
+                insert_query,
+                user_id,
+                user_row['email'],
+                first_name,
+                last_name,
+                'US',  # Default country code
+                'user'  # Default role
+            )
+            
+            if new_profile:
+                logger.info(f"Successfully created user profile for {user_id}")
+                return UserProfile(**new_profile)
+            else:
+                logger.error(f"Failed to create user profile for {user_id}")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error in get_user_profile for {user_id}: {str(e)}")
+            return None
+
+    async def get_encrypted_seeds(self, user_id: str) -> List[EncryptedSeed]:
+        try:
+            # Query multi_chain_addresses table which has the encrypted seeds
+            query = """
+                SELECT blockchain, encrypted_seed, encrypted_private_key
+                FROM multi_chain_addresses 
+                WHERE user_id = $1 AND encrypted_seed IS NOT NULL
+            """
+            rows = await self.connection.fetch(query, user_id)
+            return [EncryptedSeed(**row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error fetching encrypted seeds for user {user_id}: {str(e)}")
+            return []
+        
     async def get_user_profile_raw(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get UNFILTERED user profile for internal operations (KYC, compliance)
@@ -408,13 +395,7 @@ class DatabaseService:
                 logger.error(f"[DB] Invalid UUID format: {user_id}")
                 return None
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .select("*")
-                .eq("id", str(user_uuid))
-                .maybe_single()
-                .execute()
-            )
+            response = self.supabase.table("user_profiles").select("*").eq("id", str(user_uuid)).maybe_single().execute()
             
             if response.data:
                 logger.debug(f"[DB] Raw profile found with {len(response.data)} fields")
@@ -456,12 +437,7 @@ class DatabaseService:
             
             clean_update["updated_at"] = datetime.utcnow().isoformat()
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .update(clean_update)
-                .eq("id", str(user_uuid))
-                .execute()
-            )
+            response = self.supabase.table("user_profiles").update(clean_update).eq("id", str(user_uuid)).execute()
             
             if response.data and len(response.data) > 0:
                 logger.info(f"[DB] User profile updated successfully: {user_id}")
@@ -524,11 +500,7 @@ class DatabaseService:
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("kyc_sessions")
-                .insert(session_data)
-                .execute()
-            )
+            response = self.supabase.table("kyc_sessions").insert(session_data).execute()
             
             if response.data:
                 logger.info(f"[DB] KYC session logged successfully")
@@ -557,12 +529,7 @@ class DatabaseService:
             elif status in ["pending", "initiated"]:
                 update_data["kyc_started_at"] = datetime.utcnow().isoformat()
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .update(update_data)
-                .eq("id", user_id)
-                .execute()
-            )
+            response = self.supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
             
             if response.data:
                 logger.info(f"[DB] KYC status updated successfully")
@@ -590,11 +557,7 @@ class DatabaseService:
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_wallets")
-                .upsert(wallet_data, on_conflict="user_id")
-                .execute()
-            )
+            response = self.supabase.table("user_wallets").upsert(wallet_data, on_conflict="user_id").execute()
             
             if response.data:
                 logger.info(f"[DB] Encrypted private key saved successfully")
@@ -612,14 +575,7 @@ class DatabaseService:
         try:
             logger.debug(f"[DB] Retrieving encrypted private key for user {user_id}")
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_wallets")
-                .select("algorand_private_key")
-                .eq("user_id", user_id)
-                .eq("is_active", True)
-                .maybe_single()
-                .execute()
-            )
+            response = self.supabase.table("user_wallets").select("algorand_private_key").eq("user_id", user_id).eq("is_active", True).maybe_single().execute()
             
             if response.data:
                 logger.debug(f"[DB] Encrypted private key retrieved")
@@ -637,14 +593,12 @@ class DatabaseService:
         try:
             logger.debug(f"[DB] Fetching user wallet: {user_id}")
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_wallets")
-                .select("*")
-                .eq("user_id", user_id)
-                .eq("is_active", True)
-                .maybe_single()
+            response = self.supabase.table("user_wallets") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .eq("is_active", True) \
+                .maybe_single() \
                 .execute()
-            )
             
             if response and hasattr(response, 'data') and response.data:
                 wallet = response.data
@@ -669,11 +623,7 @@ class DatabaseService:
     async def log_event(self, table_name: str, event_data: Dict[str, Any]) -> bool:
         """Generic event logger"""
         try:
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table(table_name)
-                .insert(event_data)
-                .execute()
-            )
+            response = self.supabase.table(table_name).insert(event_data).execute()
             return bool(response.data)
         except Exception as e:
             logger.warning(f"[DB] log_event failed: {str(e)}")
@@ -684,12 +634,7 @@ class DatabaseService:
         try:
             logger.debug("[DB] Performing health check")
             
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .select("count", count="exact")
-                .limit(1)
-                .execute()
-            )
+            response = self.supabase.table("user_profiles").select("count", count="exact").limit(1).execute()
             
             if response.count is not None:
                 logger.debug(f"[DB] Health check passed")
@@ -711,5 +656,4 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
 
-# ✅ FIXED: Proper class alias
 SuperDatabaseService = DatabaseService
