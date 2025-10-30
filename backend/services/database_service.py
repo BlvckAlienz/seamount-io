@@ -324,37 +324,93 @@ class DatabaseService:
             raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
 
     async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
-    """
-    Get user profile using Supabase (consistent with class design)
-    """
-    try:
-        logger.debug(f"[DB] Fetching user profile: {user_id}")
-        
+        """
+        Get user profile with proper name handling from auth system
+        """
         try:
-            user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-        except ValueError:
-            logger.error(f"[DB] Invalid UUID format: {user_id}")
-            return None
-        
-        # Use Supabase instead of asyncpg
-        response = await asyncio.to_thread(
-            lambda: self.supabase.table("user_profiles")
-            .select("*")
-            .eq("id", str(user_uuid))
-            .maybe_single()
-            .execute()
-        )
-        
-        if response.data:
-            logger.debug(f"[DB] User profile found: {user_id}")
-            return UserProfile(**response.data)
-        else:
-            logger.warning(f"[DB] User profile not found: {user_id}")
-            return None
+            logger.debug(f"[DB] Fetching user profile: {user_id}")
             
-    except Exception as e:
-        logger.error(f"[DB] Error in get_user_profile for {user_id}: {str(e)}")
-        return None
+            try:
+                user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+            except ValueError:
+                logger.error(f"[DB] Invalid UUID format: {user_id}")
+                return None
+            
+            # Get user from auth to capture name
+            auth_response = await asyncio.to_thread(
+                lambda: self.supabase.auth.admin.get_user_by_id(str(user_uuid))
+            )
+            
+            if not auth_response.user:
+                logger.warning(f"[DB] User not found in auth: {user_id}")
+                return None
+            
+            auth_user = auth_response.user
+            user_metadata = auth_user.user_metadata or {}
+            
+            # Get or create user profile
+            profile_response = await asyncio.to_thread(
+                lambda: self.supabase.table("user_profiles")
+                .select("*")
+                .eq("id", str(user_uuid))
+                .maybe_single()
+                .execute()
+            )
+            
+            if profile_response.data:
+                profile_data = profile_response.data
+                # Update profile with current auth data if missing
+                if not profile_data.get('first_name') and user_metadata.get('full_name'):
+                    names = user_metadata['full_name'].split(' ', 1)
+                    update_data = {
+                        'first_name': names[0],
+                        'last_name': names[1] if len(names) > 1 else '',
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    await asyncio.to_thread(
+                        lambda: self.supabase.table("user_profiles")
+                        .update(update_data)
+                        .eq("id", str(user_uuid))
+                        .execute()
+                    )
+                    profile_data.update(update_data)
+                
+                logger.debug(f"[DB] User profile found: {user_id}")
+                return UserProfile(**profile_data)
+            else:
+                # Create new profile with auth data
+                names = user_metadata.get('full_name', 'User').split(' ', 1)
+                new_profile_data = {
+                    "id": str(user_uuid),
+                    "user_id": str(user_uuid),  # Add user_id for relationships
+                    "email": auth_user.email,
+                    "first_name": names[0],
+                    "last_name": names[1] if len(names) > 1 else '',
+                    "country_code": "US",
+                    "kyc_status": "not_started",
+                    "kyc_level": 0,
+                    "role": "user",
+                    "is_admin": False,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+                
+                create_response = await asyncio.to_thread(
+                    lambda: self.supabase.table("user_profiles")
+                    .insert(new_profile_data)
+                    .execute()
+                )
+                
+                if create_response.data:
+                    logger.info(f"[DB] Created new user profile: {user_id}")
+                    return UserProfile(**create_response.data[0])
+                else:
+                    logger.error(f"[DB] Failed to create user profile: {user_id}")
+                    return None
+                
+        except Exception as e:
+            logger.error(f"[DB] Error in get_user_profile for {user_id}: {str(e)}")
+            return None
 
     async def get_encrypted_seeds(self, user_id: str) -> List[EncryptedSeed]:
         """
