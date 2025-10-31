@@ -1,5 +1,5 @@
 # File: backend/services/algorand_service.py
-# UPDATED VERSION - Remove test funding for production
+# PRODUCTION READY - All duplicates removed
 
 import logging
 from decimal import Decimal
@@ -18,12 +18,11 @@ logger = logging.getLogger(__name__)
 class AlgorandService:
     """Algorand blockchain interaction service using free public nodes"""
     
-    def __init__(self, settings):  # Add settings parameter
+    def __init__(self, settings):
         self.settings = settings
-        # Use free AlgoNode - no API key needed
         self.algod_client = algod.AlgodClient(
             algod_token="",
-            algod_address=settings.ALGORAND_ALGOD_ADDRESS,  # Now works
+            algod_address=settings.ALGORAND_ALGOD_ADDRESS,
             headers={"User-Agent": "Seamount/1.0"}
         )
     
@@ -42,36 +41,29 @@ class AlgorandService:
     async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
         """Create new Algorand wallet for user - NO TEST FUNDING"""
         try:
-            from cryptography.fernet import Fernet
-            import os
+            from backend.services.seed_encryption_service import SeedEncryptionService
             
-            # Generate keypair
             private_key, address = account.generate_account()
             mnemonic_phrase = mnemonic.from_private_key(private_key)
             
             logger.info(f"Generated Algorand wallet: {address[:10]}...")
-            
-            # 🆕 REMOVED: Test funding for production
-            # Users will fund their own wallets or use on-ramp services
             logger.info(f"✅ Wallet created (no test funding): {address[:10]}...")
             
-            # Encrypt keys
-            encryption_key = os.getenv('ENCRYPTION_KEY', Fernet.generate_key().decode())
-            fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+            encryption_service = SeedEncryptionService()
+            encrypted_private_key = encryption_service.encrypt_seed(private_key)
+            encrypted_mnemonic = encryption_service.encrypt_seed(mnemonic_phrase)
             
-            encrypted_private_key = fernet.encrypt(private_key.encode()).decode()
-            encrypted_mnemonic = fernet.encrypt(mnemonic_phrase.encode()).decode()
+            logger.info(f"✅ Algorand seeds encrypted (mnemonic length: {len(encrypted_mnemonic)})")
             
             return {
                 'wallet_address': address,
                 'encrypted_private_key': encrypted_private_key,
                 'encrypted_mnemonic': encrypted_mnemonic,
-                'blockchain': 'algorand',
                 'created_at': datetime.utcnow().isoformat()
             }
             
         except Exception as e:
-            logger.error(f"❌ Algorand wallet creation failed: {e}")
+            logger.error(f"❌ Algorand wallet creation failed for user {user_id}: {e}")
             raise Exception(f"Failed to create Algorand wallet: {str(e)}")
 
     async def get_account_info(self, address: str) -> Optional[Dict[str, Any]]:
@@ -187,35 +179,10 @@ class AlgorandService:
                     pass
         raise TimeoutError(f"Transaction {tx_id} not confirmed")
 
-    # 🆕 COMMENT OUT: Remove funding method or make it conditional
     async def fund_account_for_opt_in(self, user_address: str) -> Optional[str]:
         """🆕 DISABLED: Funding removed for production"""
         logger.info(f"🆕 Funding disabled for production: {user_address[:10]}...")
-        return None  # No funding in production
-        
-        # try:
-        #     min_balance = 100000  # 0.1 ALGO base
-        #     asset_opt_in_fee = 100000  # 0.1 ALGO per asset
-        #     total_funding = min_balance + asset_opt_in_fee
-        #     
-        #     params = self.algod_client.suggested_params()
-        #     txn = PaymentTxn(
-        #         sender=self.treasury_address,
-        #         sp=params,
-        #         receiver=user_address,
-        #         amt=total_funding,
-        #         note=b"Seamount Account Funding"
-        #     )
-        #     
-        #     signed_txn = txn.sign(self.treasury_private_key)
-        #     tx_id = self.algod_client.send_transaction(signed_txn)
-        #     await self.wait_for_confirmation(tx_id)
-        #     
-        #     logger.info(f"Funded {user_address} with {total_funding} microAlgos")
-        #     return tx_id
-        # except Exception as e:
-        #     logger.error(f"Account funding failed: {e}")
-        #     raise
+        return None
 
     async def prepare_payment_txn(self, sender: str, receiver: str, amount: Decimal) -> Dict[str, Any]:
         """Prepare ALGO payment transaction"""
@@ -289,27 +256,23 @@ class AlgorandService:
         
     async def mint_usdt(self, user_id: str, amount: Decimal, reference: str) -> Dict:
         """Mint USDT to user's Algorand wallet"""
-    
-        # Get user's wallet address
         wallet_data = await self.db_service.get_user_wallet(user_id)
         recipient_address = wallet_data['algorand_address']
         
-        # USDT Asset ID on Algorand Mainnet
-        USDT_ASSET_ID = 312769  # Actual Algorand USDT asset
+        USDT_ASSET_ID = 312769
         
-        # Transfer USDT from treasury to user
         txn = AssetTransferTxn(
             sender=self.treasury_address,
             sp=self.algod_client.suggested_params(),
             receiver=recipient_address,
-            amt=int(amount * 1_000_000),  # 6 decimals
+            amt=int(amount * 1_000_000),
             index=USDT_ASSET_ID
         )
     
         signed_txn = txn.sign(self.treasury_private_key)
         tx_id = self.algod_client.send_transaction(signed_txn)
         
-        # Wait for confirmation
+        from algosdk.v2client.algod import wait_for_confirmation
         wait_for_confirmation(self.algod_client, tx_id, 4)
         
         return {"txn_id": tx_id, "amount": float(amount)}

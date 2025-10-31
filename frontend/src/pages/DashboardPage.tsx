@@ -15,6 +15,7 @@ import NigerianUserBanner from '../components/layout/NigerianUserBanner';
 import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
 import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatusBanner';
+import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -138,7 +139,8 @@ const DashboardPage = () => {
   const [selectedChain, setSelectedChain] = useState<string | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
-  
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+
   const [serviceStatus, setServiceStatus] = useState<any>(null);
 
   // Enhanced health monitoring
@@ -406,28 +408,42 @@ const DashboardPage = () => {
             ))}
           </div>
 
-          {/* 🔒 ADD THIS SECURITY CARD - Backup Wallet Seeds */}
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mt-4">
-            <div className="flex items-center mb-4">
-              <div className="bg-red-100 p-3 rounded-lg mr-4">
-                <span className="text-2xl">🔒</span>
+          {/* 🔐 ENHANCED BACKUP SECURITY BANNER */}
+          <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/50 rounded-2xl p-6 mt-6 hover:shadow-xl hover:shadow-red-500/20 transition-all">
+            <div className="flex items-start gap-4">
+              <div className="bg-red-500/20 p-4 rounded-xl">
+                <Shield className="w-8 h-8 text-red-400" />
               </div>
-              <div>
-                <h3 className="font-semibold text-red-800">Wallet Security</h3>
-                <p className="text-red-600 text-sm">Backup your seed phrases</p>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-2">
+                  🚨 Backup Your Wallet Seeds
+                </h3>
+                <p className="text-gray-300 mb-4">
+                  Your wallet seeds are the ONLY way to recover your funds. Back them up now to prevent permanent loss.
+                </p>
+                <ul className="text-gray-400 text-sm space-y-1 mb-4">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-400" />
+                    Secure recovery for all 5 chains
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-400" />
+                    Encrypted storage with decryption on-demand
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-400" />
+                    Backup verification test included
+                  </li>
+                </ul>
+                <button 
+                  onClick={() => setShowRecoveryModal(true)}
+                  className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white py-3 px-6 rounded-xl font-bold text-center transition-all hover:shadow-lg hover:shadow-red-500/50"
+                >
+                  🔓 Backup Seeds Now (Critical)
+                </button>
               </div>
             </div>
-            <p className="text-red-700 text-sm mb-4">
-              Secure your assets by backing up your wallet recovery seeds. Required for fund recovery.
-            </p>
-            <button 
-              onClick={handleViewSeedPhrases}
-              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-center"
-            >
-              Backup Seeds Now
-            </button>
           </div>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
@@ -495,6 +511,13 @@ const DashboardPage = () => {
       {selectedChain && (
         <WalletDetailModal isOpen={showWalletModal} onClose={() => { setShowWalletModal(false); setSelectedChain(null); }} chain={selectedChain} chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} address={multiChainWallets[selectedChain]?.address || ''} balance={calculateChainBalance(selectedChain)} />
       )}
+      {/* Wallet Recovery Modal */}
+      {showRecoveryModal && (
+        <WalletRecoveryModal
+          isOpen={showRecoveryModal}
+          onClose={() => setShowRecoveryModal(false)}
+  />
+)}
     </div>
   );
 };

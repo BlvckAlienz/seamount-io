@@ -227,10 +227,31 @@ class WDKClient:
     
     # ========== WALLET CREATION (Tether Pattern) ==========
     
-    async def generate_seed(self) -> Dict[str, Any]:
-        """Generate encrypted mnemonic seed phrase - WITH REAL FALLBACKS"""
+    async def generate_seed(self, encrypt: bool = True) -> Dict[str, Any]:
+        """
+        Generate mnemonic seed phrase
         
-        # 🔥 TIER 1: Primary WDK Service
+        Args:
+            encrypt: If False, returns PLAINTEXT seed for local encryption
+        """
+        
+        if not encrypt:
+            # 🔥 CRITICAL: Generate plaintext seed locally
+            # WDK service doesn't support unencrypted seed generation
+            # So we generate BIP39 mnemonic locally
+            from mnemonic import Mnemonic
+            
+            mnemo = Mnemonic("english")
+            plaintext_seed = mnemo.generate(strength=128)  # 12 words
+            
+            logger.info("✅ Generated plaintext seed locally (12 words)")
+            return {
+                'seed': plaintext_seed,
+                'created_at': datetime.utcnow().isoformat(),
+                'source': 'local_bip39'
+            }
+        
+        # Original encrypted path
         try:
             result = await self._make_request('POST', '/wallet/generate-seed')
             if result.get('success'):

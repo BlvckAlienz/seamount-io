@@ -16,6 +16,8 @@ from backend.services.fee_calculator import FeeCalculatorService, TransactionTyp
 from backend.services.oracle_service import OracleService
 from backend.config import get_settings
 
+from backend.services.seed_encryption_service import SeedEncryptionService
+
 logger = logging.getLogger(__name__)
 
 class MultiChainWalletService:
@@ -103,9 +105,17 @@ class MultiChainWalletService:
                 self.db.supabase.table('user_wallets').upsert(wallet_data, on_conflict='user_id').execute()
                 return {'success': True, 'address': algo_address, 'chain': chain}
             else:
-                # ✅ FIXED: Create WDK wallet for the specific chain
-                seed_data = await self.wdk.generate_seed()
-                encrypted_seed = seed_data['encrypted_seed']
+                # 🔐 Create WDK wallet with centralized encryption
+                encryption_service = SeedEncryptionService()
+                
+                # Generate PLAINTEXT seed from WDK
+                seed_data = await self.wdk.generate_seed(encrypt=False)  # Get plaintext
+                plaintext_seed = seed_data['seed']  # Should be 12-word mnemonic
+                
+                # Encrypt using OUR centralized service
+                encrypted_seed = encryption_service.encrypt_seed(plaintext_seed)
+                
+                logger.info(f"🔐 WDK seed encrypted with centralized service (length: {len(encrypted_seed)})")
                 
                 wdk_result = await self.wdk.create_wallet(
                     encrypted_seed=encrypted_seed,

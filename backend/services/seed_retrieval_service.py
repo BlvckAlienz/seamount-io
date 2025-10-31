@@ -27,17 +27,16 @@ class SeedRetrievalService:
     MAX_REQUESTS_PER_HOUR = 3
     RATE_LIMIT_WINDOW = timedelta(hours=1)
     
+    # In your seed_retrieval_service.py, update the __init__ method to add key validation:
+
     def __init__(self, db_service: DatabaseService):
         self.db = db_service
         
-        # Initialize encryption key
-        encryption_key = os.getenv('ENCRYPTION_KEY')
-        if not encryption_key:
-            logger.error("❌ ENCRYPTION_KEY not found in environment")
-            raise ValueError("ENCRYPTION_KEY not configured")
+        # 🔐 Use centralized encryption service
+        from backend.services.seed_encryption_service import SeedEncryptionService
+        self.encryption_service = SeedEncryptionService()
         
-        self.cipher_suite = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
-        logger.info("✅ SeedRetrievalService initialized with decryption capability")
+        logger.info("✅ SeedRetrievalService initialized with centralized encryption")
     
     async def get_decrypted_seeds(self, user_id: str, request_ip: str = None) -> Dict[str, Any]:
         """
@@ -78,7 +77,10 @@ class SeedRetrievalService:
                 }
             
             # 🔓 STEP 3: DECRYPT SEEDS IN-MEMORY
-            decrypted_seeds = self._decrypt_seeds(encrypted_seeds)
+            decrypted_seeds = {
+                'algorand_seed': self._decrypt_seed(encrypted_seeds['algorand_seed']) if encrypted_seeds['algorand_seed'] else None,
+                'wdk_seed': self._decrypt_seed(encrypted_seeds['wdk_seed']) if encrypted_seeds['wdk_seed'] else None
+            }
             
             # 📝 STEP 4: Log the access (audit trail)
             await self._log_seed_access(user_id, request_ip, encrypted_seeds, decrypted=True)
@@ -127,38 +129,111 @@ class SeedRetrievalService:
                 'error_details': str(e) if logger.level == logging.DEBUG else None
             }
     
-    def _decrypt_seeds(self, encrypted_seeds: Dict[str, Any]) -> Dict[str, str]:
+    def _decrypt_seed(self, encrypted_seed: str) -> str:
         """
-        🔓 DECRYPT SEEDS IN-MEMORY
-        
-        This is the CRITICAL security function that handles decryption.
-        Seeds are decrypted, returned, and immediately discarded from memory.
+        🔓 DECRYPT using centralized service
         """
-        decrypted = {
-            'algorand_seed': None,
-            'wdk_seed': None
-        }
-        
         try:
-            # Decrypt Algorand seed (25-word mnemonic)
+            return self.encryption_service.decrypt_seed(encrypted_seed)
+        except Exception as e:
+            logger.error(f"❌ Seed decryption failed: {e}")
+            raise
+    
+    async def validate_and_fix_stored_seeds(self, user_id: str) -> Dict[str, Any]:
+        """
+        🔧 ADMIN FUNCTION: Validate and fix corrupted seed storage
+        Call this if decryption fails to diagnose issues
+        """
+        try:
+            # Fetch seeds
+            encrypted_seeds = await self._fetch_encrypted_seeds(user_id)
+            
+            results = {
+                'algorand_seed_valid': False,
+                'wdk_seed_valid': False,
+                'issues': []
+            }
+            
+            # Check Algorand seed
             if encrypted_seeds['algorand_seed']:
-                encrypted_bytes = encrypted_seeds['algorand_seed'].encode('utf-8')
-                decrypted_bytes = self.cipher_suite.decrypt(encrypted_bytes)
-                decrypted['algorand_seed'] = decrypted_bytes.decode('utf-8')
-                logger.info("✅ Algorand seed decrypted in-memory")
+                algo_seed = encrypted_seeds['algorand_seed']
+                
+                # Check length
+                if len(algo_seed) % 4 != 0:
+                    results['issues'].append(f"Algorand seed has invalid length: {len(algo_seed)} (not multiple of 4)")
+                
+                # Check base64 validity
+                import base64
+                try:
+                    # Fix padding
+                    missing = len(algo_seed) % 4
+                    if missing:
+                        algo_seed_fixed = algo_seed + ('=' * (4 - missing))
+                    else:
+                        algo_seed_fixed = algo_seed
+                    
+                    base64.b64decode(algo_seed_fixed)
+                    results['algorand_seed_valid'] = True
+                except Exception as e:
+                    results['issues'].append(f"Algorand seed is not valid base64: {e}")
             
-            # Decrypt WDK seed (12-word mnemonic)
+            # Check WDK seed
             if encrypted_seeds['wdk_seed']:
-                encrypted_bytes = encrypted_seeds['wdk_seed'].encode('utf-8')
-                decrypted_bytes = self.cipher_suite.decrypt(encrypted_bytes)
-                decrypted['wdk_seed'] = decrypted_bytes.decode('utf-8')
-                logger.info("✅ WDK seed decrypted in-memory")
+                wdk_seed = encrypted_seeds['wdk_seed']
+                
+                if len(wdk_seed) % 4 != 0:
+                    results['issues'].append(f"WDK seed has invalid length: {len(wdk_seed)} (not multiple of 4)")
+                
+                try:
+                    missing = len(wdk_seed) % 4
+                    if missing:
+                        wdk_seed_fixed = wdk_seed + ('=' * (4 - missing))
+                    else:
+                        wdk_seed_fixed = wdk_seed
+                    
+                    base64.b64decode(wdk_seed_fixed)
+                    results['wdk_seed_valid'] = True
+                except Exception as e:
+                    results['issues'].append(f"WDK seed is not valid base64: {e}")
             
-            return decrypted
+            return results
             
         except Exception as e:
-            logger.error(f"❌ Decryption error: {e}")
-            raise Exception("Failed to decrypt seed phrases. Encryption key may be invalid.")
+            logger.error(f"Seed validation failed: {e}")
+            return {'error': str(e)}
+
+    def _decrypt_seeds(self, encrypted_seeds: Dict[str, Any]) -> Dict[str, str]:
+        """Decrypt both Algorand and WDK seeds"""
+        try:
+            algorand_seed = ""
+            wdk_seed = ""
+            
+            # Decrypt Algorand seed if it exists
+            if encrypted_seeds.get('algorand_seed'):
+                try:
+                    algorand_seed = self._decrypt_seed(encrypted_seeds['algorand_seed'])
+                    logger.info("✅ Algorand seed decrypted successfully")
+                except Exception as e:
+                    logger.error(f"❌ Failed to decrypt Algorand seed: {e}")
+                    raise Exception("Failed to decrypt Algorand seed phrase")
+            
+            # Decrypt WDK seed if it exists  
+            if encrypted_seeds.get('wdk_seed'):
+                try:
+                    wdk_seed = self._decrypt_seed(encrypted_seeds['wdk_seed'])
+                    logger.info("✅ WDK seed decrypted successfully")
+                except Exception as e:
+                    logger.error(f"❌ Failed to decrypt WDK seed: {e}")
+                    raise Exception("Failed to decrypt WDK seed phrase")
+            
+            return {
+                'algorand_seed': algorand_seed,
+                'wdk_seed': wdk_seed
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Seed decryption failed: {e}")
+            raise
     
     async def _fetch_encrypted_seeds(self, user_id: str) -> Dict[str, Any]:
         """Fetch encrypted seeds from multiple tables"""

@@ -148,7 +148,14 @@ export {
   walletAPI,
   portfolioAPI,
   tradingAPI,
+  seedAPI,
   initializeSession,
+};
+
+// 🔐 Seed Recovery API
+const seedAPI = {
+  getRecoverySeeds: () => apiClient.get('/api/v1/seeds/recovery'),
+  getAccessLog: () => apiClient.get('/api/v1/seeds/access-log'),
 };
 
 export default apiClient;

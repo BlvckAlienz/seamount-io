@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Check, AlertTriangle, Copy, Eye, EyeOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { apiClient } from '../../config/api';
+import { seedAPI } from '../../config/api';
 
 interface RecoverySeeds {
   algorand_seed?: string;
@@ -40,7 +40,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
   const fetchSeeds = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/v1/seeds/recovery');
+      const response = await seedAPI.getRecoverySeeds();
       
       if (response.data.success) {
         setSeeds(response.data);
@@ -50,7 +50,17 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
       }
     } catch (error: any) {
       console.error('Seed recovery error:', error);
-      const errorMsg = error.response?.data?.detail || 'Failed to retrieve seed phrases';
+      
+      // Handle rate limiting
+      if (error.response?.status === 429) {
+        toast.error('⏰ Rate limit: Max 3 requests/hour');
+        setLoading(false);
+        return;
+      }
+      
+      const errorMsg = error.response?.data?.detail || 
+                      error.response?.data?.error ||
+                      'Failed to retrieve seed phrases';
       toast.error(errorMsg);
     } finally {
       setLoading(false);
