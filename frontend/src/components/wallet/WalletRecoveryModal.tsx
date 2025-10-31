@@ -1,33 +1,32 @@
 // File: frontend/src/components/wallet/WalletRecoveryModal.tsx
-// 🔐 BEAUTIFUL WALLET RECOVERY MODAL WITH BACKUP VERIFICATION
+// 🔐 STREAMLINED WALLET BACKUP MODAL - NO TEST, NO INSTRUCTIONS
 
 import React, { useState, useEffect } from 'react';
 import { X, Download, Check, AlertTriangle, Copy, Eye, EyeOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { seedAPI } from '../../config/api';
+import { seedAPI, apiClient } from '../../config/api';
 
 interface RecoverySeeds {
   algorand_seed?: string;
   wdk_seed?: string;
   wallet_addresses: { [key: string]: string };
   security_warning: string;
-  backup_instructions: string;
-  algorand_info?: any;
-  wdk_info?: any;
 }
 
 interface WalletRecoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  newWalletsOnly?: string[];  // ✅ NEW: Only show seeds for these chains
 }
 
-const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClose }) => {
+const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ 
+  isOpen, 
+  onClose,
+  newWalletsOnly 
+}) => {
   const [loading, setLoading] = useState(false);
   const [seeds, setSeeds] = useState<RecoverySeeds | null>(null);
   const [showSeeds, setShowSeeds] = useState(false);
-  const [verificationStep, setVerificationStep] = useState(1);
-  const [testInput, setTestInput] = useState('');
-  const [verified, setVerified] = useState(false);
   const [copiedAlgo, setCopiedAlgo] = useState(false);
   const [copiedWdk, setCopiedWdk] = useState(false);
 
@@ -40,7 +39,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
   const fetchSeeds = async () => {
     try {
       setLoading(true);
-      const response = await seedAPI.getRecoverySeeds();  // ✅ Already correct!
+      const response = await seedAPI.getRecoverySeeds();
       
       if (response.data.success) {
         setSeeds(response.data);
@@ -53,7 +52,6 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
       
       if (error.response?.status === 429) {
         toast.error('⏰ Rate limit: Max 3 requests/hour');
-        setLoading(false);
         return;
       }
       
@@ -79,12 +77,10 @@ Generated: ${new Date().toISOString()}
 ------------------
 Seed Phrase: ${seeds.algorand_seed || 'N/A'}
 Address: ${seeds.wallet_addresses?.algorand || 'N/A'}
-Compatible Wallets: Pera Wallet, Defly Wallet, AlgoSigner
 
 🔗 MULTI-CHAIN WALLET (WDK)
 ---------------------------
 Seed Phrase: ${seeds.wdk_seed || 'N/A'}
-Supported Chains: Bitcoin, Ethereum, Polygon, TRON
 
 Addresses:
 ${Object.entries(seeds.wallet_addresses || {})
@@ -92,15 +88,9 @@ ${Object.entries(seeds.wallet_addresses || {})
   .map(([chain, address]) => `  ${chain.toUpperCase()}: ${address}`)
   .join('\n')}
 
-Compatible Wallets: MetaMask, Trust Wallet, Ledger, Trezor
-
 ⚠️ SECURITY WARNING
 -------------------
 ${seeds.security_warning}
-
-📋 BACKUP INSTRUCTIONS
-----------------------
-${seeds.backup_instructions}
     `.trim();
 
     const blob = new Blob([content], { type: 'text/plain' });
@@ -114,6 +104,26 @@ ${seeds.backup_instructions}
     URL.revokeObjectURL(url);
 
     toast.success('✅ Recovery file downloaded');
+    
+    // ✅ Mark as backed up
+    markAsBackedUp();
+  };
+
+  const markAsBackedUp = async () => {
+    try {
+      const chains = Object.keys(seeds?.wallet_addresses || {});
+      await apiClient.post('/api/v1/wallet-backup/mark-backed-up', { chains });
+      
+      // Close modal after successful backup
+      setTimeout(() => {
+        onClose();
+        toast.success('🎉 Backup complete! Your wallets are safe.');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Failed to mark backup:', error);
+      // Don't block the user if tracking fails
+    }
   };
 
   const handleCopy = (text: string, type: 'algo' | 'wdk') => {
@@ -128,27 +138,12 @@ ${seeds.backup_instructions}
     toast.success(`${type === 'algo' ? 'Algorand' : 'Multi-chain'} seed copied!`);
   };
 
-  const handleVerifyBackup = () => {
-    if (!seeds) return;
-
-    const normalizeWords = (phrase: string) => 
-      phrase.toLowerCase().trim().replace(/\s+/g, ' ');
-
-    const algoMatch = seeds.algorand_seed && 
-      normalizeWords(testInput) === normalizeWords(seeds.algorand_seed);
-    
-    const wdkMatch = seeds.wdk_seed && 
-      normalizeWords(testInput) === normalizeWords(seeds.wdk_seed);
-
-    if (algoMatch || wdkMatch) {
-      setVerified(true);
-      toast.success('✅ Backup verified! You stored it correctly.');
-    } else {
-      toast.error('❌ Phrases don\'t match. Please try again.');
-    }
-  };
-
   if (!isOpen) return null;
+
+  // ✅ Filter seeds if only showing new wallets
+  const shouldShowAlgorand = !newWalletsOnly || newWalletsOnly.includes('algorand');
+  const shouldShowWdk = !newWalletsOnly || 
+    newWalletsOnly.some(chain => ['bitcoin', 'ethereum', 'polygon', 'tron'].includes(chain));
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -214,12 +209,12 @@ ${seeds.backup_instructions}
                   className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold text-white transition-all"
                 >
                   <Download className="w-5 h-5" />
-                  Download Backup
+                  Download & Mark Backed Up
                 </button>
               </div>
 
               {/* Algorand Seed */}
-              {seeds.algorand_seed && (
+              {shouldShowAlgorand && seeds.algorand_seed && (
                 <div className="bg-gray-800/50 rounded-xl p-6 mb-6 border border-gray-700">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -254,13 +249,12 @@ ${seeds.backup_instructions}
 
                   <div className="mt-4 text-sm text-gray-400">
                     <p><strong>Address:</strong> <span className="font-mono text-gray-300">{seeds.wallet_addresses?.algorand}</span></p>
-                    <p><strong>Compatible Wallets:</strong> Pera Wallet, Defly Wallet, AlgoSigner</p>
                   </div>
                 </div>
               )}
 
               {/* WDK Multi-Chain Seed */}
-              {seeds.wdk_seed && (
+              {shouldShowWdk && seeds.wdk_seed && (
                 <div className="bg-gray-800/50 rounded-xl p-6 mb-6 border border-gray-700">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -305,53 +299,9 @@ ${seeds.backup_instructions}
                           </div>
                         ))}
                     </div>
-                    <p><strong>Compatible Wallets:</strong> MetaMask, Trust Wallet, Ledger, Trezor</p>
                   </div>
                 </div>
               )}
-
-              {/* Backup Verification Test */}
-              <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-6">
-                <h3 className="text-xl font-bold text-white mb-4">
-                  {verified ? '✅ Backup Verified!' : '📝 Test Your Backup'}
-                </h3>
-                
-                {verified ? (
-                  <div className="text-green-400 flex items-center gap-2">
-                    <Check className="w-6 h-6" />
-                    <span>You've successfully verified your backup! Your seeds are stored correctly.</span>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-gray-400 mb-4">
-                      To ensure you've backed up correctly, paste one of your seed phrases below:
-                    </p>
-                    <textarea
-                      value={testInput}
-                      onChange={(e) => setTestInput(e.target.value)}
-                      placeholder="Paste your seed phrase here..."
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 text-white font-mono text-sm mb-4 h-24"
-                    />
-                    <button
-                      onClick={handleVerifyBackup}
-                      disabled={!testInput.trim()}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed px-6 py-3 rounded-xl font-semibold text-white transition-all"
-                    >
-                      Verify Backup
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Backup Instructions */}
-              <div className="mt-6 bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-                <h3 className="text-lg font-bold text-white mb-3">📋 Backup Instructions</h3>
-                <div className="text-gray-400 text-sm space-y-2">
-                  {seeds.backup_instructions.split('\n').map((line, i) => (
-                    <p key={i}>{line}</p>
-                  ))}
-                </div>
-              </div>
             </>
           ) : (
             <div className="text-center text-gray-400 py-12">

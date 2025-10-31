@@ -20,18 +20,18 @@ async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client)
 ):
-    """Create user profile with proper data capture"""
+    """Create user profile with proper data capture - FIXED VERSION"""
     try:
         data = await request.json()
         user_id = data.get('id')
         
-        # ✅ FIX: Properly extract camelCase data from frontend
+        # 🚨 CRITICAL FIX: Properly extract ALL data from frontend
         insert_data = {
             "id": user_id,
             "email": data.get('email', ''),
-            "first_name": data.get('firstName', ''),  # ✅ camelCase
-            "last_name": data.get('lastName', ''),    # ✅ camelCase
-            "country_code": data.get('countryCode', 'US').upper(),  # ✅ camelCase
+            "first_name": data.get('firstName', data.get('first_name', '')),  # Handle both formats
+            "last_name": data.get('lastName', data.get('last_name', '')),
+            "country_code": (data.get('countryCode') or data.get('country_code') or 'US').upper(),
             "phone": data.get('phone', ''),
             "kyc_status": "not_started",
             "kyc_level": 0,
@@ -40,15 +40,26 @@ async def create_user_profile(
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        # ✅ Log for debugging
-        logger.info(f"[Profile Create] Creating profile for {user_id}: {insert_data['first_name']} {insert_data['last_name']} ({insert_data['country_code']})")
+        # ✅ Log for verification
+        logger.info(f"[Profile Create] User {user_id}: {insert_data['first_name']} {insert_data['last_name']} ({insert_data['country_code']})")
         
-        result = supabase.from_("user_profiles").upsert(insert_data, on_conflict="id").execute()
+        # Upsert to handle duplicate attempts
+        result = supabase.from_("user_profiles").upsert(
+            insert_data, 
+            on_conflict="id"
+        ).execute()
         
-        return {"success": True, "profile": result.data[0]}
+        if not result.data:
+            raise Exception("Profile creation returned no data")
+        
+        return {
+            "success": True, 
+            "profile": result.data[0],
+            "message": f"Profile created for {insert_data['first_name']}"
+        }
         
     except Exception as e:
-        logger.error(f"Profile creation failed: {e}")
+        logger.error(f"[Profile Create] Failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/profile")

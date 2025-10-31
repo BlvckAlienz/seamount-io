@@ -105,6 +105,44 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
         setTimeout(async () => {
           await fetchUserProfile(5, 2000);
+          
+          // ✅ CHECK IF WALLETS NEED TO BE CREATED
+          // This handles email confirmation flow
+          if (event === 'SIGNED_IN') {
+            try {
+              // Check if user has wallets
+              const walletStatusResponse = await apiClient.get('/api/v1/wallet-creation/status');
+              
+              if (walletStatusResponse.data.success) {
+                const missingWallets = walletStatusResponse.data.summary?.missing_chains || [];
+                
+                if (missingWallets.length > 0) {
+                  console.log('[Auth] 🔐 User missing wallets, triggering creation...');
+                  
+                  // Small delay to ensure profile is ready
+                  setTimeout(async () => {
+                    try {
+                      const createResponse = await apiClient.post('/api/v1/wallet/create');
+                      
+                      if (createResponse.data.success) {
+                        console.log('[Auth] ✅ Wallets created on login:', createResponse.data.created_chains);
+                        
+                        // Flag to show backup modal
+                        sessionStorage.setItem('show_wallet_backup', 'true');
+                        sessionStorage.setItem('new_wallets', JSON.stringify(createResponse.data.created_chains));
+                        
+                        toast.success('🎉 Your wallets are ready! Please back them up.');
+                      }
+                    } catch (createError) {
+                      console.error('[Auth] Wallet creation on login failed:', createError);
+                    }
+                  }, 1500);
+                }
+              }
+            } catch (statusError) {
+              console.error('[Auth] Wallet status check failed:', statusError);
+            }
+          }
         }, 1000);
       } else if (event === 'SIGNED_OUT') {
         setState((prev) => ({ ...prev, user: null, error: null }));
@@ -145,69 +183,66 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { data, error } = await retryWithBackoff(() =>
         supabase.auth.signUp(signUpOptions)
       );
-      
+
       if (error) throw error;
-      
+
+      // ✅ CREATE USER PROFILE FIRST
+      if (data.user) {
+        try {
+          console.log('[Auth] Creating user profile for:', data.user.id);
+          
+          // Call backend to create profile with proper data
+          const profileData = {
+            id: data.user.id,
+            email: data.user.email,
+            firstName: options.firstName || '',
+            lastName: options.lastName || '',
+            countryCode: options.countryCode || 'US'
+          };
+          
+          const profileResponse = await apiClient.post('/api/v1/user/profile', profileData);
+          
+          if (profileResponse.data.success) {
+            console.log('[Auth] ✅ Profile created:', profileResponse.data.profile);
+            
+            // ✅ NOW TRIGGER WALLET CREATION
+            if (!data.user.email_confirmed_at) {
+              // Wait for email confirmation before wallet creation
+              toast.success('Please check your email to confirm your account');
+            } else {
+              // Email already confirmed (rare) - create wallets immediately
+              console.log('[Auth] 🔐 Triggering wallet creation...');
+              
+              setTimeout(async () => {
+                try {
+                  const walletResponse = await apiClient.post('/api/v1/wallet/create');
+                  
+                  if (walletResponse.data.success) {
+                    console.log('[Auth] ✅ Wallets created:', walletResponse.data.created_chains);
+                    
+                    // Flag to show backup modal
+                    sessionStorage.setItem('show_wallet_backup', 'true');
+                    sessionStorage.setItem('new_wallets', JSON.stringify(walletResponse.data.created_chains));
+                  }
+                } catch (walletError) {
+                  console.error('[Auth] ❌ Wallet creation failed:', walletError);
+                  // Don't block signup - user can retry from dashboard
+                }
+              }, 2000);
+            }
+          }
+        } catch (profileError) {
+          console.error('[Auth] Profile creation failed:', profileError);
+          // Don't block signup - profile can be created later
+          toast.error('Account created but profile incomplete. Please update in settings.');
+        }
+      }
+
       if (data.user && !data.user.email_confirmed_at) {
         toast.success('Please check your email to confirm your account');
       }
-      
-      return { success: true };
-      
-    } catch (err: any) {
-      setState((prev) => ({ ...prev, error: err.message }));
-      console.error('SignUp error:', err);
-      
-      if (err.message.includes('User already registered')) {
-        toast.error('Email already registered. Try signing in instead.');
-      } else if (err.message.includes('Email not confirmed')) {
-        toast.error('Please check your email and confirm your account');
-      } else if (err.message.includes('Password')) {
-        toast.error('Password requirements not met');
-      } else {
-        toast.error(err.message || 'Sign up failed');
-      }
-      
-      return { success: false, error: err.message };
-    } finally {
-      setState((prev) => ({ ...prev, loading: false }));
-    }
-  };
 
-  const signIn = async (email: string, password: string, options: { captchaToken?: string } = {}) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      const signInOptions: any = { email, password };
-      if (options.captchaToken) {
-        signInOptions.options = { captchaToken: options.captchaToken };
-      }
-
-      const { error } = await retryWithBackoff(() =>
-        supabase.auth.signInWithPassword(signInOptions)
-      );
-      
-      if (error) throw error;
-      
       return { success: true };
-      
-    } catch (err: any) {
-      console.error('SignIn error:', err);
-      setState((prev) => ({ ...prev, error: err.message }));
-      
-      if (err.message.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password');
-      } else if (err.message.includes('Email not confirmed')) {
-        toast.error('Please confirm your email before signing in');
-      } else {
-        toast.error(err.message || 'Sign in failed');
-      }
-      
-      return { success: false, error: err.message };
-    } finally {
-      setState((prev) => ({ ...prev, loading: false }));
-    }
-  };
 
   // ✅ BULLETPROOF LOGOUT FIX
   const signOut = async () => {
@@ -366,10 +401,19 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (state.session && state.user && !state.loading) {
       const kycStatus = state.user.kyc_status || 'not_started';
       const hasWallet = state.user.algorand_address || state.user.wallet_address;
+      const currentPath = window.location.pathname;
+      
+      console.log('[Auth Navigation]', {
+        kycStatus,
+        hasWallet,
+        role: state.user.role,
+        path: currentPath
+      });
       
       // Tribe members always go to dashboard
       if (kycStatus === 'approved' || state.user.role === 'tribe') {
-        if (window.location.pathname !== '/dashboard') {
+        if (currentPath !== '/dashboard' && !currentPath.startsWith('/settings')) {
+          console.log('[Auth] Tribe member → dashboard');
           navigate('/dashboard');
         }
         return;
@@ -377,14 +421,23 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // Users with wallets can access dashboard
       if (hasWallet) {
-        if (window.location.pathname !== '/dashboard' && window.location.pathname !== '/onboarding') {
+        // Allow them on dashboard, settings, and wallet-recovery pages
+        const allowedPaths = ['/dashboard', '/onboarding', '/settings', '/wallet-recovery'];
+        const isOnAllowedPath = allowedPaths.some(path => currentPath.startsWith(path));
+        
+        if (!isOnAllowedPath) {
+          console.log('[Auth] User has wallet but on restricted path → dashboard');
           navigate('/dashboard');
         }
         return;
       }
       
-      // Only redirect to onboarding if on root/landing page
-      if (window.location.pathname === '/' || window.location.pathname === '/landing') {
+      // No wallet yet - must complete onboarding
+      if (currentPath === '/' || currentPath === '/landing') {
+        console.log('[Auth] No wallet, on landing → onboarding');
+        navigate('/onboarding');
+      } else if (currentPath === '/dashboard') {
+        console.log('[Auth] No wallet, trying dashboard → onboarding');
         navigate('/onboarding');
       }
     }

@@ -141,6 +141,42 @@ const DashboardPage = () => {
   const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
+  const [backupStatus, setBackupStatus] = useState<any>(null);
+  const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
+
+  // ✅ Check backup status on mount
+  useEffect(() => {
+    const checkBackupStatus = async () => {
+      try {
+        const response = await apiClient.get('/api/v1/wallet-backup/status');
+        if (response.data.success) {
+          setBackupStatus(response.data);
+          
+          // Check if there are new wallets from sessionStorage
+          const newWallets = sessionStorage.getItem('new_wallets');
+          if (newWallets) {
+            const chains = JSON.parse(newWallets);
+            const unbacked = chains.filter(
+              (c: string) => !response.data.backed_up_chains.includes(c)
+            );
+            
+            if (unbacked.length > 0) {
+              setNewWalletsForBackup(unbacked);
+              setShowRecoveryModal(true);
+              sessionStorage.removeItem('new_wallets'); // Clear after showing
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Backup status check failed:', error);
+      }
+    };
+
+    if (user) {
+      checkBackupStatus();
+    }
+  }, [user]);
+
   const [serviceStatus, setServiceStatus] = useState<any>(null);
 
   // Enhanced health monitoring
@@ -438,7 +474,10 @@ const DashboardPage = () => {
                   </li>
                 </ul>
                 <button 
-                  onClick={() => setShowRecoveryModal(true)}
+                  onClick={() => {
+                    setNewWalletsForBackup([]); // Show all wallets when manually triggered
+                    setShowRecoveryModal(true);
+                  }}
                   className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white py-3 px-6 rounded-xl font-bold text-center transition-all hover:shadow-lg hover:shadow-red-500/50"
                 >
                   🔐 Backup Seeds Now (Critical)
@@ -532,7 +571,11 @@ const DashboardPage = () => {
       {showRecoveryModal && (
         <WalletRecoveryModal
           isOpen={showRecoveryModal}
-          onClose={() => setShowRecoveryModal(false)}
+          onClose={() => {
+            setShowRecoveryModal(false);
+            setNewWalletsForBackup([]); // Clear after closing
+          }}
+          newWalletsOnly={newWalletsForBackup.length > 0 ? newWalletsForBackup : undefined}
         />
       )}
     </div>

@@ -496,6 +496,13 @@ try:
 except ImportError as e:
     logger.error(f"❌ Failed to import wallet creation routes: {e}")
 
+try:
+    from backend.api.routes.wallet_backup import router as wallet_backup_router
+    app.include_router(wallet_backup_router)
+    logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
+except ImportError as e:
+    logger.error(f"❌ Wallet backup routes import error: {e}")
+
 if routers_available.get('kyc'):
     app.include_router(routers_available['kyc'], prefix="/api/v1/kyc", tags=["KYC"])
     logger.info("✅ KYC router registered at /api/v1/kyc")

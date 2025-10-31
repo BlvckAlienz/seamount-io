@@ -338,15 +338,15 @@ class WDKClient:
             'source': 'local_cryptographic',
             'warning': 'Generated locally due to service unavailability'
         }
-    
+   
     async def create_wallet(
         self, 
-        plaintext_seed: str,  # ✅ Changed from encrypted_seed
+        plaintext_seed: str,
         chains: Optional[List[str]] = None,
         enable_gasless: bool = True
     ) -> Dict[str, Any]:
         """
-        Create wallets on specified chains
+        Create wallets on specified chains with comprehensive error handling
         
         Args:
             plaintext_seed: Unencrypted BIP39 mnemonic (12 words)
@@ -362,19 +362,33 @@ class WDKClient:
         if invalid_chains:
             raise ValueError(f"Unsupported chains: {invalid_chains}")
         
+        # 🚨 CRITICAL FIX: Validate seed format
+        seed_words = plaintext_seed.strip().split()
+        if len(seed_words) != 12:
+            raise ValueError(f"Invalid seed: expected 12 words, got {len(seed_words)}")
+        
+        logger.info(f"🔐 Creating wallets for {len(chains)} chains with validated 12-word seed")
+        
         payload = {
-            'plaintext_seed': plaintext_seed,  # ✅ Send raw mnemonic
+            'plaintext_seed': plaintext_seed.strip(),  # ✅ Clean whitespace
             'chains': chains,
             'enable_gasless': enable_gasless and any(c in self.GASLESS_CHAINS for c in chains)
         }
         
-        result = await self._make_request('POST', '/wallet/create', data=payload)
-        
-        if not result.get('success'):
-            raise Exception(f"Wallet creation failed: {result.get('error', 'Unknown error')}")
-        
-        logger.info(f"✅ Wallets created on {len(result['wallets'])} chains")
-        return result
+        try:
+            result = await self._make_request('POST', '/wallet/create', data=payload)
+            
+            if not result.get('success'):
+                error_msg = result.get('error', 'Unknown error')
+                logger.error(f"❌ WDK wallet creation failed: {error_msg}")
+                raise Exception(f"Wallet creation failed: {error_msg}")
+            
+            logger.info(f"✅ Wallets created on {len(result.get('wallets', {}))} chains")
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ WDK wallet creation exception: {str(e)}")
+            raise
     
     # ========== BALANCE QUERIES (Using Indexer API) ==========
     
