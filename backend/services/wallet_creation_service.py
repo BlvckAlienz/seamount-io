@@ -400,6 +400,42 @@ class WalletCreationService:
                 'user_id': user_id
             }
     
+    # Add this BEFORE wallet creation in your backend
+    async def ensure_user_profile_exists(self, user_id: str) -> bool:
+        """Ensure user profile exists before wallet creation - CRITICAL FIX"""
+        try:
+            # Check if profile exists
+            profile_response = await asyncio.to_thread(
+                lambda: self.db.supabase.table('user_profiles')
+                .select('user_id')
+                .eq('user_id', user_id)
+                .execute()
+            )
+            
+            if not profile_response.data:
+                # Create profile if missing
+                logger.warning(f"🆘 Creating missing user profile for {user_id}")
+                profile_data = {
+                    'user_id': user_id,
+                    'created_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.utcnow().isoformat()
+                }
+                
+                await asyncio.to_thread(
+                    lambda: self.db.supabase.table('user_profiles')
+                    .insert(profile_data)
+                    .execute()
+                )
+                logger.info(f"✅ Created missing user profile for {user_id}")
+                return True
+            else:
+                logger.info(f"✅ User profile exists for {user_id}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to ensure user profile: {e}")
+            return False
+
     async def create_user_wallets(user_id: str):
         """Create wallets and store encrypted seeds"""
         encryption_service = SeedEncryptionService()

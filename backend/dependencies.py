@@ -15,6 +15,7 @@ import json
 # FIXED IMPORTS: Use absolute imports
 from backend.config import get_settings
 from backend.models import UserRole
+from backend.services.seed_retrieval_service import SeedRetrievalService
 
 # ADD THIS IMPORT AT THE TOP OF THE FILE:
 
@@ -173,6 +174,12 @@ def get_database_service() -> "DatabaseService":
             )
     
     return _database_service
+
+def get_seed_retrieval_service(
+    db_service: DatabaseService = Depends(get_database_service)
+) -> SeedRetrievalService:
+    """Get seed retrieval service instance"""
+    return SeedRetrievalService(db_service)
 
 def get_algorand_service() -> "AlgorandService":
     """Get Algorand service instance"""

@@ -110,6 +110,8 @@ except ImportError as e:
     logger.error(f"❌ Oracle service import error: {e}")
     oracle_service_available = False
 
+from backend.api.routes import seed_routes
+
 # ===== IMPORT ROUTERS WITH COMPREHENSIVE ERROR HANDLING =====
 try:
     from backend.api.routes.users import router as users_router
@@ -227,15 +229,6 @@ try:
 except ImportError as e:
     logger.error(f"❌ Yield router import error: {e}")
     routers_available['yield'] = None
-
-# 🔒 ADD WALLET RECOVERY ROUTER IMPORT
-try:
-    from backend.api.routes.wallet_recovery import router as wallet_recovery_router
-    routers_available['wallet_recovery'] = wallet_recovery_router
-    logger.info("✅ Wallet recovery router imported")
-except ImportError as e:
-    logger.error(f"❌ Wallet recovery router import error: {e}")
-    routers_available['wallet_recovery'] = None
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
@@ -475,12 +468,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🔐 Seed Retrieval Routes - ADD HERE
+try:
+    from backend.api.routes.seed_routes import router as seed_routes_router
+    app.include_router(seed_routes_router)
+    logger.info("✅ Seed retrieval routes registered at /api/v1/seeds")
+except ImportError as e:
+    logger.error(f"❌ Seed routes import error: {e}")
+
 # ✅ ADD this clean registration (only once)
 if routers_available.get('wallet_creation'):
     app.include_router(routers_available['wallet_creation'], prefix="/api/v1", tags=["Wallet Creation"])
     logger.info("✅ Wallet creation routes registered at /api/v1/wallet-creation")
 
 # ===== REGISTER ROUTERS =====
+app.include_router(seed_routes.router)
+
 if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
     logger.info("✅ Users router registered at /api/v1/user")
@@ -552,19 +555,6 @@ if routers_available.get('wallet_connect'):
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
-
-# ✅ FIXED WALLET RECOVERY ROUTE REGISTRATION
-if routers_available.get('wallet_recovery'):
-    app.include_router(routers_available['wallet_recovery'], prefix="/api/v1", tags=["Wallet Recovery"])
-    logger.info("✅ Wallet recovery router registered - endpoints: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
-
-# ✅ SIMPLE, DIRECT WALLET RECOVERY REGISTRATION (NO COMPLEX LOGIC)
-try:
-    from backend.api.routes.wallet_recovery import router as wallet_recovery_router
-    app.include_router(wallet_recovery_router, prefix="/api/v1")
-    logger.info("🎯 WALLET RECOVERY ROUTES REGISTERED: /api/v1/wallet/recovery-seeds and /api/v1/wallet/test")
-except Exception as e:
-    logger.error(f"💥 CRITICAL: Wallet recovery route registration failed: {e}")
 
 # ===== CORE API ENDPOINTS =====
 
