@@ -41,3 +41,4 @@ redis==5.0.1
 # Blockchain
 py-algorand-sdk==2.6.0
 web3==6.15.0
+mnemonic==0.21  # ✅ BIP39 seed phrase generation
