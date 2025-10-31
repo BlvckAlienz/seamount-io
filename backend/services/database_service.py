@@ -1,5 +1,5 @@
 # File Location: backend/services/database_service.py
-# 🚀 MINIMAL FIX - ONLY ADD MISSING CLASS DEFINITIONS
+# 🚀 DEFINITIVE PRODUCTION READY VERSION
 
 import asyncio
 import logging
@@ -19,20 +19,6 @@ from fastapi import HTTPException
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-# ✅ MINIMAL FIX: Add ONLY the missing class definitions
-class UserProfile:
-    """User profile data class - MINIMAL DEFINITION TO FIX IMPORT"""
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-class EncryptedSeed:
-    """Encrypted seed data class - MINIMAL DEFINITION TO FIX IMPORT"""
-    def __init__(self, blockchain: str, encrypted_seed: str, encrypted_private_key: str):
-        self.blockchain = blockchain
-        self.encrypted_seed = encrypted_seed
-        self.encrypted_private_key = encrypted_private_key
 
 class DatabaseService:
     """Production-ready database service with wallet creation support"""
@@ -323,10 +309,8 @@ class DatabaseService:
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"Failed to create user profile: {str(e)}")
 
-    async def get_user_profile(self, user_id: str) -> Optional[UserProfile]:
-        """
-        Get user profile with proper name handling from auth system
-        """
+    async def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Enhanced user profile retrieval with proper error handling"""
         try:
             logger.debug(f"[DB] Fetching user profile: {user_id}")
             
@@ -336,116 +320,20 @@ class DatabaseService:
                 logger.error(f"[DB] Invalid UUID format: {user_id}")
                 return None
             
-            # Get user from auth to capture name
-            auth_response = await asyncio.to_thread(
-                lambda: self.supabase.auth.admin.get_user_by_id(str(user_uuid))
-            )
+            response = self.supabase.table("user_profiles").select("*").eq("id", str(user_uuid)).maybe_single().execute()
             
-            if not auth_response.user:
-                logger.warning(f"[DB] User not found in auth: {user_id}")
-                return None
-            
-            auth_user = auth_response.user
-            user_metadata = auth_user.user_metadata or {}
-            
-            # Get or create user profile
-            profile_response = await asyncio.to_thread(
-                lambda: self.supabase.table("user_profiles")
-                .select("*")
-                .eq("id", str(user_uuid))
-                .maybe_single()
-                .execute()
-            )
-            
-            if profile_response.data:
-                profile_data = profile_response.data
-                # Update profile with current auth data if missing
-                if not profile_data.get('first_name') and user_metadata.get('full_name'):
-                    names = user_metadata['full_name'].split(' ', 1)
-                    update_data = {
-                        'first_name': names[0],
-                        'last_name': names[1] if len(names) > 1 else '',
-                        'updated_at': datetime.utcnow().isoformat()
-                    }
-                    await asyncio.to_thread(
-                        lambda: self.supabase.table("user_profiles")
-                        .update(update_data)
-                        .eq("id", str(user_uuid))
-                        .execute()
-                    )
-                    profile_data.update(update_data)
-                
-                logger.debug(f"[DB] User profile found: {user_id}")
-                return UserProfile(**profile_data)
-            else:
-                # Create new profile with auth data
-                names = user_metadata.get('full_name', 'User').split(' ', 1)
-                new_profile_data = {
-                    "id": str(user_uuid),
-                    "user_id": str(user_uuid),  # Add user_id for relationships
-                    "email": auth_user.email,
-                    "first_name": names[0],
-                    "last_name": names[1] if len(names) > 1 else '',
-                    "country_code": "US",
-                    "kyc_status": "not_started",
-                    "kyc_level": 0,
-                    "role": "user",
-                    "is_admin": False,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat()
-                }
-                
-                create_response = await asyncio.to_thread(
-                    lambda: self.supabase.table("user_profiles")
-                    .insert(new_profile_data)
-                    .execute()
-                )
-                
-                if create_response.data:
-                    logger.info(f"[DB] Created new user profile: {user_id}")
-                    return UserProfile(**create_response.data[0])
-                else:
-                    logger.error(f"[DB] Failed to create user profile: {user_id}")
-                    return None
-                
-        except Exception as e:
-            logger.error(f"[DB] Error in get_user_profile for {user_id}: {str(e)}")
-            return None
-
-    async def get_encrypted_seeds(self, user_id: str) -> List[EncryptedSeed]:
-        """
-        Get encrypted seeds using Supabase (consistent with class design)
-        """
-        try:
-            logger.debug(f"[DB] Fetching encrypted seeds for user: {user_id}")
-            
-            # Use Supabase instead of asyncpg
-            response = await asyncio.to_thread(
-                lambda: self.supabase.table("multi_chain_addresses")
-                .select("blockchain, encrypted_seed, encrypted_private_key")
-                .eq("user_id", user_id)
-                .not_.is_("encrypted_seed", "null")
-                .execute()
-            )
-            
-            seeds = []
             if response.data:
-                for row in response.data:
-                    seeds.append(EncryptedSeed(
-                        blockchain=row['blockchain'],
-                        encrypted_seed=row['encrypted_seed'],
-                        encrypted_private_key=row['encrypted_private_key']
-                    ))
-                logger.debug(f"[DB] Found {len(seeds)} encrypted seeds for user {user_id}")
+                logger.debug(f"[DB] User profile found: {user_id}")
+                return self._format_user_profile(response.data)
             else:
-                logger.debug(f"[DB] No encrypted seeds found for user {user_id}")
+                logger.warning(f"[DB] User profile not found: {user_id}")
+                return None
                 
-            return seeds
-            
         except Exception as e:
-            logger.error(f"[DB] Error fetching encrypted seeds for user {user_id}: {str(e)}")
-            return []
-        
+            logger.error(f"[DB] Error fetching user profile {user_id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail="Failed to fetch user profile")
+
     async def get_user_profile_raw(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         Get UNFILTERED user profile for internal operations (KYC, compliance)
@@ -722,22 +610,3 @@ class DatabaseService:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
 
 SuperDatabaseService = DatabaseService
-
-# 🛡️ DEPENDENCY INJECTION FOR FASTAPI
-async def get_db_service() -> DatabaseService:
-    """
-    FastAPI dependency injection for DatabaseService
-    Used by ALL routers for dependency injection
-    """
-    try:
-        db_service = DatabaseService()
-        # Verify the service is healthy
-        if await db_service.health_check():
-            logger.info("✅ DatabaseService dependency injection - healthy")
-            return db_service
-        else:
-            logger.error("❌ DatabaseService health check failed in dependency injection")
-            raise HTTPException(status_code=503, detail="Database service unavailable")
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize DatabaseService dependency: {str(e)}")
-        raise HTTPException(status_code=500, detail="Database service initialization failed")
