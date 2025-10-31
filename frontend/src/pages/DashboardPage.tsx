@@ -344,6 +344,7 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
@@ -397,6 +398,7 @@ const DashboardPage = () => {
 
         <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
 
+        {/* Multi-Chain Wallets Section */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
@@ -408,7 +410,7 @@ const DashboardPage = () => {
             ))}
           </div>
 
-          {/* 🔐 ENHANCED BACKUP SECURITY BANNER */}
+          {/* Backup Security Banner */}
           <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/50 rounded-2xl p-6 mt-6 hover:shadow-xl hover:shadow-red-500/20 transition-all">
             <div className="flex items-start gap-4">
               <div className="bg-red-500/20 p-4 rounded-xl">
@@ -439,12 +441,14 @@ const DashboardPage = () => {
                   onClick={() => setShowRecoveryModal(true)}
                   className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white py-3 px-6 rounded-xl font-bold text-center transition-all hover:shadow-lg hover:shadow-red-500/50"
                 >
-                  🔓 Backup Seeds Now (Critical)
+                  🔐 Backup Seeds Now (Critical)
                 </button>
               </div>
             </div>
           </div>
+        </div>
 
+        {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
             <div className="flex items-center justify-between mb-4">
@@ -475,6 +479,7 @@ const DashboardPage = () => {
           </div>
         </div>
         
+        {/* Quick Actions */}
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -491,6 +496,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
+        {/* Cross-Border Payments Banner */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -508,16 +514,27 @@ const DashboardPage = () => {
         </div>
       </div>
 
+      {/* Modals */}
       {selectedChain && (
-        <WalletDetailModal isOpen={showWalletModal} onClose={() => { setShowWalletModal(false); setSelectedChain(null); }} chain={selectedChain} chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} address={multiChainWallets[selectedChain]?.address || ''} balance={calculateChainBalance(selectedChain)} />
+        <WalletDetailModal 
+          isOpen={showWalletModal} 
+          onClose={() => { 
+            setShowWalletModal(false); 
+            setSelectedChain(null); 
+          }} 
+          chain={selectedChain} 
+          chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
+          address={multiChainWallets[selectedChain]?.address || ''} 
+          balance={calculateChainBalance(selectedChain)} 
+        />
       )}
-      {/* Wallet Recovery Modal */}
+      
       {showRecoveryModal && (
         <WalletRecoveryModal
           isOpen={showRecoveryModal}
           onClose={() => setShowRecoveryModal(false)}
-  />
-)}
+        />
+      )}
     </div>
   );
 };
