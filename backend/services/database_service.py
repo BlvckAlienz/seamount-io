@@ -721,4 +721,25 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
 
+    # 🛡️ DEPENDENCY INJECTION FOR FASTAPI
+    # Add this to the END of your database_service.py file
+
+    async def get_db_service() -> DatabaseService:
+        """
+        FastAPI dependency injection for DatabaseService
+        Used by ALL routers for dependency injection
+        """
+        try:
+            db_service = DatabaseService()
+            # Verify the service is healthy
+            if await db_service.health_check():
+                logger.info("✅ DatabaseService dependency injection - healthy")
+                return db_service
+            else:
+                logger.error("❌ DatabaseService health check failed in dependency injection")
+                raise HTTPException(status_code=503, detail="Database service unavailable")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize DatabaseService dependency: {str(e)}")
+            raise HTTPException(status_code=500, detail="Database service initialization failed")
+
 SuperDatabaseService = DatabaseService
