@@ -325,7 +325,7 @@ class WalletCreationService:
                             
                             # Create wallet with seed
                             wdk_result = await self.wdk_client.create_wallet(
-                                plaintext_seed=plaintext_seed,  # ✅ CORRECT - 12 words
+                                plaintext_seed=plaintext_seed,
                                 chains=[chain],
                                 enable_gasless=True
                             )
@@ -368,6 +368,57 @@ class WalletCreationService:
                             else:
                                 error_msg = wdk_result.get('error', 'WDK wallet creation failed')
                                 raise Exception(error_msg)
+                        else:
+                            raise Exception("WDK client not available")
+                            
+                except Exception as e:
+                    logger.error(f"❌ Failed to create {chain} wallet: {e}")
+                    results[chain] = {'success': False, 'error': str(e)}
+                    
+                    # Update tracking status to failed
+                    update_data = {
+                        'status': 'failed',
+                        'error_message': str(e),
+                        'attempt_count': 1,
+                        'last_attempt_at': datetime.utcnow().isoformat(),
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    try:
+                        await asyncio.to_thread(
+                            lambda: self.db.supabase.table("wallet_creation_status")
+                            .update(update_data)
+                            .eq('user_id', user_id)
+                            .eq('chain', chain)
+                            .execute()
+                        )
+                    except Exception as db_error:
+                        logger.error(f"Failed to update status for {chain}: {db_error}")
+            
+            # Calculate final summary
+            successful_chains = [c for c, r in results.items() if r.get('success')]
+            failed_chains = [c for c, r in results.items() if not r.get('success')]
+            
+            return {
+                'success': len(successful_chains) > 0,
+                'message': f"Created {len(successful_chains)}/{len(target_chains)} wallets",
+                'user_id': user_id,
+                'retried_chains': target_chains,
+                'results': results,
+                'summary': {
+                    'successful': successful_chains,
+                    'failed': failed_chains
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Retry failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'user_id': user_id,
+                'retried_chains': [],
+                'results': {}
+            }
     
     # Add this BEFORE wallet creation in your backend
     async def ensure_user_profile_exists(self, user_id: str) -> bool:
