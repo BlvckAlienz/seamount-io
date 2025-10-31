@@ -239,22 +239,22 @@ app.post('/wallet/generate-seed', validateApiKey, (req, res) => {
 
 app.post('/wallet/create', validateApiKey, async (req, res) => {
     try {
-        const { encrypted_seed, chains, enable_gasless } = req.body;
+        const { plaintext_seed, chains, enable_gasless } = req.body;  // ✅ Changed param name
         
-        if (!encrypted_seed) {
+        if (!plaintext_seed) {
             return res.status(400).json({ 
                 success: false,
-                error: 'encrypted_seed required' 
+                error: 'plaintext_seed required' 
             });
         }
 
-        console.log('🔓 Decrypting seed...');
-        const mnemonic = decrypt(encrypted_seed);
+        console.log('✅ Received plaintext seed for wallet creation');
         
-        if (!validateSeedPhrase(mnemonic)) {
+        // Validate it's a proper BIP39 mnemonic
+        if (!validateSeedPhrase(plaintext_seed)) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Invalid seed phrase' 
+                error: 'Invalid BIP39 seed phrase' 
             });
         }
 
@@ -267,17 +267,17 @@ app.post('/wallet/create', validateApiKey, async (req, res) => {
 
         for (const chain of chainsToCreate) {
             try {
-                console.log(`⚙️  Creating ${chain} wallet...`);
+                console.log(`⚙️ Creating ${chain} wallet...`);
                 let wallet;
                 
                 if (chain === 'bitcoin') {
-                    wallet = await createBitcoinWallet(mnemonic);
+                    wallet = await createBitcoinWallet(plaintext_seed);  // ✅ Use plaintext
                 } else if (chain === 'tron') {
-                    wallet = await createTronWallet(mnemonic);
+                    wallet = await createTronWallet(plaintext_seed);
                 } else if (['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
-                    wallet = await createEVMWallet(mnemonic);
+                    wallet = await createEVMWallet(plaintext_seed);
                 } else {
-                    console.warn(`⚠️  Chain ${chain} not yet supported`);
+                    console.warn(`⚠️ Chain ${chain} not yet supported`);
                     errors.push(`Chain ${chain} not yet supported`);
                     continue;
                 }

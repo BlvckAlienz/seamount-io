@@ -20,30 +20,28 @@ async def create_user_profile(
     request: Request,
     supabase=Depends(get_supabase_client)
 ):
-    """Create user profile - FIXED to handle KYC fields"""
+    """Create user profile with proper data capture"""
     try:
         data = await request.json()
         user_id = data.get('id')
         
+        # ✅ FIX: Properly extract camelCase data from frontend
         insert_data = {
             "id": user_id,
             "email": data.get('email', ''),
-            "first_name": data.get('firstName', ''),
-            "last_name": data.get('lastName', ''),
-            "country_code": data.get('countryCode', 'US').upper(),
+            "first_name": data.get('firstName', ''),  # ✅ camelCase
+            "last_name": data.get('lastName', ''),    # ✅ camelCase
+            "country_code": data.get('countryCode', 'US').upper(),  # ✅ camelCase
             "phone": data.get('phone', ''),
-            # ✅ ADD: KYC fields with safe defaults
-            "bvn": data.get('bvn'),  # nullable
-            "id_number": data.get('id_number'),  # nullable
-            "id_type": data.get('id_type', 'BVN'),
-            "date_of_birth": data.get('date_of_birth'),  # nullable
-            "gender": data.get('gender'),  # nullable
             "kyc_status": "not_started",
             "kyc_level": 0,
             "role": "alien",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        # ✅ Log for debugging
+        logger.info(f"[Profile Create] Creating profile for {user_id}: {insert_data['first_name']} {insert_data['last_name']} ({insert_data['country_code']})")
         
         result = supabase.from_("user_profiles").upsert(insert_data, on_conflict="id").execute()
         

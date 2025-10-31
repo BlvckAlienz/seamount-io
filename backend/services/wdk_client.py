@@ -341,17 +341,20 @@ class WDKClient:
     
     async def create_wallet(
         self, 
-        encrypted_seed: str, 
+        plaintext_seed: str,  # ✅ Changed from encrypted_seed
         chains: Optional[List[str]] = None,
         enable_gasless: bool = True
     ) -> Dict[str, Any]:
         """
         Create wallets on specified chains
-        Follows Tether's multi-chain wallet pattern
+        
+        Args:
+            plaintext_seed: Unencrypted BIP39 mnemonic (12 words)
+            chains: List of chains to create wallets on
+            enable_gasless: Enable gasless transactions where supported
         """
         
         if chains is None:
-            # Default: Essential chains from Tether docs
             chains = ['bitcoin', 'ethereum', 'polygon', 'tron']
         
         # Validate chains
@@ -360,7 +363,7 @@ class WDKClient:
             raise ValueError(f"Unsupported chains: {invalid_chains}")
         
         payload = {
-            'encrypted_seed': encrypted_seed,
+            'plaintext_seed': plaintext_seed,  # ✅ Send raw mnemonic
             'chains': chains,
             'enable_gasless': enable_gasless and any(c in self.GASLESS_CHAINS for c in chains)
         }

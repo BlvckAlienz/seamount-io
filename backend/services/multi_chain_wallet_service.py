@@ -105,35 +105,45 @@ class MultiChainWalletService:
                 self.db.supabase.table('user_wallets').upsert(wallet_data, on_conflict='user_id').execute()
                 return {'success': True, 'address': algo_address, 'chain': chain}
             else:
-                # 🔐 Create WDK wallet with centralized encryption
+                # 🔥 CRITICAL: Generate seed, ENCRYPT IT FIRST, then use plaintext with WDK
+                from mnemonic import Mnemonic
+                
+                # Step 1: Generate plaintext seed locally
+                mnemo = Mnemonic("english")
+                plaintext_seed = mnemo.generate(strength=128)  # 12 words
+                
+                logger.info("✅ Generated plaintext seed for WDK (12 words)")
+                
+                # Step 2: ENCRYPT IMMEDIATELY for storage (before sending to WDK)
                 encryption_service = SeedEncryptionService()
+                encrypted_seed_for_storage = encryption_service.encrypt_seed(plaintext_seed)
                 
-                # Generate PLAINTEXT seed from WDK
-                seed_data = await self.wdk.generate_seed(encrypt=False)  # Get plaintext
-                plaintext_seed = seed_data['seed']  # Should be 12-word mnemonic
+                logger.info(f"🔐 Seed encrypted for storage BEFORE WDK call (length: {len(encrypted_seed_for_storage)})")
                 
-                # Encrypt using OUR centralized service
-                encrypted_seed = encryption_service.encrypt_seed(plaintext_seed)
-                
-                logger.info(f"🔐 WDK seed encrypted with centralized service (length: {len(encrypted_seed)})")
-                
-                wdk_result = await self.wdk.create_wallet(
-                    encrypted_seed=encrypted_seed,
-                    chains=[chain],
-                    enable_gasless=True
-                )
+                # Step 3: Send PLAINTEXT to WDK (it derives wallets but we don't care about its encryption)
+                try:
+                    wdk_result = await self.wdk.create_wallet(
+                        plaintext_seed=plaintext_seed,  # ✅ Raw mnemonic for wallet derivation
+                        chains=[chain],
+                        enable_gasless=True
+                    )
+                except Exception as wdk_error:
+                    logger.error(f"WDK wallet creation failed: {wdk_error}")
+                    raise
                 
                 wallet_data = wdk_result.get('wallets', {}).get(chain)
                 if wallet_data:
-                    # Store in multi_chain_addresses
+                    # Step 4: Store OUR encrypted version (not WDK's)
                     self.db.supabase.table('multi_chain_addresses').upsert({
                         'user_id': user_id,
                         'blockchain': chain,
                         'address': wallet_data['address'],
-                        'encrypted_seed': encrypted_seed,
+                        'encrypted_seed': encrypted_seed_for_storage,  # ✅ OUR encryption, not WDK's
                         'wallet_type': 'wdk',
                         'created_at': datetime.utcnow().isoformat()
                     }, on_conflict='user_id,blockchain').execute()
+                    
+                    logger.info(f"✅ Stored {chain} wallet with OUR encrypted seed")
                     
                     return {
                         'success': True,

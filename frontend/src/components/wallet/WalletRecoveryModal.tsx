@@ -40,7 +40,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
   const fetchSeeds = async () => {
     try {
       setLoading(true);
-      const response = await seedAPI.getRecoverySeeds();
+      const response = await seedAPI.getRecoverySeeds();  // ✅ Already correct!
       
       if (response.data.success) {
         setSeeds(response.data);
@@ -51,7 +51,6 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClo
     } catch (error: any) {
       console.error('Seed recovery error:', error);
       
-      // Handle rate limiting
       if (error.response?.status === 429) {
         toast.error('⏰ Rate limit: Max 3 requests/hour');
         setLoading(false);
