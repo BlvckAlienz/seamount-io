@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
 from backend.services.seed_encryption_service import SeedEncryptionService
+from mnemonic import Mnemonic
 
 logger = logging.getLogger(__name__)
 
@@ -307,98 +308,66 @@ class WalletCreationService:
                         else:
                             raise Exception("Algorand wallet creation failed")
                     else:
-                        # Create WDK wallet (Bitcoin, Ethereum, Polygon)
+                        # Create WDK wallet (Bitcoin, Ethereum, Polygon, Tron)
                         if self.wdk_client:
-                            wdk_result = await self.wdk_client.create_wallet(chain)
-                            if wdk_result and wdk_result.get('success') and wdk_result.get('address'):
-                                # Update tracking status
-                                update_data = {
-                                    'status': 'success', 
-                                    'address': wdk_result['address'],
-                                    'updated_at': datetime.utcnow().isoformat()
-                                }
-                                await asyncio.to_thread(
-                                    lambda: self.db.supabase.table("wallet_creation_status")
-                                    .update(update_data)
-                                    .eq('user_id', user_id)
-                                    .eq('chain', chain)
-                                    .execute()
-                                )
-                                results[chain] = {'success': True, 'address': wdk_result['address']}
-                                logger.info(f"✅ {chain} wallet created successfully")
+                            # 🔥 FIX: Generate seed first, then create wallet
+                            from mnemonic import Mnemonic
+                            
+                            # Generate 12-word seed
+                            mnemo = Mnemonic("english")
+                            plaintext_seed = mnemo.generate(strength=128)
+                            
+                            logger.info(f"✅ Generated 12-word seed for {chain} wallet")
+                            
+                            # Encrypt seed for storage
+                            encryption_service = SeedEncryptionService()
+                            encrypted_seed_for_storage = encryption_service.encrypt_seed(plaintext_seed)
+                            
+                            # Create wallet with seed
+                            wdk_result = await self.wdk_client.create_wallet(
+                                plaintext_seed=plaintext_seed,  # ✅ CORRECT - 12 words
+                                chains=[chain],
+                                enable_gasless=True
+                            )
+                            
+                            if wdk_result and wdk_result.get('success'):
+                                wallet_data = wdk_result.get('wallets', {}).get(chain)
+                                if wallet_data and wallet_data.get('address'):
+                                    # Store encrypted seed in database
+                                    await asyncio.to_thread(
+                                        lambda: self.db.supabase.table("multi_chain_addresses")
+                                        .upsert({
+                                            'user_id': user_id,
+                                            'blockchain': chain,
+                                            'address': wallet_data['address'],
+                                            'encrypted_seed': encrypted_seed_for_storage,
+                                            'wallet_type': 'wdk',
+                                            'created_at': datetime.utcnow().isoformat()
+                                        }, on_conflict='user_id,blockchain')
+                                        .execute()
+                                    )
+                                    
+                                    # Update tracking status
+                                    update_data = {
+                                        'status': 'success', 
+                                        'address': wallet_data['address'],
+                                        'updated_at': datetime.utcnow().isoformat()
+                                    }
+                                    await asyncio.to_thread(
+                                        lambda: self.db.supabase.table("wallet_creation_status")
+                                        .update(update_data)
+                                        .eq('user_id', user_id)
+                                        .eq('chain', chain)
+                                        .execute()
+                                    )
+                                    results[chain] = {'success': True, 'address': wallet_data['address']}
+                                    logger.info(f"✅ {chain} wallet created successfully")
+                                else:
+                                    error_msg = "WDK returned no address"
+                                    raise Exception(error_msg)
                             else:
                                 error_msg = wdk_result.get('error', 'WDK wallet creation failed')
                                 raise Exception(error_msg)
-                        else:
-                            raise Exception("WDK client not available")
-                            
-                except Exception as e:
-                    error_msg = str(e)
-                    logger.error(f"❌ Failed to create {chain} wallet: {error_msg}")
-                    
-                    # Update tracking status to failed
-                    update_data = {
-                        'status': 'failed',
-                        'error_message': error_msg,
-                        'updated_at': datetime.utcnow().isoformat()
-                    }
-                    await asyncio.to_thread(
-                        lambda: self.db.supabase.table("wallet_creation_status")
-                        .update(update_data)
-                        .eq('user_id', user_id)
-                        .eq('chain', chain)
-                        .execute()
-                    )
-                    results[chain] = {'success': False, 'error': error_msg}
-            
-            # Add to retry queue for background processing
-            queue_data = {
-                'user_id': user_id,
-                'chain': chain,
-                'priority': 5,
-                'scheduled_for': datetime.utcnow().isoformat(),
-                'retry_count': 0,
-                'max_retries': 10,
-                'error_message': error_msg,
-                'created_at': datetime.utcnow().isoformat(),
-                'updated_at': datetime.utcnow().isoformat()
-            }
-
-            await asyncio.to_thread(
-                lambda: self.db.supabase.table("wallet_creation_queue")
-                .upsert(queue_data, on_conflict='user_id,chain')
-                .execute()
-            )
-
-            # Check if all succeeded
-            successful_creations = [r for r in results.values() if r.get('success')]
-            all_succeeded = len(successful_creations) == len(target_chains)
-            
-            # Update overall completion status if all succeeded
-            if all_succeeded:
-                profile_update = {
-                    'wallet_creation_complete': True,
-                    'wallet_creation_completed_at': datetime.utcnow().isoformat()
-                }
-                await self.db.update_user_profile(user_id, profile_update)
-            
-            return {
-                'success': True,
-                'user_id': user_id,
-                'message': f'Created {len(successful_creations)}/{len(target_chains)} wallets successfully',
-                'missing_chains': missing_chains,
-                'retried_chains': target_chains,
-                'results': results,
-                'all_succeeded': all_succeeded
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in smart retry: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'user_id': user_id
-            }
     
     # Add this BEFORE wallet creation in your backend
     async def ensure_user_profile_exists(self, user_id: str) -> bool:
