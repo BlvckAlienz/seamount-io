@@ -244,7 +244,24 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
       console.log('[Form] Calling signUp with data:', signUpData);
       
-      await signUp(formData.email.trim(), formData.password, signUpData);
+      const response = await signUp(formData.email.trim(), formData.password, signUpData);
+
+      // ✅ CRITICAL: Create profile immediately after signup
+      if (response.success) {
+        try {
+          await apiClient.post('/api/v1/user/profile', {
+            id: response.user.id, // Supabase returns user object
+            email: formData.email.trim(),
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            countryCode: formData.countryCode.toUpperCase()
+          });
+          logger.info('[Register] Profile created successfully');
+        } catch (profileError) {
+          logger.error('[Register] Profile creation failed:', profileError);
+          // Don't block signup - profile will be created on first login
+        }
+      }
       
       console.log('[Form] Registration successful');
       

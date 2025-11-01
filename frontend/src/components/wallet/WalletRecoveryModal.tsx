@@ -1,5 +1,5 @@
 // File: frontend/src/components/wallet/WalletRecoveryModal.tsx
-// 🔐 STREAMLINED WALLET BACKUP MODAL - NO TEST, NO INSTRUCTIONS
+// 🔥 STREAMLINED: No test, no instructions, auto-dismiss after download
 
 import React, { useState, useEffect } from 'react';
 import { X, Download, Check, AlertTriangle, Copy, Eye, EyeOff, Shield } from 'lucide-react';
@@ -16,19 +16,16 @@ interface RecoverySeeds {
 interface WalletRecoveryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  newWalletsOnly?: string[];  // ✅ NEW: Only show seeds for these chains
 }
 
-const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ 
-  isOpen, 
-  onClose,
-  newWalletsOnly 
-}) => {
+const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [seeds, setSeeds] = useState<RecoverySeeds | null>(null);
   const [showSeeds, setShowSeeds] = useState(false);
   const [copiedAlgo, setCopiedAlgo] = useState(false);
   const [copiedWdk, setCopiedWdk] = useState(false);
+  const [algoDownloaded, setAlgoDownloaded] = useState(false);
+  const [wdkDownloaded, setWdkDownloaded] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -64,25 +61,65 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
     }
   };
 
-  const handleDownload = () => {
-    if (!seeds) return;
+  const handleDownloadAlgorand = async () => {
+    if (!seeds?.algorand_seed) return;
 
     const content = `
-SEAMOUNT WALLET RECOVERY SEEDS
-===============================
-⚠️ CRITICAL: KEEP THIS FILE SECURE
+SEAMOUNT ALGORAND WALLET RECOVERY
+==================================
+⚠️ KEEP THIS FILE SECURE - NEVER SHARE IT
 Generated: ${new Date().toISOString()}
 
-🌐 ALGORAND WALLET
-------------------
-Seed Phrase: ${seeds.algorand_seed || 'N/A'}
+🌐 ALGORAND SEED PHRASE (25 words)
+----------------------------------
+${seeds.algorand_seed}
+
 Address: ${seeds.wallet_addresses?.algorand || 'N/A'}
 
-🔗 MULTI-CHAIN WALLET (WDK)
----------------------------
-Seed Phrase: ${seeds.wdk_seed || 'N/A'}
+⚠️ SECURITY WARNING
+-------------------
+${seeds.security_warning}
+    `.trim();
 
-Addresses:
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `seamount-algorand-recovery-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success('✅ Algorand seed downloaded');
+    setAlgoDownloaded(true);
+    
+    // Mark as backed up
+    try {
+      await apiClient.post('/api/v1/wallet-backup/mark-downloaded', null, {
+        params: { wallet_type: 'algorand' }
+      });
+    } catch (error) {
+      console.error('Failed to mark backup:', error);
+    }
+
+    checkAndDismiss();
+  };
+
+  const handleDownloadWDK = async () => {
+    if (!seeds?.wdk_seed) return;
+
+    const content = `
+SEAMOUNT MULTI-CHAIN WALLET RECOVERY (WDK)
+===========================================
+⚠️ KEEP THIS FILE SECURE - NEVER SHARE IT
+Generated: ${new Date().toISOString()}
+
+🔗 MULTI-CHAIN SEED PHRASE (12 words)
+-------------------------------------
+${seeds.wdk_seed}
+
+Supported Chains:
 ${Object.entries(seeds.wallet_addresses || {})
   .filter(([chain]) => chain !== 'algorand')
   .map(([chain, address]) => `  ${chain.toUpperCase()}: ${address}`)
@@ -97,32 +134,34 @@ ${seeds.security_warning}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `seamount-wallet-recovery-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `seamount-multichain-recovery-${new Date().toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast.success('✅ Recovery file downloaded');
+    toast.success('✅ Multi-chain seed downloaded');
+    setWdkDownloaded(true);
     
-    // ✅ Mark as backed up
-    markAsBackedUp();
-  };
-
-  const markAsBackedUp = async () => {
+    // Mark as backed up
     try {
-      const chains = Object.keys(seeds?.wallet_addresses || {});
-      await apiClient.post('/api/v1/wallet-backup/mark-backed-up', { chains });
-      
-      // Close modal after successful backup
-      setTimeout(() => {
-        onClose();
-        toast.success('🎉 Backup complete! Your wallets are safe.');
-      }, 1500);
-      
+      await apiClient.post('/api/v1/wallet-backup/mark-downloaded', null, {
+        params: { wallet_type: 'wdk' }
+      });
     } catch (error) {
       console.error('Failed to mark backup:', error);
-      // Don't block the user if tracking fails
+    }
+
+    checkAndDismiss();
+  };
+
+  const checkAndDismiss = () => {
+    // If both downloaded, auto-dismiss after 2 seconds
+    if (algoDownloaded && wdkDownloaded) {
+      toast.success('🎉 All seeds backed up! This modal will not appear again.');
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     }
   };
 
@@ -140,11 +179,6 @@ ${seeds.security_warning}
 
   if (!isOpen) return null;
 
-  // ✅ Filter seeds if only showing new wallets
-  const shouldShowAlgorand = !newWalletsOnly || newWalletsOnly.includes('algorand');
-  const shouldShowWdk = !newWalletsOnly || 
-    newWalletsOnly.some(chain => ['bitcoin', 'ethereum', 'polygon', 'tron'].includes(chain));
-
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-red-500/30 shadow-2xl">
@@ -157,7 +191,7 @@ ${seeds.security_warning}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white">🔐 Wallet Recovery Seeds</h2>
-                <p className="text-red-100 text-sm">CRITICAL: Store these safely offline</p>
+                <p className="text-red-100 text-sm">CRITICAL: Download both seed files now</p>
               </div>
             </div>
             <button
@@ -195,6 +229,23 @@ ${seeds.security_warning}
                 </div>
               </div>
 
+              {/* Download Progress */}
+              <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300">Download Progress:</span>
+                  <div className="flex items-center gap-4">
+                    <div className={`flex items-center gap-2 ${algoDownloaded ? 'text-green-400' : 'text-gray-400'}`}>
+                      {algoDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                      <span>Algorand</span>
+                    </div>
+                    <div className={`flex items-center gap-2 ${wdkDownloaded ? 'text-green-400' : 'text-gray-400'}`}>
+                      {wdkDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                      <span>Multi-Chain</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3 mb-6">
                 <button
@@ -204,29 +255,36 @@ ${seeds.security_warning}
                   {showSeeds ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   {showSeeds ? 'Hide Seeds' : 'Reveal Seeds'}
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold text-white transition-all"
-                >
-                  <Download className="w-5 h-5" />
-                  Download & Mark Backed Up
-                </button>
               </div>
 
               {/* Algorand Seed */}
-              {shouldShowAlgorand && seeds.algorand_seed && (
+              {seeds.algorand_seed && (
                 <div className="bg-gray-800/50 rounded-xl p-6 mb-6 border border-gray-700">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-white">🌐 Algorand Wallet</h3>
                       <p className="text-gray-400 text-sm">25-word recovery phrase</p>
                     </div>
-                    <button
-                      onClick={() => handleCopy(seeds.algorand_seed!, 'algo')}
-                      className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                    >
-                      {copiedAlgo ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleCopy(seeds.algorand_seed!, 'algo')}
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                      >
+                        {copiedAlgo ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      <button
+                        onClick={handleDownloadAlgorand}
+                        disabled={algoDownloaded}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                          algoDownloaded
+                            ? 'bg-green-600 text-white cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                      >
+                        {algoDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                        {algoDownloaded ? 'Downloaded' : 'Download'}
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="relative">
@@ -254,19 +312,33 @@ ${seeds.security_warning}
               )}
 
               {/* WDK Multi-Chain Seed */}
-              {shouldShowWdk && seeds.wdk_seed && (
+              {seeds.wdk_seed && (
                 <div className="bg-gray-800/50 rounded-xl p-6 mb-6 border border-gray-700">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="text-xl font-bold text-white">🔗 Multi-Chain Wallet</h3>
                       <p className="text-gray-400 text-sm">12-word BIP39 phrase (Bitcoin, Ethereum, Polygon, TRON)</p>
                     </div>
-                    <button
-                      onClick={() => handleCopy(seeds.wdk_seed!, 'wdk')}
-                      className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-                    >
-                      {copiedWdk ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleCopy(seeds.wdk_seed!, 'wdk')}
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                      >
+                        {copiedWdk ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
+                      </button>
+                      <button
+                        onClick={handleDownloadWDK}
+                        disabled={wdkDownloaded}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                          wdkDownloaded
+                            ? 'bg-green-600 text-white cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
+                      >
+                        {wdkDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                        {wdkDownloaded ? 'Downloaded' : 'Download'}
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="relative">

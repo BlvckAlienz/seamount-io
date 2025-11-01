@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ArrowDownLeft, ExternalLink, Activity, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../config/api';
+import LivePriceChart from './LivePriceChart';
 
 interface WalletDetailModalProps {
   isOpen: boolean;
@@ -484,15 +485,14 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                   </button>
                 </div>
 
-                {/* Chart Placeholder */}
-                <div className="bg-gray-800 rounded-xl p-6 mb-6 h-64 flex items-center justify-center">
+                {/* Live Price Chart */}
+                <LivePriceChart symbol={selectedAssetData.symbol} timeframe="24h" />
                   <div className="text-center">
                     <TrendingUp className="w-12 h-12 text-blue-400 mx-auto mb-4" />
                     <h4 className="text-white font-semibold mb-2">Live Price Chart</h4>
                     <p className="text-gray-400 text-sm">
                       Real-time chart for {selectedAssetData.symbol} coming soon
                     </p>
-                  </div>
                 </div>
 
                 {/* Additional Info */}

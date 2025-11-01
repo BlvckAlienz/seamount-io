@@ -7,6 +7,7 @@ import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
+import { useAutoLogout } from '../hooks/useAutoLogout';
 import { retryWithBackoff } from '../utils/retry';
 import toast from 'react-hot-toast';
 
@@ -56,6 +57,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
    
   const navigate = useNavigate();
+  
+  // Auto-logout on inactivity
+  useAutoLogout();
 
   const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
     try {
