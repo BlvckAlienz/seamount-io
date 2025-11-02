@@ -154,9 +154,22 @@ ${seeds.security_warning}
   };
 
   const checkAndDismiss = () => {
-    // If both downloaded, auto-dismiss after 2 seconds
-    if (algoDownloaded && wdkDownloaded) {
-      toast.success('🎉 All seeds backed up! This modal will not appear again.');
+    // Determine which seeds the user actually has
+    const hasAlgoSeed = !!seeds?.algorand_seed;
+    const hasWdkSeed = !!seeds?.wdk_seed;
+    
+    // Check if each available seed is backed up
+    const algoComplete = hasAlgoSeed ? algoDownloaded : true; // No Algo wallet = auto-complete
+    const wdkComplete = hasWdkSeed ? wdkDownloaded : true;    // No WDK wallet = auto-complete
+    
+    // Only dismiss if ALL AVAILABLE seeds are backed up
+    if (algoComplete && wdkComplete) {
+      const message = hasAlgoSeed && hasWdkSeed 
+        ? '🎉 All seeds backed up! This modal will not appear again.'
+        : '🎉 Seed backed up! This modal will not appear again.';
+      
+      toast.success(message);
+      
       setTimeout(() => {
         onClose();
       }, 2000);
