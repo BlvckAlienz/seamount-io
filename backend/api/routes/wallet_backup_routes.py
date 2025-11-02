@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from backend.services.database_service import DatabaseService
-from backend.api.dependencies import get_current_user, get_db_service
+from backend.dependencies import get_current_user, get_db_service
 
 logger = logging.getLogger(__name__)
 
