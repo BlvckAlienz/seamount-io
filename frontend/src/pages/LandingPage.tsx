@@ -295,14 +295,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 {
                   icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-600" />,
                   number: "01",
-                  title: "Connect or Create Your Wallet",
+                  title: "Create Your Wallets",
                   description: "Create new multi-chain wallets supporting 5+ blockchains. Buy Algo, Bitcoin, USDC, USDT, and others. You control your keys—we never touch your funds.",
                   color: "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white"
                 },
                 {
                   icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
                   number: "02",
-                  title: "Fund Your Wallet Easily",
+                  title: "Fund Your Wallets Easily",
                   description: "Deposit via local payment channels (Paystack, Flutterwave, etc). Withdraw anytime the same way. We make crypto accessible—no complexity, just results.",
                   color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
