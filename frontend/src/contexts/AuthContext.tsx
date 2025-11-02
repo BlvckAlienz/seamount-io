@@ -57,9 +57,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
    
   const navigate = useNavigate();
-  
-  // Auto-logout on inactivity
-  useAutoLogout();
 
   const fetchUserProfile = useCallback(async (maxRetries: number = 3, delayMs: number = 1000) => {
     try {
@@ -455,6 +452,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       return false;
     }
   }, []);
+
+  // Auto-logout on inactivity (must be after all hooks)
+  useAutoLogout();
 
   return (
     <AuthContext.Provider value={{
