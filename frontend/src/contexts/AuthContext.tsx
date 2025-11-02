@@ -161,92 +161,91 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [fetchUserProfile]);
 
   const signUp = async (
-    email: string,
-    password: string,
-    options: { firstName?: string; lastName?: string; countryCode?: string; captchaToken?: string } = {}
-  ) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      const signUpOptions: any = {
-        email,
-        password,
-        options: {
-          data: {
-            firstName: options.firstName || '',
-            lastName: options.lastName || '',
-            countryCode: options.countryCode || 'US',
-          },
+  email: string,
+  password: string,
+  options: { firstName?: string; lastName?: string; countryCode?: string; captchaToken?: string } = {}
+) => {
+  setState((prev) => ({ ...prev, loading: true, error: null }));
+  
+  try {
+    const signUpOptions: any = {
+      email,
+      password,
+      options: {
+        data: {
+          firstName: options.firstName || '',
+          lastName: options.lastName || '',
+          countryCode: options.countryCode || 'US',
         },
-      };
-      
-      if (options.captchaToken) {
-        signUpOptions.options.captchaToken = options.captchaToken;
-      }
+      },
+    };
+    
+    if (options.captchaToken) {
+      signUpOptions.options.captchaToken = options.captchaToken;
+    }
 
-      const { data, error } = await retryWithBackoff(() =>
-        supabase.auth.signUp(signUpOptions)
-      );
+    const { data, error } = await retryWithBackoff(() =>
+      supabase.auth.signUp(signUpOptions)
+    );
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // ✅ CREATE USER PROFILE FIRST
-      if (data.user) {
-        try {
-          console.log('[Auth] Creating user profile for:', data.user.id);
+    // ✅ CREATE USER PROFILE FIRST
+    if (data.user) {
+      try {
+        console.log('[Auth] Creating user profile for:', data.user.id);
+        
+        const profileData = {
+          id: data.user.id,
+          email: data.user.email,
+          firstName: options.firstName || '',
+          lastName: options.lastName || '',
+          countryCode: options.countryCode || 'US'
+        };
+        
+        const profileResponse = await apiClient.post('/api/v1/user/profile', profileData);
+        
+        if (profileResponse.data.success) {
+          console.log('[Auth] ✅ Profile created:', profileResponse.data.profile);
           
-          // Call backend to create profile with proper data
-          const profileData = {
-            id: data.user.id,
-            email: data.user.email,
-            firstName: options.firstName || '',
-            lastName: options.lastName || '',
-            countryCode: options.countryCode || 'US'
-          };
-          
-          const profileResponse = await apiClient.post('/api/v1/user/profile', profileData);
-          
-          if (profileResponse.data.success) {
-            console.log('[Auth] ✅ Profile created:', profileResponse.data.profile);
+          if (!data.user.email_confirmed_at) {
+            toast.success('Please check your email to confirm your account');
+          } else {
+            console.log('[Auth] 📍 Triggering wallet creation...');
             
-            // ✅ NOW TRIGGER WALLET CREATION
-            if (!data.user.email_confirmed_at) {
-              // Wait for email confirmation before wallet creation
-              toast.success('Please check your email to confirm your account');
-            } else {
-              // Email already confirmed (rare) - create wallets immediately
-              console.log('[Auth] 🔐 Triggering wallet creation...');
-              
-              setTimeout(async () => {
-                try {
-                  const walletResponse = await apiClient.post('/api/v1/wallet/create');
-                  
-                  if (walletResponse.data.success) {
-                    console.log('[Auth] ✅ Wallets created:', walletResponse.data.created_chains);
-                    
-                    // Flag to show backup modal
-                    sessionStorage.setItem('show_wallet_backup', 'true');
-                    sessionStorage.setItem('new_wallets', JSON.stringify(walletResponse.data.created_chains));
-                  }
-                } catch (walletError) {
-                  console.error('[Auth] ❌ Wallet creation failed:', walletError);
-                  // Don't block signup - user can retry from dashboard
+            setTimeout(async () => {
+              try {
+                const walletResponse = await apiClient.post('/api/v1/wallet/create');
+                
+                if (walletResponse.data.success) {
+                  console.log('[Auth] ✅ Wallets created:', walletResponse.data.created_chains);
+                  sessionStorage.setItem('show_wallet_backup', 'true');
+                  sessionStorage.setItem('new_wallets', JSON.stringify(walletResponse.data.created_chains));
                 }
-              }, 2000);
-            }
+              } catch (walletError) {
+                console.error('[Auth] ❌ Wallet creation failed:', walletError);
+              }
+            }, 2000);
           }
-        } catch (profileError) {
-          console.error('[Auth] Profile creation failed:', profileError);
-          // Don't block signup - profile can be created later
-          toast.error('Account created but profile incomplete. Please update in settings.');
         }
+      } catch (profileError) {
+        console.error('[Auth] Profile creation failed:', profileError);
+        toast.error('Account created but profile incomplete. Please update in settings.');
       }
+    }
 
-      if (data.user && !data.user.email_confirmed_at) {
-        toast.success('Please check your email to confirm your account');
-      }
+    if (data.user && !data.user.email_confirmed_at) {
+      toast.success('Please check your email to confirm your account');
+    }
 
-      return { success: true };
+    return { success: true };
+
+  } catch (error: any) {
+    setState((prev) => ({ ...prev, loading: false, error: error.message }));
+    toast.error(error.message || 'Sign up failed');
+    return { success: false, error: error.message };
+  }
+};
 
   // ✅ BULLETPROOF LOGOUT FIX
   const signOut = async () => {

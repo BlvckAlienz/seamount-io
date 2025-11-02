@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import countryList from 'react-select-country-list';
+import { supabase } from '@/lib/supabase';
 
 interface IRegisterFormProps {
   onSuccess?: () => void;
@@ -244,7 +245,32 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
 
       console.log('[Form] Calling signUp with data:', signUpData);
       
-      const response = await signUp(formData.email.trim(), formData.password, signUpData);
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email.trim(),
+        password: formData.password,
+        options: {
+          data: signUpData,
+          ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken })
+        }
+      });
+
+      if (error) throw error;
+
+      // ✅ CRITICAL: Create profile immediately
+      if (data.user) {
+        try {
+          await apiClient.post('/api/v1/user/profile', {
+            id: data.user.id,
+            email: formData.email.trim(),
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            countryCode: formData.countryCode.toUpperCase()
+          });
+          console.log('[Register] ✅ Profile created');
+        } catch (profileError) {
+          console.error('[Register] Profile creation failed:', profileError);
+        }
+      }
 
       // ✅ CRITICAL: Create profile immediately after signup
       if (response.success) {

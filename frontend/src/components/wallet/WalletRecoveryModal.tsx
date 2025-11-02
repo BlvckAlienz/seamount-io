@@ -96,9 +96,7 @@ ${seeds.security_warning}
     
     // Mark as backed up
     try {
-      await apiClient.post('/api/v1/wallet-backup/mark-downloaded', null, {
-        params: { wallet_type: 'algorand' }
-      });
+      await apiClient.post('/api/v1/wallet-backup/mark-backed-up', { chains: ['algorand'] });
     } catch (error) {
       console.error('Failed to mark backup:', error);
     }
@@ -145,8 +143,8 @@ ${seeds.security_warning}
     
     // Mark as backed up
     try {
-      await apiClient.post('/api/v1/wallet-backup/mark-downloaded', null, {
-        params: { wallet_type: 'wdk' }
+      await apiClient.post('/api/v1/wallet-backup/mark-backed-up', { 
+        chains: ['bitcoin', 'ethereum', 'polygon', 'tron'] 
       });
     } catch (error) {
       console.error('Failed to mark backup:', error);

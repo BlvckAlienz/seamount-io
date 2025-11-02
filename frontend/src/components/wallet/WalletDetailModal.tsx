@@ -487,13 +487,6 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
 
                 {/* Live Price Chart */}
                 <LivePriceChart symbol={selectedAssetData.symbol} timeframe="24h" />
-                  <div className="text-center">
-                    <TrendingUp className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-                    <h4 className="text-white font-semibold mb-2">Live Price Chart</h4>
-                    <p className="text-gray-400 text-sm">
-                      Real-time chart for {selectedAssetData.symbol} coming soon
-                    </p>
-                </div>
 
                 {/* Additional Info */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
