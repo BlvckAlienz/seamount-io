@@ -445,6 +445,7 @@ const DashboardPage = () => {
               <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
             ))}
           </div>
+        </div>
 
         {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
