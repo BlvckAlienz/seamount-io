@@ -20,8 +20,8 @@ async def get_backup_status(
     try:
         user_id = current_user['id']
         
-        # Query backup tracking table
-        result = await db_service.supabase.table('wallet_backup_tracking')\
+        # Query backup tracking table (Supabase is SYNC, not async)
+        result = db_service.supabase.table('wallet_backup_tracking')\
             .select('*')\
             .eq('user_id', user_id)\
             .execute()
@@ -57,7 +57,7 @@ async def mark_chains_backed_up(
             'backup_method': 'modal_download'
         } for chain in chains]
         
-        await db_service.supabase.table('wallet_backup_tracking')\
+        db_service.supabase.table('wallet_backup_tracking')\
             .upsert(records)\
             .execute()
         
