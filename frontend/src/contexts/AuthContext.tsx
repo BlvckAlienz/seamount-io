@@ -157,6 +157,29 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [fetchUserProfile]);
 
+  const signIn = async (email: string, password: string, options?: { captchaToken?: string }) => {
+  setState((prev) => ({ ...prev, loading: true, error: null }));
+  
+  try {
+    const signInOptions: any = { email, password };
+    
+    if (options?.captchaToken) {
+      signInOptions.captchaToken = options.captchaToken;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
+    
+    if (error) throw error;
+    
+    setState((prev) => ({ ...prev, session: data.session, loading: false }));
+    return { success: true };
+    
+  } catch (error: any) {
+    setState((prev) => ({ ...prev, loading: false, error: error.message }));
+    return { success: false, error: error.message };
+  }
+};
+
   const signUp = async (
   email: string,
   password: string,
