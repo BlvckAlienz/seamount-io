@@ -484,8 +484,18 @@ if routers_available.get('wallet_creation'):
 
 # ===== REGISTER ROUTERS =====
 app.include_router(seed_routes.router)
-app.include_router(wallet_backup_routes.router)  # ← ADD THIS LINE
-logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
+
+# Wallet backup tracking
+try:
+    from backend.api.routes.wallet_backup import router as wallet_backup_router
+    app.include_router(wallet_backup_router)
+    logger.info("✅ Wallet backup routes registered")
+except ImportError as e:
+    logger.error(f"❌ Wallet backup routes import error: {e}")
+
+if routers_available.get('users'):
+    app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
+    logger.info("✅ Users router registered at /api/v1/user")
 
 # Register wallet creation routes
 try:
