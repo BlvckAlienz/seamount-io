@@ -64,12 +64,25 @@ apiClient.interceptors.request.use(
       const token = session?.access_token;
       
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log(`[API Auth] Token attached for authenticated request`);
+        // 🔧 FIX: Ensure headers object exists
+        if (!config.headers) {
+          config.headers = {} as any;
+        }
+        
+        // 🔧 FIX: Force set Authorization header
+        config.headers['Authorization'] = `Bearer ${token}`;
+        
+        console.log(`[API Auth] ✅ Token attached (length: ${token.length})`);
+        console.log(`[API Auth] ✅ Authorization header set for ${config.url}`);
+      } else {
+        console.warn(`[API Auth] ⚠️ NO TOKEN available for ${config.url}`);
       }
     } catch (error) {
       console.error('[API Auth Error] Failed to get session:', error);
     }
+    
+    // 🔧 DEBUG: Log final headers
+    console.log('[API Headers]', config.headers);
     
     return config;
   },
