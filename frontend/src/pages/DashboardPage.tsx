@@ -446,47 +446,6 @@ const DashboardPage = () => {
             ))}
           </div>
 
-          {/* Backup Security Banner */}
-          <div className="bg-gradient-to-r from-red-900/20 to-orange-900/20 border border-red-500/50 rounded-2xl p-6 mt-6 hover:shadow-xl hover:shadow-red-500/20 transition-all">
-            <div className="flex items-start gap-4">
-              <div className="bg-red-500/20 p-4 rounded-xl">
-                <Shield className="w-8 h-8 text-red-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-white mb-2">
-                  🚨 Backup Your Wallet Seeds
-                </h3>
-                <p className="text-gray-300 mb-4">
-                  Your wallet seeds are the ONLY way to recover your funds. Back them up now to prevent permanent loss.
-                </p>
-                <ul className="text-gray-400 text-sm space-y-1 mb-4">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-400" />
-                    Secure recovery for all 5 chains
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-400" />
-                    Encrypted storage with decryption on-demand
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-400" />
-                    Backup verification test included
-                  </li>
-                </ul>
-                <button 
-                  onClick={() => {
-                    setNewWalletsForBackup([]); // Show all wallets when manually triggered
-                    setShowRecoveryModal(true);
-                  }}
-                  className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white py-3 px-6 rounded-xl font-bold text-center transition-all hover:shadow-lg hover:shadow-red-500/50"
-                >
-                  🔐 Backup Seeds Now (Critical)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Balance Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
