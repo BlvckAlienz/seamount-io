@@ -1,56 +1,87 @@
 // File: frontend/src/hooks/useAutoLogout.ts
 // 🔒 SECURITY: Auto-logout after 10 mins inactivity
+// ✅ FIXED: No crashes, proper cleanup, React-safe
 
-import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
-const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
-const WARNING_DURATION = 2 * 60 * 1000; // Warn 2 minutes before timeout
+const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 minutes
+const WARNING_DURATION = 2 * 60 * 1000; // Warn 2 minutes before
 
 export const useAutoLogout = () => {
   const { signOut, user } = useAuth();
-  const navigate = useNavigate();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const warningRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // ✅ Browser-safe timer types (number, not NodeJS.Timeout)
+  const timeoutRef = useRef<number | null>(null);
+  const warningRef = useRef<number | null>(null);
   const warningShownRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  const clearTimers = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (warningRef.current) clearTimeout(warningRef.current);
-    warningShownRef.current = false;
-  };
-
-  const handleLogout = async () => {
-    toast.error('Session expired due to inactivity. Please sign in again.');
-    await signOut();
-    navigate('/');
-  };
-
-  const showWarning = () => {
-    if (!warningShownRef.current) {
-      warningShownRef.current = true;
-      toast.warning(
-        'You will be logged out in 2 minutes due to inactivity',
-        { duration: 5000 }
-      );
+  // ✅ Memoized cleanup - prevents stale closures
+  const clearTimers = useCallback(() => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
-  };
+    if (warningRef.current) {
+      window.clearTimeout(warningRef.current);
+      warningRef.current = null;
+    }
+    warningShownRef.current = false;
+  }, []);
 
-  const resetTimer = () => {
-    if (!user) return; // Only run for authenticated users
+  // ✅ Async-safe logout - no navigation conflicts
+  const handleLogout = useCallback(async () => {
+    if (!isMountedRef.current) return; // Guard against unmounted calls
+    
+    clearTimers();
+    
+    // Show toast BEFORE logout to ensure user sees it
+    toast.error('Session expired due to inactivity. Please sign in again.', {
+      duration: 6000,
+      id: 'auto-logout' // Prevent duplicate toasts
+    });
+    
+    // Let AuthContext handle ALL navigation/cleanup
+    // It already does: window.location.href = '/' in signOut()
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('[AutoLogout] Logout failed:', error);
+    }
+  }, [signOut, clearTimers]);
+
+  // ✅ Memoized warning - prevents duplicate toasts
+  const showWarning = useCallback(() => {
+    if (!isMountedRef.current || warningShownRef.current) return;
+    
+    warningShownRef.current = true;
+    toast.warning(
+      'You will be logged out in 2 minutes due to inactivity',
+      { 
+        duration: 5000,
+        id: 'auto-logout-warning' // Prevent duplicates
+      }
+    );
+  }, []);
+
+  // ✅ Memoized resetTimer - safe for dependency arrays
+  const resetTimer = useCallback(() => {
+    if (!user || !isMountedRef.current) return;
 
     clearTimers();
 
     // Set warning timer (8 minutes)
-    warningRef.current = setTimeout(showWarning, TIMEOUT_DURATION - WARNING_DURATION);
+    warningRef.current = window.setTimeout(showWarning, TIMEOUT_DURATION - WARNING_DURATION);
 
     // Set logout timer (10 minutes)
-    timeoutRef.current = setTimeout(handleLogout, TIMEOUT_DURATION);
-  };
+    timeoutRef.current = window.setTimeout(handleLogout, TIMEOUT_DURATION);
+  }, [user, clearTimers, showWarning, handleLogout]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (!user) {
       clearTimers();
       return;
@@ -59,7 +90,7 @@ export const useAutoLogout = () => {
     // Activity events to track
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
-    // Add listeners
+    // Add listeners with proper options
     events.forEach(event => {
       document.addEventListener(event, resetTimer, { passive: true });
     });
@@ -69,12 +100,13 @@ export const useAutoLogout = () => {
 
     // Cleanup
     return () => {
+      isMountedRef.current = false;
       clearTimers();
       events.forEach(event => {
         document.removeEventListener(event, resetTimer);
       });
     };
-  }, [user]);
+  }, [user, resetTimer, clearTimers]); // ✅ All deps included
 
   return { resetTimer };
 };

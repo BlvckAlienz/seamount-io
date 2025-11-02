@@ -25,8 +25,9 @@ import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 import AuthDebugPage from './pages/AuthDebugPage';
 import WalletRecovery from './pages/wallet-recovery';
 
-// --- Context ---
+// --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useAutoLogout } from './hooks/useAutoLogout';
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -34,7 +35,10 @@ const AppContent: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState<boolean>(false);
 
-  // ✅ FIXED: Call hook unconditionally at top level
+  // ✅ Auto-logout hook (only runs for authenticated users)
+  useAutoLogout();
+
+  // ✅ Call hook unconditionally at top level
   const auth = useAuth();
   const authSession = auth?.session || null;
 
