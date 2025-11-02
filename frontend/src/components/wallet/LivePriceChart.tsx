@@ -19,6 +19,7 @@ interface CandleData {
 }
 
 const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }) => {
+  const [activeTimeframe, setActiveTimeframe] = useState<'1h' | '24h' | '7d' | '30d'>(timeframe); // ✅ NEW
   const [chartData, setChartData] = useState<CandleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [priceChange, setPriceChange] = useState<{ value: number; percent: number } | null>(null);
@@ -40,7 +41,7 @@ const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }
 
   // Timeframe to Binance interval
   const getInterval = (): string => {
-    switch (timeframe) {
+    switch (activeTimeframe) { // ✅ CHANGED
       case '1h': return '1m';
       case '24h': return '15m';
       case '7d': return '1h';
@@ -50,14 +51,14 @@ const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }
   };
 
   const getLimit = (): number => {
-    switch (timeframe) {
-      case '1h': return 60;
-      case '24h': return 96;
-      case '7d': return 168;
-      case '30d': return 180;
-      default: return 96;
-    }
-  };
+  switch (activeTimeframe) { // ✅ CHANGED
+    case '1h': return 60;
+    case '24h': return 96;
+    case '7d': return 168;
+    case '30d': return 180;
+    default: return 96;
+  }
+};
 
   const fetchChartData = async () => {
     try {
@@ -106,7 +107,7 @@ const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchChartData, 30000);
     return () => clearInterval(interval);
-  }, [symbol, timeframe]);
+  }, [symbol, activeTimeframe]); // ✅ CHANGED - now reacts to timeframe changes
 
   // Simple SVG line chart
   const renderChart = () => {
@@ -221,11 +222,12 @@ const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }
             key={tf}
             onClick={(e) => {
               e.stopPropagation();
-              // Re-fetch data with new timeframe without reloading
-              fetchChartData();
+              e.preventDefault();
+              console.log('Changing timeframe to:', tf); // ✅ DEBUG
+              setActiveTimeframe(tf); // ✅ UPDATE STATE - triggers useEffect
             }}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-              timeframe === tf
+              activeTimeframe === tf // ✅ CHANGED - use activeTimeframe
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
             }`}

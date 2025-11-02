@@ -359,7 +359,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       bitcoin: `https://blockstream.info/address/${address}`,
       ethereum: `https://etherscan.io/address/${address}`,
       polygon: `https://polygonscan.com/address/${address}`,
-      algorand: `https://algoexplorer.io/address/${address}`,
+      algorand: `https://explorer.perawallet.app/address/${address}`,
       tron: `https://tronscan.org/#/address/${address}`
     };
     return explorers[chain] || '#';
