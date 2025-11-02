@@ -219,7 +219,11 @@ const LivePriceChart: React.FC<PriceChartProps> = ({ symbol, timeframe = '24h' }
         {(['1h', '24h', '7d', '30d'] as const).map((tf) => (
           <button
             key={tf}
-            onClick={() => window.location.reload()} // Simple reload for now
+            onClick={(e) => {
+              e.stopPropagation();
+              // Re-fetch data with new timeframe without reloading
+              fetchChartData();
+            }}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               timeframe === tf
                 ? 'bg-blue-600 text-white'
