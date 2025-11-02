@@ -7,7 +7,7 @@ import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
-import { useAutoLogout } from '../hooks/useAutoLogout';
+// import { useAutoLogout } from '../hooks/useAutoLogout';
 import { retryWithBackoff } from '../utils/retry';
 import toast from 'react-hot-toast';
 
@@ -454,7 +454,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   // Auto-logout on inactivity (must be after all hooks)
-  useAutoLogout();
+  // useAutoLogout();
 
   return (
     <AuthContext.Provider value={{
