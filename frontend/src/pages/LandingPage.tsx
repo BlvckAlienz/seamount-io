@@ -23,7 +23,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   
   const [calc, setCalc] = useState({
     amount: '10000',
-    period: '30'
+    period: '365'
   });
 
   useEffect(() => {
@@ -128,7 +128,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const faqs = [
     { 
       question: "How do I get started with crypto investing?", 
-      answer: "Connect or create a wallet on Seamount supporting 7+ blockchains. Fund it via local payment channels (Paystack, M-Pesa, bank transfers). Choose an investment tier—Stable (7.5%), Growth (9%), or Alpha (11%)—and stake your funds. We handle everything. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn. Compounding rewards early movers."
+      answer: "Connect or create a wallet on Seamount supporting 5+ blockchains. Fund it via local payment channels (Paystack, Flutterwave, M-Pesa, bank transfers). Choose an investment tier—Stable (7.5%), Growth (9%), or Alpha (11%)—and stake your funds. We handle everything. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn. Compounding rewards early movers."
     },
     { 
       question: "How do you offer 7.5-11% APY with different risk tiers?", 
@@ -140,7 +140,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     {
       question: "Is this regulated and safe?",
-      answer: "Yes—compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU. Quarterly reserve audits, real-time collateralization dashboard, embedded KYC/AML via Regfyl. Not NDIC-insured but protected by 160% overcollateralization and independent custody (Fireblocks). We publish all reserve compositions monthly—full transparency vs traditional banks. Your wallet, your keys—we never have custody of your funds."
+      answer: "Yes—compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU & SEC Licensee Parnership in Nigeria. Wallets are protected with military grade (Fernet) encryption, restricted level access, and full audit trails with embedded KYC/AML via Regfyl. We publish all reserve compositions monthly—full transparency. Your wallets, your keys—we never have custody of your funds."
     }
   ];
 
@@ -244,7 +244,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500" />
-                  <span>7+ Blockchain Networks</span>
+                  <span>5+ Blockchain Networks</span>
                 </div>
               </div>
               
@@ -274,7 +274,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </div>
                 <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
                   <div className="text-3xl sm:text-4xl font-bold text-indigo-600 mb-1 sm:mb-2">Multi-Chain</div>
-                  <div className="text-xs sm:text-sm text-gray-600">7+ Networks</div>
+                  <div className="text-xs sm:text-sm text-gray-600">5+ Networks</div>
                 </div>
               </div>
             </div>
@@ -296,14 +296,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <Wallet className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-600" />,
                   number: "01",
                   title: "Connect or Create Your Wallet",
-                  description: "Link existing wallets or create new multi-chain wallets supporting 7+ blockchains. Buy Bitcoin, Ethereum, or any crypto you want. You control your keys—we never touch your funds.",
+                  description: "Create new multi-chain wallets supporting 5+ blockchains. Buy Algo, Bitcoin, USDC, USDT, and others. You control your keys—we never touch your funds.",
                   color: "border-indigo-200 bg-gradient-to-br from-indigo-50 to-white"
                 },
                 {
                   icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
                   number: "02",
                   title: "Fund Your Wallet Easily",
-                  description: "Deposit via local payment channels (Paystack, M-Pesa, bank transfer). Withdraw anytime the same way. We make crypto accessible—no complexity, just results.",
+                  description: "Deposit via local payment channels (Paystack, Flutterwave, etc). Withdraw anytime the same way. We make crypto accessible—no complexity, just results.",
                   color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
                 {
@@ -360,7 +360,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 {
                   icon: <Lock className="h-8 w-8 text-indigo-500" />,
                   title: "Self-Custody Multi-Chain Wallets",
-                  description: "Support for 7+ blockchains with account abstraction for gasless USDT transactions. Your keys, your control, zero custody risk—true financial sovereignty."
+                  description: "Support for 5+ blockchains with account abstraction for gasless USDT transactions. Your keys, your control, zero custody risk—true financial sovereignty."
                 },
                 {
                   icon: <Coins className="h-8 w-8 text-purple-500" />,
@@ -561,7 +561,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
                   <div className="flex justify-between items-center text-xs sm:text-sm">
                     <span className="text-gray-700 font-medium">Collateralization</span>
-                    <span className="font-semibold text-green-600">160%</span>
+                    <span className="font-semibold text-green-600">100%</span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs sm:text-sm">
@@ -607,7 +607,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                           ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured.`
                           : calc.period === '90'
                           ? 'Growth tier uses stablecoin liquidity pools with minimal volatility exposure. Yields are more stable than Alpha but higher than Stable. 160% overcollateralization protects principal. Not NDIC-insured.'
-                          : 'Stable tier uses pure lending with no crypto price exposure. Yields are consistent and predictable. 160% overcollateralization protects principal. Not NDIC-insured.'
+                          : 'Stable tier uses pure lending with no crypto price exposure. Yields are consistent and predictable. 100% collateralization protects principal. Not NDIC-insured.'
                       }
                     </div>
                   </div>

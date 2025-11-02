@@ -145,8 +145,8 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
         <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
           <Sparkles className="h-8 w-8 text-white" />
         </div>
-        <h3 className="text-2xl font-bold text-white mb-2">Multi-Chain Wallet</h3>
-        <p className="text-gray-400">Create your unified wallet across multiple blockchains</p>
+        <h3 className="text-2xl font-bold text-white mb-2">Multi-Chain Wallets</h3>
+        <p className="text-gray-400">Create your unified wallets across multiple blockchains</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -164,12 +164,12 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       <div className="bg-blue-900/20 rounded-xl p-4 mb-6 border border-blue-500/30 text-left">
         <h4 className="font-semibold text-white mb-2 flex items-center">
           <CheckCircle className="h-4 w-4 text-blue-400 mr-2" />
-          One Wallet, Multiple Chains
+          One Account, Multi-Chain Wallets
         </h4>
         <ul className="text-sm text-gray-300 space-y-1">
-          <li>• Single recovery phrase for all chains</li>
+          <li>• Two recovery phrases for five chains</li>
           <li>• Auto-routing to fastest/cheapest network</li>
-          <li>• Unified balance across Bitcoin, Ethereum, Polygon, Algorand</li>
+          <li>• Unified balance across Algorand, Bitcoin, Ethereum, Polygon, and Tron</li>
           <li>• No blockchain complexity - we handle everything</li>
         </ul>
       </div>
@@ -182,7 +182,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
         {creating ? (
           <div className="flex items-center justify-center gap-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            Creating Multi-Chain Wallet...
+            Creating Multi-Chain Wallets...
           </div>
         ) : Object.keys(wallets).length > 0 ? (
           <div className="flex items-center justify-center gap-2">
@@ -197,7 +197,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       {Object.keys(wallets).length > 0 && (
         <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
           <p className="text-green-400 text-sm">
-            ✓ Your multi-chain wallet is ready! Redirecting to dashboard...
+            ✓ Your multi-chain wallets are ready! Redirecting to dashboard...
           </p>
         </div>
       )}

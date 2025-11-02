@@ -500,7 +500,7 @@ const DashboardPage = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
-              <p className="text-blue-100 text-sm mb-3">Send money globally at 2.9% fee vs 8% traditional (5.1% savings!)</p>
+              <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
               <div className="flex flex-wrap items-center gap-4 text-xs">
                 <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
                 <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
