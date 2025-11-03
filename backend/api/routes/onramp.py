@@ -336,23 +336,3 @@ async def get_providers():
             }
         ]
     }
-```
-
----
-
-### **✅ REVENUE COMPARISON:**
-
-**OLD (Aggregator approach):**
-```
-User pays $100
-Provider keeps $3.50 (3.5%)
-We keep $0 ❌
-User gets $96.50
-```
-
-**NEW (Our providers):**
-```
-User pays $100 NGN
-Paystack keeps $1.20 (1.2%)
-We keep $0.60 (0.6%) ✅
-User gets $98.20
