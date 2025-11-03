@@ -93,7 +93,6 @@ class SeedRetrievalService:
                 'wallet_addresses': encrypted_seeds['addresses'],
                 'retrieved_at': datetime.utcnow().isoformat(),
                 'security_warning': (
-                    "🚨 CRITICAL SECURITY WARNING:\n"
                     "• These are your ACTUAL seed phrases\n"
                     "• Anyone with these phrases has FULL ACCESS to your funds\n"
                     "• Seeds are decrypted in-memory and never stored unencrypted\n"
