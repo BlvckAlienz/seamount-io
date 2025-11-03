@@ -247,6 +247,29 @@ class YieldManagerService:
             allocation_pct = Decimal(str(strategy["allocation"])) / Decimal("100")
             allocated_amount = total_amount * allocation_pct
             
+            # ➕ ADD THIS: Actually deploy to DeFi protocols
+            if strategy_type == YieldStrategy.FOLKS_FINANCE:
+                # Deploy to Folks Finance
+                defi_service = AlgorandDeFiService(self.algorand_service.algod_client)
+                result = await defi_service.stake_in_folks_finance(
+                    user_private_key=self._get_user_key(stake_id),
+                    asset_id=self._get_asset_id(asset),
+                    amount=allocated_amount
+                )
+                tx_hash = result['tx_id']
+                
+            elif strategy_type == YieldStrategy.PACT_LIQUIDITY:
+                # Deploy to Pact DEX
+                defi_service = AlgorandDeFiService(self.algorand_service.algod_client)
+                result = await defi_service.add_liquidity_to_pact(
+                    user_private_key=self._get_user_key(stake_id),
+                    asset_a_id=self._get_asset_id("USDC"),
+                    asset_b_id=self._get_asset_id("USDT"),
+                    amount_a=allocated_amount / 2,
+                    amount_b=allocated_amount / 2
+                )
+                tx_hash = result['tx_id']
+            
             allocation_data = {
                 "id": f"ALLOC_{uuid4().hex[:8].upper()}",
                 "stake_id": stake_id,
@@ -256,13 +279,14 @@ class YieldManagerService:
                 "current_value": float(allocated_amount),
                 "realized_yield": 0.0,
                 "status": "active",
+                "tx_hash": tx_hash,  # ➕ ADD THIS
                 "created_at": datetime.utcnow().isoformat()
             }
             
             allocations.append(allocation_data)
             await self.db.log_event("strategy_allocations", allocation_data)
         
-        logger.info(f"Allocated {len(strategies)} strategies for stake {stake_id}")
+        logger.info(f"✅ Deployed {len(strategies)} strategies for stake {stake_id}")
     
     async def calculate_current_yield(self, stake_id: str) -> Dict[str, Any]:
         """Calculate current yield for a stake"""

@@ -94,12 +94,11 @@ class SeedRetrievalService:
                 'retrieved_at': datetime.utcnow().isoformat(),
                 'security_warning': (
                     "🚨 CRITICAL SECURITY WARNING:\n"
-                    "• These are your ACTUAL, UNENCRYPTED seed phrases\n"
+                    "• These are your ACTUAL seed phrases\n"
                     "• Anyone with these phrases has FULL ACCESS to your funds\n"
-                    "• Write them down and store them in a SECURE location\n"
+                    "• Seeds are decrypted in-memory and never stored unencrypted\n"
                     "• NEVER share them with anyone, including Seamount support\n"
-                    "• These phrases are NOT stored anywhere - you're seeing them for the FIRST and ONLY time\n"
-                    "• If you lose these, you lose access to your funds PERMANENTLY"
+                    "• Rate limited per user (max 3 requests per hour)"
                 ),
                 'backup_instructions': (
                     "RECOMMENDED BACKUP METHOD:\n"

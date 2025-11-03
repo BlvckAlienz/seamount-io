@@ -172,3 +172,30 @@ class RevenueTrackingService:
         except Exception as e:
             logger.error(f"Revenue summary failed: {e}")
             return {'error': str(e)}
+        
+    async def test_revenue_tracking():
+        from backend.services.revenue_tracking_service import RevenueTrackingService
+        from decimal import Decimal
+        
+        revenue_service = RevenueTrackingService(db_service)
+        
+        # Test transaction fee tracking
+        await revenue_service.track_transaction_fee(
+            user_id="test_user",
+            transaction_type="cross_border",
+            amount=Decimal("1000"),
+            fee_rate=Decimal("0.012"),
+            platform_fee=Decimal("12"),
+            network_fee=Decimal("0.01"),
+            blockchain="algorand",
+            metadata={"test": True}
+        )
+        
+        # Verify in database
+        result = await db_service.supabase.table('revenue_events')\
+            .select('*')\
+            .eq('user_id', 'test_user')\
+            .execute()
+        
+        assert len(result.data) > 0, "❌ Revenue tracking failed!"
+        print("✅ Revenue tracking works!")
