@@ -23,7 +23,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   
   const [calc, setCalc] = useState({
     amount: '10000',
-    period: '365'
+    period: '90'
   });
 
   useEffect(() => {
@@ -77,26 +77,41 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, [isClient]);
 
   const yieldData = useMemo(() => {
-    if (!isClient) return { annualYield: 750, periodYield: 62.5, adjustedAPY: 0.075 };
+    if (!isClient) return { annualYield: 525, periodYield: 131.25, adjustedAPY: 0.0525, grossAPY: 0.0657, seamountFee: 0.0132 };
     
     const amount = parseFloat(calc.amount) || 0;
     const period = parseInt(calc.period);
     
-    let baseAPY = 0.075;
-    if (period === 90) baseAPY = 0.09;
-    else if (period === 365) baseAPY = 0.11;
+    let grossAPY = period === 0 ? 0.0657 : 0.109;
     
-    let adjustedAPY = baseAPY;
-    if (period === 365) {
+    const basePlatformFee = 0.005;
+    const performanceFeeRate = 0.20;
+    
+    const performanceFee = grossAPY * performanceFeeRate;
+    const totalSeamountFee = basePlatformFee + performanceFee;
+    
+    let netAPY = grossAPY - totalSeamountFee;
+    
+    if (period === 90) {
       const fundingAdjustment = (oracleData.fundingRate - 12.5) / 1000;
       const volAdjustment = (oracleData.btcVolatility - 65) / 2000;
-      adjustedAPY = Math.max(0.09, Math.min(0.13, baseAPY + fundingAdjustment + volAdjustment));
+      grossAPY = Math.max(0.095, Math.min(0.125, grossAPY + fundingAdjustment + volAdjustment));
+      
+      const adjustedPerformanceFee = grossAPY * performanceFeeRate;
+      const adjustedTotalFee = basePlatformFee + adjustedPerformanceFee;
+      netAPY = grossAPY - adjustedTotalFee;
     }
     
-    const annualYield = amount * adjustedAPY;
-    const periodYield = annualYield * (period / 365);
+    const annualYield = amount * netAPY;
+    const periodYield = period === 0 ? annualYield : annualYield * (period / 365);
     
-    return { annualYield, periodYield, adjustedAPY };
+    return { 
+      annualYield, 
+      periodYield, 
+      adjustedAPY: netAPY,
+      grossAPY: grossAPY,
+      seamountFee: totalSeamountFee
+    };
   }, [isClient, calc.amount, calc.period, oracleData.btcVolatility, oracleData.fundingRate]);
 
   const handleContactSubmit = async () => {
@@ -128,19 +143,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const faqs = [
     { 
       question: "How do I get started with crypto investing?", 
-      answer: "Connect or create a wallet on Seamount supporting 5+ blockchains. Fund it via local payment channels (Paystack, Flutterwave, M-Pesa, bank transfers). Choose an investment tier—Stable (7.5%), Growth (9%), or Alpha (11%)—and stake your funds. We handle everything. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn. Compounding rewards early movers."
+      answer: "Connect or create a wallet on Seamount supporting 5+ blockchains. Fund it via local payment channels (Paystack, Flutterwave, M-Pesa, bank transfers). Choose an investment tier—Prime (5.25% net, instant liquidity) or Alpha (8.20% net, quarterly liquidity)—and stake your funds. We handle everything through our institutional partner Securitize. Net rates shown after our 0.5% platform fee + 20% performance fee. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn."
     },
     { 
-      question: "How do you offer 7.5-11% APY with different risk tiers?", 
-      answer: "We offer 3 tiers: STABLE (7.5% APY, 30-day lock) uses Folks Finance lending—low risk, consistent returns. GROWTH (9% APY, 90-day lock) adds liquidity pool rewards—medium risk, higher upside. ALPHA (11% APY, 365-day lock) uses delta-neutral BTC hedging + DeFi composability—highest returns, requires sophisticated risk management. All tiers backed by 160% overcollateralized reserves. You choose your risk appetite—we handle the execution."
+      question: "How do you offer 5.25-8.20% net APY with different risk tiers?", 
+      answer: "We offer 2 tiers via Securitize Capital: PRIME (6.57% gross, 5.25% net after fees, instant liquidity) invests in Hamilton Lane Senior Credit Opportunities—senior secured loans with stable, risk-adjusted returns. Low risk, predictable income. ALPHA (10.9% gross, 8.20% net after fees, quarterly liquidity) invests in Apollo Diversified Credit Fund—structured credit across multiple sectors for higher yield. Medium-high risk, institutional-grade diversification. Seamount charges 0.5% annual platform fee + 20% performance fee (industry standard). All returns are net of total fees and backed by Securitize's regulatory framework. You choose your risk appetite—we execute through world-class fund managers."
     },
     { 
       question: "What happens if crypto markets crash?", 
-      answer: "Your principal is protected across all tiers. STABLE tier (7.5%) uses pure lending—no crypto price exposure. GROWTH tier (9%) uses stablecoin liquidity pools—minimal volatility risk. ALPHA tier (11%) uses delta-neutral hedging: when BTC drops 30%, our short position gains 30%, netting zero price exposure. However, yields can drop in bear markets (to 8-9% range) if funding rates turn negative. Our 160% overcollateralization and 20% stablecoin reserve ensure liquidity even in black swan events."
+      answer: "Your principal protection varies by tier. PRIME tier (5.25% net) invests in senior secured loans—minimal crypto price exposure, stable income even in bear markets. ALPHA tier (8.20% net) uses diversified structured credit—some volatility risk exists, but Apollo's multi-sector approach cushions downturns. Both tiers are managed by institutional-grade fund managers (Hamilton Lane, Apollo) with decades of credit market experience. Net rates shown after Seamount's 0.5% + 20% performance fees. However, yields can fluctuate based on credit market conditions. Past performance is not indicative of future results, and returns may include return of capital."
     },
     {
       question: "Is this regulated and safe?",
-      answer: "Yes—compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU & SEC Licensee Parnership in Nigeria. Wallets are protected with military grade (Fernet) encryption, restricted level access, and full audit trails with embedded KYC/AML via Regfyl. We publish all reserve compositions monthly—full transparency. Your wallets, your keys—we never have custody of your funds."
+      answer: "Yes—triple compliance layer. Seamount is compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU & SEC Licensee Partnership in Nigeria. Your funds are invested through Securitize Capital, a regulated investment platform with SEC oversight in the US. Underlying funds (Apollo, Hamilton Lane) are managed by institutional-grade firms with $650B+ AUM combined. Wallets are protected with military-grade (Fernet) encryption, restricted level access, and full audit trails with embedded KYC/AML via Regfyl. We publish all fund allocations monthly—full transparency. Seamount earns 0.5% annual + 20% of yield (all disclosed upfront). Your wallets, your keys—we never have custody of your funds."
     }
   ];
 
@@ -220,7 +235,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                Self-Custody • Multi-Chain • Secure
+                Powered by Securitize Markets • FINRA/SIPC Member • Self-Custody
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
@@ -230,13 +245,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </h1>
               
               <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-4">
-                Build real wealth with digital currencies no government can devalue. <strong className="text-indigo-600">Earn 7.5-11% yearly returns</strong> on your crypto savings—automatically. Send money instantly anywhere in the world, no banks needed.
+                Build real wealth with digital currencies no government can devalue. <strong className="text-indigo-600">Earn 5.25-8.20% net yearly returns</strong> through institutional-grade funds—automatically. Send money instantly anywhere in the world, no banks needed.
               </p>
               
               <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-600 mb-6 sm:mb-8 px-4">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                  <span>Up to 11%/Year Returns</span>
+                  <span>Up to 8.20% Net Returns</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
@@ -265,8 +280,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto px-4">
                 <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
-                  <div className="text-3xl sm:text-4xl font-bold text-green-500 mb-1 sm:mb-2">Up to 11%</div>
-                  <div className="text-xs sm:text-sm text-gray-600">Annual Returns</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-green-500 mb-1 sm:mb-2">Up to 8.20%</div>
+                  <div className="text-xs sm:text-sm text-gray-600">Net Annual Returns</div>
                 </div>
                 <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-sm hover-lift">
                   <div className="text-3xl sm:text-4xl font-bold text-yellow-500 mb-1 sm:mb-2">&lt;5 sec</div>
@@ -303,14 +318,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
                   number: "02",
                   title: "Fund Your Wallets Easily",
-                  description: "Deposit via local payment channels (Paystack, Flutterwave, etc). Withdraw anytime the same way. We make crypto accessible—no complexity, just results.",
+                  description: "Deposit via local payment channels (Paystack, Flutterwave, etc). Withdraw anytime based on your tier's liquidity. We make crypto accessible—no complexity, just results.",
                   color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
                 {
                   icon: <LineChart className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />,
                   number: "03",
                   title: "Invest on Autopilot",
-                  description: "Choose your plan: Stable (7.5%) for safety, Growth (9%) for balance, Alpha (11%) for maximum returns. Stake your funds, we handle everything—just watch it grow. Your crypto works for you 24/7.",
+                  description: "Choose your plan: Prime (5.25% net, instant liquidity) for stability, Alpha (8.20% net, quarterly liquidity) for maximum returns. Stake your funds through Securitize—just watch it grow. Net rates after our transparent 0.5% + 20% performance fees. Your crypto works for you 24/7.",
                   color: "border-purple-200 bg-gradient-to-br from-purple-50 to-white"
                 },
                 {
@@ -354,8 +369,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 },
                 {
                   icon: <TrendingUp className="h-8 w-8 text-green-500" />,
-                  title: "Invest on Autopilot, Earn Up to 11%/Year",
-                  description: "Stable (7.5%), Growth (9%), Alpha (11%) tiers. Choose your risk, we execute the strategy. Your crypto compounds daily while you sleep."
+                  title: "Invest on Autopilot, Earn Up to 8.20% Net/Year",
+                  description: "Prime (5.25% net, instant) or Alpha (8.20% net, quarterly) tiers. Net rates after transparent 0.5% + 20% performance fees. Choose your risk, Securitize executes through institutional fund managers. Your crypto compounds daily while you sleep."
                 },
                 {
                   icon: <Lock className="h-8 w-8 text-indigo-500" />,
@@ -385,7 +400,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-center mb-10 sm:mb-16 fade-in">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 text-gray-900">Calculate Your Returns</h2>
               <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-                See how much your crypto can earn. Stable (7.5%), Growth (9%), and Alpha (11%) tiers available now.
+                See how much your crypto can earn. Prime (5.25% net, instant) and Alpha (8.20% net, quarterly) tiers available now via Seamount. All fees included.
               </p>
             </div>
 
@@ -415,21 +430,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       onChange={(e) => setCalc({...calc, period: e.target.value})}
                       className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-base sm:text-lg focus:border-indigo-600 focus:outline-none transition"
                     >
-                      <option value="30">Stable Tier - 7.5% APY (30-day lock)</option>
-                      <option value="90">Growth Tier - 9.0% APY (90-day lock)</option>
-                      <option value="365">Alpha Tier - 11.0% APY (365-day lock)</option>
+                      <option value="0">Prime Tier - 5.25% Net APY (Instant Liquidity)</option>
+                      <option value="90">Alpha Tier - 8.20% Net APY (Quarterly Liquidity)</option>
                     </select>
                   </div>
 
                   <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs sm:text-sm text-gray-600 flex items-center font-medium">
-                        {calc.period === '365' ? 'Live Market Data (Alpha Tier)' : 'Fixed Rate Strategy'}
+                        {calc.period === '90' ? 'Live Market Data (Alpha Tier)' : 'Fixed Rate Strategy'}
                         <button onClick={() => setShowFundingInfo(!showFundingInfo)} className="ml-1">
                           <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                         </button>
                       </span>
-                      {calc.period === '365' && (
+                      {calc.period === '90' && (
                         <span className="text-xs text-green-600 flex items-center font-medium">
                           {oracleData.loading ? (
                             <>Loading...</>
@@ -446,21 +460,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </div>
                     {showFundingInfo && (
                       <div className="mb-3 p-3 bg-indigo-50 rounded-lg text-xs text-gray-700 border border-indigo-200">
-                        {calc.period === '365' ? (
-                          <><strong>Alpha Tier:</strong> Uses delta-neutral BTC hedging. When BTC funding rates are high (currently {oracleData.fundingRate.toFixed(1)}%), we earn more. When low, yields compress to 9% minimum. Your principal is protected via 160% overcollateralization.</>
-                        ) : calc.period === '90' ? (
-                          <><strong>Growth Tier:</strong> Combines Folks Finance lending (6-8%) + liquidity pool rewards (2-3%) for consistent 9% APY. Medium risk—stablecoin pools have minimal volatility exposure.</>
+                        {calc.period === '90' ? (
+                          <><strong>Alpha Tier (Securitize Apollo Fund):</strong> 10.9% gross APY. Invests in diversified structured credit across multiple sectors. Managed by Apollo Global Management. Seamount charges 0.5% annual + 20% performance fee (2.70% total). Your net: 8.20% APY. Yields reflect credit market conditions and may include return of capital. Quarterly liquidity allows redemptions every 90 days. Your principal is professionally managed by institutional-grade fund managers with $500B+ AUM.</>
                         ) : (
-                          <><strong>Stable Tier:</strong> Pure lending via Folks Finance. Your investment is lent to verified borrowers at 8-9%, we pay you 7.5%, pocket 0.5-1% spread. Low risk, predictable returns.</>
+                          <><strong>Prime Tier (Hamilton Lane Fund):</strong> 6.57% gross APY. Targets senior secured loans and credit instruments for stable, risk-adjusted returns. Managed by Hamilton Lane with $150B+ AUM. Seamount charges 0.5% annual + 20% performance fee (1.32% total). Your net: 5.25% APY. Instant liquidity—withdraw anytime. Low volatility exposure, predictable returns.</>
                         )}
                       </div>
                     )}
-                    {calc.period === '365' ? (
+                    {calc.period === '90' ? (
                       <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
                         <div>
                           <div className="text-gray-500 text-xs font-medium mb-1">BTC Price</div>
                           <div className="font-semibold text-gray-900" suppressHydrationWarning>
-                            {oracleData.loading ? '...' : `${oracleData.btcPrice.toLocaleString(undefined, {maximumFractionDigits: 0})}`}
+                            ${oracleData.loading ? '...' : oracleData.btcPrice.toLocaleString(undefined, {maximumFractionDigits: 0})}
                           </div>
                         </div>
                         <div>
@@ -476,49 +488,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                           </div>
                         </div>
                         <div>
-                          <div className="text-gray-500 text-xs font-medium mb-1">Gold Premium</div>
-                          <div className="font-semibold text-purple-600">2-3%</div>
+                          <div className="text-gray-500 text-xs font-medium mb-1">Credit Spread</div>
+                          <div className="font-semibold text-purple-600">2.5-3.5%</div>
                         </div>
                       </div>
                     ) : (
                       <div className="text-xs sm:text-sm text-center py-4">
                         <div className="text-gray-400 mb-2">Fixed Strategy Components</div>
                         <div className="space-y-2">
-                          {calc.period === '90' ? (
-                            <>
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-500">Folks Finance Lending</span>
-                                <span className="text-blue-500 font-semibold">6-8%</span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-500">Liquidity Pool Rewards</span>
-                                <span className="text-green-500 font-semibold">2-3%</span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
-                                <span className="text-gray-900 font-medium">Total APY</span>
-                                <span className="text-indigo-600 font-bold">9.0%</span>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-500">Folks Finance Lending</span>
-                                <span className="text-blue-500 font-semibold">8-9%</span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-500">Platform Spread</span>
-                                <span className="text-gray-500 font-semibold">-1.5%</span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
-                                <span className="text-gray-900 font-medium">Your APY</span>
-                                <span className="text-indigo-600 font-bold">7.5%</span>
-                              </div>
-                            </>
-                          )}
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Senior Secured Loans</span>
+                            <span className="text-blue-500 font-semibold">7.5-8.5%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Management Fee</span>
+                            <span className="text-gray-500 font-semibold">-1.75%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Seamount Fee</span>
+                            <span className="text-indigo-500 font-semibold">-1.32%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
+                            <span className="text-gray-900 font-medium">Your Net APY</span>
+                            <span className="text-green-600 font-bold">5.25%</span>
+                          </div>
                         </div>
                       </div>
                     )}
-                    {calc.period === '365' && oracleData.lastUpdate && (
+                    {calc.period === '90' && oracleData.lastUpdate && (
                       <div className="mt-2 text-xs text-gray-500 text-center">
                         Last updated: {oracleData.lastUpdate.toLocaleTimeString()}
                       </div>
@@ -535,33 +532,76 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
                 <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border-2 border-green-200 shadow-sm">
                   <div className="text-center">
-                    <div className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Estimated Annual Yield</div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Estimated Annual Yield (Net)</div>
                     <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-green-600 mb-2" suppressHydrationWarning>
                       ${yieldData.annualYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                     <div className="text-base sm:text-lg text-gray-700 font-medium" suppressHydrationWarning>
-                      ({(yieldData.adjustedAPY * 100).toFixed(1)}% APY)
+                      ({(yieldData.adjustedAPY * 100).toFixed(2)}% Net APY)
                     </div>
                     <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-green-200">
-                      <div className="text-xs sm:text-sm text-gray-600 font-medium">Period Return ({calc.period} days)</div>
+                      <div className="text-xs sm:text-sm text-gray-600 font-medium">
+                        {calc.period === '0' ? 'Instant Liquidity' : 'Quarterly Return (90 days)'}
+                      </div>
                       <div className="text-xl sm:text-2xl font-semibold text-green-700 mt-1" suppressHydrationWarning>
-                        ${yieldData.periodYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {calc.period === '0' ? 'Available Anytime' : `${yieldData.periodYield.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-3 sm:space-y-4">
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                    <div className="text-xs text-blue-700 font-medium mb-2">Fee Breakdown</div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Gross Fund APY:</span>
+                        <span className="font-semibold text-gray-900" suppressHydrationWarning>
+                          {(yieldData.grossAPY * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Seamount Platform Fee:</span>
+                        <span className="font-semibold text-indigo-600">0.50%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Performance Fee (20%):</span>
+                        <span className="font-semibold text-indigo-600" suppressHydrationWarning>
+                          {((yieldData.grossAPY * 0.20) * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-blue-300">
+                        <span className="text-gray-900 font-semibold">Total Seamount Fee:</span>
+                        <span className="font-bold text-indigo-600" suppressHydrationWarning>
+                          {(yieldData.seamountFee * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t-2 border-green-300">
+                        <span className="text-gray-900 font-bold">Your Net APY:</span>
+                        <span className="font-bold text-green-600" suppressHydrationWarning>
+                          {(yieldData.adjustedAPY * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-between items-center text-xs sm:text-sm">
-                    <span className="text-gray-700 font-medium">Strategy</span>
+                    <span className="text-gray-700 font-medium">Fund Manager</span>
                     <span className="font-semibold text-indigo-600">
-                      {calc.period === '365' ? 'Delta-Neutral' : calc.period === '90' ? 'Hybrid DeFi' : 'Pure Lending'}
+                      {calc.period === '90' ? 'Apollo Global' : 'Hamilton Lane'}
                     </span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs sm:text-sm">
-                    <span className="text-gray-700 font-medium">Collateralization</span>
-                    <span className="font-semibold text-green-600">100%</span>
+                    <span className="text-gray-700 font-medium">Platform Partner</span>
+                    <span className="font-semibold text-purple-600">Securitize Capital</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
+                    <span className="text-gray-700 font-medium">Liquidity</span>
+                    <span className="font-semibold text-green-600">
+                      {calc.period === '0' ? 'Instant' : 'Quarterly'}
+                    </span>
                   </div>
 
                   <div className="flex justify-between items-center text-xs sm:text-sm">
@@ -571,8 +611,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                       </button>
                     </span>
-                    <span className={`font-semibold ${calc.period === '30' ? 'text-green-600' : calc.period === '90' ? 'text-amber-600' : 'text-red-600'}`}>
-                      {calc.period === '30' ? '25/100' : calc.period === '90' ? '45/100' : '65/100'}
+                    <span className={`font-semibold ${calc.period === '0' ? 'text-green-600' : 'text-amber-600'}`}>
+                      {calc.period === '0' ? '35/100' : '55/100'}
                     </span>
                   </div>
 
@@ -580,18 +620,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <div className="p-3 bg-white rounded-lg border-2 border-gray-200 text-xs text-gray-700">
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span>Market Risk:</span>
-                          <span className={calc.period === '30' ? 'text-green-600' : calc.period === '90' ? 'text-amber-600' : 'text-red-600'}>
-                            {calc.period === '30' ? 'Low (5 pts)' : calc.period === '90' ? 'Medium (15 pts)' : 'High (25 pts)'}
+                          <span>Credit Risk:</span>
+                          <span className={calc.period === '0' ? 'text-green-600' : 'text-amber-600'}>
+                            {calc.period === '0' ? 'Low (10 pts)' : 'Medium (20 pts)'}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Liquidity Risk:</span>
-                          <span className="text-green-600">{calc.period === '30' ? '5 pts' : calc.period === '90' ? '10 pts' : '15 pts'}</span>
+                          <span>Market Risk:</span>
+                          <span className="text-green-600">{calc.period === '0' ? '10 pts' : '15 pts'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Duration Risk:</span>
-                          <span className="text-blue-600">{calc.period === '30' ? '15 pts' : calc.period === '90' ? '20 pts' : '25 pts'}</span>
+                          <span>Liquidity Risk:</span>
+                          <span className="text-blue-600">{calc.period === '0' ? '15 pts' : '20 pts'}</span>
                         </div>
                       </div>
                     </div>
@@ -603,11 +643,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-xs text-gray-700">
                       <strong className="text-amber-700">Risk Disclosure:</strong> {
-                        calc.period === '365' 
-                          ? `Alpha tier yields depend on BTC funding rates (currently ${oracleData.fundingRate.toFixed(1)}%, historical 5-8%, can drop to 2-5% in bear markets). Principal protected via delta-neutral hedging + 160% overcollateralization. Not NDIC-insured.`
-                          : calc.period === '90'
-                          ? 'Growth tier uses stablecoin liquidity pools with minimal volatility exposure. Yields are more stable than Alpha but higher than Stable. 160% overcollateralization protects principal. Not NDIC-insured.'
-                          : 'Stable tier uses pure lending with no crypto price exposure. Yields are consistent and predictable. 100% collateralization protects principal. Not NDIC-insured.'
+                        calc.period === '90' 
+                          ? `Net APY ${(yieldData.adjustedAPY * 100).toFixed(2)}% for Apollo Diversified Credit Fund, after Seamount's 0.5% platform + ${((yieldData.grossAPY * 0.20) * 100).toFixed(2)}% performance fees (${(yieldData.seamountFee * 100).toFixed(2)}% total). Gross fund yield ${(yieldData.grossAPY * 100).toFixed(2)}%. Based on NAV performance Q3 2025. Returns may include return of capital and vary with credit market conditions. Quarterly liquidity—redemptions processed every 90 days. Not FDIC-insured. Managed by Apollo Global Management ($650B AUM). Past performance not indicative of future results.`
+                          : `Net APY ${(yieldData.adjustedAPY * 100).toFixed(2)}% for Hamilton Lane Senior Credit Fund, after Seamount's 0.5% platform + ${((yieldData.grossAPY * 0.20) * 100).toFixed(2)}% performance fees (${(yieldData.seamountFee * 100).toFixed(2)}% total). Gross fund yield ${(yieldData.grossAPY * 100).toFixed(2)}%, net of 1.75% management fee. Based on Tokenized Unit Price performance Q3 2025. Instant liquidity—withdraw anytime. Returns may fluctuate with credit spreads and include return of capital. Not FDIC-insured. Managed by Hamilton Lane ($150B+ AUM). Past performance not indicative of future results.`
                       }
                     </div>
                   </div>
@@ -637,7 +675,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <span><strong className="text-gray-900">Treasury Management:</strong> Earn yields on idle corporate funds (7.5-11% APY)</span>
+                    <span><strong className="text-gray-900">Treasury Management:</strong> Earn yields on idle corporate funds (5.25-8.20% net APY)</span>
                   </li>
                   <li className="flex items-start">
                     <div className="w-2 h-2 bg-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
@@ -764,7 +802,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <div className="max-w-3xl mx-auto">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 text-white">Don't Miss the Next Wealth Revolution</h2>
-              <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">Join thousands building real wealth with crypto. Start with any amount, earn up to 11% yearly.</p>
+              <p className="text-base sm:text-lg lg:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">Join thousands building real wealth with crypto. Earn up to 8.20% net yearly with Seamount.</p>
               <button onClick={() => onOpenAuth('register')} className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-indigo-600 hover:bg-gray-100 text-base sm:text-lg font-semibold rounded-xl transform hover:scale-105 transition shadow-lg">
                 Start Building Wealth Now
               </button>

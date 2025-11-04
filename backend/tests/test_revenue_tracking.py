@@ -8,6 +8,7 @@ import pytest
 import pytest_asyncio
 from decimal import Decimal
 from datetime import datetime
+from uuid import uuid4
 
 # Import services
 from backend.services.revenue_tracking_service import RevenueTrackingService
