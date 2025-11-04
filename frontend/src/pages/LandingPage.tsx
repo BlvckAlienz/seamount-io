@@ -143,7 +143,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const faqs = [
     { 
       question: "How do I get started with crypto investing?", 
-      answer: "Connect or create a wallet on Seamount supporting 5+ blockchains. Fund it via local payment channels (Paystack, Flutterwave, M-Pesa, bank transfers). Choose an investment tier—Prime (5.25% net, instant liquidity) or Alpha (8.20% net, quarterly liquidity)—and stake your funds. We handle everything through our institutional partner Securitize. Net rates shown after our 0.5% platform fee + 20% performance fee. Why Bitcoin? Limited supply (21M max), borderless, trustless, near-instant, peer-to-peer, designed as superior digital money. Why Ethereum & Stablecoins? Programmable money, decentralized apps, dollar stability with crypto speed. Start small, verify when comfortable, scale as you learn."
+      answer: "Create your wallets on Seamount supporting 5+ blockchains. Fund it via local payment channels (Paystack, Flutterwave, M-Pesa, bank transfers). Choose an investment tier—Prime (5.25% net, instant liquidity) or Alpha (8.20% net, quarterly liquidity)—and stake your funds. We handle everything through our institutional partner Securitize. Net rates shown after our 0.5% platform fee + 20% performance fee."
     },
     { 
       question: "How do you offer 5.25-8.20% net APY with different risk tiers?", 
@@ -151,11 +151,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     { 
       question: "What happens if crypto markets crash?", 
-      answer: "Your principal protection varies by tier. PRIME tier (5.25% net) invests in senior secured loans—minimal crypto price exposure, stable income even in bear markets. ALPHA tier (8.20% net) uses diversified structured credit—some volatility risk exists, but Apollo's multi-sector approach cushions downturns. Both tiers are managed by institutional-grade fund managers (Hamilton Lane, Apollo) with decades of credit market experience. Net rates shown after Seamount's 0.5% + 20% performance fees. However, yields can fluctuate based on credit market conditions. Past performance is not indicative of future results, and returns may include return of capital."
+      answer: "Your principal protection varies by tier. PRIME tier (5.25% net) invests in senior secured loans—minimal crypto price exposure, stable income even in bear markets. ALPHA tier (8.20% net) uses diversified structured credit—some volatility risk exists, but Apollo's multi-sector approach cushions downturns. Both tiers are managed by institutional-grade fund managers (Hamilton Lane, Apollo) with decades of credit market experience. However, yields can fluctuate based on credit market conditions. Past performance is not indicative of future results, and returns may include return of capital."
     },
     {
       question: "Is this regulated and safe?",
-      answer: "Yes—triple compliance layer. Seamount is compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA), GH/TZ/ET/RW frameworks. Registered with NFIU & SEC Licensee Partnership in Nigeria. Your funds are invested through Securitize Capital, a regulated investment platform with SEC oversight in the US. Underlying funds (Apollo, Hamilton Lane) are managed by institutional-grade firms with $650B+ AUM combined. Wallets are protected with military-grade (Fernet) encryption, restricted level access, and full audit trails with embedded KYC/AML via Regfyl. We publish all fund allocations monthly—full transparency. Seamount earns 0.5% annual + 20% of yield (all disclosed upfront). Your wallets, your keys—we never have custody of your funds."
+      answer: "Yes—Seamount is compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA) frameworks. Registered with NFIU & pursuing SEC License in Nigeria. Your funds are invested through Securitize Capital, a regulated investment platform with SEC oversight in the US. Underlying funds (Apollo, Hamilton Lane) are managed by institutional-grade firms with $650B+ AUM combined. Wallets are protected with military-grade (Fernet) encryption, restricted level access, and full audit trails with embedded AML via Regfyl. We publish all fund allocations quarterly—full transparency. Your wallets, your keys—we never have custody of your funds."
     }
   ];
 
@@ -318,14 +318,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   icon: <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />,
                   number: "02",
                   title: "Fund Your Wallets Easily",
-                  description: "Deposit via local payment channels (Paystack, Flutterwave, etc). Withdraw anytime based on your tier's liquidity. We make crypto accessible—no complexity, just results.",
+                  description: "Deposit via local payment channels (Paystack, Flutterwave, etc). We make crypto accessible—no complexity, just results.",
                   color: "border-green-200 bg-gradient-to-br from-green-50 to-white"
                 },
                 {
                   icon: <LineChart className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600" />,
                   number: "03",
                   title: "Invest on Autopilot",
-                  description: "Choose your plan: Prime (5.25% net, instant liquidity) for stability, Alpha (8.20% net, quarterly liquidity) for maximum returns. Stake your funds through Securitize—just watch it grow. Net rates after our transparent 0.5% + 20% performance fees. Your crypto works for you 24/7.",
+                  description: "Choose your plan: Prime (5.25% net, instant liquidity) for stability, Alpha (8.20% net, quarterly liquidity) for maximum returns. Your crypto works for you 24/7.",
                   color: "border-purple-200 bg-gradient-to-br from-purple-50 to-white"
                 },
                 {
@@ -370,7 +370,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 {
                   icon: <TrendingUp className="h-8 w-8 text-green-500" />,
                   title: "Invest on Autopilot, Earn Up to 8.20% Net/Year",
-                  description: "Prime (5.25% net, instant) or Alpha (8.20% net, quarterly) tiers. Net rates after transparent 0.5% + 20% performance fees. Choose your risk, Securitize executes through institutional fund managers. Your crypto compounds daily while you sleep."
+                  description: "Prime (5.25% net, instant) or Alpha (8.20% net, quarterly) tiers. Choose your risk, Seamount executes through institutional fund managers. Your crypto compounds daily while you sleep."
                 },
                 {
                   icon: <Lock className="h-8 w-8 text-indigo-500" />,
