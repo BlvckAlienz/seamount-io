@@ -155,7 +155,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     {
       question: "Is this regulated and safe?",
-      answer: "Yes—Seamount is compliant across NG (ISA 2025), KE (VASP Act), SA (FSCA) frameworks. Registered with NFIU & pursuing SEC License in Nigeria. Your funds are invested through Securitize Capital, a regulated investment platform with SEC oversight in the US. Underlying funds (Apollo, Hamilton Lane) are managed by institutional-grade firms with $650B+ AUM combined. Wallets are protected with military-grade (Fernet) encryption, restricted level access, and full audit trails with embedded AML via Regfyl. We publish all fund allocations quarterly—full transparency. Your wallets, your keys—we never have custody of your funds."
+      answer: "Yes—Seamount is on the path to compliance across NG (ISA 2025), KE (VASP Act), SA (FSCA) frameworks. We are registered with The Nigerian Financial Intelligence Unit. Your funds are invested through Securitize Capital, a regulated investment platform with SEC oversight in the US. Underlying funds (Apollo, Hamilton Lane) are managed by institutional-grade firms with $650B+ AUM combined. Wallets are protected with military-grade (Fernet) encryption, restricted level access, and full audit trails with embedded AML via Regfyl. We publish all fund allocations quarterly—full transparency. Your wallets, your keys—we never have custody of your funds."
     }
   ];
 
@@ -235,7 +235,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                Powered by Securitize Markets • FINRA/SIPC Member • Self-Custody
+                Powered by Algorand • Securitize Markets (FINRA/SIPC Member) • Tether WDK
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
