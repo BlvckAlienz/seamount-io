@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 // --- DEFINITIVE, CORRECTED IMPORT ---
 // Using a robust, absolute path with the '@' alias from vite.config.ts
 import { apiClient } from '@/config/api';
-import { Skeleton } from '@/components/ui/LoadingSkeleton';
+import { Skeleton } from '@/components/ui/LoadingSkeleton.tsx';
 
 // Define a clear type for the alert data for better code quality and safety
 interface Alert {

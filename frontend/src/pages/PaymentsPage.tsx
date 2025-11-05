@@ -5,10 +5,10 @@ import React from 'react';
 
 // --- CORRECTED IMPORT PATHS ---
 // We now use robust, absolute paths from the '/src' directory using the '@' alias.
-import PaymentFlow from '@/components/payments/PaymentFlow';
-import CrossBorderPayment from '@/components/payments/CrossBorderPayment';
-import P2PPayment from '@/components/payments/P2PPayment';
-import FlutterwavePayment from '@/components/payments/FlutterwavePayment';
+import PaymentFlow from '@/components/payments/PaymentFlow.tsx';
+import CrossBorderPayment from '@/components/payments/CrossBorderPayment.tsx';
+import P2PPayment from '@/components/payments/P2PPayment.tsx';
+import FlutterwavePayment from '@/components/payments/FlutterwavePayment.tsx';
 
 // Note: This component is a high-level orchestrator.
 // In a real application, you would likely use React Router's nested routes

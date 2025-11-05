@@ -7,8 +7,8 @@ import { toast } from 'react-hot-toast';
 // --- CORRECTED IMPORT PATHS ---
 // Using robust, absolute paths with the '@' alias from vite.config.ts
 import { apiClient } from '@/config/api';
-import { AlertsTable } from '@/components/admin/AlertsTable';
-import { CardSkeleton } from '@/components/ui/LoadingSkeleton';
+import { AlertsTable } from '@/components/admin/AlertsTable.tsx';
+import { CardSkeleton } from '@/components/ui/LoadingSkeleton.tsx';
 
 // --- StatCard Component Definition ---
 // This component was missing. It's defined here for completeness.

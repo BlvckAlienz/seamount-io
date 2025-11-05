@@ -1,7 +1,7 @@
 import React from 'react';
 import { HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button.tsx';
 
 const QuickAccessButton: React.FC = () => {
   return (

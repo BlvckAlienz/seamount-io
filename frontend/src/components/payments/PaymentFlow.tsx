@@ -4,8 +4,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CreditCard, Smartphone, Globe, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card.tsx';
+import { Button } from '@/components/ui/button.tsx';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 

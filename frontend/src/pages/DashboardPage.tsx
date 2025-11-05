@@ -17,9 +17,9 @@ import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
 import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatusBanner';
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
-import { FundWalletModal } from '@/components/wallet/FundWalletModal';
-import { WithdrawModal } from '@/components/wallet/WithdrawModal';
-import { SendForm } from '@/components/payments/SendForm';
+import { FundWalletModal } from '@/components/wallet/FundWalletModal.tsx';
+import { WithdrawModal } from '@/components/wallet/WithdrawModal.tsx';
+import { SendForm } from '@/components/payments/SendForm.tsx';
 import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 
 // KYC Banner Component

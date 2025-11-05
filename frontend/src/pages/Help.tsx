@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, HelpCircle, MessageCircle, Book, Mail, Phone, ExternalLink } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card.tsx';
+import { Button } from '@/components/ui/button.tsx';
 
 const Help: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');

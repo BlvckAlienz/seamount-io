@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Copy, ExternalLink, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card.tsx';
+import { Button } from '@/components/ui/button.tsx';
 import { apiClient } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 

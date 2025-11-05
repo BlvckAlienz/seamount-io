@@ -7,8 +7,8 @@ import { User, Mail, Phone, Globe, CheckCircle, Shield, AlertCircle } from 'luci
 // --- CORRECTED IMPORT PATHS ---
 // Using robust, absolute paths with the '@' alias from vite.config.ts
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button.tsx';
+import { Card } from '@/components/ui/card.tsx';
 import { UserProfile } from '@/types'; // Centralized type definition
 
 interface UserProfilePageProps {

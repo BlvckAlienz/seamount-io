@@ -7,10 +7,10 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { apiClient } from '@/config/api'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Label } from '@/components/ui/label.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from '@/components/ui/dialog.tsx'
+import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
 import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface WithdrawModalProps {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import ErrorTracking from '@/components/ErrorTracking';
-import QuickAccessButton from '@/components/QuickAccessButton';
+import ErrorBoundary from '@/components/ErrorBoundary.tsx';
+import ErrorTracking from '@/components/ErrorTracking.tsx';
+import QuickAccessButton from '@/components/QuickAccessButton.tsx';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
