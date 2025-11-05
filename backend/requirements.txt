@@ -12,7 +12,7 @@ asyncpg==0.29.0
 sqlalchemy==2.0.23
 
 # HTTP & Async
-aiohttp==3.9.1
+aiohttp==3.8.6 # ✅ CHANGED: Downgraded to stable version compatible with algokit
 httpx==0.23.3  # ✅ COMPATIBLE WITH SUPABASE 1.0.3
 
 # Email
@@ -42,4 +42,4 @@ redis==5.0.1
 py-algorand-sdk==2.6.0
 web3==6.15.0
 mnemonic==0.21  # ✅ BIP39 seed phrase generation
-algokit==1.7.0  # ✅ CHANGED FROM algokit_utils to algokit
+algokit==1.6.0  # ✅ CHANGED: Downgraded to stable version that doesn't require beta dependencies
