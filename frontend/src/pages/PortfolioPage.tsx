@@ -74,7 +74,7 @@ const marketDataPage: React.FC = () => {
     <div className="space-y-6">
       {/* marketData Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card glassy>
+        <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Total marketData Value</h3>
               <DollarSign className="h-6 w-6 text-blue-400" />
@@ -85,7 +85,7 @@ const marketDataPage: React.FC = () => {
               {formatCurrency(totalPnL)} ({formatPercentage(totalPnLPercentage)})
             </div>
         </Card>
-        <Card glassy>
+        <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Active Positions</h3>
               <Activity className="h-6 w-6 text-emerald-400" />
@@ -93,7 +93,7 @@ const marketDataPage: React.FC = () => {
             <div className="text-3xl font-bold text-white">{marketDataAssets.length}</div>
             <div className="text-sm text-gray-400">Assets in marketData</div>
         </Card>
-         <Card glassy>
+         <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Performance Score</h3>
               <Target className="h-6 w-6 text-purple-400" />
@@ -104,7 +104,7 @@ const marketDataPage: React.FC = () => {
       </div>
 
       {/* marketData Performance Chart */}
-      <Card glassy>
+      <Card>
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="text-xl font-semibold text-white">marketData Performance</h3>
@@ -118,14 +118,14 @@ const marketDataPage: React.FC = () => {
                 </button>
               ))}
             </div>
-            <Button size="sm" variant="ghost" onClick={refetch} loading={marketLoading} icon={RefreshCw} />
+            <Button size="sm" variant="ghost" onClick={refetch} />
           </div>
         </div>
         <AdvancedChart data={marketDataData} height={400} />
       </Card>
 
       {/* Asset Holdings Table */}
-      <Card glassy>
+      <Card>
         <h3 className="text-xl font-semibold text-white mb-6">Asset Holdings</h3>
         <div className="overflow-x-auto">
           <table className="w-full">

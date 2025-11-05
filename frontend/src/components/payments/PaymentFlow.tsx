@@ -156,7 +156,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ userId, onComplete }) => {
                 ))}
               </div>
             </div>
-            <Button onClick={() => setCurrentStep('confirm')} disabled={!paymentData.amount} className="w-full" icon={ArrowRight}>Continue</Button>
+            <Button onClick={() => setCurrentStep('confirm')} disabled={!paymentData.amount} className="w-full">Continue</Button>
           </div>
         );
       case 'confirm':
@@ -166,7 +166,7 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ userId, onComplete }) => {
               <div className="flex justify-between items-center mb-2"><span className="text-gray-400">Amount</span><span className="text-white font-mono">{paymentData.amount} {paymentData.currency}</span></div>
               <div className="flex justify-between items-center"><span className="text-gray-400">You'll Receive (approx.)</span><span className="text-green-400 font-mono">~{paymentData.amount} USDS</span></div>
             </div>
-            <Button onClick={handleFunding} loading={loading} className="w-full bg-green-600 hover:bg-green-700" icon={CheckCircle}>Confirm Funding</Button>
+            <Button onClick={handleFunding} className="w-full bg-green-600 hover:bg-green-700">Confirm Funding</Button>
             <Button onClick={() => setCurrentStep('details')} variant="ghost" className="w-full">Back</Button>
           </div>
         );

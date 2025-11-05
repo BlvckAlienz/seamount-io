@@ -102,7 +102,7 @@ const P2PPayment: React.FC<P2PPaymentProps> = ({
         </div>
         <div className="flex space-x-4 pt-2">
           {onCancel && <Button variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>}
-          <Button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600" icon={Send} loading={status === 'executing'}>Send USDS</Button>
+          <Button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600">Send USDS</Button>
         </div>
       </form>
     </Card>

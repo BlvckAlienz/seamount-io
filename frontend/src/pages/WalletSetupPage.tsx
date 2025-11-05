@@ -71,7 +71,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ userId, onComplete }) => {
           <p className="text-sm text-gray-300 mb-4">Your new wallet address:</p>
           <div className="flex items-center bg-gray-700 rounded p-3 mb-2">
             <code className="text-green-400 text-xs break-all flex-1">{wallet.address}</code>
-            <Button size="sm" variant="ghost" icon={Copy}>Copy</Button>
+            <Button size="sm" variant="ghost">Copy</Button>
           </div>
           <p className="text-xs text-gray-400">
             This is your secure USDS wallet address. You can use it to send and receive USDS stablecoins.
@@ -83,7 +83,7 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ userId, onComplete }) => {
         </div>
         
         <div className="space-x-4">
-          <Button variant="secondary" icon={ExternalLink}>
+          <Button variant="secondary">
             View on Explorer
           </Button>
           <Button>

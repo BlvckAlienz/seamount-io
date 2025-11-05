@@ -111,7 +111,7 @@ const InvestorContact: React.FC = () => {
         
         <Button 
           type="submit" 
-          loading={isSubmitting} 
+          
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
         >
           {isSubmitting ? 'Submitting...' : 'Submit'}

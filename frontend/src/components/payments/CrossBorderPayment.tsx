@@ -102,7 +102,7 @@ const CrossBorderPayment: React.FC<CrossBorderPaymentProps> = ({
         </div>
         <div className="flex space-x-4 pt-2">
           {onCancel && <Button variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>}
-          <Button type="submit" className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600" icon={Send} loading={status === 'executing'}>Send Payment</Button>
+          <Button type="submit" className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600">Send Payment</Button>
         </div>
       </form>
     </Card>

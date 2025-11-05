@@ -103,7 +103,7 @@ const TradingPage: React.FC = () => {
         </Card>
         <Card>
           <h3 className="text-lg font-semibold text-white mb-6">Open Orders</h3>
-          <div className="space-y-3">{mockOrders.length > 0 ? (mockOrders.map((order) => (<div key={order.id} className="p-3 bg-gray-700/50 rounded-lg"><div className="flex justify-between"><div className={`text-sm font-medium ${order.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>{order.type.toUpperCase()} {order.asset}</div><Button size="sm" variant="danger" className="text-xs">Cancel</Button></div></div>))) : (<div className="text-center py-8 text-gray-400"><BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>No open orders</p></div>)}</div>
+          <div className="space-y-3">{mockOrders.length > 0 ? (mockOrders.map((order) => (<div key={order.id} className="p-3 bg-gray-700/50 rounded-lg"><div className="flex justify-between"><div className={`text-sm font-medium ${order.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>{order.type.toUpperCase()} {order.asset}</div><Button size="sm" variant="destructive" className="text-xs">Cancel</Button></div></div>))) : (<div className="text-center py-8 text-gray-400"><BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>No open orders</p></div>)}</div>
         </Card>
         <Card>
           <h3 className="text-lg font-semibold text-white mb-6">Active Positions</h3>

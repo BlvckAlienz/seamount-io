@@ -110,7 +110,7 @@ const YieldStakingInterface: React.FC = () => {
         
         <Button
           onClick={handleStake}
-          loading={loading}
+         
           disabled={!amount || parseFloat(amount) < 10}
           className="w-full bg-green-600 hover:bg-green-700"
         >

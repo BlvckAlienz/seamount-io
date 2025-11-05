@@ -168,7 +168,7 @@ const WalletFundingModal: React.FC<WalletFundingModalProps> = ({
           </Button>
           <Button
             onClick={handleFund}
-            loading={loading}
+           
             disabled={!amount || parseFloat(amount) <= 0}
             className="flex-1 bg-green-600 hover:bg-green-700"
           >

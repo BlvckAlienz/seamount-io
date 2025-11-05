@@ -149,7 +149,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ onUpdateComplete }) =
         
         {formError && (<div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg"><p className="text-sm text-red-400">{formError}</p></div>)}
         
-        <Button type="submit" loading={updating} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">Update Profile</Button>
+        <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-600">Update Profile</Button>
       </form>
     </Card>
   );

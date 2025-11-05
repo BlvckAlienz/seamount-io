@@ -123,7 +123,7 @@ const Help: React.FC = () => {
           <p className="text-gray-400 text-sm mb-4">
             Comprehensive guides and API documentation
           </p>
-          <Button variant="ghost" className="w-full" icon={ExternalLink}>
+          <Button variant="ghost" className="w-full">
             View Docs
           </Button>
         </Card>

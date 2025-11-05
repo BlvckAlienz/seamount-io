@@ -99,7 +99,7 @@ const FlutterwavePayment: React.FC<FlutterwavePaymentProps> = ({
             </div>
             <div className="flex space-x-4">
               {onCancel && <Button variant="secondary" onClick={onCancel} className="flex-1">Cancel</Button>}
-              <Button onClick={initializePayment} loading={loading} disabled={!paymentData.amount || !paymentData.email} className="flex-1 bg-gradient-to-r from-green-600 to-blue-600">Proceed to Payment</Button>
+              <Button onClick={initializePayment} disabled={!paymentData.amount || !paymentData.email} className="flex-1 bg-gradient-to-r from-green-600 to-blue-600">Proceed to Payment</Button>
             </div>
           </div>
         );

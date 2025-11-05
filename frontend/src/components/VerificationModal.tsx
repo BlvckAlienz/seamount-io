@@ -65,7 +65,7 @@ const VerificationModal: React.FC<VerificationModalProps> = ({
           <Button
             onClick={handleVerifyNow}
             className="bg-blue-600 hover:bg-blue-700 text-white"
-            icon={ArrowRight}
+           
           >
             Verify Now
           </Button>

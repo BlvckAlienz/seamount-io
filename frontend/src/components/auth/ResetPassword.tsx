@@ -49,7 +49,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onCancel, onSuccess }) =>
             {formError && <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg"><p className="text-sm text-red-400">{formError}</p></div>}
             <div className="pt-2 flex gap-4">
               {onCancel && <Button type="button" variant="secondary" onClick={onCancel} className="w-full">Cancel</Button>}
-              <Button type="submit" className="w-full" loading={loading}>Send Instructions</Button>
+              <Button type="submit" className="w-full">Send Instructions</Button>
             </div>
         </form>
       )}
