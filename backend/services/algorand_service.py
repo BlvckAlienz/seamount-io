@@ -10,8 +10,6 @@ from algosdk import account, mnemonic, transaction, encoding
 from algosdk.v2client import algod, indexer
 from algosdk.error import AlgodHTTPError
 from algosdk.transaction import AssetTransferTxn, PaymentTxn, AssetOptInTxn
-from algokit_utils import AlgorandClient
-from algokit_utils import AccountManager
 
 from backend.config import settings
 
@@ -24,19 +22,11 @@ class AlgorandService:
         
         self.settings = settings or get_settings()
         
-        # Initialize AlgoKit client (mainnet by default)
+        # Initialize algod client directly (no AlgorandClient wrapper needed)
         network = getattr(self.settings, 'ALGORAND_NETWORK', 'mainnet')
-        if network == 'testnet':
-            self.client = AlgorandClient.testnet()
-        elif network == 'localnet':
-            self.client = AlgorandClient.localnet()
-        else:
-            self.client = AlgorandClient.mainnet()
-        
-        # Initialize direct algod client for advanced operations
         algod_address = getattr(self.settings, 'ALGORAND_ALGOD_ADDRESS', 'https://mainnet-api.algonode.cloud')
         algod_token = getattr(self.settings, 'ALGORAND_ALGOD_TOKEN', None)
-        
+
         self.algod_client = algod.AlgodClient(
             algod_token=algod_token.get_secret_value() if hasattr(algod_token, 'get_secret_value') else (algod_token or ""),
             algod_address=algod_address
@@ -46,23 +36,35 @@ class AlgorandService:
         
     async def send_algo(self, sender_key: str, recipient: str, amount: int):
         """Send ALGO to recipient"""
-        result = await self.client.transactions.payment({
-            'sender': sender_key,
-            'receiver': recipient,
-            'amount': amount  # microAlgos
-        })
-        return result.tx_id
+        try:
+            params = self.algod_client.suggested_params()
+            sender_address = account.address_from_private_key(sender_key)
+            
+            txn = PaymentTxn(
+                sender=sender_address,
+                sp=params,
+                receiver=recipient,
+                amt=amount  # microAlgos
+            )
+            
+            signed_txn = txn.sign(sender_key)
+            tx_id = self.algod_client.send_transaction(signed_txn)
+            await self.wait_for_confirmation(tx_id)
+            
+            logger.info(f"Sent {amount} microAlgos to {recipient}")
+            return tx_id
+        except Exception as e:
+            logger.error(f"ALGO transfer failed: {e}")
+            raise
     
     async def send_usdt(self, sender_key: str, recipient: str, amount: int):
-        """Send USDT (ASA) on Algorand"""
-        # USDT ASA ID: 312769 (mainnet)
-        result = await self.client.transactions.asset_transfer({
-            'sender': sender_key,
-            'receiver': recipient,
-            'asset_id': 312769,
-            'amount': amount
-        })
-        return result.tx_id
+        """Send USDT (ASA 312769) on Algorand"""
+        return await self.transfer_asset(
+            sender_private_key=sender_key,
+            receiver_address=recipient,
+            asset_id=312769,  # USDT mainnet
+            amount=Decimal(amount) / Decimal(1_000_000)  # Convert microunits to decimal
+        )
 
     async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
         """Create new Algorand wallet for user - NO TEST FUNDING"""
