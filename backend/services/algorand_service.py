@@ -7,36 +7,62 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from algosdk import account, mnemonic, transaction, encoding
-from algosdk.v2client import algod
+from algosdk.v2client import algod, indexer
 from algosdk.error import AlgodHTTPError
 from algosdk.transaction import AssetTransferTxn, PaymentTxn, AssetOptInTxn
+from algokit_utils import AlgorandClient
+from algokit_utils import AccountManager
 
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
 
 class AlgorandService:
-    """Algorand blockchain interaction service using free public nodes"""
-    
-    def __init__(self, settings):
-        self.settings = settings
-        self.algod_client = algod.AlgodClient(
-            algod_token="",
-            algod_address=settings.ALGORAND_ALGOD_ADDRESS,
-            headers={"User-Agent": "Seamount/1.0"}
-        )
-    
-        if not settings.ALGORAND_CREATOR_MNEMONIC:
-            raise ValueError("ALGORAND_CREATOR_MNEMONIC required")
+    def __init__(self, settings=None):
+        """Initialize Algorand service with optional settings"""
+        from backend.config import get_settings
         
-        try:
-            mnemonic_string = settings.ALGORAND_CREATOR_MNEMONIC.get_secret_value()
-            self.treasury_private_key = mnemonic.to_private_key(mnemonic_string)
-            self.treasury_address = account.address_from_private_key(self.treasury_private_key)
-            logger.info(f"AlgorandService initialized. Treasury: {self.treasury_address}")
-        except Exception as e:
-            logger.critical(f"Failed to initialize treasury: {e}")
-            raise
+        self.settings = settings or get_settings()
+        
+        # Initialize AlgoKit client (mainnet by default)
+        network = getattr(self.settings, 'ALGORAND_NETWORK', 'mainnet')
+        if network == 'testnet':
+            self.client = AlgorandClient.testnet()
+        elif network == 'localnet':
+            self.client = AlgorandClient.localnet()
+        else:
+            self.client = AlgorandClient.mainnet()
+        
+        # Initialize direct algod client for advanced operations
+        algod_address = getattr(self.settings, 'ALGORAND_ALGOD_ADDRESS', 'https://mainnet-api.algonode.cloud')
+        algod_token = getattr(self.settings, 'ALGORAND_ALGOD_TOKEN', None)
+        
+        self.algod_client = algod.AlgodClient(
+            algod_token=algod_token.get_secret_value() if hasattr(algod_token, 'get_secret_value') else (algod_token or ""),
+            algod_address=algod_address
+        )
+        
+        logger.info(f"✅ AlgorandService initialized for {network}")
+        
+    async def send_algo(self, sender_key: str, recipient: str, amount: int):
+        """Send ALGO to recipient"""
+        result = await self.client.transactions.payment({
+            'sender': sender_key,
+            'receiver': recipient,
+            'amount': amount  # microAlgos
+        })
+        return result.tx_id
+    
+    async def send_usdt(self, sender_key: str, recipient: str, amount: int):
+        """Send USDT (ASA) on Algorand"""
+        # USDT ASA ID: 312769 (mainnet)
+        result = await self.client.transactions.asset_transfer({
+            'sender': sender_key,
+            'receiver': recipient,
+            'asset_id': 312769,
+            'amount': amount
+        })
+        return result.tx_id
 
     async def create_algorand_wallet(self, user_id: str) -> Dict[str, Any]:
         """Create new Algorand wallet for user - NO TEST FUNDING"""
@@ -253,26 +279,3 @@ class AlgorandService:
         except Exception as e:
             logger.error(f"Opt-in check failed: {e}")
             return False
-        
-    async def mint_usdt(self, user_id: str, amount: Decimal, reference: str) -> Dict:
-        """Mint USDT to user's Algorand wallet"""
-        wallet_data = await self.db_service.get_user_wallet(user_id)
-        recipient_address = wallet_data['algorand_address']
-        
-        USDT_ASSET_ID = 312769
-        
-        txn = AssetTransferTxn(
-            sender=self.treasury_address,
-            sp=self.algod_client.suggested_params(),
-            receiver=recipient_address,
-            amt=int(amount * 1_000_000),
-            index=USDT_ASSET_ID
-        )
-    
-        signed_txn = txn.sign(self.treasury_private_key)
-        tx_id = self.algod_client.send_transaction(signed_txn)
-        
-        from algosdk.v2client.algod import wait_for_confirmation
-        wait_for_confirmation(self.algod_client, tx_id, 4)
-        
-        return {"txn_id": tx_id, "amount": float(amount)}

@@ -615,14 +615,6 @@ class Settings(BaseSettings):
     # Supported Assets (Multi-Chain) - UPDATED for our 5 chains
     SUPPORTED_ASSETS: Dict[str, Dict[str, Any]] = {
         # Algorand Assets
-        "USDS": {
-            "blockchain": "algorand",
-            "asset_id": 3127280978,
-            "name": "Seamount USD",
-            "unit_name": "USDS",
-            "decimals": 6,
-            "is_stable": True
-        },
         "USDT_ALGO": {
             "blockchain": "algorand",
             "asset_id": 312769,
@@ -708,6 +700,9 @@ class Settings(BaseSettings):
     PAYSTACK_PUBLIC_KEY: Optional[SecretStr] = None
     PAYSTACK_SECRET_KEY: Optional[SecretStr] = None
     PAYSTACK_WEBHOOK_SECRET: Optional[SecretStr] = None
+    CASHRAMP_API_KEY: Optional[SecretStr] = None
+    CASHRAMP_PUBLIC_KEY: Optional[SecretStr] = None
+    CASHRAMP_WEBHOOK_SECRET: Optional[SecretStr] = None
     FLUTTERWAVE_SECRET_KEY: Optional[SecretStr] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
     

@@ -5,7 +5,8 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
-  ArrowDownLeft, RefreshCw as SwapIcon, Key
+  ArrowDownLeft, RefreshCw as SwapIcon, Key,
+  Wallet, ArrowDownToLine  // ← ADD THESE
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -16,6 +17,10 @@ import ChainWalletCard from '../components/wallet/ChainWalletCard';
 import WalletDetailModal from '../components/wallet/WalletDetailModal';
 import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatusBanner';
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
+import { FundWalletModal } from '@/components/wallet/FundWalletModal';
+import { WithdrawModal } from '@/components/wallet/WithdrawModal';
+import { SendForm } from '@/components/payments/SendForm';
+
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -143,6 +148,9 @@ const DashboardPage = () => {
 
   const [backupStatus, setBackupStatus] = useState<any>(null);
   const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
+  // Payment modal states
+  const [showFundModal, setShowFundModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -387,6 +395,12 @@ const DashboardPage = () => {
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowFundModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+              <Wallet className="h-4 w-4" />
+              Fund
+            </button>
             <button onClick={() => toast.info('Send functionality coming soon!')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
               <ArrowUpRight className="h-4 w-4" />Send
             </button>
@@ -395,6 +409,12 @@ const DashboardPage = () => {
             </button>
             <button onClick={() => toast.info('Earn functionality coming soon!')} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
               <TrendingUp className="h-4 w-4" />Earn
+            </button>
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+              <ArrowDownToLine className="h-4 w-4" />
+              Withdraw
             </button>
             <div className="relative">
               <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors">
@@ -538,6 +558,14 @@ const DashboardPage = () => {
           newWalletsOnly={newWalletsForBackup.length > 0 ? newWalletsForBackup : undefined}
         />
       )}
+      <FundWalletModal 
+        open={showFundModal} 
+        onOpenChange={setShowFundModal} 
+      />
+      <WithdrawModal 
+        open={showWithdrawModal} 
+        onOpenChange={setShowWithdrawModal} 
+      />
     </div>
   );
 };

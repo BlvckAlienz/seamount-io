@@ -1,25 +1,32 @@
 # File: backend/services/revenue_tracking_service.py
 """
-Revenue Tracking & Instrumentation Service
-Track ALL revenue streams for business intelligence
+Revenue Tracking Service - Track all platform revenue streams
+Captures fees at every transaction point for business analytics
 """
 
 import logging
-from decimal import Decimal
-from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+from decimal import Decimal
+from datetime import datetime, timedelta, UTC
+
 from backend.services.database_service import DatabaseService
-from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
+
 
 class RevenueTrackingService:
-    """Track and analyze revenue across all streams"""
+    """
+    Tracks all revenue streams across the platform:
+    - Transaction fees (on-ramp, off-ramp, P2P, swaps)
+    - Gas fee markups (hidden revenue)
+    - FX spreads
+    - Yield management fees
+    """
     
     def __init__(self, db_service: DatabaseService):
         self.db = db_service
-        
+        logger.info("RevenueTrackingService initialized")
+    
     async def track_transaction_fee(
         self,
         user_id: str,
@@ -29,12 +36,23 @@ class RevenueTrackingService:
         platform_fee: Decimal,
         network_fee: Decimal,
         blockchain: str,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Track transaction fee revenue"""
+        """
+        Track transaction fee revenue
         
+        Args:
+            user_id: User who paid the fee
+            transaction_type: Type of transaction (cross_border, on_ramp, etc.)
+            amount: Transaction amount in USD
+            fee_rate: Fee percentage (e.g., 0.018 for 1.8%)
+            platform_fee: Platform fee in USD
+            network_fee: Network/blockchain fee in USD
+            blockchain: Blockchain used
+            metadata: Additional transaction data
+        """
         try:
-            await self.db.supabase.table('revenue_events').insert({
+            revenue_event = {
                 'user_id': user_id,
                 'revenue_type': 'transaction_fee',
                 'transaction_type': transaction_type,
@@ -44,17 +62,19 @@ class RevenueTrackingService:
                 'network_fee': float(network_fee),
                 'blockchain': blockchain,
                 'metadata': metadata or {},
-                'created_at': datetime.utcnow().isoformat()
-            }).execute()
+                'created_at': datetime.now(UTC).isoformat()
+            }
+            
+            result = self.db.supabase.table('revenue_events').insert(revenue_event).execute()
             
             logger.info(
-                f"📊 Revenue tracked: ${float(platform_fee):.4f} "
-                f"({float(fee_rate * 100):.2f}% of ${float(amount)}) - {transaction_type}"
+                f"✅ Tracked transaction fee: {transaction_type} - "
+                f"${platform_fee} from user {user_id[:8]}..."
             )
             
         except Exception as e:
             logger.error(f"Failed to track transaction fee: {e}")
-            # Don't block transaction on logging failure
+            # Don't raise - revenue tracking shouldn't block transactions
     
     async def track_gas_markup(
         self,
@@ -65,29 +85,34 @@ class RevenueTrackingService:
         markup: Decimal,
         transaction_id: Optional[str] = None
     ) -> None:
-        """Track hidden gas fee markup revenue"""
+        """
+        Track hidden gas fee markup revenue
         
+        Args:
+            user_id: User who paid the gas
+            blockchain: Blockchain network
+            gas_charged: Amount charged to user
+            gas_actual: Actual network cost
+            markup: Profit margin (gas_charged - gas_actual)
+            transaction_id: Associated transaction ID
+        """
         try:
-            markup_percent = (markup / gas_actual * 100) if gas_actual > 0 else 0
-            
-            await self.db.supabase.table('revenue_events').insert({
+            revenue_event = {
                 'user_id': user_id,
                 'revenue_type': 'gas_markup',
                 'blockchain': blockchain,
                 'amount': float(gas_charged),
                 'platform_fee': float(markup),
-                'metadata': {
-                    'gas_actual': float(gas_actual),
-                    'gas_charged': float(gas_charged),
-                    'markup_percent': float(markup_percent),
-                    'transaction_id': transaction_id
-                },
-                'created_at': datetime.utcnow().isoformat()
-            }).execute()
+                'network_fee': float(gas_actual),
+                'metadata': {'transaction_id': transaction_id} if transaction_id else {},
+                'created_at': datetime.now(UTC).isoformat()
+            }
+            
+            result = self.db.supabase.table('revenue_events').insert(revenue_event).execute()
             
             logger.info(
-                f"💰 Gas markup tracked: ${float(markup):.6f} "
-                f"({float(markup_percent):.1f}% markup on {blockchain})"
+                f"✅ Tracked gas markup: {blockchain} - "
+                f"${markup} profit from user {user_id[:8]}..."
             )
             
         except Exception as e:
@@ -102,100 +127,134 @@ class RevenueTrackingService:
         spread_rate: Decimal,
         spread_amount: Decimal
     ) -> None:
-        """Track FX conversion spread revenue"""
+        """
+        Track FX spread revenue
         
+        Args:
+            user_id: User who made the conversion
+            from_currency: Source currency
+            to_currency: Destination currency
+            amount: Transaction amount
+            spread_rate: Spread percentage
+            spread_amount: Spread profit in USD
+        """
         try:
-            await self.db.supabase.table('revenue_events').insert({
+            revenue_event = {
                 'user_id': user_id,
                 'revenue_type': 'fx_spread',
                 'amount': float(amount),
+                'fee_rate': float(spread_rate),
                 'platform_fee': float(spread_amount),
                 'metadata': {
                     'from_currency': from_currency,
-                    'to_currency': to_currency,
-                    'spread_rate': float(spread_rate),
-                    'spread_bps': float(spread_rate * 10000)  # Basis points
+                    'to_currency': to_currency
                 },
-                'created_at': datetime.utcnow().isoformat()
-            }).execute()
+                'created_at': datetime.now(UTC).isoformat()
+            }
+            
+            result = self.db.supabase.table('revenue_events').insert(revenue_event).execute()
             
             logger.info(
-                f"💱 FX spread tracked: ${float(spread_amount):.4f} "
-                f"({from_currency}→{to_currency})"
+                f"✅ Tracked FX spread: {from_currency}/{to_currency} - "
+                f"${spread_amount} from user {user_id[:8]}..."
             )
             
         except Exception as e:
             logger.error(f"Failed to track FX spread: {e}")
     
+    async def track_yield_share(
+        self,
+        user_id: str,
+        amount: Decimal,
+        platform_share: Decimal,
+        protocol: str
+    ) -> None:
+        """
+        Track yield management revenue share
+        
+        Args:
+            user_id: User with staked funds
+            amount: Total yield generated
+            platform_share: Platform's share (e.g., 0.25 for 25%)
+            protocol: DeFi protocol (e.g., folks_finance)
+        """
+        try:
+            platform_fee = amount * platform_share
+            
+            revenue_event = {
+                'user_id': user_id,
+                'revenue_type': 'yield_share',
+                'amount': float(amount),
+                'fee_rate': float(platform_share),
+                'platform_fee': float(platform_fee),
+                'metadata': {'protocol': protocol},
+                'created_at': datetime.now(UTC).isoformat()
+            }
+            
+            result = self.db.supabase.table('revenue_events').insert(revenue_event).execute()
+            
+            logger.info(
+                f"✅ Tracked yield share: {protocol} - "
+                f"${platform_fee} from user {user_id[:8]}..."
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to track yield share: {e}")
+    
     async def get_revenue_summary(
         self,
-        days: int = 30
+        days: int = 30,
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get revenue summary for period"""
+        """
+        Get revenue summary for analytics
         
+        Args:
+            days: Number of days to look back
+            user_id: Optional user filter
+        
+        Returns:
+            Summary with total revenue and breakdown by type
+        """
         try:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(UTC) - timedelta(days=days)
             
-            events = self.db.supabase.table('revenue_events')\
+            # Build query
+            query = self.db.supabase.table('revenue_events')\
                 .select('*')\
-                .gte('created_at', cutoff.isoformat())\
-                .execute()
+                .gte('created_at', cutoff.isoformat())
             
-            if not events.data:
-                return {
-                    'total_revenue': 0.0,
-                    'by_type': {},
-                    'days': days
-                }
+            if user_id:
+                query = query.eq('user_id', user_id)
             
-            # Aggregate by type
+            result = query.execute()
+            
+            # Calculate totals
+            total_revenue = sum(
+                float(event.get('platform_fee', 0)) 
+                for event in result.data
+            )
+            
+            # Group by type
             by_type = {}
-            total = Decimal('0')
-            
-            for event in events.data:
+            for event in result.data:
                 rev_type = event['revenue_type']
-                fee = Decimal(str(event.get('platform_fee', 0)))
-                
                 if rev_type not in by_type:
-                    by_type[rev_type] = Decimal('0')
-                
-                by_type[rev_type] += fee
-                total += fee
+                    by_type[rev_type] = 0
+                by_type[rev_type] += float(event.get('platform_fee', 0))
             
             return {
-                'total_revenue': float(total),
-                'by_type': {k: float(v) for k, v in by_type.items()},
-                'days': days,
-                'event_count': len(events.data)
+                'total_revenue': total_revenue,
+                'by_type': by_type,
+                'event_count': len(result.data),
+                'period_days': days
             }
             
         except Exception as e:
-            logger.error(f"Revenue summary failed: {e}")
-            return {'error': str(e)}
-        
-    async def test_revenue_tracking():
-        from backend.services.revenue_tracking_service import RevenueTrackingService
-        from decimal import Decimal
-        
-        revenue_service = RevenueTrackingService(db_service)
-        
-        # Test transaction fee tracking
-        await revenue_service.track_transaction_fee(
-            user_id="test_user",
-            transaction_type="cross_border",
-            amount=Decimal("1000"),
-            fee_rate=Decimal("0.012"),
-            platform_fee=Decimal("12"),
-            network_fee=Decimal("0.01"),
-            blockchain="algorand",
-            metadata={"test": True}
-        )
-        
-        # Verify in database
-        result = await db_service.supabase.table('revenue_events')\
-            .select('*')\
-            .eq('user_id', 'test_user')\
-            .execute()
-        
-        assert len(result.data) > 0, "❌ Revenue tracking failed!"
-        print("✅ Revenue tracking works!")
+            logger.error(f"Failed to get revenue summary: {e}")
+            return {
+                'total_revenue': 0.0,
+                'by_type': {},
+                'event_count': 0,
+                'period_days': days
+            }

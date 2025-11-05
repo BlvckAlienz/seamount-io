@@ -171,7 +171,7 @@ class USDSMainnetMigrationManager:
         
         # Enhanced USDS Configuration
         self.usds_name = "Seamount USD Stablecoin"
-        self.usds_symbol = "USDS"
+        self.usds_symbol = 
         self.usds_decimals = 6
         self.new_total_supply = 500_000 * (10 ** self.usds_decimals)  # 500K USDS in base units
         self.backing_ratio = Decimal('1.25')  # 125% backing

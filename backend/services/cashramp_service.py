@@ -1,54 +1,153 @@
 # File: backend/services/cashramp_service.py
 """
-Cashramp Integration Service - COMPLETE
+Cashramp Integration Service - PRIMARY PAYMENT PROVIDER
 Core cross-border payment engine with P2P liquidity for African markets
-Enables fast, cheap USDT/USDCa settlement with local payment methods
 """
 
 import logging
 import aiohttp
-import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from decimal import Decimal
-from datetime import datetime
-import asyncio
+from datetime import datetime, UTC
 
-from backend.config import settings
+from backend.config import get_settings
 from backend.services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
+
 class CashrampService:
     """
-    Complete Cashramp integration for cross-border payments
-    Optimized for Seamount's core value: fast, cheap, secure transfers
+    PRIMARY payment provider for Seamount
+    Enables fast, cheap USDT/USDCa settlement with local payment methods
     """
     
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
+        self.settings = get_settings()
         
-        # Production URLs (staging for testing)
+        # API Configuration
         self.base_url = "https://staging.api.useaccrue.com/cashramp/api"
         self.graphql_endpoint = f"{self.base_url}/graphql"
         self.rest_endpoint = f"{self.base_url}/v1"
         
-        # API credentials - Add these to your .env
-        self.api_key = getattr(settings, 'CASHRAMP_API_KEY', None)
-        self.public_key = getattr(settings, 'CASHRAMP_PUBLIC_KEY', None)
-        self.webhook_secret = getattr(settings, 'CASHRAMP_WEBHOOK_SECRET', None)
+        # Get API credentials from settings
+        self.api_key = getattr(self.settings, 'CASHRAMP_API_KEY', None)
+        self.public_key = getattr(self.settings, 'CASHRAMP_PUBLIC_KEY', None)
+        self.webhook_secret = getattr(self.settings, 'CASHRAMP_WEBHOOK_SECRET', None)
         
-        # Supported payment methods in Africa
+        # Check if Cashramp is configured
+        if not self.api_key or not self.public_key:
+            logger.warning(
+                "⚠️ CASHRAMP NOT CONFIGURED! "
+                "Add CASHRAMP_API_KEY and CASHRAMP_PUBLIC_KEY to .env"
+            )
+        else:
+            logger.info("✅ CashrampService initialized (PRIMARY PROVIDER)")
+        
+        # Supported payment methods per country
         self.payment_methods = {
             "NG": ["bank_transfer", "mobile_money", "card"],
             "KE": ["mpesa", "bank_transfer", "airtel_money"],
             "GH": ["momo", "bank_transfer", "card"],
             "ZA": ["eft", "bank_transfer", "card"]
         }
+    
+    def is_available(self) -> bool:
+        """Check if Cashramp is configured and available"""
+        return bool(self.api_key and self.public_key)
+    
+    async def create_ngn_onramp(
+        self,
+        user_id: str,
+        asset: str,
+        amount_ngn: Decimal,
+        payment_method: str = "paystack"
+    ) -> Dict[str, Any]:
+        """
+        Create NGN on-ramp to buy USDT/USDCa
         
-        logger.info("CashrampService initialized for cross-border payments")
+        Args:
+            user_id: User ID
+            asset: Crypto asset to purchase (USDT, USDCa)
+            amount_ngn: Amount in Nigerian Naira
+            payment_method: Payment method (default: paystack)
+        
+        Returns:
+            Dict with payment_url, onramp_id, etc.
+        """
+        
+        # Check if Cashramp is configured
+        if not self.is_available():
+            raise Exception(
+                "Cashramp not configured. Please add CASHRAMP_API_KEY "
+                "and CASHRAMP_PUBLIC_KEY to your .env file"
+            )
+        
+        try:
+            # Get current NGN/USD rate
+            exchange_rate = await self.get_exchange_rate(asset, "NG")
+            if not exchange_rate:
+                raise Exception("Could not get exchange rate")
+            
+            amount_usd = amount_ngn / exchange_rate["rate"]
+            
+            # Create on-ramp request
+            onramp_data = {
+                "user_id": user_id,
+                "asset": asset,
+                "amount_ngn": float(amount_ngn),
+                "amount_usd": float(amount_usd),
+                "payment_method": payment_method,
+                "country": "NG"
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "X-Public-Key": self.public_key
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.rest_endpoint}/onramp",
+                    headers=headers,
+                    json=onramp_data,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    
+                    if response.status == 201:
+                        result = await response.json()
+                        
+                        logger.info(
+                            f"✅ Cashramp on-ramp created: {result.get('id')} "
+                            f"for user {user_id[:8]}..."
+                        )
+                        
+                        return {
+                            "success": True,
+                            "onramp_id": result.get("id"),
+                            "asset": asset,
+                            "amount_ngn": float(amount_ngn),
+                            "amount_usd": float(amount_usd),
+                            "payment_url": result.get("payment_url"),
+                            "expires_at": result.get("expires_at")
+                        }
+                    else:
+                        error_data = await response.json()
+                        error_msg = error_data.get("message", "Unknown error")
+                        logger.error(f"Cashramp API error: {error_msg}")
+                        raise Exception(f"Cashramp API error: {error_msg}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"Cashramp network error: {e}")
+            raise Exception(f"Network error connecting to Cashramp: {str(e)}")
+        except Exception as e:
+            logger.error(f"Cashramp on-ramp failed: {e}")
+            raise Exception(f"Cashramp on-ramp failed: {str(e)}")
     
     async def send_cross_border_payment(
-        self, 
+        self,
         sender_user_id: str,
         recipient_country: str,
         asset: str,
@@ -56,23 +155,31 @@ class CashrampService:
         recipient_details: Dict[str, str]
     ) -> Dict[str, Any]:
         """
-        CORE FUNCTION: Send cross-border payment
-        This is what enables fast, cheap transfers for users
+        Send cross-border payment via Cashramp
+        
+        Args:
+            sender_user_id: Sender's user ID
+            recipient_country: ISO country code (e.g., "KE")
+            asset: Crypto asset (USDT, USDCa)
+            amount_usd: Amount in USD
+            recipient_details: Recipient payment details
+        
+        Returns:
+            Transaction result with transfer_id
         """
+        
+        if not self.is_available():
+            raise Exception("Cashramp not configured")
+        
         try:
-            # Validate supported asset for cross-border
-            if asset not in ["USDT", "USDCa"]:
-                raise ValueError(f"Unsupported cross-border asset: {asset}")
-            
-            # Get recipient country exchange rate
+            # Get exchange rate
             exchange_rate = await self.get_exchange_rate(asset, recipient_country)
             if not exchange_rate:
-                raise ValueError(f"No exchange rate available for {recipient_country}")
+                raise Exception(f"No exchange rate for {recipient_country}")
             
-            # Calculate local currency amount
             local_amount = amount_usd * exchange_rate["rate"]
             
-            # Create cross-border transfer request
+            # Create transfer request
             transfer_request = {
                 "type": "CROSS_BORDER_TRANSFER",
                 "sender_id": sender_user_id,
@@ -85,26 +192,28 @@ class CashrampService:
                     "payment_method": recipient_details.get("payment_method", "bank_transfer"),
                     "account_details": recipient_details
                 },
-                "estimated_fee_usd": float(amount_usd * Decimal("0.026")),  # 2.6% fee
+                "estimated_fee_usd": float(amount_usd * Decimal("0.026")),
                 "settlement_time": "< 5 seconds"
             }
             
-            # Submit to Cashramp via REST API
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-Public-Key": self.public_key
             }
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.rest_endpoint}/transfers",
                     headers=headers,
-                    json=transfer_request
+                    json=transfer_request,
+                    timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
+                    
                     if response.status == 201:
                         result = await response.json()
                         
-                        # Store transaction record
+                        # Store transaction
                         await self.db_service.log_event("cross_border_payment", {
                             "transfer_id": result.get("id"),
                             "sender_user_id": sender_user_id,
@@ -113,8 +222,13 @@ class CashrampService:
                             "recipient_country": recipient_country,
                             "local_amount": float(local_amount),
                             "status": "pending",
-                            "created_at": datetime.utcnow().isoformat()
+                            "created_at": datetime.now(UTC).isoformat()
                         })
+                        
+                        logger.info(
+                            f"✅ Cross-border payment sent: {result.get('id')} "
+                            f"({amount_usd} USD → {local_amount} {exchange_rate['local_currency']})"
+                        )
                         
                         return {
                             "success": True,
@@ -132,82 +246,50 @@ class CashrampService:
                         
         except Exception as e:
             logger.error(f"Cross-border payment failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
     
-    async def create_ngn_onramp(
-        self, 
-        user_id: str, 
-        asset: str, 
-        amount_ngn: Decimal,
-        payment_method: str = "paystack"
-    ) -> Dict[str, Any]:
+    async def get_exchange_rate(
+        self,
+        asset: str,
+        country_code: str
+    ) -> Optional[Dict[str, Any]]:
         """
-        Create NGN on-ramp to buy USDT/USDCa
-        Integrates with Nigerian payment providers
+        Get real-time exchange rate for country
+        
+        Args:
+            asset: Crypto asset (USDT, USDCa)
+            country_code: ISO country code (e.g., "NG")
+        
+        Returns:
+            Dict with rate, currency, last_updated
         """
-        try:
-            # Get current NGN/USD rate
-            exchange_rate = await self.get_exchange_rate(asset, "NG")
-            amount_usd = amount_ngn / exchange_rate["rate"]
-            
-            # Create on-ramp request
-            onramp_data = {
-                "user_id": user_id,
-                "asset": asset,
-                "amount_ngn": float(amount_ngn),
-                "amount_usd": float(amount_usd),
-                "payment_method": payment_method,
-                "country": "NG"
+        
+        # Currency mapping
+        currency_map = {
+            "NG": "NGN", "KE": "KES", "GH": "GHS", "ZA": "ZAR",
+            "UG": "UGX", "TZ": "TZS", "EG": "EGP"
+        }
+        
+        local_currency = currency_map.get(country_code, "USD")
+        
+        # If Cashramp not available, use fallback rates
+        if not self.is_available():
+            logger.warning("Using fallback exchange rates (Cashramp not configured)")
+            fallback_rates = {
+                "NGN": 1600.0, "KES": 150.0, "GHS": 12.0, "ZAR": 18.0,
+                "UGX": 3700.0, "TZS": 2600.0, "EGP": 31.0
             }
             
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.rest_endpoint}/onramp",
-                    headers=headers,
-                    json=onramp_data
-                ) as response:
-                    if response.status == 201:
-                        result = await response.json()
-                        
-                        return {
-                            "success": True,
-                            "onramp_id": result.get("id"),
-                            "asset": asset,
-                            "amount_ngn": float(amount_ngn),
-                            "amount_usd": float(amount_usd),
-                            "payment_url": result.get("payment_url"),
-                            "expires_at": result.get("expires_at")
-                        }
-                    else:
-                        error_data = await response.json()
-                        raise Exception(f"Onramp creation failed: {error_data}")
-                        
-        except Exception as e:
-            logger.error(f"NGN onramp creation failed: {e}")
             return {
-                "success": False,
-                "error": str(e)
+                "rate": Decimal(str(fallback_rates.get(local_currency, 1.0))),
+                "local_currency": local_currency,
+                "last_updated": datetime.now(UTC).isoformat(),
+                "spread": 0.026,
+                "source": "fallback"
             }
-    
-    async def get_exchange_rate(self, asset: str, country_code: str) -> Optional[Dict[str, Any]]:
-        """Get real-time exchange rates for cross-border transfers"""
+        
+        # Try to get real rate from Cashramp
         try:
-            # Currency mapping for African countries
-            currency_map = {
-                "NG": "NGN", "KE": "KES", "GH": "GHS", "ZA": "ZAR",
-                "UG": "UGX", "TZ": "TZS", "EG": "EGP"
-            }
-            
-            local_currency = currency_map.get(country_code, "USD")
-            
             query = """
             query GetExchangeRate($asset: String!, $currency: String!) {
                 exchangeRate(asset: $asset, currency: $currency) {
@@ -222,33 +304,38 @@ class CashrampService:
             variables = {"asset": asset, "currency": local_currency}
             response_data = await self._make_graphql_request(query, variables)
             
-            if response_data and "exchangeRate" in response_data["data"]:
+            if response_data and "exchangeRate" in response_data.get("data", {}):
                 rate_data = response_data["data"]["exchangeRate"]
                 return {
                     "rate": Decimal(str(rate_data["rate"])),
                     "local_currency": local_currency,
                     "last_updated": rate_data["lastUpdated"],
-                    "spread": rate_data.get("spread", 0.02)
+                    "spread": rate_data.get("spread", 0.026),
+                    "source": "cashramp"
                 }
             
-            # Fallback rates for testing
-            fallback_rates = {
-                "NGN": 1600.0, "KES": 150.0, "GHS": 12.0, "ZAR": 18.0
-            }
-            
-            return {
-                "rate": Decimal(str(fallback_rates.get(local_currency, 1.0))),
-                "local_currency": local_currency,
-                "last_updated": datetime.utcnow().isoformat(),
-                "spread": 0.026  # 2.6% spread
-            }
-            
         except Exception as e:
-            logger.error(f"Exchange rate fetch failed: {e}")
-            return None
+            logger.warning(f"Failed to get Cashramp rate, using fallback: {e}")
+        
+        # Fallback to static rates
+        fallback_rates = {
+            "NGN": 1600.0, "KES": 150.0, "GHS": 12.0, "ZAR": 18.0
+        }
+        
+        return {
+            "rate": Decimal(str(fallback_rates.get(local_currency, 1.0))),
+            "local_currency": local_currency,
+            "last_updated": datetime.now(UTC).isoformat(),
+            "spread": 0.026,
+            "source": "fallback"
+        }
     
     async def track_transfer_status(self, transfer_id: str) -> Dict[str, Any]:
         """Track status of cross-border transfer"""
+        
+        if not self.is_available():
+            return {"success": False, "error": "Cashramp not configured"}
+        
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -258,15 +345,16 @@ class CashrampService:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.rest_endpoint}/transfers/{transfer_id}",
-                    headers=headers
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
+                    
                     if response.status == 200:
                         transfer_data = await response.json()
                         
-                        # Map Cashramp status to our status
                         status_mapping = {
                             "pending": "processing",
-                            "processing": "processing", 
+                            "processing": "processing",
                             "completed": "completed",
                             "failed": "failed",
                             "cancelled": "cancelled"
@@ -292,116 +380,23 @@ class CashrampService:
                         
         except Exception as e:
             logger.error(f"Transfer tracking failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    async def get_supported_corridors(self) -> List[Dict[str, Any]]:
-        """Get list of supported cross-border corridors"""
-        return [
-            {
-                "from_country": "NG",
-                "to_countries": ["KE", "GH", "ZA", "UG", "TZ"],
-                "supported_assets": ["USDT", "USDCa"],
-                "average_fee": "2.6%",
-                "settlement_time": "< 5 seconds"
-            },
-            {
-                "from_country": "KE", 
-                "to_countries": ["NG", "UG", "TZ", "GH"],
-                "supported_assets": ["USDT", "USDCa"],
-                "average_fee": "2.6%",
-                "settlement_time": "< 5 seconds"
-            }
-        ]
-    
-    async def process_webhook(self, webhook_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Process Cashramp webhook notifications"""
-        try:
-            event_type = webhook_data.get("event")
-            transfer_data = webhook_data.get("data", {})
-            transfer_id = transfer_data.get("id")
-            
-            logger.info(f"Processing Cashramp webhook: {event_type} for transfer {transfer_id}")
-            
-            # Store webhook event
-            await self.db_service.log_event("cashramp_webhook", {
-                "event_type": event_type,
-                "transfer_id": transfer_id,
-                "data": transfer_data,
-                "processed_at": datetime.utcnow().isoformat()
-            })
-            
-            # Handle transfer status updates
-            if event_type == "transfer.completed":
-                await self._handle_transfer_completed(transfer_data)
-            elif event_type == "transfer.failed":
-                await self._handle_transfer_failed(transfer_data)
-            elif event_type == "onramp.completed":
-                await self._handle_onramp_completed(transfer_data)
-            
-            return {"success": True, "processed": event_type}
-            
-        except Exception as e:
-            logger.error(f"Webhook processing failed: {e}")
             return {"success": False, "error": str(e)}
     
-    async def _handle_transfer_completed(self, transfer_data: Dict):
-        """Handle successful cross-border transfer completion"""
-        try:
-            transfer_id = transfer_data.get("id")
-            
-            # Update our records
-            await self.db_service.execute_query(
-                "UPDATE transaction_logs SET status = 'completed', completed_at = NOW() WHERE transfer_id = %s",
-                (transfer_id,)
-            )
-            
-            # Notify user of completion
-            logger.info(f"Cross-border transfer completed: {transfer_id}")
-            
-        except Exception as e:
-            logger.error(f"Error handling transfer completion: {e}")
-    
-    async def _handle_transfer_failed(self, transfer_data: Dict):
-        """Handle failed cross-border transfer"""
-        try:
-            transfer_id = transfer_data.get("id")
-            failure_reason = transfer_data.get("failure_reason", "Unknown error")
-            
-            # Update our records
-            await self.db_service.execute_query(
-                "UPDATE transaction_logs SET status = 'failed', failure_reason = %s WHERE transfer_id = %s",
-                (failure_reason, transfer_id)
-            )
-            
-            logger.error(f"Cross-border transfer failed: {transfer_id} - {failure_reason}")
-            
-        except Exception as e:
-            logger.error(f"Error handling transfer failure: {e}")
-    
-    async def _handle_onramp_completed(self, onramp_data: Dict):
-        """Handle successful NGN onramp completion"""
-        try:
-            onramp_id = onramp_data.get("id")
-            user_id = onramp_data.get("user_id")
-            asset = onramp_data.get("asset")
-            amount_usd = onramp_data.get("amount_usd")
-            
-            # Credit user's wallet with purchased asset
-            # This would integrate with your wallet service
-            logger.info(f"Onramp completed: {user_id} purchased {amount_usd} {asset}")
-            
-        except Exception as e:
-            logger.error(f"Error handling onramp completion: {e}")
-    
-    async def _make_graphql_request(self, query: str, variables: Dict = None) -> Optional[Dict]:
+    async def _make_graphql_request(
+        self,
+        query: str,
+        variables: Dict = None
+    ) -> Optional[Dict]:
         """Make GraphQL request to Cashramp API"""
+        
+        if not self.is_available():
+            return None
+        
         try:
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
+                "Authorization": f"Bearer {self.api_key}",
+                "X-Public-Key": self.public_key
             }
             
             payload = {
@@ -416,19 +411,13 @@ class CashrampService:
                     json=payload,
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
+                    
                     if response.status == 200:
                         return await response.json()
                     else:
                         logger.error(f"Cashramp GraphQL error: {response.status}")
                         return None
                         
-        except asyncio.TimeoutError:
-            logger.error("Cashramp API timeout")
-            return None
         except Exception as e:
             logger.error(f"GraphQL request failed: {e}")
             return None
-
-# Service factory function
-def get_cashramp_service(db_service: DatabaseService) -> CashrampService:
-    return CashrampService(db_service)

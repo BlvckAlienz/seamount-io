@@ -123,7 +123,7 @@ async def stake_funds(
             )
         
         # Validate asset
-        supported_assets = ["USDT", "USDCa", "USDS", "ALGO"]
+        supported_assets = ["USDT", "USDCa",  "ALGO"]
         if stake_request.asset not in supported_assets:
             raise HTTPException(
                 status_code=400,
@@ -471,3 +471,30 @@ async def yield_health_check():
         "tiers_available": ["stable", "growth", "alpha"],
         "min_stake": 10.0
     }
+
+@router.post("/yield/stake")
+async def stake_usdt(
+    amount: Decimal,
+    user: dict = Depends(get_current_user)
+):
+    # Transfer to Folks Finance vault
+    vault_address = "FOLKS_USDT_VAULT_ADDRESS"  # Get from Folks Finance
+    
+    tx_id = await algorand_service.transfer_asset(
+        sender_pk=user['private_key'],
+        receiver=vault_address,
+        asset_id=312769,  # USDT ASA
+        amount=int(amount * 1_000_000)  # Convert to micro-units
+    )
+    
+    # Record position
+    await db.create_yield_position(
+        user_id=user['id'],
+        asset='USDT',
+        amount=amount,
+        protocol='folks_finance',
+        apy=Decimal('0.08'),  # 8% APY
+        tx_id=tx_id
+    )
+    
+    return {"success": True, "tx_id": tx_id, "apy": "8%"}

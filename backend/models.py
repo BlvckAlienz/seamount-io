@@ -122,7 +122,7 @@ class KYCSkipResponse(BaseModel):
 class PaymentRequest(BaseModel):
     recipient_email: EmailStr
     amount: float
-    currency: str = "USDS"
+    currency: str = "USD"
 
 class PaymentResponse(BaseModel):
     transaction_id: str

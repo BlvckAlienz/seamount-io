@@ -986,9 +986,9 @@ class WDKService:
                     "icon": "💵"
                 },
                 {
-                    "symbol": "USDS",
+                    "symbol": 
                     "name": "Seamount USD",
-                    "balance": balances["balances"].get("USDS", 0),
+                    "balance": balances["balances"].get( 0),
                     "available_on": ["algorand"],
                     "icon": "🌊",
                     "is_native": True
@@ -1186,7 +1186,7 @@ class WDKService:
     def _determine_swap_type(self, from_asset: str, to_asset: str) -> str:
         """Determine swap type for fee calculation"""
         
-        stablecoins = ["USDT", "USDC", "USDS", "DAI"]
+        stablecoins = ["USDT", "USDC",  "DAI"]
         
         from_stable = from_asset in stablecoins
         to_stable = to_asset in stablecoins

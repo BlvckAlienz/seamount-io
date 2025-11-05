@@ -1,16 +1,15 @@
 # File: backend/tests/test_revenue_tracking.py
 """
-Revenue Tracking Service Tests - FIXED VERSION
-Validates fee capture at every transaction point
+Revenue Tracking Service Tests - SCHEMA FIXED
+Uses correct Supabase auth.users schema (no username column)
 """
 
 import pytest
 import pytest_asyncio
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, UTC
 from uuid import uuid4
 
-# Import services
 from backend.services.revenue_tracking_service import RevenueTrackingService
 from backend.services.database_service import DatabaseService
 from backend.config import get_settings
@@ -31,33 +30,42 @@ async def db_service():
 @pytest_asyncio.fixture
 async def revenue_service(db_service):
     """Create revenue tracking service"""
-    # ✅ FIX: Await the fixture
-    db = await db_service if hasattr(db_service, '__await__') else db_service
-    return RevenueTrackingService(db)
+    return RevenueTrackingService(db_service)
+
+@pytest_asyncio.fixture
+async def test_user(db_service):
+    """Use existing test user from database"""
+    # Use the test user you already created
+    test_user_id = "6e5f1aff-39b1-4201-87aa-c00ff243460f"
+    
+    yield test_user_id
+    
+    # Cleanup: Delete revenue events for this user
+    try:
+        db_service.supabase.table('revenue_events').delete().eq('user_id', test_user_id).execute()
+    except Exception as e:
+        print(f"Cleanup warning: {e}")
 
 @pytest.mark.asyncio
-async def test_track_transaction_fee(revenue_service):
+async def test_track_transaction_fee(revenue_service, test_user):
     """Test transaction fee tracking"""
     
-    # Get the actual service (not coroutine)
-    service = await revenue_service if hasattr(revenue_service, '__await__') else revenue_service
-    
     # Track a cross-border fee
-    await service.track_transaction_fee(
-        user_id="test_user_123",
+    await revenue_service.track_transaction_fee(
+        user_id=test_user,
         transaction_type="cross_border",
         amount=Decimal("1000"),
-        fee_rate=Decimal("0.012"),
-        platform_fee=Decimal("12"),
+        fee_rate=Decimal("0.018"),
+        platform_fee=Decimal("18"),
         network_fee=Decimal("0.01"),
         blockchain="algorand",
-        metadata={"test": True, "timestamp": datetime.utcnow().isoformat()}
+        metadata={"test": True, "timestamp": datetime.now(UTC).isoformat()}
     )
     
     # Verify it was logged
-    result = await service.db.supabase.table('revenue_events')\
+    result = revenue_service.db.supabase.table('revenue_events')\
         .select('*')\
-        .eq('user_id', 'test_user_123')\
+        .eq('user_id', test_user)\
         .order('created_at', desc=True)\
         .limit(1)\
         .execute()
@@ -66,30 +74,27 @@ async def test_track_transaction_fee(revenue_service):
     
     event = result.data[0]
     assert event['revenue_type'] == 'transaction_fee'
-    assert float(event['platform_fee']) == 12.0
+    assert float(event['platform_fee']) == 18.0
     assert event['blockchain'] == 'algorand'
     
     print("✅ Transaction fee tracking works!")
 
 @pytest.mark.asyncio
-async def test_track_gas_markup(revenue_service):
+async def test_track_gas_markup(revenue_service, test_user):
     """Test hidden gas fee markup tracking"""
     
-    service = await revenue_service if hasattr(revenue_service, '__await__') else revenue_service
-    
-    await service.track_gas_markup(
-        user_id="test_user_123",
+    await revenue_service.track_gas_markup(
+        user_id=test_user,
         blockchain="ethereum",
         gas_charged=Decimal("0.50"),
         gas_actual=Decimal("0.35"),
         markup=Decimal("0.15"),
-        transaction_id="TX_TEST_001"
+        transaction_id=f"TX_{uuid4().hex[:8].upper()}"
     )
     
-    # Verify markup was recorded
-    result = await service.db.supabase.table('revenue_events')\
+    result = revenue_service.db.supabase.table('revenue_events')\
         .select('*')\
-        .eq('user_id', 'test_user_123')\
+        .eq('user_id', test_user)\
         .eq('revenue_type', 'gas_markup')\
         .order('created_at', desc=True)\
         .limit(1)\
@@ -103,13 +108,11 @@ async def test_track_gas_markup(revenue_service):
     print("✅ Gas markup tracking works!")
 
 @pytest.mark.asyncio
-async def test_track_fx_spread(revenue_service):
+async def test_track_fx_spread(revenue_service, test_user):
     """Test FX spread revenue tracking"""
     
-    service = await revenue_service if hasattr(revenue_service, '__await__') else revenue_service
-    
-    await service.track_fx_spread(
-        user_id="test_user_123",
+    await revenue_service.track_fx_spread(
+        user_id=test_user,
         from_currency="NGN",
         to_currency="USD",
         amount=Decimal("1000"),
@@ -117,10 +120,9 @@ async def test_track_fx_spread(revenue_service):
         spread_amount=Decimal("4")
     )
     
-    # Verify spread was recorded
-    result = await service.db.supabase.table('revenue_events')\
+    result = revenue_service.db.supabase.table('revenue_events')\
         .select('*')\
-        .eq('user_id', 'test_user_123')\
+        .eq('user_id', test_user)\
         .eq('revenue_type', 'fx_spread')\
         .order('created_at', desc=True)\
         .limit(1)\
@@ -134,26 +136,24 @@ async def test_track_fx_spread(revenue_service):
     print("✅ FX spread tracking works!")
 
 @pytest.mark.asyncio
-async def test_get_revenue_summary(revenue_service):
+async def test_get_revenue_summary(revenue_service, test_user):
     """Test revenue summary aggregation"""
     
-    service = await revenue_service if hasattr(revenue_service, '__await__') else revenue_service
-    
-    # Track multiple fees
+    # Track multiple fees using the existing test user
     for i in range(5):
-        await service.track_transaction_fee(
-            user_id=f"test_user_{i}",
+        await revenue_service.track_transaction_fee(
+            user_id=test_user,
             transaction_type="cross_border",
             amount=Decimal("100"),
-            fee_rate=Decimal("0.012"),
-            platform_fee=Decimal("1.2"),
+            fee_rate=Decimal("0.018"),
+            platform_fee=Decimal("1.8"),
             network_fee=Decimal("0.01"),
             blockchain="algorand",
-            metadata={"batch_test": True}
+            metadata={"batch_test": True, "iteration": i}
         )
     
     # Get summary
-    summary = await service.get_revenue_summary(days=1)
+    summary = await revenue_service.get_revenue_summary(days=1)
     
     assert summary['total_revenue'] > 0, "❌ No revenue in summary!"
     assert 'by_type' in summary
@@ -161,4 +161,4 @@ async def test_get_revenue_summary(revenue_service):
     print(f"✅ Revenue summary works! Total: ${summary['total_revenue']}")
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    pytest.main([__file__, "-v", "-s"])

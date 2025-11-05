@@ -123,7 +123,7 @@ class OfframpService:
         """Convert crypto to fiat using oracle prices"""
         
         # Get crypto USD price
-        if crypto_asset in ["USDT", "USDCa", "USDS"]:
+        if crypto_asset in ["USDT", "USDCa", ]:
             usd_value = crypto_amount  # Stablecoins are 1:1
         else:
             asset_map = {"goBTC": "bitcoin", "goETH": "ethereum", "ALGO": "algorand"}
