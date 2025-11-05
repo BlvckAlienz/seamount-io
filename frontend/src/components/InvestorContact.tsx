@@ -2,8 +2,8 @@ import React from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { apiClient } from '../config/api';
-import Button from './ui/Button';
-import Card from './ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 interface IFormInput {
   name: string;

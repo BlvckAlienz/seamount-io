@@ -1,8 +1,8 @@
 // File: frontend/src/components/yield/YieldStakingInterface.tsx
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Shield, Zap } from 'lucide-react';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { apiClient } from '@/config/api';
 
 const YieldStakingInterface: React.FC = () => {

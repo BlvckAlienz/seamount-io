@@ -6,8 +6,8 @@ import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
 
 // --- CORRECTED IMPORT PATHS ---
 // Using robust, absolute paths with the '@' alias from vite.config.ts
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import PriceChart from '@/components/charts/PriceChart';
 import { mockAssets, mockPositions, mockOrders, mockOrderBook, generateMockChartData } from '@/data/mockData';
 

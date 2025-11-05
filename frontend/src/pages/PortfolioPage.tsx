@@ -6,8 +6,8 @@ import { TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, PieChart, Re
 
 // --- CORRECTED IMPORT PATHS ---
 // Using robust, absolute paths with the '@' alias from vite.config.ts
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import AdvancedChart from '@/components/charts/AdvancedChart';
 import { TableSkeleton, ChartSkeleton } from '@/components/ui/LoadingSkeleton';
 import { generateMockChartData } from '@/data/mockData';

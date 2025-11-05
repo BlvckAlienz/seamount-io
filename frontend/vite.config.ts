@@ -12,8 +12,8 @@ export default defineConfig({
     },
   },
   define: {
-    global: 'globalThis', // ✅ Fixes "global is not defined"
-    'process.env': {}, // ✅ Fixes process.env references
+    global: 'globalThis',
+    'process.env': {},
   },
   build: {
     outDir: 'dist',
@@ -36,15 +36,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: [
-      'react', 
-      'react-dom', 
-      'react-router-dom',
-      'buffer', // ✅ Pre-bundle buffer polyfill
-    ],
+    include: ['react', 'react-dom', 'react-router-dom', 'buffer'],
     esbuildOptions: {
       define: {
-        global: 'globalThis', // ✅ Also define for dev server
+        global: 'globalThis',
       },
     },
   },

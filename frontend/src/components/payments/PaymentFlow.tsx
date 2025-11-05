@@ -4,8 +4,8 @@
 import React, { useState, useCallback } from 'react';
 import { CreditCard, Smartphone, Globe, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { apiClient } from '@/config/api';
 
 // --- Type Definitions ---

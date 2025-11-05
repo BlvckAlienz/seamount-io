@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 interface ResetPasswordProps {
   onCancel?: () => void;
