@@ -10,7 +10,7 @@ from algosdk import account, mnemonic, transaction, encoding
 from algosdk.v2client import algod, indexer
 from algosdk.error import AlgodHTTPError
 from algosdk.transaction import AssetTransferTxn, PaymentTxn, AssetOptInTxn
-from algokit import AlgorandClient
+from algokit_utils import AlgorandClient
 from algokit_utils import AccountManager
 
 from backend.config import settings
