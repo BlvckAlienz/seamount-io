@@ -2,9 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, LogOut } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { apiClient } from '../config/api';
+import { apiClient } from '@/config/api';
 
 interface UserMenuProps {
   user: {

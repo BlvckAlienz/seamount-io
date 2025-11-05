@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Wallet, Check, Loader, Shield, X, AlertCircle, ExternalLink } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import toast from 'react-hot-toast';
+import AutomatedWalletConnect from './AutomatedWalletConnect';
 
 interface WalletOption {
   id: string;
@@ -25,6 +26,7 @@ export const MultiChainWalletConnect: React.FC<Props> = ({ isOpen, onClose, onWa
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [selectedExternalWallet, setSelectedExternalWallet] = useState<WalletOption | null>(null);
+  const [showAutomatedConnect, setShowAutomatedConnect] = useState(false);
 
   const WALLET_OPTIONS: WalletOption[] = [
     {

@@ -327,18 +327,18 @@ class SeamountTradingAgent:
             logger.error(f"Failed to get active users: {e}")
             return []
     
-    async def get_user_portfolio(self, user_id: str) -> Dict[str, Any]:
-        """Get user's current portfolio"""
+    async def get_user_marketData(self, user_id: str) -> Dict[str, Any]:
+        """Get user's current marketData"""
         try:
-            response = self.supabase.table("portfolios").select(
+            response = self.supabase.table("marketDatas").select(
                 "*"
             ).eq("user_id", user_id).execute()
             
             if response.data:
                 return response.data[0]
             
-            # Create default portfolio
-            default_portfolio = {
+            # Create default marketData
+            default_marketData = {
                 "user_id": user_id,
                 "total_value": 0,
                 "available_usds": 1000,  # Default amount
@@ -346,18 +346,18 @@ class SeamountTradingAgent:
                 "created_at": datetime.utcnow().isoformat()
             }
             
-            self.supabase.table("portfolios").insert(default_portfolio).execute()
-            return default_portfolio
+            self.supabase.table("marketDatas").insert(default_marketData).execute()
+            return default_marketData
             
         except Exception as e:
-            logger.error(f"Failed to get portfolio for user {user_id}: {e}")
+            logger.error(f"Failed to get marketData for user {user_id}: {e}")
             return {"user_id": user_id, "available_usds": 0, "positions": {}}
     
-    def calculate_position_size(self, user_data: Dict, portfolio: Dict, signal_confidence: float) -> float:
+    def calculate_position_size(self, user_data: Dict, marketData: Dict, signal_confidence: float) -> float:
         """Calculate optimal position size based on risk profile"""
         try:
             risk_profile = user_data.get("risk_profile", "moderate")
-            available_usds = float(portfolio.get("available_usds", 0))
+            available_usds = float(marketData.get("available_usds", 0))
             
             if available_usds <= 0:
                 return 0
@@ -425,7 +425,7 @@ class SeamountTradingAgent:
                 "timestamp": datetime.utcnow().timestamp()
             }
     
-    def generate_trading_signal(self, market_analysis: Dict, user_data: Dict, portfolio: Dict) -> Optional[TradingSignal]:
+    def generate_trading_signal(self, market_analysis: Dict, user_data: Dict, marketData: Dict) -> Optional[TradingSignal]:
         """Generate trading signal based on market analysis"""
         try:
             symbol = market_analysis["symbol"]
@@ -450,7 +450,7 @@ class SeamountTradingAgent:
                 return None
             
             # Calculate position size
-            position_size = self.calculate_position_size(user_data, portfolio, confidence)
+            position_size = self.calculate_position_size(user_data, marketData, confidence)
             
             if position_size <= 0:
                 return None
@@ -520,8 +520,8 @@ class SeamountTradingAgent:
         signals = []
         
         try:
-            # Get user portfolio
-            portfolio = await self.get_user_portfolio(user_data["id"])
+            # Get user marketData
+            marketData = await self.get_user_marketData(user_data["id"])
             
             # Analyze each supported symbol
             for symbol in self.supported_symbols:
@@ -530,7 +530,7 @@ class SeamountTradingAgent:
                     market_analysis = await self.analyze_market_conditions(symbol)
                     
                     # Generate signal
-                    signal = self.generate_trading_signal(market_analysis, user_data, portfolio)
+                    signal = self.generate_trading_signal(market_analysis, user_data, marketData)
                     
                     if signal:
                         # Save signal to database

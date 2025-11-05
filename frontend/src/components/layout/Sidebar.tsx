@@ -11,16 +11,25 @@ import {
   Activity,
 } from 'lucide-react';
 
+// ➕ ADD THIS INTERFACE
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+}
+
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const navigationItems = [
+// ➕ ADD TYPE ANNOTATION
+const navigationItems: NavItem[] = [
   { name: 'Dashboard', href: '/app', icon: Home },
-  { name: 'Wallet', href: '/app/wallet', icon: WalletIcon },
+  { name: 'Wallet', href: '/app/wallet', icon: WalletIcon, badge: 'New' }, // ➕ EXAMPLE
   { name: 'Send Money', href: '/app/wallet', icon: Send },
-  { name: 'Markets', href: '/app/trading', icon: TrendingUp },
+  { name: 'Markets', href: '/app/trading', icon: TrendingUp, badge: 3 }, // ➕ EXAMPLE
   { name: 'Analytics', href: '/app/analytics', icon: BarChart2 },
 ];
 

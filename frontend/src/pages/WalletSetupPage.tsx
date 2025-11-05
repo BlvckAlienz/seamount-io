@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Shield, Copy, ExternalLink, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import Card from './Card';
-import Button from './Button';
-import { apiService } from '../services/apiService';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { apiClient } from '../config/api';
 import { useAuth } from '../contexts/AuthContext';
 
 interface WalletSetupProps {
@@ -28,18 +28,17 @@ const WalletSetup: React.FC<WalletSetupProps> = ({ userId, onComplete }) => {
     
     try {
       // Create wallet through API service
-      const response = await apiService.request<{ success: boolean; address: string }>(
-        '/payment-engine/create-wallet',
-        'POST',
+      const response = await apiClient.post<{ success: boolean; address: string }>(
+        '/api/v1/wallet/create',
         { userId }
       );
       
-      if (!response.success || !response.address) {
+      if (!response.data.success || !response.data.address) {
         throw new Error('Failed to create wallet');
       }
       
-      setWallet({ address: response.address });
-      onComplete({ address: response.address });
+      setWallet({ address: response.data.address });
+      onComplete({ address: response.data.address });
     } catch (err) {
       console.error('Wallet creation failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to create wallet');

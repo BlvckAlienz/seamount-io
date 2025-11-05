@@ -6,14 +6,16 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   minKycLevel?: number;
   requiredRole?: 'tribe' | 'alien';
-  allowRestricted?: boolean; // New prop to allow restricted access
+  allowRestricted?: boolean;
+  adminRequired?: boolean; // ADD THIS PROP
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   minKycLevel = 0,
   requiredRole,
-  allowRestricted = false // Default to false for security
+  allowRestricted = false,
+  adminRequired = false // ADD WITH DEFAULT
 }) => {
   const { user, role, loading } = useAuth();
 
@@ -22,8 +24,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-  return <Navigate to="/" replace />;
-}
+    return <Navigate to="/" replace />;
+  }
+
+  // ADD ADMIN CHECK
+  if (adminRequired && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   // Check if user meets KYC requirements
   const meetsKycRequirement = user.kyc_level >= minKycLevel;

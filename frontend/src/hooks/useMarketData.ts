@@ -10,7 +10,7 @@ export const useMarketData = () => {
     try {
       setLoading(true);
       // Use the correct endpoint path
-      const response = await apiClient.get('/api/v1/portfolio/summary');
+      const response = await apiClient.get('/api/v1/marketData/summary');
       setMarketData(response.data);
       setError(null);
     } catch (err: any) {

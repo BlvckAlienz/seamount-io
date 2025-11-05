@@ -1,10 +1,10 @@
-// File: frontend/src/services/portfolio.ts (CREATE THIS FILE)
+// File: frontend/src/services/marketData.ts (CREATE THIS FILE)
 
 import { apiClient } from '../config/api';
 
-export const portfolioService = {
-  async getPortfolio(userId: string) {
-    const { data } = await apiClient.get(`/api/v1/portfolio/summary`);
+export const marketDataService = {
+  async getmarketData(userId: string) {
+    const { data } = await apiClient.get(`/api/v1/marketData/summary`);
     return data;
   },
   

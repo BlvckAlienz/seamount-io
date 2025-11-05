@@ -1,6 +1,6 @@
-import { Portfolio, Asset, Transaction, Order, Position, ChartDataPoint, OrderBook, Contact, RiskMetrics } from '../types';
+import { marketData, Asset, Transaction, Order, Position, ChartDataPoint, OrderBook, Contact, RiskMetrics } from '../types';
 
-export const mockPortfolio: Portfolio = {
+export const mockmarketData: marketData = {
   totalBalance: 125429.87,
   totalPnL: 8542.33,
   totalPnLPercentage: 7.31,
@@ -133,27 +133,29 @@ export const mockOrders: Order[] = [
 export const mockPositions: Position[] = [
   {
     id: '1',
-    asset: 'BTC',
+    asset: 'BTC/USD',
     side: 'long',
     size: 0.5,
-    entryPrice: 65400.00,
-    markPrice: 67450.32,
-    pnl: 1025.16,
-    pnlPercentage: 3.13,
-    margin: 6540.00,
+    entryPrice: 45000,
+    markPrice: 47000,
+    pnl: 1000,
+    pnlPercentage: 4.44,
+    margin: 4500,
     leverage: 5,
+    timestamp: new Date('2025-01-15T10:00:00Z'), // ➕ ADD THIS
   },
   {
     id: '2',
-    asset: 'ETH',
+    asset: 'ETH/USD',
     side: 'short',
-    size: 2.0,
-    entryPrice: 4100.00,
-    markPrice: 3842.67,
-    pnl: 514.66,
-    pnlPercentage: 6.28,
-    margin: 1640.00,
+    size: 10,
+    entryPrice: 2500,
+    markPrice: 2450,
+    pnl: 500,
+    pnlPercentage: 2.0,
+    margin: 5000,
     leverage: 5,
+    timestamp: new Date('2025-01-15T12:00:00Z'), // ➕ ADD THIS
   },
 ];
 

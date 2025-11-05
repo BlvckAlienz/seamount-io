@@ -1,7 +1,7 @@
 import React from 'react';
 import { HelpCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Button from './Button';
+import { Button } from '@/components/ui/button';
 
 const QuickAccessButton: React.FC = () => {
   return (
@@ -9,8 +9,8 @@ const QuickAccessButton: React.FC = () => {
       <Link to="/help">
         <Button
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg"
-          icon={HelpCircle}
         >
+          <HelpCircle className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Help & Support</span>
           <span className="sm:hidden">Help</span>
         </Button>

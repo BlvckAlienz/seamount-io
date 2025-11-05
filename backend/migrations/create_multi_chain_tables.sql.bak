@@ -375,8 +375,8 @@ $$ LANGUAGE plpgsql;
 -- 13. VIEWS FOR ANALYTICS
 -- ============================================================================
 
--- View: User Portfolio Summary
-CREATE OR REPLACE VIEW v_user_portfolio AS
+-- View: User marketData Summary
+CREATE OR REPLACE VIEW v_user_marketData AS
 SELECT 
     u.id AS user_id,
     u.email,
@@ -908,7 +908,7 @@ BEGIN
         'avg_chains_per_user', AVG(chains_active),
         'total_wallet_balance_usd', SUM(total_balance_usd)
     ) INTO result
-    FROM v_user_portfolio;
+    FROM v_user_marketData;
     
     RETURN result;
 END;

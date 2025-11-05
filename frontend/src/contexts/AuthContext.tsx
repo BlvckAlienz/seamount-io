@@ -10,6 +10,7 @@ import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { retryWithBackoff } from '../utils/retry';
 import toast from 'react-hot-toast';
+import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 
 interface AuthState {
   session: Session | null;
@@ -36,6 +37,9 @@ interface AuthContextType extends AuthState {
   updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
   refreshProfile: () => Promise<void>;
+  // ADD THESE TWO PROPERTIES:
+  kycStatus: string;
+  skipVerification: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -297,6 +301,12 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const skipVerification = useCallback(() => {
+    console.log('[Auth] Skipping verification');
+    // This is a no-op for now, just to satisfy the TypeScript interface
+    toastInfo('Verification skipped for demo purposes');
+  }, []);
+
   const enterDemoMode = () => {
     setState({
       session: null,
@@ -504,7 +514,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       completeOnboarding,
       refreshProfile,
       updateUserRole,
-      triggerWalletCreation
+      triggerWalletCreation,
+      kycStatus: state.user?.kyc_status || 'not_started',
+      skipVerification
     }}>
       {children}
     </AuthContext.Provider>

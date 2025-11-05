@@ -82,7 +82,7 @@ const MobileOptimizations: React.FC<MobileOptimizationsProps> = ({ children }) =
         {children}
       </div>
 
-      <style jsx>{`
+      <style>{`
         .touch-optimization {
           /* Larger touch targets for mobile */
         }

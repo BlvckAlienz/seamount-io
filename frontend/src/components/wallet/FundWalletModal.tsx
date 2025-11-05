@@ -55,7 +55,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
 
     try {
-      const response = await api.post('/onramp/quote', {
+      const response = await api.post<any>('/onramp/quote', {
         amount: parseFloat(amount),
         currency,
         asset,
@@ -80,14 +80,14 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     setError(null)
 
     try {
-      const response = await api.post('/onramp/initialize', {
+      const response = await api.post<any>('/onramp/initialize', {
         amount: parseFloat(amount),
         currency,
         asset,
       })
 
       // Redirect to payment page
-      if (response.data.payment_url) {
+      if (response.data?.payment_url) {
         window.location.href = response.data.payment_url
       } else {
         throw new Error('No payment URL received')

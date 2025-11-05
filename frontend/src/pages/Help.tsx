@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, HelpCircle, MessageCircle, Book, Mail, Phone, ExternalLink } from 'lucide-react';
-import Card from '../components/Card';
-import Button from '../components/Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 const Help: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +26,7 @@ const Help: React.FC = () => {
       id: 2,
       category: 'wallet',
       question: 'What is USDS and how does it work?',
-      answer: 'USDS is Seamount\'s stablecoin, pegged to the US Dollar. It provides stability for your portfolio and can be used for trading, transfers, and as a safe haven during market volatility.',
+      answer: 'USDS is Seamount\'s stablecoin, pegged to the US Dollar. It provides stability for your marketData and can be used for trading, transfers, and as a safe haven during market volatility.',
     },
     {
       id: 3,
@@ -67,7 +67,7 @@ const Help: React.FC = () => {
       </div>
 
       {/* Search and Categories */}
-      <Card>
+      <Card className="p-6">
         <div className="space-y-4">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -87,7 +87,7 @@ const Help: React.FC = () => {
               <Button
                 key={category.id}
                 size="sm"
-                variant={selectedCategory === category.id ? 'primary' : 'ghost'}
+                variant={selectedCategory === category.id ? 'default' : 'ghost'}
                 onClick={() => setSelectedCategory(category.id)}
               >
                 {category.name}
@@ -99,7 +99,7 @@ const Help: React.FC = () => {
 
       {/* Contact Options */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card hover className="text-center">
+        <Card className="text-center hover:shadow-lg transition-shadow">
           <MessageCircle className="h-12 w-12 text-blue-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">Live Chat</h3>
           <p className="text-gray-400 text-sm mb-4">
@@ -108,7 +108,7 @@ const Help: React.FC = () => {
           <Button className="w-full">Start Chat</Button>
         </Card>
 
-        <Card hover className="text-center">
+        <Card className="text-center hover:shadow-lg transition-shadow">
           <Mail className="h-12 w-12 text-green-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">Email Support</h3>
           <p className="text-gray-400 text-sm mb-4">
@@ -117,7 +117,7 @@ const Help: React.FC = () => {
           <Button variant="secondary" className="w-full">Send Email</Button>
         </Card>
 
-        <Card hover className="text-center">
+        <Card className="text-center hover:shadow-lg transition-shadow">
           <Book className="h-12 w-12 text-purple-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">Documentation</h3>
           <p className="text-gray-400 text-sm mb-4">

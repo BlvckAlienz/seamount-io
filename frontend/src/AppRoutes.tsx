@@ -2,6 +2,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 // Components
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -11,7 +12,7 @@ import AuthModal from './components/auth/AuthModal';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import OnboardingPage from './pages/OnboardingPage';
-import PortfolioPage from './pages/PortfolioPage';
+import MarketDataPage from './pages/marketDataPage';
 import TradingPage from './pages/TradingPage';
 import PaymentsPage from './pages/PaymentsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -24,6 +25,8 @@ const AppRoutes: React.FC = () => {
   const { loading } = useAuth();
   const [showAuthModal, setShowAuthModal] = React.useState(false);
   const [authView, setAuthView] = React.useState<'login' | 'register'>('register');
+  const navigate = useNavigate();
+  const { session } = useAuth();
 
   const handleOpenAuth = (view: 'login' | 'register') => {
     setAuthView(view);
@@ -64,10 +67,10 @@ const AppRoutes: React.FC = () => {
           } 
         />
         <Route 
-          path="/portfolio" 
+          path="/marketData" 
           element={
             <ProtectedRoute minKycLevel={0}>
-              <PortfolioPage />
+              <MarketDataPage />
             </ProtectedRoute>
           } 
         />
@@ -83,7 +86,13 @@ const AppRoutes: React.FC = () => {
           path="/wallet-setup" 
           element={
             <ProtectedRoute minKycLevel={0}>
-              <WalletSetupPage />
+              <WalletSetupPage 
+                userId={session?.user?.id || ''} 
+                onComplete={(wallet) => {
+                  console.log('Wallet created:', wallet);
+                  navigate('/dashboard');
+                }}
+              />
             </ProtectedRoute>
           } 
         />

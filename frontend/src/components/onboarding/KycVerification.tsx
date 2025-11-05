@@ -4,11 +4,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import ComplyCubeVerification from './ComplyCubeVerification';
 import BVNCollectionModal from './BVNCollectionModal';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import UniversalIDModal from './UniversalIDModal';
+import { Button } from '../ui/button';
+import { Card } from '../ui/card';
 import { AlertCircle } from 'lucide-react';
 
 interface ProfileCheck {
@@ -167,7 +166,7 @@ const handleStartKyc = async () => {
   }
 
   // Check if country-specific data needed
-  const needsIDData = ['NG', 'KE', 'GH'].includes(country);
+  const needsIDData = ['NG', 'KE', 'GH'].includes(country || '');
   
   if (needsIDData) {
     // Check if data already collected
@@ -287,16 +286,6 @@ const handleStartKyc = async () => {
     userEmail={user.email || ''}
   />
 )}
-
-  // Show ComplyCube verification
-  if (showComplyCube && profileCheck?.can_start_kyc) {
-    return (
-      <ComplyCubeVerification
-        onComplete={handleComplyCubeComplete}
-        onError={handleComplyCubeError}
-      />
-    );
-  }
 
   // Show KYC status if already in progress or completed
   if (profileCheck?.kyc_status === 'in_progress' || profileCheck?.kyc_status === 'pending') {

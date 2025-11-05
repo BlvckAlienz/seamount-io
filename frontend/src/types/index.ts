@@ -52,7 +52,6 @@ export interface UserProfile {
   last_login_at?: string | null;
   failed_login_attempts?: number;
   account_locked_until?: string | null;
-  // ✅ ADD THESE MISSING FIELDS
   algorand_address?: string | null;
   bvn?: string | null;
   id_number?: string | null;
@@ -60,9 +59,19 @@ export interface UserProfile {
   verification_skipped?: boolean;
   kyc_started_at?: string | null;
   kyc_completed_at?: string | null;
+  
+  // ➕ ADD THESE MISSING PROPERTIES:
+  country?: string;
+  gender?: string;
+  onboarding_complete?: boolean;
+  access_token?: string;
+  user_metadata?: {
+    first_name?: string;
+    last_name?: string;
+  };
 }
 
-export interface Portfolio {
+export interface marketData {
   totalBalance: number;
   totalPnL: number;
   totalPnLPercentage: number;

@@ -32,7 +32,7 @@ export async function requireUser(req: Request, res: Response, next: NextFunctio
     (req as any).authUser = { id: verified.sub };
     next();
   } catch (e) {
-    console.error('[requireUser] validation error:', e.name || e.message); // No secrets leaked
+    console.error('[requireUser] validation error:', (e as Error).name || (e as Error).message);
     return res.status(401).json({ error: 'unauthorized' });
   }
 }

@@ -1,17 +1,18 @@
 // File Location: frontend/src/components/payments/PaymentFlow.tsx
 // Description: The definitive, corrected, and production-ready fiat on-ramp flow component.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { CreditCard, Smartphone, Globe, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/config/api';
+import toast from 'react-hot-toast';
 
 // --- Type Definitions ---
 interface PaymentFlowProps {
+  userId?: string;
   onComplete: (result: any) => void;
-  onCancel?: () => void;
 }
 
 type PaymentStep = 'details' | 'confirm' | 'processing' | 'success' | 'error';
@@ -40,9 +41,10 @@ const paymentMethods: { key: PaymentMethod, icon: React.FC<any>, label: string, 
   { key: 'wire_transfer', icon: Globe, label: 'Wire Transfer', desc: '2-3 business days' }
 ];
 
-const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
+const PaymentFlow: React.FC<PaymentFlowProps> = ({ userId, onComplete }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<PaymentStep>('details');
+  const [currentStepNumber, setCurrentStepNumber] = useState<number>(1);
   const [paymentData, setPaymentData] = useState<PaymentData>({
     amount: '',
     currency: 'USD',
@@ -51,6 +53,18 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync step number with step name
+  useEffect(() => {
+    const stepMap: Record<PaymentStep, number> = {
+      'details': 1,
+      'confirm': 2,
+      'processing': 3,
+      'success': 4,
+      'error': 4
+    };
+    setCurrentStepNumber(stepMap[currentStep]);
+  }, [currentStep]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -82,8 +96,6 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
 
       if (response.data && response.data.payment_link) {
         window.open(response.data.payment_link, '_blank');
-        // A robust implementation would listen for a webhook or poll for completion.
-        // For this flow, we will assume completion after a delay.
         setTimeout(() => {
           setCurrentStep('success');
           onComplete(response.data);
@@ -101,22 +113,21 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
   }, [paymentData, user, onComplete]);
 
   const initiateNGNOnRamp = async (amountNGN: number) => {
-  try {
-    const { data } = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
-      user_id: user.id,
-      user_email: user.email,
-      user_phone: user.phone,
-      amount_fiat: amountNGN,
-      currency: "NGN"
-    });
-    
-    // Redirect to Paystack payment page
-    window.location.href = data.payment_url;
-    
-  } catch (error) {
-    toast.error("On-ramp failed: " + error.message);
-  }
-};
+    try {
+      const { data } = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
+        user_id: user?.id || '',
+        user_email: user?.email || '',
+        user_phone: user?.phone || user?.phone_number || '',
+        amount_fiat: amountNGN,
+        currency: "NGN"
+      });
+      
+      window.location.href = data.payment_url;
+      
+    } catch (error) {
+      toast.error("On-ramp failed: " + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
 
   const renderContent = () => {
     switch (currentStep) {
@@ -195,10 +206,10 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ onComplete, onCancel }) => {
         <div className="flex items-center">
           {[1, 2, 3, 4].map((step, index, arr) => (
             <React.Fragment key={step}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${currentStep >= step ? 'bg-blue-500' : 'bg-gray-700'}`}>
-                {currentStep > step ? <CheckCircle className="h-5 w-5" /> : step}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${currentStepNumber >= step ? 'bg-blue-500' : 'bg-gray-700'}`}>
+                {currentStepNumber > step ? <CheckCircle className="h-5 w-5" /> : step}
               </div>
-              {index < arr.length - 1 && <div className={`flex-1 h-1 mx-4 ${currentStep > step ? 'bg-blue-500' : 'bg-gray-700'}`} />}
+              {index < arr.length - 1 && <div className={`flex-1 h-1 mx-4 ${currentStepNumber > step ? 'bg-blue-500' : 'bg-gray-700'}`} />}
             </React.Fragment>
           ))}
         </div>

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 
 const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 minutes
 const WARNING_DURATION = 2 * 60 * 1000; // Warn 2 minutes before
@@ -57,13 +58,11 @@ export const useAutoLogout = () => {
     if (!isMountedRef.current || warningShownRef.current) return;
     
     warningShownRef.current = true;
-    toast.warning(
-      'You will be logged out in 2 minutes due to inactivity',
-      { 
-        duration: 5000,
-        id: 'auto-logout-warning' // Prevent duplicates
-      }
-    );
+    toast('You will be logged out soon due to inactivity', {
+      duration: 5000,
+      id: 'auto-logout-warning',
+      icon: 'ℹ️'
+    });
   }, []);
 
   // ✅ Memoized resetTimer - safe for dependency arrays

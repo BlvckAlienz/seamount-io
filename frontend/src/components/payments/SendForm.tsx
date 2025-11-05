@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Send, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toastWarning } from '@/lib/toast-helpers';
 
 interface SendFormProps {
   onSuccess?: () => void
@@ -43,7 +44,7 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
     }
 
     try {
-      const response = await api.post('/payments/quote', {
+      const response = await api.post<any>('/payments/quote', {
         recipient,
         asset,
         amount: parseFloat(amount),
@@ -68,14 +69,14 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
     setError(null)
 
     try {
-      const response = await api.post('/payments/send', {
+      const response = await api.post<any>('/payments/send', {
         recipient,
         asset,
         amount: parseFloat(amount),
       })
 
-      if (response.data.kyc_required) {
-        toast.warning('KYC verification required')
+      if (response.data?.kyc_required) {
+        toastWarning('KYC verification required')
         onKYCRequired?.()
       } else {
         toast.success(`Successfully sent ${amount} ${asset} to ${recipient}`)

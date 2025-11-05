@@ -4,6 +4,7 @@ import { X, Wallet, Shield, User, Bell, Globe, Key, LogOut, Eye, EyeOff, Check, 
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../config/api';
+import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -136,7 +137,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   </button>
 
                   <button
-                    onClick={() => toast.info('Multi-chain wallet connection coming soon')}
+                    onClick={() => toastInfo('Multi-chain wallet connection coming soon')}
                     className="flex items-center gap-3 p-4 border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
                   >
                     <Wallet className="h-5 w-5 text-blue-400" />
@@ -161,7 +162,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                         <div className="text-gray-400 text-sm">Add extra security to your account</div>
                       </div>
                       <button
-                        onClick={() => toast.info('2FA setup coming soon')}
+                        onClick={() => toastInfo('2FA setup coming soon')}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm"
                       >
                         Enable
@@ -176,7 +177,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                         <div className="text-gray-400 text-sm">Manage active login sessions</div>
                       </div>
                       <button
-                        onClick={() => toast.info('Session management coming soon')}
+                        onClick={() => toastInfo('Session management coming soon')}
                         className="px-4 py-2 border border-gray-600 hover:bg-gray-700 rounded-lg text-white text-sm"
                       >
                         View
@@ -222,7 +223,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   <button
-                    onClick={() => toast.info('Profile editing coming soon')}
+                    onClick={() => toastInfo('Profile editing coming soon')}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
                   >
                     Edit Profile

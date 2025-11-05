@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../config/api';
+import logger from '@/utils/logger';
 
 // Define the shape of our wallet state
 interface WalletState {

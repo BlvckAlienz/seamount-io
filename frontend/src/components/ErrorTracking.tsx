@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, X, TrendingDown } from 'lucide-react';
-import Card from './Card';
-import Button from './Button';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface ErrorLog {
   timestamp: number;
@@ -65,7 +65,7 @@ const ErrorTracking: React.FC = () => {
       {/* Error tracking modal */}
       {showErrors && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden">
+          <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
@@ -133,7 +133,7 @@ const ErrorTracking: React.FC = () => {
 
             <div className="flex space-x-3 mt-6 pt-6 border-t border-gray-700">
               <Button 
-                variant="danger" 
+                variant="destructive" 
                 size="sm"
                 onClick={() => {
                   localStorage.removeItem('seamount-errors');

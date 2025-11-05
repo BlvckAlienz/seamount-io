@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Menu, User, ChevronDown, Wifi, WifiOff, Settings, LogOut, Key } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onMenuClick: () => void;

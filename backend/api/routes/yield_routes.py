@@ -334,9 +334,9 @@ async def get_tier_info(
             detail="Failed to fetch tier information. Please try again."
         )
 
-@router.get("/portfolio")
+@router.get("/marketData")
 @limiter.limit("30/minute")
-async def get_yield_portfolio(
+async def get_yield_marketData(
     request: Request,
     current_user: dict = Depends(get_current_user),
     db_service: DatabaseService = Depends(get_db_service),
@@ -344,23 +344,23 @@ async def get_yield_portfolio(
     oracle_service: EnhancedOracleService = Depends(get_oracle_service)
 ):
     """
-    Get comprehensive yield portfolio summary
+    Get comprehensive yield marketData summary
     
     **Returns:**
-    - Total portfolio value
+    - Total marketData value
     - Breakdown by tier
     - Total earnings
     - Performance vs benchmarks
     """
     
     try:
-        logger.info(f"Fetching yield portfolio for user: {current_user['id']}")
+        logger.info(f"Fetching yield marketData for user: {current_user['id']}")
         
         service = YieldManagerService(db_service, audit_service, oracle_service)
         
         stakes = await service.get_user_stakes(current_user["id"])
         
-        # Calculate portfolio metrics
+        # Calculate marketData metrics
         active_stakes = [s for s in stakes if s["status"] == "active"]
         
         total_value = sum(float(s["current_value"]) for s in active_stakes)
@@ -385,7 +385,7 @@ async def get_yield_portfolio(
         
         return {
             "success": True,
-            "portfolio_summary": {
+            "marketData_summary": {
                 "total_value": total_value,
                 "total_principal": total_principal,
                 "total_yield": total_yield,
@@ -398,10 +398,10 @@ async def get_yield_portfolio(
         }
         
     except Exception as e:
-        logger.error(f"Failed to fetch yield portfolio: {e}", exc_info=True)
+        logger.error(f"Failed to fetch yield marketData: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch portfolio. Please try again."
+            detail="Failed to fetch marketData. Please try again."
         )
 
 @router.get("/strategies")

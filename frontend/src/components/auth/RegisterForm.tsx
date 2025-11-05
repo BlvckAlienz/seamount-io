@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import countryList from 'react-select-country-list';
 import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/config/api';
+import logger from '@/utils/logger';
 
 interface IRegisterFormProps {
   onSuccess?: () => void;
@@ -235,28 +237,23 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
     setLoading(true);
     
     try {
-      // Prepare clean signup data with proper structure
-      const signUpData = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        countryCode: formData.countryCode.toUpperCase(),
-        ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken }),
-      };
-
-      console.log('[Form] Calling signUp with data:', signUpData);
-      
+      // ✅ SINGLE SOURCE OF TRUTH: Supabase signup with metadata
       const { data, error } = await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
         options: {
-          data: signUpData,
+          data: {
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            countryCode: formData.countryCode.toUpperCase(),
+          },
           ...(isHcaptchaEnabled && { captchaToken: formData.captchaToken })
         }
       });
 
       if (error) throw error;
 
-      // ✅ CRITICAL: Create profile immediately
+      // ✅ Profile creation - backend trigger handles this, but we try anyway
       if (data.user) {
         try {
           await apiClient.post('/api/v1/user/profile', {
@@ -268,24 +265,8 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           });
           console.log('[Register] ✅ Profile created');
         } catch (profileError) {
-          console.error('[Register] Profile creation failed:', profileError);
-        }
-      }
-
-      // ✅ CRITICAL: Create profile immediately after signup
-      if (response.success) {
-        try {
-          await apiClient.post('/api/v1/user/profile', {
-            id: response.user.id, // Supabase returns user object
-            email: formData.email.trim(),
-            firstName: formData.firstName.trim(),
-            lastName: formData.lastName.trim(),
-            countryCode: formData.countryCode.toUpperCase()
-          });
-          logger.info('[Register] Profile created successfully');
-        } catch (profileError) {
-          logger.error('[Register] Profile creation failed:', profileError);
-          // Don't block signup - profile will be created on first login
+          console.error('[Register] Profile creation failed (backend will retry):', profileError);
+          // Don't block signup - backend trigger will create profile
         }
       }
       

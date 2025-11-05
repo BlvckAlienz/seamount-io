@@ -59,9 +59,9 @@ curl -s -X POST "$API_URL/whitelabel/quote" \
 -H "Content-Type: application/json" \
 -d '{"from_currency":"USD","to_currency":"KES","amount":100}' | jq .
 
-# Portfolio summary
-echo "[10] Portfolio summary..."
-curl -s -X GET "$API_URL/portfolio/summary" \
+# marketData summary
+echo "[10] marketData summary..."
+curl -s -X GET "$API_URL/marketData/summary" \
 -H "Authorization: Bearer $BEARER_TOKEN" | jq .
 
 # Compliance alerts

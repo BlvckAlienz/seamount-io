@@ -20,7 +20,7 @@ import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 import { FundWalletModal } from '@/components/wallet/FundWalletModal';
 import { WithdrawModal } from '@/components/wallet/WithdrawModal';
 import { SendForm } from '@/components/payments/SendForm';
-
+import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -132,7 +132,7 @@ const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate(); // 🔥 ADD THIS LINE - useNavigate MUST be called here
   const [loading, setLoading] = useState(true);
-  const [portfolioData, setPortfolioData] = useState<any>(null);
+  const [marketDataData, setmarketDataData] = useState<any>(null);
   const [kycInfo, setKycInfo] = useState({
     status: 'not_started',
     cumulative_volume: 0,
@@ -151,6 +151,8 @@ const DashboardPage = () => {
   // Payment modal states
   const [showFundModal, setShowFundModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -235,7 +237,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (user && userProfile) {
-      fetchPortfolioData();
+      fetchmarketDataData();
       fetchKYCStatus();
       fetchMultiChainWallets();
       fetchWalletCreationStatus();
@@ -256,7 +258,7 @@ const DashboardPage = () => {
   const handleRetrySuccess = () => {
     fetchWalletCreationStatus();
     fetchMultiChainWallets();
-    fetchPortfolioData();
+    fetchmarketDataData();
   };
 
   const fetchMultiChainWallets = async () => {
@@ -267,7 +269,7 @@ const DashboardPage = () => {
         const wallets = {};
         Object.entries(response.data.chains || {}).forEach(([chain, data]: [string, any]) => {
           if (data.address) {
-            wallets[chain] = { address: data.address };
+            (wallets as Record<string, any>)[chain] = { address: data.address };
           }
         });
         setMultiChainWallets(wallets);
@@ -288,18 +290,18 @@ const DashboardPage = () => {
   };
 
   const calculateChainBalance = (chain: string) => {
-    if (!portfolioData?.assets) return 0;
-    return portfolioData.assets
+    if (!marketDataData?.assets) return 0;
+    return marketDataData.assets
       .filter((asset: any) => getAssetChain(asset.symbol) === chain)
       .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
   };
 
-  const fetchPortfolioData = async () => {
+  const fetchmarketDataData = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/wallet/balances');
       if (response.data.success) {
-        setPortfolioData({
+        setmarketDataData({
           total_usd: response.data.total_usd,
           assets: response.data.assets,
           timestamp: response.data.timestamp
@@ -309,9 +311,9 @@ const DashboardPage = () => {
         }
       }
     } catch (error: any) {
-      console.error('Portfolio fetch error:', error);
+      console.error('marketData fetch error:', error);
       if (userProfile?.algorand_address) {
-        setPortfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
+        setmarketDataData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
       }
     } finally {
       setLoading(false);
@@ -371,7 +373,7 @@ const DashboardPage = () => {
     }
   };
 
-  const totalBalance = portfolioData?.total_usd || 0;
+  const totalBalance = marketDataData?.total_usd || 0;
   const createdChains = Object.keys(multiChainWallets).filter(chain => multiChainWallets[chain]?.address).length;
 
   if (loading) {
@@ -379,7 +381,7 @@ const DashboardPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading your portfolio...</p>
+          <p className="text-gray-400">Loading your marketData...</p>
         </div>
       </div>
     );
@@ -391,7 +393,7 @@ const DashboardPage = () => {
         {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">marketData</h1>
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
           <div className="flex items-center gap-3">
@@ -401,13 +403,13 @@ const DashboardPage = () => {
               <Wallet className="h-4 w-4" />
               Fund
             </button>
-            <button onClick={() => toast.info('Send functionality coming soon!')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+            <button onClick={() => toastInfo('Send functionality coming soon!')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
               <ArrowUpRight className="h-4 w-4" />Send
             </button>
-            <button onClick={() => toast.info('Swap functionality coming soon!')} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+            <button onClick={() => toastInfo('Swap functionality coming soon!')} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
               <SwapIcon className="h-4 w-4" />Swap
             </button>
-            <button onClick={() => toast.info('Earn functionality coming soon!')} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
+            <button onClick={() => toastInfo('Earn functionality coming soon!')} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
               <TrendingUp className="h-4 w-4" />Earn
             </button>
             <button 
@@ -475,7 +477,7 @@ const DashboardPage = () => {
                 <div className="text-sm text-gray-400 mb-1">Total Balance</div>
                 <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
               </div>
-              <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
+              <button onClick={fetchmarketDataData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
                 <RefreshCw className="h-5 w-5" />
               </button>
             </div>
@@ -503,9 +505,9 @@ const DashboardPage = () => {
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[
-              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toast.info('Send functionality coming soon!') },
-              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toast.info('Swap feature coming soon!') },
-              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toast.info('Yield farming coming soon!') },
+              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toastInfo('Send functionality coming soon!') },
+              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toastInfo('Swap feature coming soon!') },
+              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toastInfo('Yield farming coming soon!') },
             ].map(action => (
               <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
                 <action.icon className={`h-6 w-6 ${action.color}`} />
@@ -526,7 +528,7 @@ const DashboardPage = () => {
                 <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
               </div>
             </div>
-            <button onClick={() => toast.info('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
+            <button onClick={() => toastInfo('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
               Send Money
             </button>
           </div>
@@ -550,12 +552,8 @@ const DashboardPage = () => {
       
       {showRecoveryModal && (
         <WalletRecoveryModal
-          isOpen={showRecoveryModal}
-          onClose={() => {
-            setShowRecoveryModal(false);
-            setNewWalletsForBackup([]); // Clear after closing
-          }}
-          newWalletsOnly={newWalletsForBackup.length > 0 ? newWalletsForBackup : undefined}
+          isOpen={showBackupModal}
+          onClose={() => setShowBackupModal(false)}
         />
       )}
       <FundWalletModal 

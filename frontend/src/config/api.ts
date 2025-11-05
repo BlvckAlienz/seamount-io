@@ -43,8 +43,8 @@ const API_ENDPOINTS = {
     SKIP_VERIFICATION: '/api/v1/kyc/skip-verification',
     REQUIREMENTS: '/api/v1/kyc/requirements',
   },
-  PORTFOLIO: {
-    SUMMARY: '/api/v1/portfolio/summary', // FIXED: missing endpoint
+  marketData: {
+    SUMMARY: '/api/v1/marketData/summary', // FIXED: missing endpoint
   },
   TRADING: {
     SWAP: '/api/v1/trading/swap',
@@ -132,8 +132,8 @@ const walletAPI = {
   create: () => apiClient.post(API_ENDPOINTS.WALLET.CREATE),
 };
 
-const portfolioAPI = {
-  getSummary: () => apiClient.get(API_ENDPOINTS.PORTFOLIO.SUMMARY), // NEW
+const marketDataAPI = {
+  getSummary: () => apiClient.get(API_ENDPOINTS.marketData.SUMMARY), // NEW
 };
 
 const tradingAPI = {
@@ -159,7 +159,7 @@ export {
   userAPI,
   kycAPI,
   walletAPI,
-  portfolioAPI,
+  marketDataAPI,
   tradingAPI,
   seedAPI,
   initializeSession,

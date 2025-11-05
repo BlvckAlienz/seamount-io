@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, User, Shield } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import Button from './Button';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 import AuthModal from './AuthModal';
 
 interface AuthButtonProps {
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'default' | 'secondary' | 'ghost';
   className?: string;
 }
 
 const AuthButton: React.FC<AuthButtonProps> = ({ 
-  variant = 'primary',
+  variant = 'default',
   className = ''
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,9 +39,9 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         <Button 
           variant={variant}
           className={`bg-gradient-to-r from-yellow-600 to-amber-600 ${className}`}
-          icon={Shield}
           onClick={handleKycClick}
         >
+          <Shield className="h-4 w-4 mr-2" />
           Verify Identity
         </Button>
       );
@@ -52,8 +52,8 @@ const AuthButton: React.FC<AuthButtonProps> = ({
       <Button
         variant={variant}
         className={`bg-gradient-to-r from-green-600 to-teal-600 ${className}`}
-        icon={User}
       >
+        <User className="h-4 w-4 mr-2" />
         <span className="hidden md:inline">Account</span>
         <span className="inline md:hidden">Profile</span>
       </Button>
@@ -67,17 +67,17 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         <Button
           variant="secondary"
           className={className}
-          icon={LogIn}
           onClick={handleLoginClick}
         >
+          <LogIn className="h-4 w-4 mr-2" />
           Sign In
         </Button>
         <Button
           variant={variant}
           className={`bg-gradient-to-r from-blue-600 to-purple-600 ${className}`}
-          icon={UserPlus}
           onClick={handleRegisterClick}
         >
+          <UserPlus className="h-4 w-4 mr-2" />
           <span className="hidden md:inline">Create Account</span>
           <span className="inline md:hidden">Sign Up</span>
         </Button>

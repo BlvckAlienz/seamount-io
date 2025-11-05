@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
-import { authService } from '../services/authService';
-import Button from './Button';
-import Card from './Card';
+import { authService } from '@/services/authService';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -31,10 +31,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) =
 
     try {
       if (mode === 'login') {
-        const success = await authService.login({
-          email: formData.email,
-          password: formData.password
-        });
+        const { error } = await authService.signIn(formData.email, formData.password);
+        const success = !error;
 
         if (success) {
           onSuccess?.();
@@ -49,11 +47,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) =
           return;
         }
 
-        const success = await authService.register({
-          email: formData.email,
-          password: formData.password,
+        const { error } = await authService.signUp(formData.email, formData.password, {
           name: formData.name
         });
+        const success = !error;
 
         if (success) {
           onSuccess?.();
@@ -76,7 +73,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) =
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md relative" glassy>
+      <Card className="w-full max-w-md relative p-6">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
@@ -185,10 +182,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) =
 
           <Button
             type="submit"
-            loading={loading}
+            disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-            icon={mode === 'login' ? LogIn : UserPlus}
           >
+            {mode === 'login' ? <LogIn className="h-4 w-4 mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
             {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </Button>
         </form>

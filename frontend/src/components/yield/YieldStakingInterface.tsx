@@ -58,7 +58,7 @@ const YieldStakingInterface: React.FC = () => {
       {/* Tier Selection */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {tiers.map((tier: any) => {
-          const Icon = tierIcons[tier.tier];
+          const Icon = tierIcons[tier.tier as keyof typeof tierIcons];
           return (
             <Card
               key={tier.tier}

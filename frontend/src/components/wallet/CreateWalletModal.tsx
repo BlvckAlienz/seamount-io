@@ -96,7 +96,7 @@ const CreateWalletModal: React.FC<CreateWalletModalProps> = ({
       
       if (response.data.success) {
         setCreationProgress(prev => ({ ...prev, [chain]: 'success' }));
-        setCreatedWallets(prev => ({
+        setCreatedWallets((prev: Record<string, any>) => ({
           ...prev,
           [chain]: response.data.wallet
         }));

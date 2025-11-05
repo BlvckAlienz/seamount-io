@@ -150,7 +150,7 @@ export const validateEnvironment = (): EnvironmentStatus => {
     optionalServices.push({
       name: 'Supabase',
       status: 'configured',
-      description: 'User data & portfolio sync',
+      description: 'User data & marketData sync',
       required: false
     });
   } else {
