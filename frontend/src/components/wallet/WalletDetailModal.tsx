@@ -492,30 +492,30 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-blue-500/30 shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white dark:bg-white rounded-2xl max-w-6xl w-full max-h-[92vh] overflow-hidden border-2 border-gray-300 shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b-2 border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
           <div>
-            <h2 className="text-2xl font-bold text-white">{chainName} Wallet</h2>
-            <p className="text-gray-400 text-sm">Live asset performance and trading</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{chainName} Wallet</h2>
+            <p className="text-gray-600 text-sm sm:text-base">Live asset performance and trading</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-700 hover:text-gray-900"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <div className="flex flex-col lg:flex-row h-[calc(90vh-120px)]">
+        <div className="flex flex-col lg:flex-row h-[calc(92vh-100px)]">
           {/* Sidebar - Asset Selection */}
-          <div className="lg:w-80 border-r border-gray-700 p-6 overflow-auto">
+          <div className="lg:w-80 border-b lg:border-r lg:border-b-0 border-gray-200 p-3 sm:p-6 overflow-auto bg-gray-50">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Assets</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Assets</h3>
               <button
                 onClick={fetchPriceData}
-                className="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                className="p-2 hover:bg-gray-200 rounded transition-colors text-gray-700"
                 title="Refresh prices"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -528,23 +528,23 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                   <button
                     key={asset.symbol}
                     onClick={() => setSelectedAsset(asset.symbol)}
-                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                    className={`w-full text-left p-3 rounded-lg transition-all border-2 ${
                       selectedAsset === asset.symbol
-                        ? 'bg-blue-600 text-white shadow-lg'
-                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-lg'
+                        : 'bg-white hover:bg-gray-100 text-gray-900 border-gray-200'
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <div className="font-medium">{asset.symbol}</div>
+                      <div className="font-bold text-base">{asset.symbol}</div>
                       {assetPrice && !assetPrice.priceLoading && (
-                        <div className="text-sm font-mono">
+                        <div className="text-sm font-mono font-semibold">
                           ${assetPrice.livePrice?.toFixed(2) || assetPrice.price.toFixed(2)}
                         </div>
                       )}
                     </div>
-                    <div className="text-sm opacity-75">{asset.name}</div>
+                    <div className="text-sm opacity-90">{asset.name}</div>
                     {assetPrice?.priceError && (
-                      <div className="text-xs text-yellow-400 mt-1">⚠️ Fallback</div>
+                      <div className="text-xs text-yellow-600 mt-1 font-medium">⚠️ Fallback</div>
                     )}
                   </button>
                 );
@@ -552,15 +552,15 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
             </div>
 
             {/* Wallet Info */}
-            <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-400 mb-2">Wallet Balance</h4>
-              <div className="text-2xl font-bold text-white">${balance.toFixed(2)}</div>
+            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white border-2 border-gray-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Wallet Balance</h4>
+              <div className="text-xl sm:text-2xl font-bold text-gray-900">${balance.toFixed(2)}</div>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(address);
                   toast.success('Address copied!');
                 }}
-                className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full"
+                className="text-xs text-gray-600 hover:text-gray-900 mt-2 flex items-center gap-1 truncate w-full font-medium"
               >
                 <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -569,7 +569,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                 href={getExplorerUrl(chain, address)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300 mt-1 flex items-center gap-1"
+                className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1 font-semibold"
               >
                 View on Explorer
                 <ExternalLink className="w-3 h-3" />
@@ -578,20 +578,20 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 p-6 overflow-auto">
+          <div className="flex-1 p-3 sm:p-6 overflow-auto bg-white">
             {loading && !selectedAsset ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-400">Loading asset data...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600 font-medium">Loading asset data...</p>
                 </div>
               </div>
             ) : selectedAssetData ? (
               <>
                 {/* Asset Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
                   <div>
-                    <h3 className="text-2xl font-bold text-white">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                       {selectedAssetData.name} ({selectedAssetData.symbol})
                     </h3>
                     <div className="flex items-center gap-4 mt-2">
@@ -600,7 +600,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                   </div>
                   <button
                     onClick={handleBuyAsset}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-semibold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
+                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg text-sm sm:text-base"
                   >
                     <ArrowDownLeft className="w-5 h-5" />
                     Buy {selectedAssetData.symbol}
@@ -610,14 +610,14 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                 {/* Live Price Chart */}
                 <LivePriceChart symbol={selectedAssetData.symbol} timeframe="24h" />
 
-                {/* Additional Info - LIVE DATA */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">24h Volume</div>
+                {/* Additional Info */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 sm:p-4">
+                    <div className="text-gray-700 text-sm font-semibold mb-1">24h Volume</div>
                     {selectedAssetData.statsLoading ? (
-                      <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
+                      <div className="animate-pulse bg-gray-300 h-6 w-20 rounded"></div>
                     ) : (
-                      <div className="text-white font-semibold">
+                      <div className="text-gray-900 font-bold text-base sm:text-lg">
                         {selectedAssetData.volume24h && selectedAssetData.volume24h > 0
                           ? selectedAssetData.volume24h >= 1e9
                             ? `$${(selectedAssetData.volume24h / 1e9).toFixed(2)}B`
@@ -626,12 +626,12 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">Market Cap</div>
+                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 sm:p-4">
+                    <div className="text-gray-700 text-sm font-semibold mb-1">Market Cap</div>
                     {selectedAssetData.statsLoading ? (
-                      <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
+                      <div className="animate-pulse bg-gray-300 h-6 w-20 rounded"></div>
                     ) : (
-                      <div className="text-white font-semibold">
+                      <div className="text-gray-900 font-bold text-base sm:text-lg">
                         {selectedAssetData.marketCap && selectedAssetData.marketCap > 0
                           ? selectedAssetData.marketCap >= 1e9
                             ? `$${(selectedAssetData.marketCap / 1e9).toFixed(2)}B`
@@ -640,12 +640,12 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                       </div>
                     )}
                   </div>
-                  <div className="bg-gray-800 rounded-xl p-4">
-                    <div className="text-gray-400 text-sm mb-1">All-Time High</div>
+                  <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 sm:p-4">
+                    <div className="text-gray-700 text-sm font-semibold mb-1">All-Time High</div>
                     {selectedAssetData.statsLoading ? (
-                      <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
+                      <div className="animate-pulse bg-gray-300 h-6 w-20 rounded"></div>
                     ) : (
-                      <div className="text-white font-semibold">
+                      <div className="text-gray-900 font-bold text-base sm:text-lg">
                         {selectedAssetData.ath && selectedAssetData.ath > 0
                           ? `$${selectedAssetData.ath.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
@@ -658,10 +658,10 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                 </div>
               </>
             ) : (
-              <div className="text-center text-gray-400 py-12">
-                <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <h3 className="text-xl font-semibold mb-2">Select an Asset</h3>
-                <p>Choose an asset from the sidebar to view live prices and trading options</p>
+              <div className="text-center text-gray-600 py-12">
+                <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-50 text-gray-400" />
+                <h3 className="text-xl font-semibold mb-2 text-gray-900">Select an Asset</h3>
+                <p className="text-gray-600">Choose an asset from the sidebar to view live prices and trading options</p>
               </div>
             )}
           </div>
