@@ -71,7 +71,7 @@ export interface UserProfile {
   };
 }
 
-export interface marketData {
+export interface portfolio {
   totalBalance: number;
   totalPnL: number;
   totalPnLPercentage: number;
@@ -191,7 +191,7 @@ export interface RiskMetrics {
   sortinoRatio?: number;
 }
 
-export interface MarketData {
+export interface portfolio {
   symbol: string;
   price: number;
   change24h: number;

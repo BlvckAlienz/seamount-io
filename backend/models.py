@@ -138,7 +138,7 @@ class MFASetupResponse(BaseModel):
 class MFAVerifyRequest(BaseModel):
     token: str
 
-class marketDataHolding(BaseModel):
+class portfolioHolding(BaseModel):
     id: str
     user_id: str
     asset: str

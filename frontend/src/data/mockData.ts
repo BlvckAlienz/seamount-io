@@ -1,6 +1,6 @@
-import { marketData, Asset, Transaction, Order, Position, ChartDataPoint, OrderBook, Contact, RiskMetrics } from '../types';
+import { portfolio, Asset, Transaction, Order, Position, ChartDataPoint, OrderBook, Contact, RiskMetrics } from '../types';
 
-export const mockmarketData: marketData = {
+export const mockportfolio: portfolio = {
   totalBalance: 125429.87,
   totalPnL: 8542.33,
   totalPnLPercentage: 7.31,

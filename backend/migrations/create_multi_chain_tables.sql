@@ -355,7 +355,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE VIEW v_user_marketData AS
+CREATE OR REPLACE VIEW v_user_portfolio AS
 SELECT u.id AS user_id, u.email,
     COUNT(DISTINCT mca.blockchain) AS chains_active,
     COALESCE(SUM(mcb.usd_value), 0) AS total_balance_usd,
@@ -759,7 +759,7 @@ BEGIN
         'multi_chain_users', COUNT(DISTINCT CASE WHEN chains_active > 1 THEN user_id END),
         'avg_chains_per_user', AVG(chains_active),
         'total_wallet_balance_usd', SUM(total_balance_usd)
-    ) INTO result FROM v_user_marketData;
+    ) INTO result FROM v_user_portfolio;
     RETURN result;
 END;
 $$ LANGUAGE plpgsql;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, DollarSign, Activity } from 'lucide-react';
 
-const MarketDataPage: React.FC = () => {
+const portfolioPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -46,4 +46,4 @@ const MarketDataPage: React.FC = () => {
   );
 };
 
-export default MarketDataPage;
+export default portfolioPage;

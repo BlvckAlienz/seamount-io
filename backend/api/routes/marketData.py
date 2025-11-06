@@ -1,4 +1,4 @@
-# File: backend/api/routes/marketData.py
+# File: backend/api/routes/portfolio.py
 from fastapi import APIRouter, Depends, HTTPException
 from backend.dependencies import get_current_user, get_db_service, get_algorand_service, get_oracle_service
 from decimal import Decimal
@@ -7,8 +7,8 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/marketData/summary")
-async def get_marketData_summary(
+@router.get("/portfolio/summary")
+async def get_portfolio_summary(
     current_user: dict = Depends(get_current_user),
     db_service = Depends(get_db_service),
     algo_service = Depends(get_algorand_service),
@@ -16,12 +16,12 @@ async def get_marketData_summary(
 ):
     try:
         user_id = current_user['id']
-        logger.info(f"Fetching marketData summary for user: {user_id}")
+        logger.info(f"Fetching portfolio summary for user: {user_id}")
 
         # Get user's wallet - FIX: use algorand_address not wallet_address
         wallet_data = await db_service.get_user_wallet(user_id)
         if not wallet_data:
-            # Return empty marketData instead of error
+            # Return empty portfolio instead of error
             return {
                 "total_balance_usd": 0.0,
                 "assets": [],
@@ -141,5 +141,5 @@ async def get_marketData_summary(
         }
         
     except Exception as e:
-        logger.error(f"Error fetching marketData summary: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error fetching marketData data")
+        logger.error(f"Error fetching portfolio summary: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error fetching portfolio data")

@@ -132,7 +132,7 @@ const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate(); // 🔥 ADD THIS LINE - useNavigate MUST be called here
   const [loading, setLoading] = useState(true);
-  const [marketDataData, setmarketDataData] = useState<any>(null);
+  const [portfolioData, setportfolioData] = useState<any>(null);
   const [kycInfo, setKycInfo] = useState({
     status: 'not_started',
     cumulative_volume: 0,
@@ -237,7 +237,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (user && userProfile) {
-      fetchmarketDataData();
+      fetchportfolioData();
       fetchKYCStatus();
       fetchMultiChainWallets();
       fetchWalletCreationStatus();
@@ -258,7 +258,7 @@ const DashboardPage = () => {
   const handleRetrySuccess = () => {
     fetchWalletCreationStatus();
     fetchMultiChainWallets();
-    fetchmarketDataData();
+    fetchportfolioData();
   };
 
   const fetchMultiChainWallets = async () => {
@@ -290,18 +290,18 @@ const DashboardPage = () => {
   };
 
   const calculateChainBalance = (chain: string) => {
-    if (!marketDataData?.assets) return 0;
-    return marketDataData.assets
+    if (!portfolioData?.assets) return 0;
+    return portfolioData.assets
       .filter((asset: any) => getAssetChain(asset.symbol) === chain)
       .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
   };
 
-  const fetchmarketDataData = async () => {
+  const fetchportfolioData = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/wallet/balances');
       if (response.data.success) {
-        setmarketDataData({
+        setportfolioData({
           total_usd: response.data.total_usd,
           assets: response.data.assets,
           timestamp: response.data.timestamp
@@ -311,9 +311,9 @@ const DashboardPage = () => {
         }
       }
     } catch (error: any) {
-      console.error('marketData fetch error:', error);
+      console.error('portfolio fetch error:', error);
       if (userProfile?.algorand_address) {
-        setmarketDataData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
+        setportfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
       }
     } finally {
       setLoading(false);
@@ -373,7 +373,7 @@ const DashboardPage = () => {
     }
   };
 
-  const totalBalance = marketDataData?.total_usd || 0;
+  const totalBalance = portfolioData?.total_usd || 0;
   const createdChains = Object.keys(multiChainWallets).filter(chain => multiChainWallets[chain]?.address).length;
 
   if (loading) {
@@ -381,7 +381,7 @@ const DashboardPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading your marketData...</p>
+          <p className="text-gray-400">Loading your portfolio...</p>
         </div>
       </div>
     );
@@ -393,7 +393,7 @@ const DashboardPage = () => {
         {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">marketData</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">portfolio</h1>
             <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
           </div>
           <div className="flex items-center gap-3">
@@ -477,7 +477,7 @@ const DashboardPage = () => {
                 <div className="text-sm text-gray-400 mb-1">Total Balance</div>
                 <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
               </div>
-              <button onClick={fetchmarketDataData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
+              <button onClick={fetchportfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
                 <RefreshCw className="h-5 w-5" />
               </button>
             </div>

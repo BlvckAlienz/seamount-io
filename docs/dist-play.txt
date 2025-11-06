@@ -46,7 +46,7 @@ For Phase 1, we need to implement this immediately without delaying launch. The 
 
 A "Cross-Border Savings Calculator" (Micro-Solver + Trophy Generator) that shows how much users save versus traditional methods, with shareable results
 
-A "Crypto Wealth Visualizer" (Trophy Generator) that creates Instagram-ready graphics of marketData growth
+A "Crypto Wealth Visualizer" (Trophy Generator) that creates Instagram-ready graphics of portfolio growth
 
 Simple browser extensions for quick currency conversion (Micro-Solver)
 
@@ -89,7 +89,7 @@ async def calculate_savings(amount: float, from_country: str, to_country: str):
         "shareable_image": generate_savings_image(amount, savings_percentage)  # Branded visual
     }
 2. Week 2 Implementation - "Crypto Wealth Visualizer"
-Concept: A tool that shows what your marketData would be worth if you'd invested in Bitcoin/Ethereum at different times.
+Concept: A tool that shows what your portfolio would be worth if you'd invested in Bitcoin/Ethereum at different times.
 
 Why it works:
 
@@ -124,7 +124,7 @@ Create Shareable Trophy Assets
 
 "I saved X% on cross-border transfers with @SeamountApp"
 
-"My marketData grew X% with Seamount's crypto trading"
+"My portfolio grew X% with Seamount's crypto trading"
 
 QR codes that lead to registration
 

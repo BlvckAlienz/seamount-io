@@ -6,8 +6,8 @@ components/payments/FlutterwavePayment.tsx:      const response = await apiClien
 components/payments/P2PPayment.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {
 components/payments/PaymentFlow.tsx:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/initialize-deposit`, {
 contexts/AuthContext.tsx:      const { data } = await apiClient.get<UserProfile>(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/profile`);
-hooks/useMarketData.ts:      // This assumes your backend has an endpoint like '/api/v1/marketData/summary'
-hooks/useMarketData.ts:      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketData/summary`);
+hooks/useportfolio.ts:      // This assumes your backend has an endpoint like '/api/v1/portfolio/summary'
+hooks/useportfolio.ts:      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/portfolio/summary`);
 hooks/useWallet.ts:      const response = await apiClient.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/balance`);
 hooks/useWallet.ts:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/user/provision-wallets`);
 hooks/useWallet.ts:      const response = await apiClient.post(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/p2p`, {

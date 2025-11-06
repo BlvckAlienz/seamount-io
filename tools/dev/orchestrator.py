@@ -317,35 +317,35 @@ class ServiceOrchestrator:
         # Execute the transaction
         return await self.execute_transaction(transaction_id)
     
-    async def process_marketData_rebalance(self, 
+    async def process_portfolio_rebalance(self, 
                                         user_id: str, 
-                                        marketData_id: str, 
+                                        portfolio_id: str, 
                                         target_allocation: Dict[str, float]) -> Dict[str, Any]:
         """
-        Process marketData rebalancing with transaction coordination
+        Process portfolio rebalancing with transaction coordination
         Shows how to handle complex multi-step operations
         """
-        transaction_id = f"rebalance_{user_id}_{marketData_id}_{int(datetime.utcnow().timestamp())}"
+        transaction_id = f"rebalance_{user_id}_{portfolio_id}_{int(datetime.utcnow().timestamp())}"
         
         # Create transaction
         await self.create_transaction(
             transaction_id=transaction_id,
             user_id=user_id,
-            transaction_type="marketData_rebalance",
+            transaction_type="portfolio_rebalance",
             metadata={
-                "marketData_id": marketData_id,
+                "portfolio_id": portfolio_id,
                 "target_allocation": target_allocation
             }
         )
         
-        # Add marketData analysis step
+        # Add portfolio analysis step
         await self.add_step(
             transaction_id=transaction_id,
-            service="marketData_service",
+            service="portfolio_service",
             action="analyze_rebalance",
             params={
                 "user_id": user_id,
-                "marketData_id": marketData_id,
+                "portfolio_id": portfolio_id,
                 "target_allocation": target_allocation
             }
         )
@@ -357,20 +357,20 @@ class ServiceOrchestrator:
             action="execute_rebalance",
             params={
                 "user_id": user_id,
-                "marketData_id": marketData_id,
+                "portfolio_id": portfolio_id,
                 "target_allocation": target_allocation
             },
             rollback_action="reverse_trades",
             rollback_params={"transaction_id": transaction_id}
         )
         
-        # Add marketData update step
+        # Add portfolio update step
         await self.add_step(
             transaction_id=transaction_id,
-            service="marketData_service",
+            service="portfolio_service",
             action="update_allocation",
             params={
-                "marketData_id": marketData_id,
+                "portfolio_id": portfolio_id,
                 "new_allocation": target_allocation
             }
         )

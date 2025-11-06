@@ -163,17 +163,17 @@ except ImportError as e:
     routers_available['licensing'] = None
 
 try:
-    from backend.api.routes import webhooks, marketData, investor, consent
+    from backend.api.routes import webhooks, portfolio, investor, consent
     routers_available['webhooks'] = webhooks
-    routers_available['marketData'] = marketData
+    routers_available['portfolio'] = portfolio
     routers_available['investor'] = investor
     routers_available['consent'] = consent
-    logger.info("✅ Additional routers imported (webhooks, marketData, investor, consent)")
+    logger.info("✅ Additional routers imported (webhooks, portfolio, investor, consent)")
 except ImportError as e:
     logger.error(f"❌ Additional routers import error: {e}")
     routers_available.update({
         'webhooks': None,
-        'marketData': None,
+        'portfolio': None,
         'investor': None,
         'consent': None
     })
@@ -536,9 +536,9 @@ if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 
     app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
     logger.info("✅ Webhooks router registered at /webhooks")
 
-if routers_available.get('marketData') and hasattr(routers_available['marketData'], 'router'):
-    app.include_router(routers_available['marketData'].router, prefix="/api/v1", tags=["marketData"])
-    logger.info("✅ marketData router registered at /api/v1")
+if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
+    app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["portfolio"])
+    logger.info("✅ portfolio router registered at /api/v1")
 
 if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
     app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])

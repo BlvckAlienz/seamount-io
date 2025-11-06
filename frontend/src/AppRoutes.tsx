@@ -12,7 +12,7 @@ import AuthModal from './components/auth/AuthModal';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import OnboardingPage from './pages/OnboardingPage';
-import MarketDataPage from './pages/marketDataPage';
+import portfolioPage from './pages/portfolioPage';
 import TradingPage from './pages/TradingPage';
 import PaymentsPage from './pages/PaymentsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -67,10 +67,10 @@ const AppRoutes: React.FC = () => {
           } 
         />
         <Route 
-          path="/marketData" 
+          path="/portfolio" 
           element={
             <ProtectedRoute minKycLevel={0}>
-              <MarketDataPage />
+              <portfolioPage />
             </ProtectedRoute>
           } 
         />

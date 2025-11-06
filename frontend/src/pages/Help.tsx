@@ -26,7 +26,7 @@ const Help: React.FC = () => {
       id: 2,
       category: 'wallet',
       question: 'What is USDS and how does it work?',
-      answer: 'USDS is Seamount\'s stablecoin, pegged to the US Dollar. It provides stability for your marketData and can be used for trading, transfers, and as a safe haven during market volatility.',
+      answer: 'USDS is Seamount\'s stablecoin, pegged to the US Dollar. It provides stability for your portfolio and can be used for trading, transfers, and as a safe haven during market volatility.',
     },
     {
       id: 3,

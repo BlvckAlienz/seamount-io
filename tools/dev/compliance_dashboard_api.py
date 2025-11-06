@@ -1022,8 +1022,8 @@ async def get_risk_assessment(
                 "last_updated": datetime.utcnow().isoformat()
             }
         else:
-            # marketData-wide risk assessment
-            assessment = await monitoring_service.get_marketData_risk_assessment(
+            # portfolio-wide risk assessment
+            assessment = await monitoring_service.get_portfolio_risk_assessment(
                 country_code=country_code
             )
         

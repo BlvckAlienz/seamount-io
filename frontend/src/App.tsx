@@ -16,7 +16,7 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import LandingPage from './pages/LandingPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
-import MarketDataPage from './pages/marketDataPage';
+import portfolioPage from './pages/portfolioPage';
 import TradingPage from './pages/TradingPage';
 import PaymentsPage from './pages/PaymentsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -99,7 +99,7 @@ const AppContent: React.FC = () => {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/trading" element={<ProtectedRoute><TradingPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
-        <Route path="/marketData" element={<ProtectedRoute><MarketDataPage /></ProtectedRoute>} />
+        <Route path="/portfolio" element={<ProtectedRoute><portfolioPage /></ProtectedRoute>} />
         <Route path="/wallet-recovery" element={<ProtectedRoute><WalletRecovery /></ProtectedRoute>} />
 
         {/* Admin Route */}

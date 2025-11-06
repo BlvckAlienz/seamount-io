@@ -212,8 +212,8 @@ CREATE POLICY "Users can update own consent" ON user_consents
 CREATE POLICY "Users can insert own consent" ON user_consents
     FOR INSERT WITH CHECK (auth.uid()::text = user_id);
 
--- marketData holdings table with RLS
-CREATE TABLE IF NOT EXISTS marketData_holdings (
+-- portfolio holdings table with RLS
+CREATE TABLE IF NOT EXISTS portfolio_holdings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id TEXT NOT NULL,
     asset TEXT NOT NULL,
@@ -223,13 +223,13 @@ CREATE TABLE IF NOT EXISTS marketData_holdings (
     value_usd DECIMAL(18, 6) DEFAULT 0
 );
 
-ALTER TABLE marketData_holdings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE portfolio_holdings ENABLE ROW LEVEL SECURITY;
 
--- RLS policies for marketData_holdings
-CREATE POLICY "Users can view own marketData" ON marketData_holdings
+-- RLS policies for portfolio_holdings
+CREATE POLICY "Users can view own portfolio" ON portfolio_holdings
     FOR SELECT USING (auth.uid()::text = user_id);
 
-CREATE POLICY "Service role can manage marketData holdings" ON marketData_holdings
+CREATE POLICY "Service role can manage portfolio holdings" ON portfolio_holdings
     FOR ALL USING (true);
 
 -- User MFA table with RLS
