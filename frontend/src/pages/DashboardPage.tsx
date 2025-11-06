@@ -391,39 +391,98 @@ const DashboardPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 md:mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">portfolio</h1>
-            <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallet</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setShowFundModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-              <Wallet className="h-4 w-4" />
-              Fund
-            </button>
-            <button onClick={() => toastInfo('Send functionality coming soon!')} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-              <ArrowUpRight className="h-4 w-4" />Send
-            </button>
-            <button onClick={() => toastInfo('Swap functionality coming soon!')} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-              <SwapIcon className="h-4 w-4" />Swap
-            </button>
-            <button onClick={() => toastInfo('Earn functionality coming soon!')} className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-              <TrendingUp className="h-4 w-4" />Earn
-            </button>
-            <button 
-              onClick={() => setShowWithdrawModal(true)}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-medium transition-colors">
-              <ArrowDownToLine className="h-4 w-4" />
-              Withdraw
-            </button>
-            <div className="relative">
-              <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors">
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
+              <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
+            </div>
+            
+            {/* Desktop Profile Menu */}
+            <div className="hidden md:block relative">
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
+              >
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
                   {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </div>
-                <span className="text-sm hidden md:inline">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
+                <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
+              </button>
+              {showProfileMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Key className="h-4 w-4" />
+                      <span>Recovery Phrases</span>
+                    </button>
+                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Shield className="h-4 w-4" />
+                      <span>Verify</span>
+                    </button>
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons - Responsive Layout */}
+          <div className="flex flex-wrap gap-2">
+            {/* Primary Actions */}
+            <button 
+              onClick={() => setShowFundModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Fund</span>
+            </button>
+            
+            <button 
+              onClick={() => toastInfo('Send functionality coming soon!')} 
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+            
+            <button 
+              onClick={() => toastInfo('Swap functionality coming soon!')} 
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <SwapIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Swap</span>
+            </button>
+            
+            <button 
+              onClick={() => toastInfo('Earn functionality coming soon!')} 
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Earn</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              <span className="hidden sm:inline">Withdraw</span>
+            </button>
+
+            {/* Mobile Profile Menu */}
+            <div className="md:hidden ml-auto relative">
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
+              >
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                </div>
               </button>
               {showProfileMenu && (
                 <>

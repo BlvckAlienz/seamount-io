@@ -163,23 +163,23 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg">
             <ArrowDownToLine className="h-5 w-5" />
             Withdraw to Bank
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Convert crypto to NGN and send to your bank account
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
           {/* Asset Selection */}
           <div className="space-y-2">
-            <Label htmlFor="withdraw-asset">Asset to Withdraw</Label>
+            <Label htmlFor="withdraw-asset" className="text-sm font-medium">Asset to Withdraw</Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger id="withdraw-asset">
+              <SelectTrigger id="withdraw-asset" className="w-full">
                 <SelectValue placeholder="Select asset" />
               </SelectTrigger>
               <SelectContent>
@@ -194,7 +194,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="withdraw-amount">Amount</Label>
+            <Label htmlFor="withdraw-amount" className="text-sm font-medium">Amount</Label>
             <Input
               id="withdraw-amount"
               type="number"
@@ -210,22 +210,22 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Quote Display */}
           {quote && (
-            <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Exchange Rate:</span>
-                <span className="font-medium">₦{quote.exchange_rate?.toFixed(2)}/USD</span>
+            <div className="rounded-lg bg-muted p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs">Exchange Rate:</span>
+                <span className="font-medium text-sm">₦{quote.exchange_rate?.toFixed(2)}/USD</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">NGN Amount:</span>
-                <span className="font-medium">₦{quote.ngn_amount?.toLocaleString()}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs">NGN Amount:</span>
+                <span className="font-medium text-sm">₦{quote.ngn_amount?.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fee (1.8%):</span>
-                <span className="font-medium">₦{quote.fee?.toLocaleString()}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs">Fee (1.8%):</span>
+                <span className="font-medium text-sm">₦{quote.fee?.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between pt-1 border-t">
-                <span className="text-muted-foreground">You Receive:</span>
-                <span className="font-semibold text-green-600">
+              <div className="flex justify-between items-center pt-1.5 border-t">
+                <span className="text-muted-foreground text-xs">You Receive:</span>
+                <span className="font-semibold text-green-600 text-sm">
                   ₦{quote.final_amount?.toLocaleString()}
                 </span>
               </div>
@@ -234,12 +234,12 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Bank Selection */}
           <div className="space-y-2">
-            <Label htmlFor="bank">Bank</Label>
+            <Label htmlFor="bank" className="text-sm font-medium">Bank</Label>
             <Select value={bankCode} onValueChange={setBankCode}>
-              <SelectTrigger id="bank">
+              <SelectTrigger id="bank" className="w-full">
                 <SelectValue placeholder="Select bank" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[200px]">
                 {NIGERIAN_BANKS.map((bank) => (
                   <SelectItem key={bank.code} value={bank.code}>
                     {bank.name}
@@ -251,7 +251,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Account Number */}
           <div className="space-y-2">
-            <Label htmlFor="account">Account Number</Label>
+            <Label htmlFor="account" className="text-sm font-medium">Account Number</Label>
             <div className="flex gap-2">
               <Input
                 id="account"
@@ -261,15 +261,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                 value={bankAccount}
                 onChange={(e) => {
                   setBankAccount(e.target.value)
-                  setAccountName(null) // Reset verification
+                  setAccountName(null)
                 }}
                 disabled={loading || verifying}
+                className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
                 onClick={verifyBankAccount}
                 disabled={!bankAccount || !bankCode || verifying || loading}
+                className="shrink-0"
               >
                 {verifying ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -282,9 +284,9 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Account Name Display */}
           {accountName && (
-            <Alert className="bg-green-50 border-green-200">
+            <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+              <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
                 <strong>{accountName}</strong>
               </AlertDescription>
             </Alert>
@@ -294,22 +296,24 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleWithdraw}
             disabled={loading || !accountName || !amount || parseFloat(amount) <= 0}
+            className="w-full sm:w-auto"
           >
             {loading ? (
               <>
@@ -325,7 +329,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
           </Button>
         </DialogFooter>
 
-        <p className="text-xs text-muted-foreground text-center px-6">
+        <p className="text-xs text-muted-foreground text-center px-2 pb-2">
           Withdrawals typically arrive within 1-2 hours. A 1.8% fee applies.
         </p>
       </DialogContent>

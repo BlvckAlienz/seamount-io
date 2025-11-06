@@ -56,3 +56,26 @@
   border-color: #374151;
   background: #1f2937;
 }
+
+/* Modal & Dialog Fixes */
+[role="dialog"] {
+  z-index: 9999 !important;
+}
+
+.dialog-overlay {
+  background-color: rgba(0, 0, 0, 0.75);
+  z-index: 9998 !important;
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+  
+  .max-w-7xl {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

@@ -104,23 +104,23 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-lg">
             <Wallet className="h-5 w-5" />
             Fund Wallet
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Buy crypto using your local currency
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2">
           {/* Currency Selection */}
           <div className="space-y-2">
-            <Label htmlFor="currency">Currency</Label>
+            <Label htmlFor="currency" className="text-sm font-medium">Currency</Label>
             <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger id="currency">
+              <SelectTrigger id="currency" className="w-full">
                 <SelectValue placeholder="Select currency" />
               </SelectTrigger>
               <SelectContent>
@@ -135,9 +135,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
+            <Label htmlFor="amount" className="text-sm font-medium">Amount</Label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-muted-foreground">
+              <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
                 {selectedCurrency?.symbol}
               </span>
               <Input
@@ -160,9 +160,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* Asset to Receive */}
           <div className="space-y-2">
-            <Label htmlFor="asset">Asset to Receive</Label>
+            <Label htmlFor="asset" className="text-sm font-medium">Asset to Receive</Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger id="asset">
+              <SelectTrigger id="asset" className="w-full">
                 <SelectValue placeholder="Select asset" />
               </SelectTrigger>
               <SelectContent>
@@ -170,7 +170,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                   <SelectItem key={a.value} value={a.value}>
                     <span className="flex items-center gap-2">
                       <span className="text-lg">{a.icon}</span>
-                      {a.label}
+                      <span className="text-sm">{a.label}</span>
                     </span>
                   </SelectItem>
                 ))}
@@ -180,22 +180,22 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* Quote Display */}
           {quote && (
-            <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Exchange Rate:</span>
-                <span className="font-medium">
+            <div className="rounded-lg bg-muted p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs">Exchange Rate:</span>
+                <span className="font-medium text-sm">
                   {selectedCurrency?.symbol}{quote.exchange_rate?.toFixed(2)}/USD
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fee (1.8%):</span>
-                <span className="font-medium">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-xs">Fee (1.8%):</span>
+                <span className="font-medium text-sm">
                   {selectedCurrency?.symbol}{quote.fee?.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t">
-                <span className="text-muted-foreground">You Receive:</span>
-                <span className="font-semibold text-green-600">
+              <div className="flex justify-between items-center pt-1.5 border-t">
+                <span className="text-muted-foreground text-xs">You Receive:</span>
+                <span className="font-semibold text-green-600 text-sm">
                   {quote.crypto_amount?.toFixed(4)} {asset}
                 </span>
               </div>
@@ -203,9 +203,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           )}
 
           {/* Provider Info */}
-          <Alert className="bg-blue-50 border-blue-200">
+          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
             <CheckCircle2 className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
+            <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs">
               <strong>Payment via:</strong> Cashramp → Paystack → Flutterwave
               <br />
               <span className="text-xs">Automatic provider selection for best rates</span>
@@ -216,22 +216,24 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="text-sm">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleFund}
             disabled={loading || !amount || parseFloat(amount) <= 0}
+            className="w-full sm:w-auto"
           >
             {loading ? (
               <>
@@ -247,7 +249,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           </Button>
         </DialogFooter>
 
-        <p className="text-xs text-muted-foreground text-center px-6">
+        <p className="text-xs text-muted-foreground text-center px-2 pb-2">
           Crypto will be credited to your wallet within 5-10 minutes after payment.
         </p>
       </DialogContent>
