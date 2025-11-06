@@ -192,9 +192,9 @@ ${seeds.security_warning}
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white dark:bg-white rounded-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden border-2 border-red-300 shadow-2xl">
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden border border-red-500/30 shadow-2xl">
         {/* Header */}
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 p-4 sm:p-6 border-b-2 border-red-600">
+        <div className="bg-gradient-to-r from-red-600 to-orange-600 p-4 sm:p-6 border-b border-red-500/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-white/20 p-2 sm:p-3 rounded-lg">
@@ -202,7 +202,7 @@ ${seeds.security_warning}
               </div>
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-white">🔐 Wallet Recovery Seeds</h2>
-                <p className="text-red-50 text-sm sm:text-base">CRITICAL: Download both seed files now</p>
+                <p className="text-red-100 text-sm sm:text-base">CRITICAL: Download both seed files now</p>
               </div>
             </div>
             <button
@@ -220,18 +220,18 @@ ${seeds.security_warning}
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-red-600 mx-auto mb-4"></div>
-                <p className="text-gray-700 font-medium">Decrypting your seed phrases...</p>
+                <p className="text-gray-400 font-medium">Decrypting your seed phrases...</p>
               </div>
             </div>
           ) : seeds ? (
             <>
               {/* Security Warning Banner */}
-              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0 mt-1" />
+                  <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-red-700 mb-2">⚠️ CRITICAL SECURITY WARNING</h3>
-                    <div className="text-red-800 text-sm space-y-1 font-medium">
+                    <h3 className="text-base sm:text-lg font-bold text-red-400 mb-2">⚠️ CRITICAL SECURITY WARNING</h3>
+                    <div className="text-red-200 text-sm space-y-1 font-medium">
                       {seeds.security_warning.split('\n').map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
@@ -241,15 +241,15 @@ ${seeds.security_warning}
               </div>
 
               {/* Download Progress */}
-              <div className="bg-gray-100 border-2 border-gray-300 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+              <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <span className="text-gray-900 font-semibold">Download Progress:</span>
+                  <span className="text-gray-300 font-semibold">Download Progress:</span>
                   <div className="flex items-center gap-4">
-                    <div className={`flex items-center gap-2 ${algoDownloaded ? 'text-green-600' : 'text-gray-500'}`}>
+                    <div className={`flex items-center gap-2 ${algoDownloaded ? 'text-green-400' : 'text-gray-400'}`}>
                       {algoDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
                       <span className="font-semibold text-sm sm:text-base">Algorand</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${wdkDownloaded ? 'text-green-600' : 'text-gray-500'}`}>
+                    <div className={`flex items-center gap-2 ${wdkDownloaded ? 'text-green-400' : 'text-gray-400'}`}>
                       {wdkDownloaded ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
                       <span className="font-semibold text-sm sm:text-base">Multi-Chain</span>
                     </div>
@@ -261,7 +261,7 @@ ${seeds.security_warning}
               <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
                 <button
                   onClick={() => setShowSeeds(!showSeeds)}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-white transition-all text-sm sm:text-base"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 text-sm sm:text-base"
                 >
                   {showSeeds ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                   {showSeeds ? 'Hide Seeds' : 'Reveal Seeds'}
@@ -270,26 +270,26 @@ ${seeds.security_warning}
 
               {/* Algorand Seed */}
               {seeds.algorand_seed && (
-                <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-gray-900">🌐 Algorand Wallet</h3>
-                      <p className="text-gray-700 text-sm font-medium">25-word recovery phrase</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white">🌐 Algorand Wallet</h3>
+                      <p className="text-gray-400 text-sm font-medium">25-word recovery phrase</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopy(seeds.algorand_seed!, 'algo')}
-                        className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors border-2 border-gray-300"
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors border border-gray-600"
                       >
-                        {copiedAlgo ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-gray-700" />}
+                        {copiedAlgo ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
                       </button>
                       <button
                         onClick={handleDownloadAlgorand}
                         disabled={algoDownloaded}
                         className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-bold transition-all text-sm sm:text-base ${
                           algoDownloaded
-                            ? 'bg-green-600 text-white cursor-not-allowed border-2 border-green-700'
-                            : 'bg-green-600 hover:bg-green-700 text-white border-2 border-green-700'
+                            ? 'bg-green-600 text-white cursor-not-allowed border border-green-500'
+                            : 'bg-green-600 hover:bg-green-700 text-white border border-green-500 hover:shadow-lg hover:shadow-green-500/50'
                         }`}
                       >
                         {algoDownloaded ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -299,52 +299,52 @@ ${seeds.security_warning}
                   </div>
                   
                   <div className="relative">
-                    <div className={`font-mono text-xs sm:text-sm p-3 sm:p-4 rounded-lg border-2 ${
-                      showSeeds ? 'bg-white border-blue-400 text-gray-900' : 'bg-gray-100 border-gray-300'
+                    <div className={`font-mono text-xs sm:text-sm p-3 sm:p-4 rounded-lg border ${
+                      showSeeds ? 'bg-gray-900 border-blue-500/50 text-white' : 'bg-gray-900 border-gray-700'
                     }`}>
                       {showSeeds ? (
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                           {seeds.algorand_seed.split(' ').map((word, i) => (
-                            <span key={i} className="text-blue-600 font-semibold">{i + 1}. {word}</span>
+                            <span key={i} className="text-blue-400 font-semibold">{i + 1}. {word}</span>
                           ))}
                         </div>
                       ) : (
-                        <div className="text-gray-600 text-center py-4 font-medium">
+                        <div className="text-gray-500 text-center py-4 font-medium">
                           Click "Reveal Seeds" to view your recovery phrase
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-4 text-sm text-gray-700 bg-white p-3 rounded-lg border-2 border-blue-200">
+                  <div className="mt-4 text-sm text-gray-400 bg-gray-900 p-3 rounded-lg border border-blue-500/30">
                     <p className="font-semibold">Address:</p>
-                    <p className="font-mono text-xs sm:text-sm text-gray-900 break-all">{seeds.wallet_addresses?.algorand}</p>
+                    <p className="font-mono text-xs sm:text-sm text-gray-300 break-all">{seeds.wallet_addresses?.algorand}</p>
                   </div>
                 </div>
               )}
 
               {/* WDK Multi-Chain Seed */}
               {seeds.wdk_seed && (
-                <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                     <div>
-                      <h3 className="text-lg sm:text-xl font-bold text-gray-900">🔗 Multi-Chain Wallet</h3>
-                      <p className="text-gray-700 text-sm font-medium">12-word BIP39 phrase (Bitcoin, Ethereum, Polygon, TRON)</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-white">🔗 Multi-Chain Wallet</h3>
+                      <p className="text-gray-400 text-sm font-medium">12-word BIP39 phrase (Bitcoin, Ethereum, Polygon, TRON)</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleCopy(seeds.wdk_seed!, 'wdk')}
-                        className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors border-2 border-gray-300"
+                        className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors border border-gray-600"
                       >
-                        {copiedWdk ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-gray-700" />}
+                        {copiedWdk ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-gray-400" />}
                       </button>
                       <button
                         onClick={handleDownloadWDK}
                         disabled={wdkDownloaded}
                         className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg font-bold transition-all text-sm sm:text-base ${
                           wdkDownloaded
-                            ? 'bg-green-600 text-white cursor-not-allowed border-2 border-green-700'
-                            : 'bg-green-600 hover:bg-green-700 text-white border-2 border-green-700'
+                            ? 'bg-green-600 text-white cursor-not-allowed border border-green-500'
+                            : 'bg-green-600 hover:bg-green-700 text-white border border-green-500 hover:shadow-lg hover:shadow-green-500/50'
                         }`}
                       >
                         {wdkDownloaded ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Download className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -354,32 +354,32 @@ ${seeds.security_warning}
                   </div>
                   
                   <div className="relative">
-                    <div className={`font-mono text-xs sm:text-sm p-3 sm:p-4 rounded-lg border-2 ${
-                      showSeeds ? 'bg-white border-purple-400 text-gray-900' : 'bg-gray-100 border-gray-300'
+                    <div className={`font-mono text-xs sm:text-sm p-3 sm:p-4 rounded-lg border ${
+                      showSeeds ? 'bg-gray-900 border-purple-500/50 text-white' : 'bg-gray-900 border-gray-700'
                     }`}>
                       {showSeeds ? (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {seeds.wdk_seed.split(' ').map((word, i) => (
-                            <span key={i} className="text-purple-600 font-semibold">{i + 1}. {word}</span>
+                            <span key={i} className="text-purple-400 font-semibold">{i + 1}. {word}</span>
                           ))}
                         </div>
                       ) : (
-                        <div className="text-gray-600 text-center py-4 font-medium">
+                        <div className="text-gray-500 text-center py-4 font-medium">
                           Click "Reveal Seeds" to view your recovery phrase
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-2 text-sm text-gray-700 bg-white p-3 rounded-lg border-2 border-purple-200">
+                  <div className="mt-4 space-y-2 text-sm text-gray-400 bg-gray-900 p-3 rounded-lg border border-purple-500/30">
                     <p className="font-semibold">Supported Chains:</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {Object.entries(seeds.wallet_addresses || {})
                         .filter(([chain]) => chain !== 'algorand')
                         .map(([chain, address]) => (
-                          <div key={chain} className="bg-gray-100 p-2 rounded border border-gray-300">
-                            <p className="text-gray-600 text-xs uppercase font-bold">{chain}</p>
-                            <p className="font-mono text-xs text-gray-900 truncate">{address}</p>
+                          <div key={chain} className="bg-gray-800 p-2 rounded border border-gray-700">
+                            <p className="text-gray-500 text-xs uppercase font-bold">{chain}</p>
+                            <p className="font-mono text-xs text-gray-300 truncate">{address}</p>
                           </div>
                         ))}
                     </div>
@@ -388,23 +388,23 @@ ${seeds.security_warning}
               )}
             </>
           ) : (
-            <div className="text-center text-gray-700 py-12">
-              <Shield className="w-16 h-16 mx-auto mb-4 opacity-50 text-gray-400" />
-              <h3 className="text-xl font-bold mb-2 text-gray-900">No Seeds Available</h3>
-              <p className="text-gray-600">Your wallet seeds could not be retrieved. Please contact support.</p>
+            <div className="text-center text-gray-400 py-12">
+              <Shield className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <h3 className="text-xl font-bold mb-2 text-white">No Seeds Available</h3>
+              <p className="text-gray-400">Your wallet seeds could not be retrieved. Please contact support.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-100 border-t-2 border-gray-300 p-4 sm:p-6">
+        <div className="bg-gray-800/50 border-t border-gray-700 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <p className="text-gray-700 text-sm font-medium">
+            <p className="text-gray-400 text-sm font-medium">
               🔒 Seeds are decrypted in-memory and never stored unencrypted
             </p>
             <button
               onClick={onClose}
-              className="bg-gray-700 hover:bg-gray-800 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-white transition-all text-sm sm:text-base"
+              className="bg-gray-700 hover:bg-gray-600 px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg text-sm sm:text-base"
             >
               Close
             </button>
