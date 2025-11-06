@@ -565,7 +565,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                 <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
               </button>
-              <a
+              
                 href={getExplorerUrl(chain, address)}
                 target="_blank"
                 rel="noopener noreferrer"
