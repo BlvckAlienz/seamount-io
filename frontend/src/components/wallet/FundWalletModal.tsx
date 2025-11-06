@@ -104,28 +104,28 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <Wallet className="h-5 w-5" />
+      <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-white border-2 border-gray-300">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <Wallet className="h-6 w-6 text-blue-600" />
             Fund Wallet
           </DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription className="text-base text-gray-600 mt-2">
             Buy crypto using your local currency
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-5 py-4">
           {/* Currency Selection */}
           <div className="space-y-2">
-            <Label htmlFor="currency" className="text-sm font-medium">Currency</Label>
+            <Label htmlFor="currency" className="text-sm font-semibold text-gray-900">Currency</Label>
             <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger id="currency" className="w-full">
+              <SelectTrigger id="currency" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select currency" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border-gray-300">
                 {CURRENCIES.map((curr) => (
-                  <SelectItem key={curr.code} value={curr.code}>
+                  <SelectItem key={curr.code} value={curr.code} className="text-gray-900 hover:bg-gray-100">
                     {curr.symbol} {curr.name} ({curr.code})
                   </SelectItem>
                 ))}
@@ -135,9 +135,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount" className="text-sm font-medium">Amount</Label>
+            <Label htmlFor="amount" className="text-sm font-semibold text-gray-900">Amount</Label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">
+              <span className="absolute left-3 top-3 text-gray-600 font-medium">
                 {selectedCurrency?.symbol}
               </span>
               <Input
@@ -150,27 +150,27 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 onChange={(e) => setAmount(e.target.value)}
                 onBlur={fetchQuote}
                 disabled={loading}
-                className="pl-10"
+                className="pl-10 bg-gray-50 border-gray-300 text-gray-900 h-11 text-base"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-gray-600 font-medium">
               Minimum: {selectedCurrency?.symbol}1,000
             </p>
           </div>
 
           {/* Asset to Receive */}
           <div className="space-y-2">
-            <Label htmlFor="asset" className="text-sm font-medium">Asset to Receive</Label>
+            <Label htmlFor="asset" className="text-sm font-semibold text-gray-900">Asset to Receive</Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger id="asset" className="w-full">
+              <SelectTrigger id="asset" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select asset" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border-gray-300">
                 {ASSETS.map((a) => (
-                  <SelectItem key={a.value} value={a.value}>
+                  <SelectItem key={a.value} value={a.value} className="text-gray-900 hover:bg-gray-100">
                     <span className="flex items-center gap-2">
                       <span className="text-lg">{a.icon}</span>
-                      <span className="text-sm">{a.label}</span>
+                      <span className="text-base font-medium">{a.label}</span>
                     </span>
                   </SelectItem>
                 ))}
@@ -180,22 +180,22 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* Quote Display */}
           {quote && (
-            <div className="rounded-lg bg-muted p-3 space-y-1.5 text-sm">
+            <div className="rounded-lg bg-blue-50 border-2 border-blue-200 p-4 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-xs">Exchange Rate:</span>
-                <span className="font-medium text-sm">
+                <span className="text-sm font-medium text-gray-700">Exchange Rate:</span>
+                <span className="font-bold text-base text-gray-900">
                   {selectedCurrency?.symbol}{quote.exchange_rate?.toFixed(2)}/USD
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-xs">Fee (1.8%):</span>
-                <span className="font-medium text-sm">
+                <span className="text-sm font-medium text-gray-700">Fee (1.8%):</span>
+                <span className="font-bold text-base text-gray-900">
                   {selectedCurrency?.symbol}{quote.fee?.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between items-center pt-1.5 border-t">
-                <span className="text-muted-foreground text-xs">You Receive:</span>
-                <span className="font-semibold text-green-600 text-sm">
+              <div className="flex justify-between items-center pt-2 border-t-2 border-blue-300">
+                <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                <span className="font-bold text-lg text-green-600">
                   {quote.crypto_amount?.toFixed(4)} {asset}
                 </span>
               </div>
@@ -203,53 +203,53 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           )}
 
           {/* Provider Info */}
-          <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-            <CheckCircle2 className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 dark:text-blue-200 text-xs">
-              <strong>Payment via:</strong> Cashramp → Paystack → Flutterwave
+          <Alert className="bg-blue-50 border-2 border-blue-300">
+            <CheckCircle2 className="h-5 w-5 text-blue-600" />
+            <AlertDescription className="text-gray-900 text-sm font-medium">
+              <strong className="text-blue-700">Payment via:</strong> Cashramp → Paystack → Flutterwave
               <br />
-              <span className="text-xs">Automatic provider selection for best rates</span>
+              <span className="text-sm text-gray-600">Automatic provider selection for best rates</span>
             </AlertDescription>
           </Alert>
 
           {/* Error Display */}
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">{error}</AlertDescription>
+            <Alert variant="destructive" className="bg-red-50 border-2 border-red-300">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <AlertDescription className="text-red-900 font-medium">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-11 text-base font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-100"
           >
             Cancel
           </Button>
           <Button
             onClick={handleFund}
             disabled={loading || !amount || parseFloat(amount) <= 0}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white"
           >
             {loading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 Processing...
               </>
             ) : (
               <>
-                <Wallet className="mr-2 h-4 w-4" />
+                <Wallet className="mr-2 h-5 w-5" />
                 Fund {selectedCurrency?.symbol}{amount || '0'}
               </>
             )}
           </Button>
         </DialogFooter>
 
-        <p className="text-xs text-muted-foreground text-center px-2 pb-2">
+        <p className="text-sm text-gray-600 text-center px-2 pb-2 font-medium">
           Crypto will be credited to your wallet within 5-10 minutes after payment.
         </p>
       </DialogContent>

@@ -163,28 +163,28 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-w-[95vw] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <ArrowDownToLine className="h-5 w-5" />
+      <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-white border-2 border-gray-300">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <ArrowDownToLine className="h-6 w-6 text-red-600" />
             Withdraw to Bank
           </DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription className="text-base text-gray-600 mt-2">
             Convert crypto to NGN and send to your bank account
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-5 py-4">
           {/* Asset Selection */}
           <div className="space-y-2">
-            <Label htmlFor="withdraw-asset" className="text-sm font-medium">Asset to Withdraw</Label>
+            <Label htmlFor="withdraw-asset" className="text-sm font-semibold text-gray-900">Asset to Withdraw</Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger id="withdraw-asset" className="w-full">
+              <SelectTrigger id="withdraw-asset" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select asset" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border-gray-300">
                 {ASSETS.map((a) => (
-                  <SelectItem key={a.value} value={a.value}>
+                  <SelectItem key={a.value} value={a.value} className="text-gray-900 hover:bg-gray-100">
                     {a.label}
                   </SelectItem>
                 ))}
@@ -194,7 +194,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="withdraw-amount" className="text-sm font-medium">Amount</Label>
+            <Label htmlFor="withdraw-amount" className="text-sm font-semibold text-gray-900">Amount</Label>
             <Input
               id="withdraw-amount"
               type="number"
@@ -205,27 +205,28 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               onChange={(e) => setAmount(e.target.value)}
               onBlur={fetchQuote}
               disabled={loading}
+              className="bg-gray-50 border-gray-300 text-gray-900 h-11 text-base"
             />
           </div>
 
           {/* Quote Display */}
           {quote && (
-            <div className="rounded-lg bg-muted p-3 space-y-1.5 text-sm">
+            <div className="rounded-lg bg-green-50 border-2 border-green-200 p-4 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-xs">Exchange Rate:</span>
-                <span className="font-medium text-sm">₦{quote.exchange_rate?.toFixed(2)}/USD</span>
+                <span className="text-sm font-medium text-gray-700">Exchange Rate:</span>
+                <span className="font-bold text-base text-gray-900">₦{quote.exchange_rate?.toFixed(2)}/USD</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-xs">NGN Amount:</span>
-                <span className="font-medium text-sm">₦{quote.ngn_amount?.toLocaleString()}</span>
+                <span className="text-sm font-medium text-gray-700">NGN Amount:</span>
+                <span className="font-bold text-base text-gray-900">₦{quote.ngn_amount?.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-xs">Fee (1.8%):</span>
-                <span className="font-medium text-sm">₦{quote.fee?.toLocaleString()}</span>
+                <span className="text-sm font-medium text-gray-700">Fee (1.8%):</span>
+                <span className="font-bold text-base text-gray-900">₦{quote.fee?.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center pt-1.5 border-t">
-                <span className="text-muted-foreground text-xs">You Receive:</span>
-                <span className="font-semibold text-green-600 text-sm">
+              <div className="flex justify-between items-center pt-2 border-t-2 border-green-300">
+                <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                <span className="font-bold text-lg text-green-600">
                   ₦{quote.final_amount?.toLocaleString()}
                 </span>
               </div>
@@ -234,14 +235,14 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Bank Selection */}
           <div className="space-y-2">
-            <Label htmlFor="bank" className="text-sm font-medium">Bank</Label>
+            <Label htmlFor="bank" className="text-sm font-semibold text-gray-900">Bank</Label>
             <Select value={bankCode} onValueChange={setBankCode}>
-              <SelectTrigger id="bank" className="w-full">
+              <SelectTrigger id="bank" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select bank" />
               </SelectTrigger>
-              <SelectContent className="max-h-[200px]">
+              <SelectContent className="max-h-[200px] bg-white border-gray-300">
                 {NIGERIAN_BANKS.map((bank) => (
-                  <SelectItem key={bank.code} value={bank.code}>
+                  <SelectItem key={bank.code} value={bank.code} className="text-gray-900 hover:bg-gray-100">
                     {bank.name}
                   </SelectItem>
                 ))}
@@ -251,7 +252,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Account Number */}
           <div className="space-y-2">
-            <Label htmlFor="account" className="text-sm font-medium">Account Number</Label>
+            <Label htmlFor="account" className="text-sm font-semibold text-gray-900">Account Number</Label>
             <div className="flex gap-2">
               <Input
                 id="account"
@@ -264,17 +265,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                   setAccountName(null)
                 }}
                 disabled={loading || verifying}
-                className="flex-1"
+                className="flex-1 bg-gray-50 border-gray-300 text-gray-900 h-11 text-base"
               />
               <Button
                 type="button"
                 variant="outline"
                 onClick={verifyBankAccount}
                 disabled={!bankAccount || !bankCode || verifying || loading}
-                className="shrink-0"
+                className="shrink-0 h-11 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold"
               >
                 {verifying ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
                   'Verify'
                 )}
@@ -284,52 +285,52 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
           {/* Account Name Display */}
           {accountName && (
-            <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-                <strong>{accountName}</strong>
+            <Alert className="bg-green-50 border-2 border-green-300">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <AlertDescription className="text-green-900 font-bold text-base">
+                {accountName}
               </AlertDescription>
             </Alert>
           )}
 
           {/* Error Display */}
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">{error}</AlertDescription>
+            <Alert variant="destructive" className="bg-red-50 border-2 border-red-300">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <AlertDescription className="text-red-900 font-medium">{error}</AlertDescription>
             </Alert>
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-4 border-t">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-11 text-base font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-100"
           >
             Cancel
           </Button>
           <Button
             onClick={handleWithdraw}
             disabled={loading || !accountName || !amount || parseFloat(amount) <= 0}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-11 text-base font-semibold bg-red-600 hover:bg-red-700 text-white"
           >
             {loading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                 Processing...
               </>
             ) : (
               <>
-                <ArrowDownToLine className="mr-2 h-4 w-4" />
+                <ArrowDownToLine className="mr-2 h-5 w-5" />
                 Withdraw ₦{quote?.final_amount?.toLocaleString() || '0'}
               </>
             )}
           </Button>
         </DialogFooter>
 
-        <p className="text-xs text-muted-foreground text-center px-2 pb-2">
+        <p className="text-sm text-gray-600 text-center px-2 pb-2 font-medium">
           Withdrawals typically arrive within 1-2 hours. A 1.8% fee applies.
         </p>
       </DialogContent>
