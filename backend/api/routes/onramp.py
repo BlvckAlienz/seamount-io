@@ -481,6 +481,10 @@ async def get_public_onramp_quote(request: Request):
         if not asset_config:
             raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
         
+        # 🎯 FIX: Get database service properly
+        from backend.dependencies import get_database_service
+        database_service = await get_database_service()  # 🎯 CORRECT NAME
+        
         # 🎯 STEP 1: GET REAL FOREX RATE
         if currency == "USD":
             fiat_to_usd_rate = Decimal("1.0")
@@ -511,7 +515,7 @@ async def get_public_onramp_quote(request: Request):
         
         # 🎯 STEP 2: GET REAL CRYPTO PRICE
         from backend.services.oracle_service import EnhancedOracleService
-        oracle_service = EnhancedOracleService(db_service)
+        oracle_service = EnhancedOracleService(database_service)  # 🎯 USE CORRECT NAME
         
         oracle_symbol = asset_config.get("oracle_symbol", "bitcoin")
         

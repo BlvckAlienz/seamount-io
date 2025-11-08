@@ -167,9 +167,13 @@ async def get_public_offramp_quote(request: Request):
         if not asset_config:
             raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
         
+        # 🎯 FIX: Get database service properly
+        from backend.dependencies import get_database_service
+        database_service = await get_database_service()  # 🎯 CORRECT NAME
+        
         # 🎯 STEP 1: GET REAL CRYPTO PRICE
         from backend.services.oracle_service import EnhancedOracleService
-        oracle_service = EnhancedOracleService(db_service)
+        oracle_service = EnhancedOracleService(database_service)  # 🎯 USE CORRECT NAME
         
         oracle_symbol = asset_config.get("oracle_symbol", "bitcoin")
         
@@ -182,32 +186,6 @@ async def get_public_offramp_quote(request: Request):
                 status_code=503,
                 detail="Cannot get live crypto prices. Please try again."
             )
-        
-        # Calculate USD value
-        crypto_value_usd = crypto_amount * crypto_price_usd
-        
-        # 🎯 STEP 2: GET REAL FOREX RATE
-        if fiat_currency == "USD":
-            usd_to_fiat_rate = Decimal("1.0")
-        else:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f"https://api.exchangerate-api.com/v4/latest/USD",
-                        timeout=aiohttp.ClientTimeout(total=5)
-                    ) as response:
-                        if response.status == 200:
-                            rates_data = await response.json()
-                            usd_to_fiat_rate = Decimal(str(rates_data["rates"].get(fiat_currency, 1)))
-                            logger.info(f"✅ Public offramp - Live forex: 1 USD = {usd_to_fiat_rate} {fiat_currency}")
-                        else:
-                            raise Exception(f"ExchangeRate-API returned {response.status}")
-            except Exception as forex_error:
-                logger.error(f"❌ Public offramp forex API failed: {forex_error}")
-                raise HTTPException(
-                    status_code=503,
-                    detail="Cannot get live exchange rates. Please try again."
-                )
         
         # Convert to fiat currency
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
