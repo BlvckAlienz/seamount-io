@@ -27,6 +27,8 @@ interface WithdrawModalProps {
   onOpenChange: (open: boolean) => void
 }
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [amount, setAmount] = useState('')
   const [asset, setAsset] = useState('USDT_ALGO')  // ✅ Use backend key

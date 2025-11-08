@@ -95,6 +95,8 @@ const CHAIN_NAMES: { [key: string]: string } = {
   'tron': '🔴 Tron'
 }
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState('NGN')
