@@ -133,11 +133,11 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
       console.log('✅ Quote response:', response);
 
-      if (response?.data?.success) {
-        setQuote(response.data.quote);
-        console.log('🎯 Quote data:', response.data.quote);
+      if (response?.success) {  
+        setQuote(response.quote);  
+        console.log('🎯 Quote data:', response.quote);
       } else {
-        const errorMsg = response?.data?.error || 'Failed to get quote';
+        const errorMsg = response?.error || 'Failed to get quote';
         setError(errorMsg);
       }
     } catch (err: any) {
