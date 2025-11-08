@@ -29,14 +29,16 @@ interface WithdrawModalProps {
 
 export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [amount, setAmount] = useState('')
-  const [asset, setAsset] = useState('USDT')
+  const [asset, setAsset] = useState('USDT_ALGO')  // ✅ Use backend key
+  const [currency, setCurrency] = useState('NGN')   // ✅ NEW: Fiat currency
   const [bankAccount, setBankAccount] = useState('')
   const [bankCode, setBankCode] = useState('')
+  const [accountName, setAccountName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [quote, setQuote] = useState<any>(null)
-  const [accountName, setAccountName] = useState<string | null>(null)
+  const [fetchingQuote, setFetchingQuote] = useState(false)
 
   // Nigerian Banks
   const NIGERIAN_BANKS = [
@@ -65,11 +67,63 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     { code: '057', name: 'Zenith Bank' },
   ]
 
-  const ASSETS = [
-    { value: 'USDT', label: 'Tether (USDT)' },
-    { value: 'USDCa', label: 'USD Coin (USDCa)' },
-    { value: 'ALGO', label: 'Algorand (ALGO)' },
+  // ========== ALL SUPPORTED ASSETS (GROUPED BY BLOCKCHAIN) ==========
+
+const ASSET_GROUPS = {
+  algorand: [
+    { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ặ', backend_key: 'ALGO' },
+    { value: 'USDT', label: 'Tether (Algorand)', icon: '₮', backend_key: 'USDT_ALGO' },
+    { value: 'USDCa', label: 'USD Coin (USDCa)', icon: '◎', backend_key: 'USDCa' },
+    { value: 'goBTC', label: 'Wrapped Bitcoin', icon: '₿', backend_key: 'goBTC' },
+    { value: 'goETH', label: 'Wrapped Ethereum', icon: 'Ξ', backend_key: 'goETH' },
+  ],
+  bitcoin: [
+    { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿', backend_key: 'BTC' },
+  ],
+  ethereum: [
+    { value: 'ETH', label: 'Ethereum (ETH)', icon: 'Ξ', backend_key: 'ETH' },
+    { value: 'USDT_ETH', label: 'Tether (Ethereum)', icon: '₮', backend_key: 'USDT_ETH' },
+    { value: 'USDC_ETH', label: 'USD Coin (Ethereum)', icon: '◎', backend_key: 'USDC_ETH' },
+  ],
+  polygon: [
+    { value: 'MATIC', label: 'Polygon (MATIC)', icon: '▶', backend_key: 'MATIC' },
+    { value: 'USDT_POLYGON', label: 'Tether (Polygon)', icon: '₮', backend_key: 'USDT_POLYGON' },
+    { value: 'USDC_POLYGON', label: 'USD Coin (Polygon)', icon: '◎', backend_key: 'USDC_POLYGON' },
+  ],
+  tron: [
+    { value: 'TRX', label: 'TRON (TRX)', icon: '⚡', backend_key: 'TRX' },
+    { value: 'USDT_TRON', label: 'Tether (Tron)', icon: '₮', backend_key: 'USDT_TRON' },
   ]
+}
+
+// Flatten for easier mapping
+const ALL_ASSETS = [
+  ...ASSET_GROUPS.algorand,
+  ...ASSET_GROUPS.bitcoin,
+  ...ASSET_GROUPS.ethereum,
+  ...ASSET_GROUPS.polygon,
+  ...ASSET_GROUPS.tron
+]
+
+// Chain display names
+const CHAIN_NAMES: { [key: string]: string } = {
+  'algorand': '🟢 Algorand',
+  'bitcoin': '🟠 Bitcoin',
+  'ethereum': '🔵 Ethereum',
+  'polygon': '🟣 Polygon',
+  'tron': '🔴 Tron'
+}
+
+// ========== SUPPORTED WITHDRAWAL CURRENCIES ==========
+
+const WITHDRAWAL_CURRENCIES = [
+  { code: 'NGN', name: 'Nigerian Naira', symbol: '₦', flag: '🇳🇬', methods: ['bank_transfer'] },
+  { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh', flag: '🇰🇪', methods: ['mobile_money', 'bank_transfer'] },
+  { code: 'GHS', name: 'Ghanaian Cedi', symbol: 'GH₵', flag: '🇬🇭', methods: ['mobile_money', 'bank_transfer'] },
+  { code: 'ZAR', name: 'South African Rand', symbol: 'R', flag: '🇿🇦', methods: ['bank_transfer'] },
+  { code: 'UGX', name: 'Ugandan Shilling', symbol: 'USh', flag: '🇺🇬', methods: ['mobile_money'] },
+  { code: 'TZS', name: 'Tanzanian Shilling', symbol: 'TSh', flag: '🇹🇿', methods: ['mobile_money'] },
+]
 
   // Verify bank account
   const verifyBankAccount = async () => {
@@ -99,11 +153,48 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     }
   }
 
-  // Get withdrawal quote
+  // ✅ REAL-TIME QUOTE FETCHING (NO HARDCODED RATES!)
   const fetchQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
+      setQuote(null)
       return
     }
+
+    setFetchingQuote(true)
+    setError(null)
+
+    try {
+      const response = await apiClient.post('/api/v1/offramp/quote', {
+        crypto_amount: parseFloat(amount),
+        crypto_asset: asset,
+        fiat_currency: currency,
+      })
+
+      if (response.data?.success) {
+        setQuote(response.data.quote)
+        logger.info('✅ Offramp quote fetched:', response.data.quote)
+      } else {
+        setError(response.data?.error || 'Failed to get quote')
+      }
+    } catch (err: any) {
+      console.error('Quote fetch error:', err)
+      const errorMsg = err.response?.data?.detail || 'Failed to get live quote'
+      setError(errorMsg)
+      setQuote(null)
+    } finally {
+      setFetchingQuote(false)
+    }
+
+    // Auto-fetch quote when amount/asset/currency changes
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        if (amount && parseFloat(amount) > 0 && asset && currency) {
+          fetchQuote()
+        }
+      }, 500) // Debounce 500ms
+
+      return () => clearTimeout(timer)
+    }, [amount, asset, currency])
 
     try {
       const response = await apiClient.post('/api/v1/offramp/quote', {
@@ -180,16 +271,59 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             <Label htmlFor="withdraw-asset" className="text-sm font-semibold text-gray-900">Asset to Withdraw</Label>
             <Select value={asset} onValueChange={setAsset}>
               <SelectTrigger id="withdraw-asset" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
-                <SelectValue placeholder="Select asset" />
+                <SelectValue placeholder="Select crypto to withdraw" />
               </SelectTrigger>
-              <SelectContent className="bg-white border-gray-300">
-                {ASSETS.map((a) => (
-                  <SelectItem key={a.value} value={a.value} className="text-gray-900 hover:bg-gray-100">
-                    {a.label}
-                  </SelectItem>
+              <SelectContent className="bg-white border-gray-300 max-h-[400px]">
+                {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
+                  <div key={chain} className="py-2">
+                    {/* Chain Header */}
+                    <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-100">
+                      {CHAIN_NAMES[chain] || chain}
+                    </div>
+                    
+                    {/* Assets in this chain */}
+                    {assets.map((a) => (
+                      <SelectItem 
+                        key={a.backend_key} 
+                        value={a.backend_key}
+                        className="text-gray-900 hover:bg-gray-100 py-3 pl-8"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{a.icon}</span>
+                          <span className="font-medium">{a.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </div>
                 ))}
               </SelectContent>
             </Select>
+            {/* Currency Selection - NEW! */}
+            <div className="space-y-2">
+              <Label htmlFor="withdraw-currency" className="text-sm font-semibold text-gray-900">
+                Withdraw To Currency
+              </Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="withdraw-currency" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-300 max-h-[300px]">
+                  {WITHDRAWAL_CURRENCIES.map((curr) => (
+                    <SelectItem 
+                      key={curr.code} 
+                      value={curr.code}
+                      className="text-gray-900 hover:bg-gray-100 py-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{curr.flag}</span>
+                        <span className="font-medium">{curr.symbol}</span>
+                        <span>{curr.name} ({curr.code})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Amount */}
@@ -208,27 +342,65 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               className="bg-gray-50 border-gray-300 text-gray-900 h-11 text-base"
             />
           </div>
+          
+          const getCurrencySymbol = (code: string) => {
+            return WITHDRAWAL_CURRENCIES.find(c => c.code === code)?.symbol || code
+          }
 
-          {/* Quote Display */}
-          {quote && (
-            <div className="rounded-lg bg-green-50 border-2 border-green-200 p-4 space-y-2">
+          {/* Quote Display - LIVE DATA! */}
+          {fetchingQuote && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              <span className="ml-2 text-sm text-gray-600">Fetching live quote...</span>
+            </div>
+          )}
+
+          {quote && !fetchingQuote && (
+            <div className="rounded-lg bg-red-50 border-2 border-red-200 p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="h-5 w-5 text-green-500 animate-pulse" />
+                <span className="text-xs font-bold text-gray-700 uppercase">Live Quote</span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">Crypto Value:</span>
+                <span className="font-bold text-base text-gray-900">
+                  ${quote.crypto_value_usd?.toFixed(2)} USD
+                </span>
+              </div>
+              
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700">Exchange Rate:</span>
-                <span className="font-bold text-base text-gray-900">₦{quote.exchange_rate?.toFixed(2)}/USD</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">NGN Amount:</span>
-                <span className="font-bold text-base text-gray-900">₦{quote.ngn_amount?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Fee (1.8%):</span>
-                <span className="font-bold text-base text-gray-900">₦{quote.fee?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t-2 border-green-300">
-                <span className="text-sm font-semibold text-gray-900">You Receive:</span>
-                <span className="font-bold text-lg text-green-600">
-                  ₦{quote.final_amount?.toLocaleString()}
+                <span className="font-bold text-base text-gray-900">
+                  1 USD = {getCurrencySymbol(currency)}{quote.exchange_rate?.toFixed(2)}
                 </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">Gross Amount:</span>
+                <span className="font-bold text-base text-gray-900">
+                  {getCurrencySymbol(currency)}{quote.gross_fiat_amount?.toLocaleString()}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">Withdrawal Fee (1.8%):</span>
+                <span className="font-bold text-base text-gray-900">
+                  {getCurrencySymbol(currency)}{quote.withdrawal_fee?.toFixed(2)}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 border-t-2 border-red-300">
+                <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                <span className="font-bold text-xl text-green-600">
+                  {getCurrencySymbol(currency)}{quote.net_fiat_amount?.toLocaleString()}
+                </span>
+              </div>
+              
+              <div className="text-xs text-gray-600 mt-2 flex items-center gap-1">
+                <span>📊 Price: {quote.price_source}</span>
+                <span>•</span>
+                <span>💱 Forex: {quote.forex_source}</span>
               </div>
             </div>
           )}

@@ -612,16 +612,26 @@ class Settings(BaseSettings):
     TRON_NETWORK_URL: str = Field(default="https://api.trongrid.io")
     TRON_API_KEY: Optional[SecretStr] = Field(default=None)
 
-    # Supported Assets (Multi-Chain) - UPDATED for our 5 chains
+    # Supported Assets (Multi-Chain) - ALL CHAINS INCLUDING WDK
     SUPPORTED_ASSETS: Dict[str, Dict[str, Any]] = {
-        # Algorand Assets
+        # ========== ALGORAND NATIVE ==========
+        "ALGO": {
+            "blockchain": "algorand",
+            "asset_id": 0,  # Native ALGO
+            "name": "Algorand",
+            "unit_name": "ALGO",
+            "decimals": 6,
+            "is_stable": False,
+            "oracle_symbol": "algorand"
+        },
         "USDT_ALGO": {
             "blockchain": "algorand",
             "asset_id": 312769,
             "name": "Tether USD (Algorand)",
             "unit_name": "USDT",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether"
         },
         "USDCa": {
             "blockchain": "algorand",
@@ -629,66 +639,120 @@ class Settings(BaseSettings):
             "name": "USD Coin (Algorand)",
             "unit_name": "USDCa",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether"  # Use USDT oracle for stable
         },
-        # Ethereum Assets (via WDK)
+        "goBTC": {
+            "blockchain": "algorand",
+            "asset_id": 386192725,  # goMint wrapped BTC
+            "name": "Wrapped Bitcoin (Algorand)",
+            "unit_name": "goBTC",
+            "decimals": 8,
+            "is_stable": False,
+            "oracle_symbol": "bitcoin"
+        },
+        "goETH": {
+            "blockchain": "algorand",
+            "asset_id": 386195940,  # goMint wrapped ETH
+            "name": "Wrapped Ethereum (Algorand)",
+            "unit_name": "goETH",
+            "decimals": 8,
+            "is_stable": False,
+            "oracle_symbol": "ethereum"
+        },
+        
+        # ========== BITCOIN (WDK) ==========
+        "BTC": {
+            "blockchain": "bitcoin",
+            "name": "Bitcoin",
+            "unit_name": "BTC",
+            "decimals": 8,
+            "is_stable": False,
+            "oracle_symbol": "bitcoin",
+            "wdk_enabled": True
+        },
+        
+        # ========== ETHEREUM (WDK) ==========
+        "ETH": {
+            "blockchain": "ethereum",
+            "name": "Ethereum",
+            "unit_name": "ETH",
+            "decimals": 18,
+            "is_stable": False,
+            "oracle_symbol": "ethereum",
+            "wdk_enabled": True
+        },
         "USDT_ETH": {
             "blockchain": "ethereum",
             "contract_address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
             "name": "Tether USD (Ethereum)",
+            "unit_name": "USDT",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
         },
         "USDC_ETH": {
             "blockchain": "ethereum",
             "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
             "name": "USD Coin (Ethereum)",
+            "unit_name": "USDC",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
         },
-        # Polygon Assets
+        
+        # ========== POLYGON (WDK) ==========
+        "MATIC": {
+            "blockchain": "polygon",
+            "name": "Polygon",
+            "unit_name": "MATIC",
+            "decimals": 18,
+            "is_stable": False,
+            "oracle_symbol": "matic",
+            "wdk_enabled": True
+        },
         "USDT_POLYGON": {
             "blockchain": "polygon",
             "contract_address": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
             "name": "Tether USD (Polygon)",
+            "unit_name": "USDT",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
         },
         "USDC_POLYGON": {
             "blockchain": "polygon",
             "contract_address": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
             "name": "USD Coin (Polygon)",
+            "unit_name": "USDC",
             "decimals": 6,
-            "is_stable": True
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
         },
-        # Tron Assets
+        
+        # ========== TRON (WDK) ==========
+        "TRX": {
+            "blockchain": "tron",
+            "name": "TRON",
+            "unit_name": "TRX",
+            "decimals": 6,
+            "is_stable": False,
+            "oracle_symbol": "tron",
+            "wdk_enabled": True
+        },
         "USDT_TRON": {
             "blockchain": "tron",
             "contract_address": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
             "name": "Tether USD (Tron)",
+            "unit_name": "USDT",
             "decimals": 6,
-            "is_stable": True
-        },
-        # Bitcoin (via WDK)
-        "BTC": {
-            "blockchain": "bitcoin",
-            "name": "Bitcoin",
-            "decimals": 8,
-            "is_stable": False
-        },
-        # Ethereum (via WDK)
-        "ETH": {
-            "blockchain": "ethereum",
-            "name": "Ethereum",
-            "decimals": 18,
-            "is_stable": False
-        },
-        # Tron native
-        "TRX": {
-            "blockchain": "tron",
-            "name": "Tron",
-            "decimals": 6,
-            "is_stable": False
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
         }
     }
 

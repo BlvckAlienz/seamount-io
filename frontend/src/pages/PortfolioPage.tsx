@@ -1,5 +1,5 @@
-// File Location: frontend/src/pages/portfolioPage.tsx
-// Description: The definitive, corrected, and production-ready portfolio page.
+// File Location: frontend/src/pages/marketDataPage.tsx
+// Description: The definitive, corrected, and production-ready marketData page.
 
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Activity, BarChart3, PieChart, RefreshCw, ArrowUpRight, ArrowDownRight, Target, Zap } from 'lucide-react';
@@ -14,10 +14,10 @@ import { generateMockChartData } from '@/data/mockData';
 
 // --- CORRECTED HOOK USAGE ---
 // Using the new, consolidated hooks from our final architecture.
-import { useportfolio } from '@/hooks/useportfolio';
+import { usemarketData } from '@/hooks/usemarketData';
 import { useWallet } from '@/hooks/useWallet';
 
-interface portfolioAsset {
+interface marketDataAsset {
   symbol: string;
   name: string;
   quantity: number;
@@ -29,16 +29,16 @@ interface portfolioAsset {
   allocation: number;
 }
 
-const portfolioPage: React.FC = () => {
+const marketDataPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState('1M');
-  const [portfolioData, setportfolioData] = useState(generateMockChartData(30));
+  const [marketDataData, setmarketDataData] = useState(generateMockChartData(30));
   
-  const { portfolio, loading: marketLoading, refetch } = useportfolio();
+  const { marketData, loading: marketLoading, refetch } = usemarketData();
   const { balance: usdsBalance, isConnected } = useWallet();
 
-  // Mock portfolio assets for demonstration. In a real app, this would come from the portfolio hook.
-  const [portfolioAssets] = useState<portfolioAsset[]>([
+  // Mock marketData assets for demonstration. In a real app, this would come from the marketData hook.
+  const [marketDataAssets] = useState<marketDataAsset[]>([
     { symbol: 'BTC', name: 'Bitcoin', quantity: 2.5, avgCost: 42000, currentPrice: 43500, totalValue: 108750, pnl: 3750, pnlPercentage: 3.57, allocation: 45.2 },
     { symbol: 'ETH', name: 'Ethereum', quantity: 15.8, avgCost: 2800, currentPrice: 2950, totalValue: 46610, pnl: 2370, pnlPercentage: 5.36, allocation: 19.4 },
     { symbol: 'AAPL', name: 'Apple Inc.', quantity: 200, avgCost: 175, currentPrice: 182.5, totalValue: 36500, pnl: 1500, pnlPercentage: 4.29, allocation: 15.2 },
@@ -53,9 +53,9 @@ const portfolioPage: React.FC = () => {
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   const formatPercentage = (percentage: number) => `${percentage >= 0 ? '+' : ''}${percentage.toFixed(2)}%`;
 
-  const totalportfolioValue = portfolioAssets.reduce((sum, asset) => sum + asset.totalValue, 0);
-  const totalPnL = portfolioAssets.reduce((sum, asset) => sum + asset.pnl, 0);
-  const totalPnLPercentage = totalportfolioValue > 0 ? (totalPnL / (totalportfolioValue - totalPnL)) * 100 : 0;
+  const totalmarketDataValue = marketDataAssets.reduce((sum, asset) => sum + asset.totalValue, 0);
+  const totalPnL = marketDataAssets.reduce((sum, asset) => sum + asset.pnl, 0);
+  const totalPnLPercentage = totalmarketDataValue > 0 ? (totalPnL / (totalmarketDataValue - totalPnL)) * 100 : 0;
 
   if (loading || marketLoading) {
     return (
@@ -72,14 +72,14 @@ const portfolioPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* portfolio Summary Cards */}
+      {/* marketData Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Total portfolio Value</h3>
+              <h3 className="text-lg font-semibold text-white">Total marketData Value</h3>
               <DollarSign className="h-6 w-6 text-blue-400" />
             </div>
-            <div className="text-3xl font-bold text-white">{formatCurrency(totalportfolioValue)}</div>
+            <div className="text-3xl font-bold text-white">{formatCurrency(totalmarketDataValue)}</div>
             <div className={`flex items-center text-sm ${totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {totalPnL >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
               {formatCurrency(totalPnL)} ({formatPercentage(totalPnLPercentage)})
@@ -90,8 +90,8 @@ const portfolioPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-white">Active Positions</h3>
               <Activity className="h-6 w-6 text-emerald-400" />
             </div>
-            <div className="text-3xl font-bold text-white">{portfolioAssets.length}</div>
-            <div className="text-sm text-gray-400">Assets in portfolio</div>
+            <div className="text-3xl font-bold text-white">{marketDataAssets.length}</div>
+            <div className="text-sm text-gray-400">Assets in marketData</div>
         </Card>
          <Card>
             <div className="flex items-center justify-between mb-4">
@@ -103,11 +103,11 @@ const portfolioPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* portfolio Performance Chart */}
+      {/* marketData Performance Chart */}
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <h3 className="text-xl font-semibold text-white">portfolio Performance</h3>
+            <h3 className="text-xl font-semibold text-white">marketData Performance</h3>
             <p className="text-sm text-gray-400">Powered by Seamount AI Analytics</p>
           </div>
           <div className="flex items-center space-x-1">
@@ -121,7 +121,7 @@ const portfolioPage: React.FC = () => {
             <Button size="sm" variant="ghost" onClick={refetch} />
           </div>
         </div>
-        <AdvancedChart data={portfolioData} height={400} />
+        <AdvancedChart data={marketDataData} height={400} />
       </Card>
 
       {/* Asset Holdings Table */}
@@ -139,7 +139,7 @@ const portfolioPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {portfolioAssets.map((asset) => (
+              {marketDataAssets.map((asset) => (
                 <tr key={asset.symbol} className="border-b border-gray-800/30 hover:bg-gray-800/20 transition-colors">
                   <td className="py-4 px-4"><div className="flex items-center space-x-3"><div><div className="font-medium text-white">{asset.symbol}</div><div className="text-xs text-gray-400">{asset.name}</div></div></div></td>
                   <td className="py-4 px-4 text-right font-mono text-white">{asset.quantity.toLocaleString()}</td>
@@ -158,4 +158,4 @@ const portfolioPage: React.FC = () => {
   );
 };
 
-export default portfolioPage;
+export default marketDataPage;

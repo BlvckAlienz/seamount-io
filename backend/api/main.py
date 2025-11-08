@@ -430,7 +430,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.critical(f"💥 FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
         logger.info("🚨 Continuing with degraded functionality")
-    
+
+        # ✅ START WDK DEPOSIT MONITOR (background task)
+        if services_available:
+            try:
+                from backend.services.wdk_deposit_monitor import WDKDepositMonitor
+                
+                monitor = WDKDepositMonitor(db_service)
+                
+                # Run in background (non-blocking)
+                asyncio.create_task(monitor.monitor_deposits())
+                
+                logger.info("✅ WDK Deposit Monitor started (polling every 30s)")
+            except Exception as e:
+                logger.warning(f"⚠️ WDK Deposit Monitor failed to start: {e}")
+                
     yield
     
     logger.info("--- Seamount API Shutting Down ---")
