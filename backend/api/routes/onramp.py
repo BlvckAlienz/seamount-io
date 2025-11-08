@@ -460,7 +460,10 @@ async def get_onramp_quote(
         raise HTTPException(status_code=500, detail=f"Quote generation failed: {str(e)}")
     
 @router.post("/quote/public")
-async def get_public_onramp_quote(request: Request):
+async def get_public_onramp_quote(
+    request: Request,
+    database_service = Depends(get_database_service)  # 🎯 USE DEPENDENCY INJECTION
+):
     """
     🎯 PUBLIC quote endpoint - no authentication required
     For unauthenticated users to see pricing

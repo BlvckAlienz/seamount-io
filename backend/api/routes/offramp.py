@@ -147,7 +147,10 @@ async def get_offramp_quote(
         raise HTTPException(status_code=500, detail=f"Quote generation failed: {str(e)}")
 
 @router.post("/quote/public")
-async def get_public_offramp_quote(request: Request):
+async def get_public_offramp_quote(
+    request: Request,
+    database_service = Depends(get_database_service)  # 🎯 USE DEPENDENCY INJECTION
+):
     """
     🎯 PUBLIC offramp quote - no authentication required
     """
