@@ -4,7 +4,7 @@
  * Converts USDT/ALGO to NGN and sends to bank account
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { apiClient } from '@/config/api'
 import { Button } from '@/components/ui/button.tsx'
@@ -153,7 +153,7 @@ const WITHDRAWAL_CURRENCIES = [
     }
   }
 
-  // ✅ REAL-TIME QUOTE FETCHING (NO HARDCODED RATES!)
+  // ✅ FIXED: Remove logger, add proper imports
   const fetchQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       setQuote(null)
@@ -164,7 +164,7 @@ const WITHDRAWAL_CURRENCIES = [
     setError(null)
 
     try {
-      const response = await apiClient.post('/api/v1/offramp/quote', {
+      const response = await api.post('/api/v1/offramp/quote', {
         crypto_amount: parseFloat(amount),
         crypto_asset: asset,
         fiat_currency: currency,
@@ -172,7 +172,7 @@ const WITHDRAWAL_CURRENCIES = [
 
       if (response.data?.success) {
         setQuote(response.data.quote)
-        logger.info('✅ Offramp quote fetched:', response.data.quote)
+        console.log('✅ Offramp quote fetched:', response.data.quote)  // ✅ FIXED
       } else {
         setError(response.data?.error || 'Failed to get quote')
       }
@@ -184,31 +184,18 @@ const WITHDRAWAL_CURRENCIES = [
     } finally {
       setFetchingQuote(false)
     }
-
-    // Auto-fetch quote when amount/asset/currency changes
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        if (amount && parseFloat(amount) > 0 && asset && currency) {
-          fetchQuote()
-        }
-      }, 500) // Debounce 500ms
-
-      return () => clearTimeout(timer)
-    }, [amount, asset, currency])
-
-    try {
-      const response = await apiClient.post('/api/v1/offramp/quote', {
-        amount: parseFloat(amount),
-        asset,
-      })
-
-      setQuote(response.data)
-      setError(null)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to get quote')
-      setQuote(null)
-    }
   }
+
+  // ✅ FIXED: Proper useEffect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (amount && parseFloat(amount) > 0 && asset && currency) {
+        fetchQuote()
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [amount, asset, currency])
 
   // Handle withdrawal
   const handleWithdraw = async () => {
@@ -277,7 +264,7 @@ const WITHDRAWAL_CURRENCIES = [
               <SelectTrigger id="withdraw-asset" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select crypto to withdraw" />
               </SelectTrigger>
-              <SelectContent className="bg-white border-gray-300 max-h-[400px]">
+              <SelectContent className="bg-white border-gray-300 max-h-[400px] z-50">
                 {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                   <div key={chain} className="py-2">
                     {/* Chain Header */}
@@ -311,7 +298,7 @@ const WITHDRAWAL_CURRENCIES = [
                 <SelectTrigger id="withdraw-currency" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border-gray-300 max-h-[300px]">
+                <SelectContent className="bg-white border-gray-300 max-h-[300px] z-50">
                   {WITHDRAWAL_CURRENCIES.map((curr) => (
                     <SelectItem 
                       key={curr.code} 
@@ -412,7 +399,7 @@ const WITHDRAWAL_CURRENCIES = [
               <SelectTrigger id="bank" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-11">
                 <SelectValue placeholder="Select bank" />
               </SelectTrigger>
-              <SelectContent className="max-h-[200px] bg-white border-gray-300">
+              <SelectContent className="max-h-[200px] bg-white border-gray-300 z-50">
                 {NIGERIAN_BANKS.map((bank) => (
                   <SelectItem key={bank.code} value={bank.code} className="text-gray-900 hover:bg-gray-100">
                     {bank.name}

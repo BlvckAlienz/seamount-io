@@ -104,20 +104,12 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
 
-  // Auto-fetch quote when amount/currency/asset changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (amount && parseFloat(amount) > 0) {
-        fetchQuote()
-      }
-    }, 500) // Debounce 500ms
-
-    return () => clearTimeout(timer)
-  }, [amount, currency, asset])
-
-  // Get quote from backend
+  // ✅ FIXED: Remove logger, add proper error handling
   const fetchQuote = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (!amount || parseFloat(amount) <= 0) {
+      setQuote(null)
+      return
+    }
 
     setFetchingQuote(true)
     setError(null)
@@ -131,16 +123,30 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
       if (response.data?.success) {
         setQuote(response.data.quote)
+        console.log('✅ Quote fetched:', response.data.quote)  // ✅ FIXED: console.log instead of logger
       } else {
         setError(response.data?.error || 'Failed to get quote')
       }
     } catch (err: any) {
       console.error('Quote fetch error:', err)
-      setError(err.response?.data?.detail || 'Failed to get quote')
+      const errorMsg = err.response?.data?.detail || 'Failed to get quote'
+      setError(errorMsg)
+      setQuote(null)
     } finally {
       setFetchingQuote(false)
     }
   }
+
+  // ✅ FIXED: Import useEffect from React
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (amount && parseFloat(amount) > 0) {
+        fetchQuote()
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [amount, currency, asset])  // ✅ Dependencies
 
   // Handle fund wallet
   const handleFund = async () => {
@@ -214,7 +220,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               <SelectTrigger id="currency" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
                 <SelectValue placeholder="Select your currency" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[300px]">
+              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[300px] z-50">
                 {SUPPORTED_CURRENCIES.map((curr) => (
                   <SelectItem 
                     key={curr.code} 
@@ -267,7 +273,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               <SelectTrigger id="asset" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
                 <SelectValue placeholder="Select crypto asset" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px]">
+              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
                 {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                   <div key={chain} className="py-2">
                     {/* Chain Header */}
