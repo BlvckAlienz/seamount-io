@@ -252,6 +252,10 @@ const WITHDRAWAL_CURRENCIES = [
     }
   }
 
+  const getCurrencySymbol = (code: string) => {
+    return WITHDRAWAL_CURRENCIES.find(c => c.code === code)?.symbol || code
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-white border-2 border-gray-300">
@@ -342,10 +346,6 @@ const WITHDRAWAL_CURRENCIES = [
               className="bg-gray-50 border-gray-300 text-gray-900 h-11 text-base"
             />
           </div>
-          
-          const getCurrencySymbol = (code: string) => {
-            return WITHDRAWAL_CURRENCIES.find(c => c.code === code)?.symbol || code
-          }
 
           {/* Quote Display - LIVE DATA! */}
           {fetchingQuote && (
