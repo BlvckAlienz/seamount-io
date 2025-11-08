@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { apiClient } from '@/config/api'
+import { api } from '@/lib/api'  // ✅ USE SAME API CLIENT
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
-import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Activity } from 'lucide-react'  // ✅ ADD ACTIVITY
 
 interface WithdrawModalProps {
   open: boolean
@@ -137,7 +137,7 @@ const WITHDRAWAL_CURRENCIES = [
     setAccountName(null)
 
     try {
-      const response = await apiClient.post('/api/v1/offramp/verify-account', {
+      const response = await api.post('/api/v1/offramp/verify-account', {  // ✅ USE api NOT apiClient
         account_number: bankAccount,
         bank_code: bankCode,
       })
@@ -213,7 +213,7 @@ const WITHDRAWAL_CURRENCIES = [
     setError(null)
 
     try {
-      const response = await apiClient.post('/api/v1/offramp/withdraw', {
+      const response = await api.post('/api/v1/offramp/withdraw', {  // ✅ USE api NOT apiClient
         amount: parseFloat(amount),
         asset,
         bank_code: bankCode,
@@ -245,7 +245,7 @@ const WITHDRAWAL_CURRENCIES = [
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-white border-2 border-gray-300">
+      <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 z-[100]">  // ✅ ADD z-[100]
         <DialogHeader className="border-b pb-4">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
             <ArrowDownToLine className="h-6 w-6 text-red-600" />
@@ -343,10 +343,13 @@ const WITHDRAWAL_CURRENCIES = [
           )}
 
           {quote && !fetchingQuote && (
-            <div className="rounded-lg bg-red-50 border-2 border-red-200 p-4 space-y-2">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="h-5 w-5 text-green-500 animate-pulse" />
-                <span className="text-xs font-bold text-gray-700 uppercase">Live Quote</span>
+            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700 p-4 space-y-3 shadow-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Live Quote</span>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Valid 5 min</span>
               </div>
               
               <div className="flex justify-between items-center">
@@ -414,6 +417,7 @@ const WITHDRAWAL_CURRENCIES = [
             <Label htmlFor="account" className="text-sm font-semibold text-gray-900">Account Number</Label>
             <div className="flex gap-2">
               <Input
+                className="pl-12 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-white h-12 text-lg font-medium transition-colors"
                 id="account"
                 type="text"
                 maxLength={10}

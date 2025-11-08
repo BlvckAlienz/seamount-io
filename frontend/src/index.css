@@ -79,3 +79,16 @@
     padding-right: 1rem;
   }
 }
+
+/* 🎯 CRITICAL: Ensure dropdowns appear above modals */
+[data-radix-select-content] {
+  z-index: 10000 !important;
+}
+
+.SelectContent {
+  z-index: 10000 !important;
+}
+
+[role="dialog"] {
+  z-index: 9999 !important;
+}

@@ -248,6 +248,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 {selectedCurrency?.symbol}
               </span>
               <Input
+                className="pl-12 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-white h-12 text-lg font-medium transition-colors"
                 id="amount"
                 type="number"
                 step="any"
@@ -312,12 +313,13 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           )}
 
           {quote && !fetchingQuote && (
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Exchange Rate:</span>
-                <span className="font-bold text-base text-gray-900 dark:text-white">
-                  {selectedCurrency?.symbol}{quote.exchange_rate?.toFixed(2)}/USD
-                </span>
+            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700 p-4 space-y-3 shadow-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Live Quote</span>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">Valid 5 min</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Platform Fee (1.8%):</span>
