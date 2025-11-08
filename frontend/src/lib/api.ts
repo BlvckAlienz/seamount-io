@@ -29,14 +29,23 @@ class ApiClient {
     this.client.interceptors.request.use(
       (config) => {
         const token = localStorage.getItem('access_token');
-        if (token) {
+        
+        // 🎯 SMART TOKEN LOGIC: Only add token to non-public endpoints
+        const isPublicEndpoint = config.url?.includes('/public') || 
+                              config.url?.includes('/health') ||
+                              config.url?.includes('/session/initialize');
+        
+        if (token && !isPublicEndpoint) {
           config.headers.Authorization = `Bearer ${token}`;
           console.log(`🔐 API: Token attached to ${config.url}`);
-        } else {
-          console.warn('⚠️ API: No token found for', config.url);
+        } else if (!token && !isPublicEndpoint) {
+          // Only warn for non-public endpoints that should have tokens
+          console.warn(`⚠️ API: No token found for protected endpoint: ${config.url}`);
+        } else if (isPublicEndpoint) {
+          // Silent for public endpoints - no token needed
+          console.log(`🌐 API: Public endpoint - ${config.url}`);
         }
         
-        // 🎯 Log the full URL being called
         console.log(`🚀 API Call: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },

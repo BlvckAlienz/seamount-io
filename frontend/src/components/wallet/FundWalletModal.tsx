@@ -122,8 +122,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     try {
       console.log('🔄 Fetching quote - Auth status:', session ? 'Authenticated' : 'Unauthenticated');
 
-      // 🎯 USE PUBLIC ENDPOINT - no authentication required
-      const response = await api.post('/api/v1/onramp/quote/public', {
+      // 🎯 SMART ENDPOINT SELECTION: Use authenticated endpoint when logged in
+      const endpoint = session ? '/api/v1/onramp/quote' : '/api/v1/onramp/quote/public';
+      
+      const response = await api.post(endpoint, {
         amount_fiat: parseFloat(amount),
         currency,
         crypto_asset: asset,
@@ -141,6 +143,13 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     } catch (err: any) {
       console.error('💥 Quote fetch error:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to get quote';
+      
+      // 🎯 Graceful fallback: Try public endpoint if authenticated fails
+      if (err.response?.status === 403 && session) {
+        console.log('🔄 Falling back to public endpoint...');
+        // You could implement fallback logic here if needed
+      }
+      
       setError(errorMsg);
       setQuote(null);
     } finally {

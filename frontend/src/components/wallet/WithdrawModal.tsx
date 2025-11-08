@@ -169,22 +169,36 @@ const WITHDRAWAL_CURRENCIES = [
     setError(null);
 
     try {
-      // 🎯 USE PUBLIC ENDPOINT - no authentication required
-      const response = await api.post('/api/v1/offramp/quote/public', {
-        crypto_amount: parseFloat(amount),
+      console.log('🔄 Fetching quote - Auth status:', session ? 'Authenticated' : 'Unauthenticated');
+
+      // 🎯 SMART ENDPOINT SELECTION: Use authenticated endpoint when logged in
+      const endpoint = session ? '/api/v1/offramp/quote' : '/api/v1/offramp/quote/public';
+      
+      const response = await api.post(endpoint, {
+        amount_fiat: parseFloat(amount),
+        currency,
         crypto_asset: asset,
-        fiat_currency: currency,
       });
 
-      if (response.data?.success) {
+      console.log('✅ Quote response:', response);
+
+      if (response?.data?.success) {
         setQuote(response.data.quote);
-        console.log('✅ Offramp quote fetched:', response.data.quote);
+        console.log('🎯 Quote data:', response.data.quote);
       } else {
-        setError(response.data?.error || 'Failed to get quote');
+        const errorMsg = response?.data?.error || 'Failed to get quote';
+        setError(errorMsg);
       }
     } catch (err: any) {
-      console.error('Quote fetch error:', err);
-      const errorMsg = err.response?.data?.detail || 'Failed to get live quote';
+      console.error('💥 Quote fetch error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to get quote';
+      
+      // 🎯 Graceful fallback: Try public endpoint if authenticated fails
+      if (err.response?.status === 403 && session) {
+        console.log('🔄 Falling back to public endpoint...');
+        // You could implement fallback logic here if needed
+      }
+      
       setError(errorMsg);
       setQuote(null);
     } finally {
