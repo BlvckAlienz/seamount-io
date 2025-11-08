@@ -460,10 +460,7 @@ async def get_onramp_quote(
         raise HTTPException(status_code=500, detail=f"Quote generation failed: {str(e)}")
     
 @router.post("/quote/public")
-async def get_public_onramp_quote(
-    request: Request,
-    database_service = Depends(get_database_service)  # 🎯 USE DEPENDENCY INJECTION
-):
+async def get_public_onramp_quote(request: Request):
     """
     🎯 PUBLIC quote endpoint - no authentication required
     For unauthenticated users to see pricing
@@ -484,9 +481,9 @@ async def get_public_onramp_quote(
         if not asset_config:
             raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
         
-        # 🎯 FIX: Get database service properly
+        # 🎯 FIX: Get database service WITHOUT await
         from backend.dependencies import get_database_service
-        database_service = await get_database_service()  # 🎯 CORRECT NAME
+        database_service = get_database_service()  # 🎯 REMOVE 'await'
         
         # 🎯 STEP 1: GET REAL FOREX RATE
         if currency == "USD":
