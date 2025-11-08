@@ -1,11 +1,10 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
-// 🎯 CRITICAL FIX: Force localhost in development
+// 🎯 CRITICAL FIX: Use relative paths in development to leverage Vite proxy
 const getBaseURL = () => {
-  // Always use localhost:8000 in development
   if (import.meta.env.DEV) {
-    console.log('🔧 API: Using localhost:8000 (development)');
-    return 'http://localhost:8000';
+    console.log('🔧 API: Using relative paths (Vite proxy)');
+    return ''; // Empty string = relative to current origin (localhost:5173)
   }
   // Use environment variable in production
   return import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
@@ -34,8 +33,11 @@ class ApiClient {
           config.headers.Authorization = `Bearer ${token}`;
           console.log(`🔐 API: Token attached to ${config.url}`);
         } else {
-          console.warn('⚠️ API: No token found');
+          console.warn('⚠️ API: No token found for', config.url);
         }
+        
+        // 🎯 Log the full URL being called
+        console.log(`🚀 API Call: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },
       (error) => Promise.reject(error)
@@ -44,11 +46,12 @@ class ApiClient {
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`✅ API: ${response.config.url} - ${response.status}`);
+        console.log(`✅ API Success: ${response.config.url} - ${response.status}`);
         return response;
       },
       async (error: AxiosError) => {
-        console.error(`❌ API Error: ${error.config?.url} - ${error.response?.status}`);
+        console.error(`❌ API Error: ${error.config?.url} - ${error.response?.status}`, error.message);
+        
         if (error.response?.status === 401) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');

@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { apiClient, API_ENDPOINTS } from './config/api';
+import { api } from '@/lib/api'; // 🎯 Use our fixed API client
 
 // --- Core Components & Pages ---
 import ErrorBoundary from './components/ErrorBoundary';
@@ -59,10 +59,25 @@ const AppContent: React.FC = () => {
     // Initialize anonymous session for unauthenticated users without consent
     const initializeAnonymousSession = async () => {
       try {
-        const { data } = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
-        setSessionId(data.session_id);
+        const response = await api.post('/api/v1/session/initialize');
+        console.log('🔄 Session initialize response:', response);
+        
+        // 🎯 Handle different response structures
+        if (response && response.data) {
+          // If response has data property
+          setSessionId(response.data.session_id || response.data.id);
+        } else if (response && response.session_id) {
+          // If response is the data itself
+          setSessionId(response.session_id);
+        } else {
+          console.warn('⚠️ Unexpected session response structure:', response);
+          // Generate a fallback session ID
+          setSessionId(`anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+        }
       } catch (error) {
         console.error("Failed to initialize anonymous session:", error);
+        // Generate fallback session ID on error
+        setSessionId(`anon_error_${Date.now()}`);
       }
     };
     
