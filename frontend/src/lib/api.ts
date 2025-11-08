@@ -25,10 +25,20 @@ class ApiClient {
       withCredentials: true,
     });
 
-    // Request interceptor - add auth token
+    // Request interceptor - add auth token from Supabase
     this.client.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem('access_token');
+      async (config) => {
+        // 🎯 GET TOKEN FROM SUPABASE SESSION (not localStorage!)
+        let token: string | null = null;
+        
+        try {
+          // Dynamic import to avoid circular dependency
+          const { supabase } = await import('../lib/supabase');
+          const { data: { session } } = await supabase.auth.getSession();
+          token = session?.access_token || null;
+        } catch (error) {
+          console.error('❌ Failed to get Supabase session:', error);
+        }
         
         // 🎯 SMART TOKEN LOGIC: Only add token to non-public endpoints
         const isPublicEndpoint = config.url?.includes('/public') || 
@@ -37,12 +47,10 @@ class ApiClient {
         
         if (token && !isPublicEndpoint) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log(`🔐 API: Token attached to ${config.url}`);
+          console.log(`🔑 API: Token attached to ${config.url}`);
         } else if (!token && !isPublicEndpoint) {
-          // Only warn for non-public endpoints that should have tokens
-          console.warn(`⚠️ API: No token found for protected endpoint: ${config.url}`);
+          console.warn(`⚠️ API: No Supabase session found for protected endpoint: ${config.url}`);
         } else if (isPublicEndpoint) {
-          // Silent for public endpoints - no token needed
           console.log(`🌐 API: Public endpoint - ${config.url}`);
         }
         
