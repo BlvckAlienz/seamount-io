@@ -42,6 +42,9 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
 
+  // 🎯 CRITICAL: Call useAuth hook to get session
+  const { session } = useAuth()
+  
   // Nigerian Banks
   const NIGERIAN_BANKS = [
     { code: '044', name: 'Access Bank' },

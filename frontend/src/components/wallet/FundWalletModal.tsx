@@ -106,6 +106,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
 
+  // 🎯 CRITICAL: Call useAuth hook to get session
+  const { session } = useAuth()
+
   // ✅ FIXED: Remove logger, add proper error handling
   const fetchQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
