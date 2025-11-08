@@ -28,6 +28,7 @@ import WalletRecovery from './pages/wallet-recovery';
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAutoLogout } from './hooks/useAutoLogout';
+import { DebugEnv } from './components/DebugEnv';
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -127,6 +128,7 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
+          <DebugEnv />
           <Toaster position="top-right" />
           <AppContent />
           <Analytics />
