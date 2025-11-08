@@ -245,7 +245,10 @@ const WITHDRAWAL_CURRENCIES = [
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700 z-[100]">  // ✅ ADD z-[100]
+      <DialogContent 
+        className="sm:max-w-[500px] max-w-[95vw] max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700"
+        style={{ zIndex: 1000 }}
+      >
         <DialogHeader className="border-b pb-4">
           <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
             <ArrowDownToLine className="h-6 w-6 text-red-600" />

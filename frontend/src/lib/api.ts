@@ -1,6 +1,17 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+// 🎯 CRITICAL FIX: Force localhost in development
+const getBaseURL = () => {
+  // Always use localhost:8000 in development
+  if (import.meta.env.DEV) {
+    console.log('🔧 API: Using localhost:8000 (development)');
+    return 'http://localhost:8000';
+  }
+  // Use environment variable in production
+  return import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
+};
+
+const BASE_URL = getBaseURL();
 
 class ApiClient {
   private client: AxiosInstance;
@@ -21,6 +32,9 @@ class ApiClient {
         const token = localStorage.getItem('access_token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log(`🔐 API: Token attached to ${config.url}`);
+        } else {
+          console.warn('⚠️ API: No token found');
         }
         return config;
       },
@@ -29,10 +43,13 @@ class ApiClient {
 
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log(`✅ API: ${response.config.url} - ${response.status}`);
+        return response;
+      },
       async (error: AxiosError) => {
+        console.error(`❌ API Error: ${error.config?.url} - ${error.response?.status}`);
         if (error.response?.status === 401) {
-          // Token expired - clear auth and redirect to login
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
           window.location.href = '/login';
@@ -66,45 +83,6 @@ class ApiClient {
   async patch<T>(url: string, data?: any): Promise<T> {
     const response = await this.client.patch<T>(url, data);
     return response.data;
-  }
-
-  // Auth endpoints
-  async login(email: string, password: string) {
-    return this.post('/auth/login', { email, password });
-  }
-
-  async register(email: string, password: string, fullName: string) {
-    return this.post('/auth/register', { email, password, full_name: fullName });
-  }
-
-  async logout() {
-    return this.post('/auth/logout');
-  }
-
-  // Wallet endpoints
-  async getWalletBalance() {
-    return this.get('/wallet/balance');
-  }
-
-  async fundWallet(amount: number, paymentMethod: string) {
-    return this.post('/wallet/fund', { amount, payment_method: paymentMethod });
-  }
-
-  async withdrawFromWallet(amount: number, destination: string) {
-    return this.post('/wallet/withdraw', { amount, destination });
-  }
-
-  // Payment endpoints
-  async createPayment(data: any) {
-    return this.post('/payments/create', data);
-  }
-
-  async getPaymentHistory() {
-    return this.get('/payments/history');
-  }
-
-  async getPaymentById(id: string) {
-    return this.get(`/payments/${id}`);
   }
 }
 
