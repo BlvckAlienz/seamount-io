@@ -156,35 +156,36 @@ const WITHDRAWAL_CURRENCIES = [
   // ✅ FIXED: Remove logger, add proper imports
   const fetchQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      setQuote(null)
-      return
+      setQuote(null);
+      return;
     }
 
-    setFetchingQuote(true)
-    setError(null)
+    setFetchingQuote(true);
+    setError(null);
 
     try {
-      const response = await api.post('/api/v1/offramp/quote', {
+      // 🎯 USE PUBLIC ENDPOINT - no authentication required
+      const response = await api.post('/api/v1/offramp/quote/public', {
         crypto_amount: parseFloat(amount),
         crypto_asset: asset,
         fiat_currency: currency,
-      })
+      });
 
       if (response.data?.success) {
-        setQuote(response.data.quote)
-        console.log('✅ Offramp quote fetched:', response.data.quote)  // ✅ FIXED
+        setQuote(response.data.quote);
+        console.log('✅ Offramp quote fetched:', response.data.quote);
       } else {
-        setError(response.data?.error || 'Failed to get quote')
+        setError(response.data?.error || 'Failed to get quote');
       }
     } catch (err: any) {
-      console.error('Quote fetch error:', err)
-      const errorMsg = err.response?.data?.detail || 'Failed to get live quote'
-      setError(errorMsg)
-      setQuote(null)
+      console.error('Quote fetch error:', err);
+      const errorMsg = err.response?.data?.detail || 'Failed to get live quote';
+      setError(errorMsg);
+      setQuote(null);
     } finally {
-      setFetchingQuote(false)
+      setFetchingQuote(false);
     }
-  }
+  };
 
   // ✅ FIXED: Proper useEffect
   useEffect(() => {

@@ -107,35 +107,41 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   // ✅ FIXED: Remove logger, add proper error handling
   const fetchQuote = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      setQuote(null)
-      return
+      setQuote(null);
+      return;
     }
 
-    setFetchingQuote(true)
-    setError(null)
+    setFetchingQuote(true);
+    setError(null);
 
     try {
-      const response = await api.post('/api/v1/onramp/quote', {
+      console.log('🔄 Fetching quote - Auth status:', session ? 'Authenticated' : 'Unauthenticated');
+
+      // 🎯 USE PUBLIC ENDPOINT - no authentication required
+      const response = await api.post('/api/v1/onramp/quote/public', {
         amount_fiat: parseFloat(amount),
         currency,
         crypto_asset: asset,
-      })
+      });
 
-      if (response.data?.success) {
-        setQuote(response.data.quote)
-        console.log('✅ Quote fetched:', response.data.quote)  // ✅ FIXED: console.log instead of logger
+      console.log('✅ Quote response:', response);
+
+      if (response?.data?.success) {
+        setQuote(response.data.quote);
+        console.log('🎯 Quote data:', response.data.quote);
       } else {
-        setError(response.data?.error || 'Failed to get quote')
+        const errorMsg = response?.data?.error || 'Failed to get quote';
+        setError(errorMsg);
       }
     } catch (err: any) {
-      console.error('Quote fetch error:', err)
-      const errorMsg = err.response?.data?.detail || 'Failed to get quote'
-      setError(errorMsg)
-      setQuote(null)
+      console.error('💥 Quote fetch error:', err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to get quote';
+      setError(errorMsg);
+      setQuote(null);
     } finally {
-      setFetchingQuote(false)
+      setFetchingQuote(false);
     }
-  }
+  };
 
   // ✅ FIXED: Import useEffect from React
   useEffect(() => {

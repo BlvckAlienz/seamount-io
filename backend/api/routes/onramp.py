@@ -458,3 +458,119 @@ async def get_onramp_quote(
     except Exception as e:
         logger.error(f"💥 Quote generation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Quote generation failed: {str(e)}")
+    
+@router.post("/quote/public")
+async def get_public_onramp_quote(request: Request):
+    """
+    🎯 PUBLIC quote endpoint - no authentication required
+    For unauthenticated users to see pricing
+    """
+    try:
+        data = await request.json()
+        amount_fiat = Decimal(str(data.get("amount_fiat", 0)))
+        currency = data.get("currency", "NGN")
+        crypto_asset = data.get("crypto_asset", "USDT_ALGO")
+        
+        if amount_fiat <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+        
+        # Get asset config
+        settings = get_settings()
+        asset_config = settings.SUPPORTED_ASSETS.get(crypto_asset)
+        
+        if not asset_config:
+            raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
+        
+        # 🎯 STEP 1: GET REAL FOREX RATE
+        if currency == "USD":
+            fiat_to_usd_rate = Decimal("1.0")
+        else:
+            import aiohttp
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"https://api.exchangerate-api.com/v4/latest/USD",
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as response:
+                        if response.status == 200:
+                            rates_data = await response.json()
+                            fiat_per_usd = Decimal(str(rates_data["rates"].get(currency, 1)))
+                            fiat_to_usd_rate = Decimal("1") / fiat_per_usd if fiat_per_usd > 0 else Decimal("1")
+                            logger.info(f"✅ Public quote - Live forex: 1 USD = {fiat_per_usd} {currency}")
+                        else:
+                            raise Exception(f"ExchangeRate-API returned {response.status}")
+            except Exception as forex_error:
+                logger.error(f"❌ Public quote forex API failed: {forex_error}")
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Cannot get live exchange rates. Please try again."
+                )
+        
+        # Convert fiat to USD
+        amount_usd = amount_fiat * fiat_to_usd_rate
+        
+        # 🎯 STEP 2: GET REAL CRYPTO PRICE
+        from backend.services.oracle_service import EnhancedOracleService
+        oracle_service = EnhancedOracleService(db_service)
+        
+        oracle_symbol = asset_config.get("oracle_symbol", "bitcoin")
+        
+        try:
+            crypto_price_usd, price_metadata = await oracle_service.get_asset_price(oracle_symbol)
+            logger.info(f"✅ Public quote - Live crypto price: {crypto_asset} = ${crypto_price_usd}")
+        except Exception as price_error:
+            logger.error(f"❌ Public quote price oracle failed: {price_error}")
+            raise HTTPException(
+                status_code=503,
+                detail="Cannot get live crypto prices. Please try again."
+            )
+        
+        # 🎯 STEP 3: CALCULATE FEES (1.8% platform fee)
+        platform_fee_usd = amount_usd * Decimal("0.018")
+        net_usd = amount_usd - platform_fee_usd
+        
+        # Calculate crypto amount
+        estimated_crypto = net_usd / crypto_price_usd
+        
+        # Convert fees back to user's currency
+        platform_fee_fiat = platform_fee_usd / fiat_to_usd_rate if currency != "USD" else platform_fee_usd
+        
+        quote_response = {
+            "success": True,
+            "quote": {
+                "amount_fiat": float(amount_fiat),
+                "currency": currency,
+                "crypto_asset": crypto_asset,
+                "blockchain": asset_config["blockchain"],
+                
+                # Exchange rates (LIVE!)
+                "exchange_rate": float(Decimal("1") / fiat_to_usd_rate) if currency != "USD" else 1.0,
+                "forex_source": "ExchangeRate-API (live)",
+                
+                # Crypto pricing (LIVE!)
+                "crypto_price_usd": float(crypto_price_usd),
+                "price_source": price_metadata.get("source", "oracle"),
+                "price_confidence": price_metadata.get("confidence", 0.95),
+                
+                # Amounts
+                "amount_usd": float(amount_usd),
+                "platform_fee": float(platform_fee_fiat),
+                "platform_fee_usd": float(platform_fee_usd),
+                "estimated_crypto_amount": float(estimated_crypto),
+                
+                # Quote metadata
+                "valid_for_seconds": 300,
+                "timestamp": datetime.now().isoformat(),
+                "quote_id": f"public_quote_{int(datetime.now().timestamp())}"
+            }
+        }
+        
+        logger.info(f"✅ Public quote generated: {amount_fiat} {currency} → {estimated_crypto:.6f} {crypto_asset}")
+        
+        return quote_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"💥 Public quote generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Quote generation failed: {str(e)}")
