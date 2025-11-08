@@ -279,7 +279,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                     {assets.map((a) => (
                       <SelectItem 
                         key={a.value} 
-                        value={a.backend_key}  {/* ✅ USE BACKEND KEY FOR API */}
+                        value={a.backend_key}
                         className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
                       >
                         <div className="flex flex-col gap-1">
