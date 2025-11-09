@@ -131,6 +131,10 @@ async def initialize_onramp(
                         logger.warning(f"⚠️ Cashramp returned success but no valid URL. Response keys: {list(payment_result.keys())}")
                 else:
                     logger.warning(f"⚠️ Cashramp returned invalid response or no success: {payment_result}")
+                    
+            except Exception as cashramp_error:
+                logger.warning(f"⚠️ Cashramp failed: {cashramp_error}")
+        
                 # Fall through to Paystack
         
         # 🥈 TIER 2: PAYSTACK (Best for NGN, fast settlement)
@@ -245,7 +249,7 @@ async def initialize_onramp(
                         
             except Exception as emergency_error:
                 logger.error(f"💥 EMERGENCY FALLBACK FAILED: {emergency_error}")
-                
+
         # 🚨 VALIDATION: Ensure we have a checkout URL
         if not checkout_url:
             logger.error(
