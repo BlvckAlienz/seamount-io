@@ -130,7 +130,11 @@ class CashrampService:
                             "asset": asset,
                             "amount_ngn": float(amount_ngn),
                             "amount_usd": float(amount_usd),
+                            # 🎯 CRITICAL FIX: Return ALL possible URL fields for frontend extraction
                             "payment_url": result.get("payment_url"),
+                            "checkout_url": result.get("payment_url"),  # Same as payment_url for consistency
+                            "link": result.get("payment_url"),          # Another alias
+                            "url": result.get("payment_url"),           # Another alias  
                             "expires_at": result.get("expires_at")
                         }
                     else:
