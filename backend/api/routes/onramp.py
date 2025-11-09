@@ -289,7 +289,7 @@ async def initialize_onramp(
         }
         
         try:
-            await db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+            db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
             logger.info(f"✅ Transaction record created: {tx_id}")
         except Exception as db_error:
             logger.error(f"❌ Failed to store transaction: {db_error}")
@@ -318,15 +318,16 @@ async def initialize_onramp(
         # 📍 STEP 5: Log audit trail (optional, non-blocking)
         if audit_service:
             try:
+                # 🎯 FIX: Ensure we're passing proper string values, not objects
                 await audit_service.log_event(
                     "ONRAMP_INITIATED",
-                    user_id=current_user["id"],
-                    resource_id=tx_id,
+                    user_id=str(current_user["id"]),  # 🎯 EXPLICIT STRING CONVERSION
+                    resource_id=str(tx_id),           # 🎯 EXPLICIT STRING CONVERSION
                     details={
-                        "provider": provider,
+                        "provider": str(provider),    # 🎯 EXPLICIT STRING CONVERSION
                         "amount": float(amount),
-                        "currency": request.currency,
-                        "asset": request.crypto_asset
+                        "currency": str(request.currency),
+                        "asset": str(request.crypto_asset)
                     }
                 )
             except Exception as audit_error:
@@ -422,7 +423,7 @@ async def _credit_user_wallet(db_service, tx_ref: str, amount: float, currency: 
     """Credit user wallet after successful payment"""
     
     try:
-        result = await db_service.supabase.from_('onramp_transactions')\
+        result = db_service.supabase.from_('onramp_transactions')\
             .select('user_id, crypto_asset, wallet_address')\
             .eq('id', tx_ref)\
             .limit(1)\
@@ -448,7 +449,7 @@ async def _credit_user_wallet(db_service, tx_ref: str, amount: float, currency: 
             current_balance = float(balance_result.data[0].get('usdt_balance', 0))
             new_balance = current_balance + amount
             
-            await db_service.supabase.from_('wallet_balances')\
+            db_service.supabase.from_('wallet_balances')\
                 .update({'usdt_balance': new_balance, 'updated_at': 'NOW()'})\
                 .eq('user_id', tx["user_id"])\
                 .execute()
@@ -458,7 +459,7 @@ async def _credit_user_wallet(db_service, tx_ref: str, amount: float, currency: 
         logger.error(f"❌ Failed to update balance: {e}")
     
     try:
-        await db_service.supabase.from_('onramp_transactions')\
+        db_service.supabase.from_('onramp_transactions')\
             .update({'status': 'completed', 'completed_at': 'NOW()'})\
             .eq('id', tx_ref)\
             .execute()

@@ -103,9 +103,9 @@ class CashrampService:
             }
             
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer {self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key}",
                 "Content-Type": "application/json",
-                "X-Public-Key": self.public_key
+                "X-Public-Key": self.public_key.get_secret_value() if hasattr(self.public_key, 'get_secret_value') else self.public_key
             }
             
             async with aiohttp.ClientSession() as session:
@@ -399,8 +399,8 @@ class CashrampService:
         try:
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "X-Public-Key": self.public_key
+                "Authorization": f"Bearer {self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key}",
+                "X-Public-Key": self.public_key.get_secret_value() if hasattr(self.public_key, 'get_secret_value') else self.public_key
             }
             
             payload = {
