@@ -280,7 +280,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 disabled={loading}
-                className="pl-12 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium"
               />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
