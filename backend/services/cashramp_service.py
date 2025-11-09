@@ -26,8 +26,8 @@ class CashrampService:
         self.db_service = db_service
         self.settings = get_settings()
         
-        # API Configuration
-        self.base_url = "https://staging.api.useaccrue.com/cashramp/api"
+        # API Configuration - UPDATED TO PRODUCTION
+        self.base_url = "https://api.useaccrue.com/cashramp/api"  # 🎯 PRODUCTION
         self.graphql_endpoint = f"{self.base_url}/graphql"
         self.rest_endpoint = f"{self.base_url}/v1"
         
@@ -65,16 +65,7 @@ class CashrampService:
         payment_method: str = "paystack"
     ) -> Dict[str, Any]:
         """
-        Create NGN on-ramp to buy USDT/USDCa
-        
-        Args:
-            user_id: User ID
-            asset: Crypto asset to purchase (USDT, USDCa)
-            amount_ngn: Amount in Nigerian Naira
-            payment_method: Payment method (default: paystack)
-        
-        Returns:
-            Dict with payment_url, onramp_id, etc.
+        Create NGN on-ramp to buy USDT/USDCa with PRODUCTION endpoint
         """
         
         # Check if Cashramp is configured
@@ -103,10 +94,12 @@ class CashrampService:
             }
             
             headers = {
-                "Authorization": f"Bearer {self.api_key.get_secret_value() if hasattr(self.api_key, 'get_secret_value') else self.api_key}",
+                "Authorization": f"Bearer {str(self.api_key)}",
                 "Content-Type": "application/json",
-                "X-Public-Key": self.public_key.get_secret_value() if hasattr(self.public_key, 'get_secret_value') else self.public_key
+                "X-Public-Key": str(self.public_key)
             }
+            
+            logger.info(f"🔄 Calling Cashramp production endpoint: {self.rest_endpoint}/onramp")
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -116,13 +109,17 @@ class CashrampService:
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     
+                    # 🎯 ENHANCED ERROR HANDLING
+                    response_text = await response.text()
+                    
                     if response.status == 201:
-                        result = await response.json()
+                        try:
+                            result = await response.json()
+                        except:
+                            logger.error(f"❌ Cashramp returned invalid JSON: {response_text}")
+                            raise Exception("Cashramp returned invalid response format")
                         
-                        logger.info(
-                            f"✅ Cashramp on-ramp created: {result.get('id')} "
-                            f"for user {user_id[:8]}..."
-                        )
+                        logger.info(f"✅ Cashramp on-ramp created: {result.get('id')}")
                         
                         return {
                             "success": True,
@@ -130,24 +127,31 @@ class CashrampService:
                             "asset": asset,
                             "amount_ngn": float(amount_ngn),
                             "amount_usd": float(amount_usd),
-                            # 🎯 CRITICAL FIX: Return ALL possible URL fields for frontend extraction
+                            # 🎯 RETURN ALL POSSIBLE URL FIELDS
                             "payment_url": result.get("payment_url"),
-                            "checkout_url": result.get("payment_url"),  # Same as payment_url for consistency
-                            "link": result.get("payment_url"),          # Another alias
-                            "url": result.get("payment_url"),           # Another alias  
+                            "checkout_url": result.get("payment_url"),
+                            "link": result.get("payment_url"),
+                            "url": result.get("payment_url"),
                             "expires_at": result.get("expires_at")
                         }
                     else:
-                        error_data = await response.json()
-                        error_msg = error_data.get("message", "Unknown error")
-                        logger.error(f"Cashramp API error: {error_msg}")
-                        raise Exception(f"Cashramp API error: {error_msg}")
+                        logger.error(f"❌ Cashramp API error {response.status}: {response_text}")
+                        
+                        # Specific error messages based on status code
+                        if response.status == 401:
+                            raise Exception("Cashramp authentication failed - check API keys")
+                        elif response.status == 403:
+                            raise Exception("Cashramp access forbidden")
+                        elif response.status == 404:
+                            raise Exception("Cashramp endpoint not found")
+                        else:
+                            raise Exception(f"Cashramp API error: {response.status} - {response_text}")
                         
         except aiohttp.ClientError as e:
-            logger.error(f"Cashramp network error: {e}")
+            logger.error(f"❌ Cashramp network error: {e}")
             raise Exception(f"Network error connecting to Cashramp: {str(e)}")
         except Exception as e:
-            logger.error(f"Cashramp on-ramp failed: {e}")
+            logger.error(f"❌ Cashramp on-ramp failed: {e}")
             raise Exception(f"Cashramp on-ramp failed: {str(e)}")
     
     async def send_cross_border_payment(
