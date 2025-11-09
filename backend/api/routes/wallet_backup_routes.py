@@ -9,6 +9,7 @@ from datetime import datetime
 
 from backend.services.database_service import DatabaseService
 from backend.dependencies import get_current_user, get_db_service
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -178,20 +179,31 @@ async def get_backup_status(
         
         logger.debug(f"🔍 Checking backup status for user {user_id}")
         
+        # ✅ FIX: Cast user_id to UUID explicitly to avoid type mismatch
+        from uuid import UUID
+        
+        # Validate and convert user_id to UUID format
+        try:
+            user_uuid = UUID(user_id) if isinstance(user_id, str) else user_id
+            user_id_str = str(user_uuid)  # Ensure it's a valid UUID string
+        except (ValueError, AttributeError) as uuid_error:
+            logger.error(f"❌ Invalid UUID format for user_id: {user_id} - {uuid_error}")
+            raise HTTPException(status_code=400, detail="Invalid user ID format")
+        
         # ============================================
         # Query backup status using RPC function
         # ============================================
         try:
             status = db.supabase.rpc(
                 'get_user_backup_status', 
-                {'p_user_id': user_id}
+                {'p_user_id': user_id_str}  # ✅ Pass validated UUID string
             ).execute()
         except Exception as e:
             logger.error(f"❌ RPC call failed: {e}")
-            # Fallback: Query view directly
+            # Fallback: Query view directly with explicit UUID cast
             status = db.supabase.table('user_wallet_backup_status')\
                 .select('*')\
-                .eq('user_id', user_id)\
+                .eq('user_id', user_id_str)\
                 .execute()
         
         # ============================================

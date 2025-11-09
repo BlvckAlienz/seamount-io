@@ -45,7 +45,7 @@ async def initialize_onramp(
         
         # Get user wallet address
         try:
-            wallet_result = await db_service.supabase.from_('user_wallets')\
+            wallet_result = db_service.supabase.from_('user_wallets')\
                 .select('algorand_address')\
                 .eq('user_id', current_user["id"])\
                 .limit(1)\
