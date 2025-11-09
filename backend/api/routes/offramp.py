@@ -187,6 +187,9 @@ async def get_public_offramp_quote(request: Request):
                 detail="Cannot get live crypto prices. Please try again."
             )
         
+        # Calculate USD value
+        crypto_value_usd = crypto_amount * crypto_price_usd
+
         # Convert to fiat currency
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
         
