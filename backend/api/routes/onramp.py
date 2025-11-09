@@ -37,7 +37,6 @@ async def initialize_onramp(
 ):
     """
     Initialize fiat → crypto on-ramp
-
     """
     
     try:
@@ -56,6 +55,8 @@ async def initialize_onramp(
                 raise HTTPException(status_code=400, detail="User wallet not found. Create wallet first.")
             
             wallet_address = wallet_result.data[0]["algorand_address"]
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to fetch wallet: {e}")
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -164,41 +165,54 @@ async def initialize_onramp(
             "checkout_url": payment_result.get("payment_link") or payment_result.get("authorization_url"),
             "user_email": current_user["email"],
             "user_country": request.user_country,
-            "estimated_settlement": "5-10 minutes"
+            "estimated_settlement": "5-10 minutes",
+            "created_at": datetime.now().isoformat()
         }
         
-        await db_service.log_event("onramp_transactions", tx_data)
+        # 🎯 FIX: Use Supabase ORM instead of execute_query
+        try:
+            await db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+            logger.info(f"✅ Transaction record created: {tx_id}")
+        except Exception as db_error:
+            logger.error(f"Failed to store transaction: {db_error}")
+            # Continue anyway - payment link is still valid
         
         # Track revenue
-        revenue_service = RevenueTrackingService(db_service)
-        await revenue_service.track_transaction_fee(
-            user_id=current_user["id"],
-            transaction_type="on_ramp",
-            amount=amount,
-            fee_rate=Decimal("0.018"),
-            platform_fee=our_fee,
-            network_fee=Decimal("0.001"),
-            blockchain="algorand",
-            metadata={
-                "transaction_id": tx_id,
-                "provider": provider,
-                "currency": request.currency
-            }
-        )
+        try:
+            revenue_service = RevenueTrackingService(db_service)
+            await revenue_service.track_transaction_fee(
+                user_id=current_user["id"],
+                transaction_type="on_ramp",
+                amount=amount,
+                fee_rate=Decimal("0.018"),
+                platform_fee=our_fee,
+                network_fee=Decimal("0.001"),
+                blockchain="algorand",
+                metadata={
+                    "transaction_id": tx_id,
+                    "provider": provider,
+                    "currency": request.currency
+                }
+            )
+        except Exception as revenue_error:
+            logger.warning(f"Failed to track revenue: {revenue_error}")
         
         # Log audit
         if audit_service:
-            await audit_service.log_event(
-                "ONRAMP_INITIATED",
-                user_id=current_user["id"],
-                resource_id=tx_id,
-                details={
-                    "provider": provider,
-                    "amount": float(amount),
-                    "currency": request.currency,
-                    "asset": request.crypto_asset
-                }
-            )
+            try:
+                await audit_service.log_event(
+                    "ONRAMP_INITIATED",
+                    user_id=current_user["id"],
+                    resource_id=tx_id,
+                    details={
+                        "provider": provider,
+                        "amount": float(amount),
+                        "currency": request.currency,
+                        "asset": request.crypto_asset
+                    }
+                )
+            except Exception as audit_error:
+                logger.warning(f"Failed to log audit: {audit_error}")
         
         logger.info(f"✅ On-ramp initialized: {tx_id} via {provider}")
         
