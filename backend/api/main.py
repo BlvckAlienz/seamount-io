@@ -112,8 +112,17 @@ except ImportError as e:
 
 from backend.api.routes import seed_routes
 from backend.api.routes import wallet_backup_routes
+from backend.api.routes import onramp, offramp, bank_verification
 
 # ===== IMPORT ROUTERS WITH COMPREHENSIVE ERROR HANDLING =====
+try:
+    from backend.api.routes import bank_verification
+    routers_available['bank_verification'] = bank_verification
+    logger.info("✅ Bank verification router imported")
+except ImportError as e:
+    logger.error(f"❌ Bank verification router import error: {e}")
+    routers_available['bank_verification'] = None
+
 try:
     from backend.api.routes.users import router as users_router
     routers_available['users'] = users_router
@@ -578,6 +587,10 @@ if routers_available.get('offramp'):
     app.include_router(routers_available['offramp'], prefix="/api/v1", tags=["Off-Ramp"])
     logger.info("✅ Off-ramp router registered at /api/v1")
 
+if routers_available.get('bank_verification'):
+    app.include_router(routers_available['bank_verification'].router, prefix="/api/v1", tags=["Bank Verification"])
+    logger.info("✅ Bank verification router registered at /api/v1/bank")
+    
 if routers_available.get('wallet_connect'):
     app.include_router(routers_available['wallet_connect'], prefix="/api/v1", tags=["Wallet Connect"])
     logger.info("✅ Wallet connect router registered at /api/v1")

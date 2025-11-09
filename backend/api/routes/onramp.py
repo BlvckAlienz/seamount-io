@@ -75,19 +75,32 @@ async def initialize_onramp(
                 paystack_amount = amount - our_fee
                 
                 payment_result = await paystack.initialize_payment(
-                    amount=float(paystack_amount),
-                    currency="NGN",
-                    email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
-                    phone=current_user.get("phone"),
-                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
+                amount=float(paystack_amount),
+                currency="NGN",
+                email=current_user["email"],
+                tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
+                phone=current_user.get("phone"),
+                name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
+            )
+
+            provider = "paystack"
+
+            # ✅ CRITICAL FIX: Validate payment_result has required fields
+            if not payment_result:
+                logger.error("❌ Paystack returned empty response")
+                raise HTTPException(status_code=502, detail="Payment provider returned invalid response")
+
+            # Extract checkout URL (Paystack uses 'authorization_url')
+            checkout_url = payment_result.get("authorization_url") or payment_result.get("payment_link")
+
+            if not checkout_url:
+                logger.error(f"❌ Paystack response missing checkout URL: {payment_result}")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Payment provider did not return checkout URL"
                 )
-                
-                provider = "paystack"
-                logger.info(f"✅ Paystack on-ramp initialized: {amount} NGN")
-                
-            except Exception as paystack_error:
-                logger.warning(f"⚠️ Paystack failed: {paystack_error}")
+
+            logger.info(f"✅ Paystack checkout URL: {checkout_url}")
                 # Fall through to Flutterwave
         
         # TIER 2: Flutterwave (International fallback)
@@ -150,24 +163,24 @@ async def initialize_onramp(
         tx_id = f"ONRAMP_{current_user['id'][:8]}_{int(amount)}"
         
         tx_data = {
-            "id": tx_id,
-            "user_id": current_user["id"],
-            "type": "onramp",
-            "status": "pending_payment",
-            "provider": provider,
-            "provider_name": provider.title(),
-            "currency": request.currency,
-            "crypto_asset": request.crypto_asset,
-            "amount_fiat": float(amount),
-            "seamount_fee": float(our_fee),
-            "net_to_user": float(amount - our_fee),
-            "wallet_address": wallet_address,
-            "checkout_url": payment_result.get("payment_link") or payment_result.get("authorization_url"),
-            "user_email": current_user["email"],
-            "user_country": request.user_country,
-            "estimated_settlement": "5-10 minutes",
-            "created_at": datetime.now().isoformat()
-        }
+        "id": tx_id,
+        "user_id": current_user["id"],
+        "type": "onramp",
+        "status": "pending_payment",
+        "provider": provider,
+        "provider_name": provider.title(),
+        "currency": request.currency,
+        "crypto_asset": request.crypto_asset,
+        "amount_fiat": float(amount),
+        "seamount_fee": float(our_fee),
+        "net_to_user": float(amount - our_fee),
+        "wallet_address": wallet_address,
+        "checkout_url": checkout_url,  # ✅ Use validated URL from above
+        "user_email": current_user["email"],
+        "user_country": request.user_country,
+        "estimated_settlement": "5-10 minutes",
+        "created_at": datetime.now().isoformat()
+    }
         
         # 🎯 FIX: Use Supabase ORM instead of execute_query
         try:

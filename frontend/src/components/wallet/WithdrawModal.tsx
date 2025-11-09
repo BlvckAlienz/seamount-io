@@ -215,8 +215,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
   // Get selected currency details
   const selectedCurrency = WITHDRAWAL_CURRENCIES.find(c => c.code === currency)
-  const supportsMobileMoney = selectedCurrency?.methods.includes('mobile_money')
-  const supportsBankTransfer = selectedCurrency?.methods.includes('bank_transfer')
+  // ✅ FIX: Add safe fallbacks
+  const supportsMobileMoney = selectedCurrency?.methods?.includes('mobile_money') || false
+  const supportsBankTransfer = selectedCurrency?.methods?.includes('bank_transfer') || false
+
+  // 🎯 Debug logging
+  console.log('💳 Payout options:', {
+    currency,
+    supportsMobileMoney,
+    supportsBankTransfer,
+    methods: selectedCurrency?.methods
+  })
 
   // Auto-select payout method based on currency
   useEffect(() => {
@@ -287,7 +296,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     return () => clearTimeout(timer)
   }, [amount, asset, currency])
 
-  // Bank account verification (Paystack API)
+  // ✅ FIX: Get key from backend API instead of frontend env
   const verifyBankAccount = async () => {
     if (!bankAccount || !bankCode || bankAccount.length !== 10) {
       toast.error('Please enter a valid 10-digit account number')
@@ -299,32 +308,20 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     setAccountName(null)
 
     try {
-      // ✅ Use Paystack's public API for verification
-      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY
-      
-      if (!paystackKey) {
-        throw new Error('Paystack public key not configured')
-      }
+      // 🎯 USE BACKEND PROXY - keys stay secure on server
+      const response = await api.post('/api/v1/bank/verify', {
+        account_number: bankAccount,
+        bank_code: bankCode
+      })
 
-      const response = await fetch(
-        `https://api.paystack.co/bank/resolve?account_number=${bankAccount}&bank_code=${bankCode}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${paystackKey}`
-          }
-        }
-      )
-
-      const data = await response.json()
-
-      if (data.status && data.data?.account_name) {
-        setAccountName(data.data.account_name)
-        toast.success(`Account verified: ${data.data.account_name}`)
+      if (response.success && response.account_name) {
+        setAccountName(response.account_name)
+        toast.success(`Account verified: ${response.account_name}`)
       } else {
-        throw new Error(data.message || 'Account verification failed')
+        throw new Error(response.error || 'Verification failed')
       }
     } catch (err: any) {
-      const errorMsg = err.message || 'Failed to verify account'
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to verify account'
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -605,45 +602,6 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                   <Smartphone className="mr-2 h-5 w-5" />
                   Mobile Money
                 </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Mobile Money Fields */}
-          {payoutMethod === 'mobile_money' && supportsMobileMoney && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Mobile Money Provider</Label>
-                <Select value={mobileProvider} onValueChange={setMobileProvider}>
-                  <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 h-12">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 z-50">
-                    {selectedCurrency?.mobile_providers?.map((provider) => (
-                      <SelectItem 
-                        key={provider} 
-                        value={provider}
-                        className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                      >
-                        {MOBILE_PROVIDER_NAMES[provider] || provider}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Phone Number</Label>
-                <Input
-                  type="tel"
-                  placeholder="e.g., 0712345678"
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
-                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 h-12"
-                />
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Enter number registered with {mobileProvider ? MOBILE_PROVIDER_NAMES[mobileProvider] : 'mobile money'}
-                </p>
               </div>
             </div>
           )}
