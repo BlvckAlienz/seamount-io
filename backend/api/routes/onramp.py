@@ -422,6 +422,7 @@ async def get_onramp_quote(
                 "amount_usd": float(amount_usd),
                 "platform_fee": float(platform_fee_fiat),
                 "estimated_crypto_amount": float(estimated_crypto),
+                "provider": "auto",
                 "valid_for_seconds": 300,
                 "timestamp": datetime.now().isoformat()
             }
@@ -516,6 +517,7 @@ async def get_public_onramp_quote(request: Request):
                 "amount_usd": float(amount_usd),
                 "platform_fee": float(platform_fee_fiat),
                 "estimated_crypto_amount": float(estimated_crypto),
+                "provider": "auto",
                 "valid_for_seconds": 300,
                 "timestamp": datetime.now().isoformat()
             }
