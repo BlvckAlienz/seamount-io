@@ -290,55 +290,54 @@ async def handle_webhook(
 async def _credit_user_wallet(db_service, tx_ref: str, amount: float, currency: str):
     """Credit user wallet after successful payment"""
     
+    # Get transaction details
     try:
-        # Get transaction details
-        try:
-            result = await db_service.supabase.from_('onramp_transactions')\
-                .select('user_id, crypto_asset, wallet_address')\
-                .eq('id', tx_ref)\
-                .limit(1)\
-                .execute()
-            
-            if not result.data:
-                logger.error(f"Transaction not found: {tx_ref}")
-                return
-            
-            tx = result.data[0]
-        except Exception as e:
-            logger.error(f"Failed to fetch transaction: {e}")
-            return
-                
-        # Update wallet balance
-        try:
-            # Get current balance
-            balance_result = await db_service.supabase.from_('wallet_balances')\
-                .select('usdt_balance')\
-                .eq('user_id', tx["user_id"])\
-                .limit(1)\
-                .execute()
-            
-            if balance_result.data:
-                current_balance = float(balance_result.data[0].get('usdt_balance', 0))
-                new_balance = current_balance + amount
-                
-                # Update balance
-                await db_service.supabase.from_('wallet_balances')\
-                    .update({'usdt_balance': new_balance, 'updated_at': 'NOW()'})\
-                    .eq('user_id', tx["user_id"])\
-                    .execute()
-                
-                logger.info(f"✅ Credited {amount} USDT to user {tx['user_id']}")
-        except Exception as e:
-            logger.error(f"Failed to update balance: {e}")
+        result = await db_service.supabase.from_('onramp_transactions')\
+            .select('user_id, crypto_asset, wallet_address')\
+            .eq('id', tx_ref)\
+            .limit(1)\
+            .execute()
         
-        # Mark transaction complete
-        try:
-            await db_service.supabase.from_('onramp_transactions')\
-                .update({'status': 'completed', 'completed_at': 'NOW()'})\
-                .eq('id', tx_ref)\
+        if not result.data:
+            logger.error(f"Transaction not found: {tx_ref}")
+            return
+        
+        tx = result.data[0]
+    except Exception as e:
+        logger.error(f"Failed to fetch transaction: {e}")
+        return
+            
+    # Update wallet balance
+    try:
+        # Get current balance
+        balance_result = await db_service.supabase.from_('wallet_balances')\
+            .select('usdt_balance')\
+            .eq('user_id', tx["user_id"])\
+            .limit(1)\
+            .execute()
+        
+        if balance_result.data:
+            current_balance = float(balance_result.data[0].get('usdt_balance', 0))
+            new_balance = current_balance + amount
+            
+            # Update balance
+            await db_service.supabase.from_('wallet_balances')\
+                .update({'usdt_balance': new_balance, 'updated_at': 'NOW()'})\
+                .eq('user_id', tx["user_id"])\
                 .execute()
-        except Exception as e:
-            logger.error(f"Failed to mark transaction complete: {e}")
+            
+            logger.info(f"✅ Credited {amount} USDT to user {tx['user_id']}")
+    except Exception as e:
+        logger.error(f"Failed to update balance: {e}")
+    
+    # Mark transaction complete
+    try:
+        await db_service.supabase.from_('onramp_transactions')\
+            .update({'status': 'completed', 'completed_at': 'NOW()'})\
+            .eq('id', tx_ref)\
+            .execute()
+    except Exception as e:
+        logger.error(f"Failed to mark transaction complete: {e}")
 
 @router.get("/providers")
 async def get_providers():
