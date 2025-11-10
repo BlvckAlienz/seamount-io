@@ -186,24 +186,57 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     setError(null)
 
     try {
-      // ✅ FIXED: Call correct endpoint with proper payload
+      console.log('📤 Sending onramp request...')
+      
       const response = await api.post('/api/v1/onramp/initialize', {
         amount_fiat: parseFloat(amount),
         currency,
         crypto_asset: asset,
-        payment_method: 'auto', // Let backend choose best provider
+        payment_method: 'auto',
       })
 
-      if (response.data?.success && response.data?.checkout_url) {
-        // Redirect to payment page
-        toast.success('Redirecting to payment...')
-        window.location.href = response.data.checkout_url
+      console.log('📦 Raw response:', response)
+      
+      // 🎯 SMART EXTRACTION: Handle both response structures
+      const responseData = response.data || response
+      
+      console.log('📊 Extracted data:', responseData)
+      console.log('🔍 Checkout URL:', responseData?.checkout_url)
+
+      // ✅ BULLETPROOF CHECK
+      if (responseData?.success && responseData?.checkout_url) {
+        toast.success('Payment link generated! Redirecting...')
+        
+        // Small delay for user to see success message
+        setTimeout(() => {
+          window.location.href = responseData.checkout_url
+        }, 500)
       } else {
-        throw new Error(response.data?.error || 'No payment URL received')
+        // 🚨 DETAILED ERROR LOGGING
+        console.error('❌ Invalid response structure:', {
+          hasSuccess: !!responseData?.success,
+          hasCheckoutUrl: !!responseData?.checkout_url,
+          fullResponse: responseData
+        })
+        
+        throw new Error(
+          responseData?.detail || 
+          responseData?.error || 
+          responseData?.message ||
+          'Payment link not generated. Please try again.'
+        )
       }
     } catch (err: any) {
-      console.error('Fund wallet error:', err)
-      const errorMsg = err.response?.data?.detail || err.message || 'Failed to initialize payment'
+      console.error('💥 Fund wallet error:', err)
+      console.error('💥 Error response:', err.response)
+      
+      const errorMsg = 
+        err.response?.data?.detail || 
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message || 
+        'Failed to initialize payment. Please try again.'
+      
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
