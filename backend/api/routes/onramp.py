@@ -84,65 +84,16 @@ async def initialize_onramp(
         except Exception as e:
             logger.error(f"🔍 Cashramp Service Check Failed: {e}")
 
-        # 🚨 VALIDATION: Ensure we have a checkout URL
-        if not checkout_url:
-            logger.error(
-                f"❌ All providers failed to return checkout URL. "
-                f"Last provider: {provider}, Last result: {payment_result}"
-            )
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Payment service temporarily unavailable. "
-                    "All providers failed to generate payment link. "
-                    "Please try again in a few minutes."
-                )
-            )
-        
-        # 📍 STEP 2: Smart routing with PAYSTACK as PRIMARY
+        # 📍 STEP 2: Smart routing with proper URL extraction
         provider = None
         payment_result = None
         checkout_url = None
         our_fee = Decimal("0")
         
-        # 🥇 TIER 1: PAYSTACK (PRIMARY PROVIDER - Most Reliable)
-        if request.payment_method in ["auto", "paystack"] and request.currency == "NGN":
+        # 🥇 TIER 1: CASHRAMP (Best P2P rates, instant settlement)
+        if request.payment_method in ["auto", "cashramp"]:
             try:
-                logger.info(f"🔄 PRIMARY: Paystack on-ramp: {amount} {request.currency}")
-                paystack = PaystackProvider(settings)
-                
-                # Paystack fee: 1.8%
-                our_fee = amount * Decimal("0.018")
-                paystack_amount = amount - our_fee
-                
-                payment_result = await paystack.initialize_payment(
-                    amount=float(paystack_amount),
-                    currency="NGN",
-                    email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
-                    phone=current_user.get("phone"),
-                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
-                )
-                
-                # 🎯 EXTRACT PAYMENT URL FROM PAYSTACK RESPONSE
-                if payment_result and payment_result.get("status") == "success":
-                    checkout_url = payment_result.get("payment_link")
-                    if checkout_url:
-                        provider = "paystack"
-                        logger.info(f"✅ Paystack PRIMARY checkout URL: {checkout_url}")
-                    else:
-                        logger.error(f"❌ Paystack response missing payment_link: {payment_result}")
-                else:
-                    logger.warning(f"⚠️ Paystack returned no success: {payment_result}")
-                    
-            except Exception as paystack_error:
-                logger.warning(f"⚠️ Paystack PRIMARY failed: {paystack_error}")
-                # Fall through to Cashramp
-        
-        # 🥈 TIER 2: CASHRAMP (Secondary - Only if Paystack fails)
-        if not checkout_url and request.payment_method in ["auto", "cashramp"]:
-            try:
-                logger.info(f"🔄 SECONDARY: Cashramp on-ramp: {amount} {request.currency}")
+                logger.info(f"🔄 Attempting Cashramp on-ramp: {amount} {request.currency}")
                 cashramp = CashrampService(db_service)
                 
                 # Cashramp fee: 1.8%
@@ -156,24 +107,82 @@ async def initialize_onramp(
                 )
                 
                 # 🎯 EXTRACT PAYMENT URL FROM CASHRAMP RESPONSE
-                if payment_result and payment_result.get("success"):
-                    checkout_url = payment_result.get("payment_url")
-                    if checkout_url:
-                        provider = "cashramp"
-                        logger.info(f"✅ Cashramp SECONDARY checkout URL: {checkout_url}")
-                    else:
-                        logger.warning(f"⚠️ Cashramp returned success but no payment_url: {payment_result}")
+                if payment_result and isinstance(payment_result, dict) and payment_result.get("success"):
+                    # Cashramp-specific URL extraction - try ALL fields systematically
+                    url_candidates = [
+                        payment_result.get("payment_url"),
+                        payment_result.get("checkout_url"), 
+                        payment_result.get("url"),
+                        payment_result.get("link"),
+                        payment_result.get("redirect_url"),
+                        payment_result.get("hosted_url"),
+                        payment_result.get("payment_link")
+                    ]
+                    
+                    # Find first non-empty URL
+                    for candidate in url_candidates:
+                        if candidate and isinstance(candidate, str) and candidate.startswith(('http://', 'https://')):
+                            checkout_url = candidate
+                            provider = "cashramp"
+                            logger.info(f"✅ Cashramp URL found: {checkout_url}")
+                            break
+                    
+                    if not checkout_url:
+                        logger.warning(f"⚠️ Cashramp returned success but no valid URL. Response keys: {list(payment_result.keys())}")
                 else:
-                    logger.warning(f"⚠️ Cashramp returned no success: {payment_result}")
+                    logger.warning(f"⚠️ Cashramp returned invalid response or no success: {payment_result}")
                     
             except Exception as cashramp_error:
-                logger.warning(f"⚠️ Cashramp SECONDARY failed: {cashramp_error}")
+                logger.warning(f"⚠️ Cashramp failed: {cashramp_error}")
+        
+                # Fall through to Paystack
+        
+        # 🥈 TIER 2: PAYSTACK (Best for NGN, fast settlement)
+        if not checkout_url and request.currency == "NGN" and request.payment_method in ["auto", "paystack"]:
+            try:
+                logger.info(f"🔄 Attempting Paystack on-ramp: {amount} {request.currency}")
+                paystack = PaystackProvider(settings)
+                
+                # Paystack fee: 1.8%
+                our_fee = amount * Decimal("0.018")
+                paystack_amount = amount - our_fee
+                
+                payment_result = await paystack.initialize_payment(
+                    amount=float(paystack_amount),
+                    currency="NGN",
+                    email=current_user["email"],
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
+                    phone=current_user.get("phone"),
+                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
+                )
+                
+                # 🎯 CRITICAL: Extract Paystack authorization URL
+                if payment_result:
+                    logger.info(f"📦 Paystack response: {payment_result}")
+                    
+                    # Paystack returns: authorization_url or access_url
+                    checkout_url = (
+                        payment_result.get("authorization_url") or 
+                        payment_result.get("access_url") or
+                        payment_result.get("payment_link")
+                    )
+                    
+                    if checkout_url:
+                        provider = "paystack"
+                        logger.info(f"✅ Paystack checkout URL: {checkout_url}")
+                    else:
+                        logger.error(f"❌ Paystack response missing URL: {payment_result}")
+                else:
+                    logger.warning("⚠️ Paystack returned empty response")
+                    
+            except Exception as paystack_error:
+                logger.warning(f"⚠️ Paystack failed: {paystack_error}")
                 # Fall through to Flutterwave
         
         # 🥉 TIER 3: FLUTTERWAVE (International fallback)
         if not checkout_url and request.payment_method in ["auto", "flutterwave"]:
             try:
-                logger.info(f"🔄 TERTIARY: Flutterwave on-ramp: {amount} {request.currency}")
+                logger.info(f"🔄 Attempting Flutterwave on-ramp: {amount} {request.currency}")
                 flutterwave = FlutterwaveProvider(settings)
                 
                 # Flutterwave fee: 2.5%
@@ -184,41 +193,63 @@ async def initialize_onramp(
                     amount=float(flutterwave_amount),
                     currency=request.currency,
                     email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
                     phone=current_user.get("phone"),
                     name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
                 )
                 
-                # 🎯 EXTRACT PAYMENT URL FROM FLUTTERWAVE RESPONSE
-                if payment_result and payment_result.get("status") == "success":
-                    checkout_url = payment_result.get("payment_link")
+                # 🎯 CRITICAL: Extract Flutterwave payment link
+                if payment_result:
+                    logger.info(f"📦 Flutterwave response: {payment_result}")
+                    
+                    # Flutterwave returns: link or payment_link
+                    checkout_url = (
+                        payment_result.get("link") or 
+                        payment_result.get("payment_link") or
+                        payment_result.get("data", {}).get("link")
+                    )
+                    
                     if checkout_url:
                         provider = "flutterwave"
-                        logger.info(f"✅ Flutterwave TERTIARY checkout URL: {checkout_url}")
+                        logger.info(f"✅ Flutterwave checkout URL: {checkout_url}")
                     else:
-                        logger.error(f"❌ Flutterwave response missing payment_link: {payment_result}")
+                        logger.error(f"❌ Flutterwave response missing URL: {payment_result}")
                 else:
-                    logger.warning(f"⚠️ Flutterwave returned no success: {payment_result}")
+                    logger.warning("⚠️ Flutterwave returned empty response")
                     
             except Exception as flutterwave_error:
-                logger.error(f"❌ Flutterwave TERTIARY failed: {flutterwave_error}")
+                logger.error(f"❌ Flutterwave failed: {flutterwave_error}")
                 # No more fallbacks
         
-        # 🚨 VALIDATION: Ensure we have a checkout URL
+        # 🚨 EMERGENCY FALLBACK: Direct Flutterwave as last resort
         if not checkout_url:
-            logger.error(
-                f"❌ ALL PROVIDERS FAILED to return checkout URL. "
-                f"Last provider attempted: {provider}"
-            )
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Payment service temporarily unavailable. "
-                    "All providers failed to generate payment link. "
-                    "Please try again in a few minutes."
+            try:
+                logger.info("🆘 ACTIVATING EMERGENCY FLUTTERWAVE FALLBACK...")
+                flutterwave = FlutterwaveProvider(settings)
+                our_fee = amount * Decimal("0.025")
+                flutterwave_amount = amount - our_fee
+                
+                # Simple direct Flutterwave call
+                payment_result = await flutterwave.initialize_payment(
+                    amount=float(flutterwave_amount),
+                    currency=request.currency,
+                    email=current_user["email"],
+                    tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                    name=current_user.get('first_name', 'User')
                 )
-            )
-        
+                
+                logger.info(f"🆘 EMERGENCY FLUTTERWAVE RESPONSE: {payment_result}")
+                
+                # Direct URL extraction for Flutterwave
+                if payment_result and payment_result.get("status") == "success":
+                    checkout_url = payment_result.get("data", {}).get("link")
+                    if checkout_url:
+                        provider = "flutterwave_emergency"
+                        logger.info(f"✅ EMERGENCY FLUTTERWAVE URL: {checkout_url}")
+                        
+            except Exception as emergency_error:
+                logger.error(f"💥 EMERGENCY FALLBACK FAILED: {emergency_error}")
+
         # 🚨 VALIDATION: Ensure we have a checkout URL
         if not checkout_url:
             logger.error(
@@ -233,7 +264,7 @@ async def initialize_onramp(
                     "Please try again in a few minutes."
                 )
             )
-
+        
         # 📍 STEP 3: Store on-ramp transaction
         tx_id = f"ONRAMP_{current_user['id'][:8]}_{int(amount)}_{int(datetime.now().timestamp())}"
         
