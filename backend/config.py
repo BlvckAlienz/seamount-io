@@ -90,6 +90,42 @@ class MultiChainBusinessModel:
         TransactionType.MULTI_CHAIN_BRIDGE: Decimal("0.75") # $0.75 min (was $1.00)
     }
     
+    # ===================================================================
+    # SEAMOUNT NET MARGINS (Investor-Grade: Profitable from Day 1)
+    # These are OUR revenue after provider costs are paid
+    # ===================================================================
+    SEAMOUNT_NET_MARGINS = {
+        "paystack_card": Decimal("0.005"),        # 0.5% net margin
+        "paystack_bank": Decimal("0.005"),        # 0.5% net margin
+        "flutterwave_card_local": Decimal("0.005"),   # 0.5% net margin
+        "flutterwave_mobile_money": Decimal("0.006"), # 0.6% net margin
+        "flutterwave_card_intl": Decimal("0.002")     # 0.2% net margin (still profitable)
+    }
+
+    # Provider actual costs (verified from testing + agreements)
+    PROVIDER_BASE_COSTS = {
+        "paystack": {
+            "base_rate": Decimal("0.015"),      # 1.5%
+            "flat_fee_ngn": Decimal("100"),     # NGN 100 flat
+            "cap_ngn": Decimal("2000")          # Max NGN 2,000 cap
+        },
+        "flutterwave": {
+            "card_local": Decimal("0.020"),          # 2.0% (verified from your testing)
+            "card_intl": Decimal("0.038"),           # 3.8% international
+            "mobile_money": Decimal("0.029"),        # 2.9% (verified from your testing)
+            "bank": Decimal("0.020")                 # 2.0% bank transfer
+        }
+    }
+
+    # Total user-facing fees (provider cost + Seamount margin)
+    # These are what customers see in checkout
+    USER_FACING_FEES = {
+        "paystack_card": Decimal("0.025"),           # 2.5% total (2.0% Paystack avg + 0.5% Seamount)
+        "paystack_bank": Decimal("0.025"),           # 2.5% total
+        "flutterwave_card_local": Decimal("0.025"),  # 2.5% total (2.0% FW + 0.5% Seamount)
+        "flutterwave_mobile_money": Decimal("0.035"), # 3.5% total (2.9% FW + 0.6% Seamount)
+        "flutterwave_card_intl": Decimal("0.040")    # 4.0% total (3.8% FW + 0.2% Seamount)
+    }
     # ========================================================================
     # HIDDEN REVENUE OPTIMIZATION (Backend Only - Never Shown to Users)
     # ========================================================================

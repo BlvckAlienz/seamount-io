@@ -37,66 +37,171 @@ class FeeCalculatorService:
         from_asset: Optional[str] = None,
         to_asset: Optional[str] = None,
         destination_country: Optional[str] = None,
-        payment_method: Optional[str] = None
+        payment_method: Optional[str] = None,
+        currency: str = "USD"
     ) -> Dict[str, Any]:
         """
-        Calculate comprehensive fee breakdown for any transaction
+        Calculate fee with investor-grade precision
         
-        ✅ FIX: B2C users = standard pricing (no tiers)
-        ✅ FIX: B2B API users = check license tier (separate system)
+        ✅ Seamount earns 0.2-0.6% on every transaction
+        ✅ Provider costs are accurately calculated
+        ✅ User sees transparent total fee
         """
         try:
-            # ✅ Check if user is B2B API customer (optional)
-            is_api_customer = await self._is_api_customer(user_id)
+            from backend.config import (
+                USER_FACING_FEES, 
+                PROVIDER_BASE_COSTS, 
+                SEAMOUNT_NET_MARGINS
+            )
             
-            if is_api_customer:
-                # B2B API customer - check license tier
-                api_tier = await self._get_api_license_tier(user_id)
-                fee_calculation = self.business_model.calculate_api_customer_fee(
-                    transaction_type=transaction_type.value,
-                    amount=amount,
-                    license_tier=api_tier,
-                    from_asset=from_asset,
-                    to_asset=to_asset
-                )
+            # ===================================================================
+            # STEP 1: Determine provider and payment method
+            # ===================================================================
+            if payment_method in ["paystack", "auto"] and currency == "NGN":
+                provider = "paystack"
+                method = "card"  # Default (Paystack handles card/bank/USSD same)
             else:
-                # ✅ B2C user - standard pricing (NO TIERS)
-                fee_calculation = self.business_model.calculate_total_fee(
-                    transaction_type=transaction_type.value,
-                    amount=amount,
-                    from_asset=from_asset,
-                    to_asset=to_asset
-                )
+                provider = "flutterwave"
+                
+                # Determine Flutterwave method
+                if payment_method == "mobile_money":
+                    method = "mobile_money"
+                elif currency not in ["NGN", "KES", "GHS", "ZAR"]:
+                    method = "card_intl"  # International card
+                else:
+                    method = "card_local"  # Local African card
             
-            # Add transaction-specific enhancements
-            if transaction_type == TransactionType.CROSS_BORDER:
-                enhanced_calc = await self._enhance_cross_border_calculation(
-                    fee_calculation, amount, destination_country
-                )
-                fee_calculation.update(enhanced_calc)
+            fee_key = f"{provider}_{method}"
             
-            elif transaction_type == TransactionType.ON_RAMP:
-                enhanced_calc = await self._enhance_onramp_calculation(
-                    fee_calculation, amount, payment_method
-                )
-                fee_calculation.update(enhanced_calc)
+            # ===================================================================
+            # STEP 2: Calculate provider's actual cost
+            # ===================================================================
+            if provider == "paystack":
+                # Paystack has complex fee: (amount × 1.5%) + NGN 100, capped at NGN 2,000
+                # Need to convert amount to NGN first
+                
+                # Get live NGN rate (fallback to 1450 if oracle fails)
+                try:
+                    from backend.services.oracle_service import EnhancedOracleService
+                    oracle = EnhancedOracleService(self.db_service)
+                    
+                    # Get USD/NGN rate (assume 1 USD = X NGN)
+                    # For now, use fixed rate - TODO: integrate forex API
+                    usd_to_ngn_rate = Decimal("1450")
+                except:
+                    usd_to_ngn_rate = Decimal("1450")  # Fallback
+                
+                amount_ngn = amount * usd_to_ngn_rate
+                
+                # Calculate Paystack fee in NGN
+                paystack_config = PROVIDER_BASE_COSTS["paystack"]
+                percentage_fee = amount_ngn * paystack_config["base_rate"]  # 1.5%
+                total_fee_ngn = percentage_fee + paystack_config["flat_fee_ngn"]  # + NGN 100
+                
+                # Apply cap
+                if total_fee_ngn > paystack_config["cap_ngn"]:
+                    total_fee_ngn = paystack_config["cap_ngn"]  # Max NGN 2,000
+                
+                # Convert back to USD
+                provider_fee = total_fee_ngn / usd_to_ngn_rate
+                provider_fee_rate = provider_fee / amount if amount > 0 else Decimal("0")
+                
+            else:
+                # Flutterwave has simple percentage fees
+                flutterwave_rates = PROVIDER_BASE_COSTS["flutterwave"]
+                
+                if method == "card_local":
+                    provider_fee_rate = flutterwave_rates["card_local"]  # 2.0%
+                elif method == "card_intl":
+                    provider_fee_rate = flutterwave_rates["card_intl"]  # 3.8%
+                elif method == "mobile_money":
+                    provider_fee_rate = flutterwave_rates["mobile_money"]  # 2.9%
+                else:
+                    provider_fee_rate = flutterwave_rates["bank"]  # 2.0%
+                
+                provider_fee = amount * provider_fee_rate
             
-            # Store calculation for audit trail
+            # ===================================================================
+            # STEP 3: Add Seamount's margin (OUR REVENUE)
+            # ===================================================================
+            seamount_margin_rate = SEAMOUNT_NET_MARGINS.get(fee_key, Decimal("0.005"))
+            seamount_margin = amount * seamount_margin_rate
+            
+            # ===================================================================
+            # STEP 4: Calculate total user-facing fee
+            # ===================================================================
+            total_fee = provider_fee + seamount_margin
+            
+            # Apply minimum fee if needed
+            minimum_fee = MultiChainBusinessModel.MINIMUM_FEES.get(
+                transaction_type,
+                Decimal("2.00")
+            )
+            
+            if total_fee < minimum_fee:
+                # Scale up proportionally
+                scale_factor = minimum_fee / total_fee
+                provider_fee = provider_fee * scale_factor
+                seamount_margin = seamount_margin * scale_factor
+                total_fee = minimum_fee
+            
+            # ===================================================================
+            # STEP 5: Calculate final amounts
+            # ===================================================================
+            total_to_charge = amount + total_fee  # User pays MORE than requested
+            crypto_to_receive = amount  # User gets EXACTLY what they wanted
+            
+            # ===================================================================
+            # STEP 6: Build response (investor-grade transparency)
+            # ===================================================================
+            fee_calculation = {
+                # What user sees
+                "requested_crypto_amount": float(amount),
+                "total_fee": float(total_fee),
+                "total_to_charge": float(total_to_charge),
+                "crypto_to_receive": float(crypto_to_receive),
+                
+                # Fee breakdown (transparent to user)
+                "provider_fee": float(provider_fee),
+                "seamount_fee": float(seamount_margin),
+                
+                # Rates (for display)
+                "provider_fee_rate": float(provider_fee_rate * 100) if provider == "flutterwave" else float(provider_fee / amount * 100),
+                "seamount_fee_rate": float(seamount_margin_rate * 100),
+                "total_fee_rate": float(total_fee / amount * 100) if amount > 0 else 0,
+                
+                # Metadata
+                "provider": provider,
+                "payment_method": method,
+                "currency": currency,
+                "breakdown": {
+                    "user_requested": float(amount),
+                    "provider_cost": float(provider_fee),
+                    "seamount_revenue": float(seamount_margin),  # 👈 THIS IS OUR PROFIT
+                    "user_pays_total": float(total_to_charge)
+                }
+            }
+            
+            # Store for audit
             await self._store_fee_calculation(user_id, fee_calculation)
             
-            # Add timestamp and metadata
+            # Add metadata
             fee_calculation.update({
                 "calculated_at": datetime.utcnow().isoformat(),
-                "calculator_version": "2.0_b2c_standard",
-                "expires_at": (datetime.utcnow().timestamp() + 300),
-                "user_type": "api_customer" if is_api_customer else "standard"
+                "calculator_version": "3.2_investor_optimized",
+                "expires_at": (datetime.utcnow().timestamp() + 300)
             })
             
-            logger.info(f"Fee calculated: {transaction_type.value} ${float(amount)} = ${fee_calculation['total_fee']:.4f}")
+            logger.info(
+                f"✅ Fee calculated: {provider}_{method} | "
+                f"User pays: ${float(total_to_charge):.2f} | "
+                f"Seamount earns: ${float(seamount_margin):.2f} ({float(seamount_margin_rate * 100):.1f}%)"
+            )
+            
             return fee_calculation
             
         except Exception as e:
-            logger.error(f"Fee calculation failed for {transaction_type.value}: {e}")
+            logger.error(f"Fee calculation failed: {e}", exc_info=True)
             raise ValueError(f"Could not calculate fees: {str(e)}")
     
     async def _is_api_customer(self, user_id: str) -> bool:

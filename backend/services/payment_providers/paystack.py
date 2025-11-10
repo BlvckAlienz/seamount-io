@@ -92,7 +92,7 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
             "channels": ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
             "metadata": {
                 "custom_fields": [
-                    {"display_name": "Payment For", "variable_name": "payment_for", "value": "USDS Purchase"},
+                    {"display_name": "Payment For", "variable_name": "payment_for", "value": "Crypto Purchase"},
                     {"display_name": "Platform", "variable_name": "platform", "value": "Seamount.io"}
                 ],
                 "tx_ref": tx_ref

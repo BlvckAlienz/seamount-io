@@ -58,9 +58,9 @@ class FlutterwaveProvider:
                 "name": name
             },
             "customizations": {
-                "title": "Seamount.io USDS Deposit",
-                "description": "Fund your wallet to purchase USDS stablecoin",
-                "logo": "https://seamount.io/seamount-logo.png"
+                "title": "Seamount.io",
+                "description": "Fund your wallet",
+                "logo": "https://media.licdn.com/dms/image/v2/D4D0BAQEgEyglQJrHzA/company-logo_100_100/B4DZfLaLaAHAAc-/0/1751464327309/seamount_io_logo?e=1764201600&v=beta&t=4BdeX4YYQePr-S6kOqycjQF_0AaoFdiFJxxpUn1gkto"
             }
         }
         

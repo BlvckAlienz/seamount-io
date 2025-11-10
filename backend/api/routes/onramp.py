@@ -16,7 +16,7 @@ from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
 from backend.services.cashramp_service import CashrampService
 from backend.services.revenue_tracking_service import RevenueTrackingService
-from backend.config import get_settings
+from backend.config import get_settings, TransactionType, MultiChainBusinessModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/onramp", tags=["On-Ramp"])
@@ -44,6 +44,32 @@ async def initialize_onramp(
         settings = get_settings()
         amount = Decimal(str(request.amount_fiat))
         
+        # ✅ STEP 1.5: Calculate fees BEFORE provider routing
+        from backend.services.fee_calculator import FeeCalculatorService
+        fee_calculator = FeeCalculatorService(db_service)
+
+        fee_calculation = await fee_calculator.calculate_transaction_fee(
+            transaction_type=TransactionType.ON_RAMP,
+            amount=amount,
+            user_id=current_user["id"],
+            from_asset=None,
+            to_asset=request.crypto_asset,
+            destination_country=None,
+            payment_method=request.payment_method,
+            currency=request.currency
+        )
+
+        # ✅ Extract calculated values
+        total_to_charge = Decimal(str(fee_calculation["total_to_charge"]))
+        crypto_to_receive = Decimal(str(fee_calculation["crypto_to_receive"]))
+        seamount_fee = Decimal(str(fee_calculation["seamount_fee"]))
+        provider_fee = Decimal(str(fee_calculation["provider_fee"]))
+
+        logger.info(
+            f"💰 Fee calculated: User pays {total_to_charge} {request.currency}, "
+            f"gets {crypto_to_receive} crypto, Seamount earns {seamount_fee}"
+        )
+
         # STEP 1: Get user wallet address
         try:
             wallet_result = db_service.supabase.from_('user_wallets')\
@@ -88,20 +114,18 @@ async def initialize_onramp(
         provider = None
         payment_result = None
         checkout_url = None
-        our_fee = Decimal("0")
         
         # TIER 1: PAYSTACK (Most reliable for NGN, 1.8% fee)
         if request.currency == "NGN" and request.payment_method in ["auto", "paystack"]:
             try:
-                logger.info(f"Attempting Paystack on-ramp (PRIMARY): {amount} {request.currency}")
+                logger.info(f"🔵 Attempting Paystack on-ramp (PRIMARY): {amount} {request.currency}")
                 paystack = PaystackProvider(settings)
                 
-                # Paystack fee: 1.8%
-                our_fee = amount * Decimal("0.018")
-                paystack_amount = amount - our_fee
+                # ✅ Use calculated total_to_charge (already includes all fees)
+                # No need to recalculate - fee_calculator already did the work
                 
                 payment_result = await paystack.initialize_payment(
-                    amount=float(paystack_amount),
+                    amount=float(total_to_charge),  # ✅ CORRECT: User pays full amount WITH fees
                     currency="NGN",
                     email=current_user["email"],
                     tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
@@ -134,12 +158,11 @@ async def initialize_onramp(
                 logger.info(f"Attempting Flutterwave on-ramp (SECONDARY): {amount} {request.currency}")
                 flutterwave = FlutterwaveProvider(settings)
                 
-                # Flutterwave fee: 2.5%
-                our_fee = amount * Decimal("0.025")
-                flutterwave_amount = amount - our_fee
+                # ✅ Fees already calculated, just use total_to_charge
+                # (Already set above, no need to recalculate)
                 
                 payment_result = await flutterwave.initialize_payment(
-                    amount=float(flutterwave_amount),
+                    amount=float(total_to_charge),  # ✅ CORRECT: User pays full amount WITH fees
                     currency=request.currency,
                     email=current_user["email"],
                     tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
@@ -175,9 +198,6 @@ async def initialize_onramp(
                 if not cashramp.is_available():
                     logger.warning("Cashramp not available (missing API keys)")
                     raise Exception("Cashramp service not configured")
-                
-                # Cashramp fee: 1.8%
-                our_fee = amount * Decimal("0.018")
                 
                 payment_result = await cashramp.create_ngn_onramp(
                     user_id=current_user["id"],
@@ -218,11 +238,9 @@ async def initialize_onramp(
                 # Only for NGN - Flutterwave for others
                 if request.currency == "NGN":
                     paystack = PaystackProvider(settings)
-                    our_fee = amount * Decimal("0.018")
-                    paystack_amount = amount - our_fee
                     
                     payment_result = await paystack.initialize_payment(
-                        amount=float(paystack_amount),
+                        amount=float(total_to_charge),
                         currency="NGN",
                         email=current_user["email"],
                         tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
@@ -237,11 +255,9 @@ async def initialize_onramp(
                 else:
                     # Non-NGN: Use Flutterwave
                     flutterwave = FlutterwaveProvider(settings)
-                    our_fee = amount * Decimal("0.025")
-                    flutterwave_amount = amount - our_fee
                     
                     payment_result = await flutterwave.initialize_payment(
-                        amount=float(flutterwave_amount),
+                        amount=float(total_to_charge),
                         currency=request.currency,
                         email=current_user["email"],
                         tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
@@ -284,14 +300,20 @@ async def initialize_onramp(
             "provider_name": provider.title(),
             "currency": request.currency,
             "crypto_asset": request.crypto_asset,
-            "amount_fiat": float(amount),
-            "seamount_fee": float(our_fee),
-            "net_to_user": float(amount - our_fee),
+            
+            # ✅ CLEAR INVESTOR-GRADE NAMING:
+            "requested_crypto_amount": float(amount),           # What user wants ($100)
+            "total_charged_fiat": float(total_to_charge),       # What user pays ($102.50)
+            "seamount_fee": float(seamount_fee),                # Our revenue ($0.50)
+            "provider_fee": float(provider_fee),                # Provider's cut ($2.00)
+            "crypto_to_receive": float(crypto_to_receive),      # What user gets ($100)
+            
             "wallet_address": wallet_address,
             "checkout_url": checkout_url,
             "user_email": current_user["email"],
             "user_country": request.user_country,
-            "estimated_settlement": "5-10 minutes" if provider != "cashramp" else "< 5 seconds",
+            "fee_breakdown": fee_calculation,  # ✅ Store full breakdown for analytics
+            "estimated_settlement": "5-10 minutes",
             "created_at": datetime.now().isoformat()
         }
         
@@ -309,8 +331,8 @@ async def initialize_onramp(
                 user_id=current_user["id"],
                 transaction_type="on_ramp",
                 amount=amount,
-                fee_rate=Decimal("0.018") if provider in ["cashramp", "paystack"] else Decimal("0.025"),
-                platform_fee=our_fee,
+                fee_rate=Decimal(str(fee_calculation["total_fee_rate"])) / Decimal("100"),
+                platform_fee=seamount_fee,
                 network_fee=Decimal("0.001"),
                 blockchain="algorand",
                 metadata={
@@ -325,7 +347,6 @@ async def initialize_onramp(
         # STEP 5: Log audit trail (optional, non-blocking)
         if audit_service:
             try:
-                # FIX: Ensure we're passing proper string values, not objects
                 await audit_service.log_event(
                     "ONRAMP_INITIATED",
                     user_id=str(current_user["id"]) if current_user else "unknown",
@@ -345,16 +366,24 @@ async def initialize_onramp(
         return {
             "success": True,
             "transaction_id": tx_id,
-            "checkout_url": checkout_url,  # THIS IS THE KEY FIELD
+            "checkout_url": checkout_url,  # ✅ CRITICAL: User needs this to pay
             "provider": provider,
-            "amount_fiat": float(amount),
+            
+            # ✅ TRANSPARENT BREAKDOWN:
+            "requested_amount": float(amount),
             "currency": request.currency,
             "crypto_asset": request.crypto_asset,
-            "seamount_fee": float(our_fee),
-            "net_amount": float(amount - our_fee),
-            "estimated_crypto_amount": float(amount - our_fee),
-            "estimated_settlement": tx_data["estimated_settlement"],
-            "expires_at": None
+            "total_to_charge": float(total_to_charge),          # User pays this
+            "crypto_to_receive": float(crypto_to_receive),      # User gets this
+            "seamount_fee": float(seamount_fee),                # Our revenue
+            "provider_fee": float(provider_fee),                # Provider cost
+            
+            "estimated_settlement": "5-10 minutes",
+            "fee_breakdown": {
+                "seamount_fee": float(seamount_fee),
+                "provider_fee": float(provider_fee),
+                "total_fee": float(seamount_fee + provider_fee)
+            }
         }
         
     except HTTPException:
@@ -484,7 +513,7 @@ async def get_providers():
                 "id": "paystack",
                 "name": "Paystack",
                 "currencies": ["NGN"],
-                "fee": "1.8%",
+                "fee": "2.5%",
                 "settlement": "Instant",
                 "recommended": True,
                 "priority": 1,
@@ -494,7 +523,7 @@ async def get_providers():
                 "id": "flutterwave",
                 "name": "Flutterwave",
                 "currencies": ["NGN", "KES", "GHS", "ZAR", "USD", "EUR"],
-                "fee": "2.5%",
+                "fee": "2.5-4.0%",
                 "settlement": "5-10 minutes",
                 "recommended": True,
                 "priority": 2,
@@ -563,6 +592,31 @@ async def get_onramp_quote(
         
         amount_usd = amount_fiat * fiat_to_usd_rate
         
+        # ✅ Determine provider and method for quote
+        if currency == "NGN":
+            provider = "paystack"
+            method = "card"
+        else:
+            provider = "flutterwave"
+            
+            # Get payment method from request
+            payment_method_requested = data.get("payment_method", "card_local")
+            
+            if payment_method_requested == "mobile_money":
+                method = "mobile_money"
+            elif currency not in ["NGN", "KES", "GHS", "ZAR"]:
+                method = "card_intl"
+            else:
+                method = "card_local"
+
+        fee_key = f"{provider}_{method}"
+
+        from backend.config import MultiChainBusinessModel
+
+        # Get rates (with updated mobile money: 3.5% total, 0.6% Seamount)
+        total_fee_rate = MultiChainBusinessModel.USER_FACING_FEES.get(fee_key, Decimal("0.025"))
+        seamount_rate = MultiChainBusinessModel.SEAMOUNT_NET_MARGINS.get(fee_key, Decimal("0.005"))
+        
         # Get crypto price
         from backend.services.oracle_service import EnhancedOracleService
         oracle_service = EnhancedOracleService(db_service)
@@ -578,28 +632,56 @@ async def get_onramp_quote(
                 detail="Cannot get live crypto prices. Please try again."
             )
         
-        # Calculate fees (1.8% for Cashramp/Paystack, 2.5% for Flutterwave)
-        platform_fee_usd = amount_usd * Decimal("0.018")
-        net_usd = amount_usd - platform_fee_usd
-        estimated_crypto = net_usd / crypto_price_usd
-        platform_fee_fiat = platform_fee_usd / fiat_to_usd_rate if currency != "USD" else platform_fee_usd
+        # Calculate USD fees first
+        total_fee_usd = amount_usd * total_fee_rate
+        seamount_fee_usd = amount_usd * seamount_rate
+        provider_fee_usd = total_fee_usd - seamount_fee_usd
+
+        # User receives full requested amount (fees are added on top)
+        estimated_crypto = amount_usd / crypto_price_usd  # ✅ Full amount
+
+        # Convert fees to fiat currency
+        if currency != "USD":
+            total_fee_fiat = total_fee_usd / fiat_to_usd_rate
+            seamount_fee_fiat = seamount_fee_usd / fiat_to_usd_rate
+            provider_fee_fiat = provider_fee_usd / fiat_to_usd_rate
+            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            usd_to_fiat_rate = Decimal("1") / fiat_to_usd_rate
+        else:
+            total_fee_fiat = total_fee_usd
+            seamount_fee_fiat = seamount_fee_usd
+            provider_fee_fiat = provider_fee_usd
+            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            usd_to_fiat_rate = Decimal("1")
         
         return {
             "success": True,
             "quote": {
-                "amount_fiat": float(amount_fiat),
+                "requested_fiat_amount": float(amount_fiat),  # ✅ What user wants to spend
                 "currency": currency,
                 "crypto_asset": crypto_asset,
                 "blockchain": asset_config["blockchain"],
-                "exchange_rate": float(Decimal("1") / fiat_to_usd_rate) if currency != "USD" else 1.0,
-                "forex_source": "ExchangeRate-API (live)",
+                
+                # Pricing info
                 "crypto_price_usd": float(crypto_price_usd),
-                "price_source": price_metadata.get("source", "oracle"),
-                "amount_usd": float(amount_usd),
-                "platform_fee": float(platform_fee_fiat),
-                "estimated_crypto_amount": float(estimated_crypto),
+                "exchange_rate": float(usd_to_fiat_rate),
+                "forex_source": "ExchangeRate-API (live)",
+                
+                # ✅ TRANSPARENT FEE BREAKDOWN:
+                "seamount_fee": float(seamount_fee_fiat),
+                "seamount_fee_pct": float(seamount_rate * 100),  # e.g., 0.5%
+                "provider_fee": float(provider_fee_fiat),
+                "provider_fee_pct": float((total_fee_rate - seamount_rate) * 100),
+                "total_fee": float(total_fee_fiat),
+                "total_fee_pct": float(total_fee_rate * 100),  # e.g., 2.5%
+                
+                # ✅ WHAT USER PAYS & GETS:
+                "total_to_charge": float(total_to_charge_fiat),  # User pays this
+                "crypto_to_receive": float(estimated_crypto),    # User gets this
+                
                 "valid_for_seconds": 300,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "quote_id": f"onramp_quote_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
             }
         }
         
@@ -658,6 +740,29 @@ async def get_public_onramp_quote(request: Request):
         
         amount_usd = amount_fiat * fiat_to_usd_rate
         
+        # ✅ Determine provider and method for quote
+        if currency == "NGN":
+            provider = "paystack"
+            method = "card"
+            fee_key = f"{provider}_{method}"
+        else:
+            provider = "flutterwave"
+            
+            # Determine Flutterwave method
+            if data.get("payment_method") == "mobile_money":
+                method = "mobile_money"
+                fee_key = f"{provider}_{method}"
+            elif currency not in ["NGN", "KES", "GHS", "ZAR"]:
+                method = "card_intl"
+                fee_key = f"{provider}_{method}"
+            else:
+                method = "card_local"
+                fee_key = f"{provider}_{method}"
+
+        # Get rates (with updated mobile money: 3.5% total, 0.6% Seamount)
+        total_fee_rate = MultiChainBusinessModel.USER_FACING_FEES.get(fee_key, Decimal("0.025"))
+        seamount_rate = MultiChainBusinessModel.SEAMOUNT_NET_MARGINS.get(fee_key, Decimal("0.005"))
+        
         # Get crypto price
         from backend.services.oracle_service import EnhancedOracleService
         oracle_service = EnhancedOracleService(database_service)
@@ -673,27 +778,56 @@ async def get_public_onramp_quote(request: Request):
                 detail="Cannot get live crypto prices. Please try again."
             )
         
-        platform_fee_usd = amount_usd * Decimal("0.018")
-        net_usd = amount_usd - platform_fee_usd
-        estimated_crypto = net_usd / crypto_price_usd
-        platform_fee_fiat = platform_fee_usd / fiat_to_usd_rate if currency != "USD" else platform_fee_usd
+        # Calculate USD fees first
+        total_fee_usd = amount_usd * total_fee_rate
+        seamount_fee_usd = amount_usd * seamount_rate
+        provider_fee_usd = total_fee_usd - seamount_fee_usd
+
+        # User receives full requested amount (fees are added on top)
+        estimated_crypto = amount_usd / crypto_price_usd  # ✅ Full amount
+
+        # Convert fees to fiat currency
+        if currency != "USD":
+            total_fee_fiat = total_fee_usd / fiat_to_usd_rate
+            seamount_fee_fiat = seamount_fee_usd / fiat_to_usd_rate
+            provider_fee_fiat = provider_fee_usd / fiat_to_usd_rate
+            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            usd_to_fiat_rate = Decimal("1") / fiat_to_usd_rate
+        else:
+            total_fee_fiat = total_fee_usd
+            seamount_fee_fiat = seamount_fee_usd
+            provider_fee_fiat = provider_fee_usd
+            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            usd_to_fiat_rate = Decimal("1")
         
         return {
             "success": True,
             "quote": {
-                "amount_fiat": float(amount_fiat),
+                "requested_fiat_amount": float(amount_fiat),
                 "currency": currency,
                 "crypto_asset": crypto_asset,
                 "blockchain": asset_config["blockchain"],
-                "exchange_rate": float(Decimal("1") / fiat_to_usd_rate) if currency != "USD" else 1.0,
-                "forex_source": "ExchangeRate-API (live)",
+                
+                # Pricing info
                 "crypto_price_usd": float(crypto_price_usd),
-                "price_source": price_metadata.get("source", "oracle"),
-                "amount_usd": float(amount_usd),
-                "platform_fee": float(platform_fee_fiat),
-                "estimated_crypto_amount": float(estimated_crypto),
+                "exchange_rate": float(usd_to_fiat_rate),
+                "forex_source": "ExchangeRate-API (live)",
+                
+                # ✅ FEE BREAKDOWN (with updated mobile money rate: 0.6% Seamount):
+                "seamount_fee": float(seamount_fee_fiat),
+                "seamount_fee_pct": float(seamount_rate * 100),
+                "provider_fee": float(provider_fee_fiat),
+                "provider_fee_pct": float((total_fee_rate - seamount_rate) * 100),
+                "total_fee": float(total_fee_fiat),
+                "total_fee_pct": float(total_fee_rate * 100),
+                
+                # ✅ WHAT USER PAYS & GETS:
+                "total_to_charge": float(total_to_charge_fiat),
+                "crypto_to_receive": float(estimated_crypto),
+                
                 "valid_for_seconds": 300,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "quote_id": f"public_onramp_quote_{int(datetime.now().timestamp())}"
             }
         }
         

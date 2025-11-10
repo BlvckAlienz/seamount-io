@@ -377,15 +377,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 <span className="text-xs text-gray-500 dark:text-gray-400">Valid 5 min</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Platform Fee (1.8%):</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Total Fee ({quote.total_fee_pct?.toFixed(1)}%):
+                </span>
                 <span className="font-bold text-base text-gray-900 dark:text-white">
-                  {selectedCurrency?.symbol}{quote.platform_fee?.toFixed(2)}
+                  {selectedCurrency?.symbol}{quote.total_fee?.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t-2 border-blue-300 dark:border-blue-700">
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
                 <span className="font-bold text-xl text-green-600 dark:text-green-400">
-                  {quote.estimated_crypto_amount?.toFixed(4)} {asset}
+                  {quote.crypto_to_receive?.toFixed(4)} {asset}
                 </span>
               </div>
             </div>
