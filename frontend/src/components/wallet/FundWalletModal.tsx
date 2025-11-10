@@ -343,25 +343,12 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">Valid 5 min</span>
               </div>
-              
-              {/* 🎯 SAFE PROVIDER STATUS - WITH FALLBACK */}
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Provider:</span>
-                <span className="font-bold text-base text-blue-600 dark:text-blue-400">
-                  {quote.provider === 'cashramp' ? 'Cashramp P2P' : 
-                  quote.provider === 'paystack' ? 'Paystack' : 
-                  quote.provider === 'flutterwave' ? 'Flutterwave' : 
-                  'Auto-routing'}
-                </span>
-              </div>
-              
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Platform Fee (1.8%):</span>
                 <span className="font-bold text-base text-gray-900 dark:text-white">
                   {selectedCurrency?.symbol}{quote.platform_fee?.toFixed(2)}
                 </span>
               </div>
-              
               <div className="flex justify-between items-center pt-2 border-t-2 border-blue-300 dark:border-blue-700">
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
                 <span className="font-bold text-xl text-green-600 dark:text-green-400">
