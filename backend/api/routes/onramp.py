@@ -106,7 +106,7 @@ async def initialize_onramp(
                     amount=float(provider_amount),  # Full amount to Paystack
                     currency="NGN",
                     email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
                     phone=current_user.get("phone"),
                     name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
                 )
@@ -144,7 +144,7 @@ async def initialize_onramp(
                     amount=float(provider_amount),  # Full amount to Flutterwave
                     currency=request.currency,
                     email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(amount)}",
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
                     phone=current_user.get("phone"),
                     name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
                 )
@@ -219,7 +219,7 @@ async def initialize_onramp(
                     paystack = PaystackProvider(settings)
                     
                     payment_result = await paystack.initialize_payment(
-                        amount=float(total_to_charge),
+                        amount=float(amount),
                         currency="NGN",
                         email=current_user["email"],
                         tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
@@ -236,7 +236,7 @@ async def initialize_onramp(
                     flutterwave = FlutterwaveProvider(settings)
                     
                     payment_result = await flutterwave.initialize_payment(
-                        amount=float(total_to_charge),
+                        amount=float(amount),
                         currency=request.currency,
                         email=current_user["email"],
                         tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
@@ -286,7 +286,11 @@ async def initialize_onramp(
             "checkout_url": checkout_url,
             "user_email": current_user["email"],
             "user_country": request.user_country,
-            "fee_breakdown": fee_calculation,  # ✅ Store full breakdown for analytics
+            "fee_breakdown": {
+                "seamount_fee": float(our_fee),
+                "provider": provider,
+                "currency": request.currency
+            },
             "estimated_settlement": "5-10 minutes",
             "created_at": datetime.now().isoformat()
         }
@@ -305,8 +309,8 @@ async def initialize_onramp(
                 user_id=current_user["id"],
                 transaction_type="on_ramp",
                 amount=amount,
-                fee_rate=Decimal(str(fee_calculation["total_fee_rate"])) / Decimal("100"),
-                platform_fee=seamount_fee,
+                fee_rate=Decimal("0.005"),  # 0.5% Seamount margin
+                platform_fee=our_fee,
                 network_fee=Decimal("0.001"),
                 blockchain="algorand",
                 metadata={
@@ -349,11 +353,8 @@ async def initialize_onramp(
             "net_amount": float(amount - our_fee),
             "estimated_crypto_amount": float(amount - our_fee),    
             "estimated_settlement": "5-10 minutes",
-            "fee_breakdown": {
-                "seamount_fee": float(seamount_fee),
-                "provider_fee": float(provider_fee),
-                "total_fee": float(seamount_fee + provider_fee)
-            }
+            "provider": provider,
+            "estimated_settlement": tx_data.get("estimated_settlement", "5-10 minutes")
         }
         
     except HTTPException:
