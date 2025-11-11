@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
-import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Building2, Smartphone } from 'lucide-react'
+import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Building2, Smartphone, Info } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface WithdrawModalProps {
@@ -725,6 +725,27 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               </div>
             </div>
           )}
+
+          {/* Error Display */}
+          {error && (
+            <Alert variant="destructive" className="border-2">
+              <AlertCircle className="h-5 w-5" />
+              <AlertDescription className="font-medium">{error}</AlertDescription>
+            </Alert>
+          )}
+          {/* Provider Info Alert */}
+          <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
+              <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best provider:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li><strong>Pretium</strong> (Tron USDT) - Instant, 2.0-3.0% fees ⚡</li>
+                <li><strong>Cashramp</strong> (P2P) - Mobile money, &lt;5 seconds</li>
+                <li><strong>Paystack</strong> (Nigeria) - Bank transfers, 1-2 hours</li>
+                <li><strong>Flutterwave</strong> (International) - Fallback option</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
 
           {/* Error Display */}
           {error && (

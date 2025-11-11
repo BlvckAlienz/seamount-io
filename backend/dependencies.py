@@ -62,6 +62,14 @@ else:
         OracleService = None
         FeeCalculatorService = None
 
+    try:
+        from backend.services.payment_providers.pretium import PretiumProvider
+        PRETIUM_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"⚠️ Pretium provider unavailable: {e}")
+        PretiumProvider = None
+        PRETIUM_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # ========== GLOBAL SERVICE INSTANCES ==========
@@ -75,6 +83,7 @@ _oracle_service: Optional["OracleService"] = None
 _multi_chain_wallet_service: Optional["MultiChainWalletService"] = None
 _fee_calculator_service: Optional["FeeCalculatorService"] = None
 _wallet_creation_service: Optional["WalletCreationService"] = None
+_pretium_provider: Optional["PretiumProvider"] = None
 
 # JWT caching
 jwks_cache: Dict[str, Any] = {}
@@ -246,6 +255,24 @@ def get_fee_calculator_service() -> "FeeCalculatorService":
             )
     
     return _fee_calculator_service
+
+def get_pretium_provider() -> Optional["PretiumProvider"]:
+    """Get Pretium provider instance"""
+    global _pretium_provider
+    
+    if not PRETIUM_AVAILABLE:
+        logger.warning("⚠️ Pretium provider not available")
+        return None
+    
+    if _pretium_provider is None:
+        try:
+            _pretium_provider = PretiumProvider(get_settings_cached())
+            logger.info("✅ Pretium provider initialized")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Pretium: {e}")
+            return None
+    
+    return _pretium_provider
 
 def get_multi_chain_wallet_service() -> "MultiChainWalletService":
     """🎯 ULTIMATE FIX: Get multi-chain wallet service instance with proper dependency injection"""

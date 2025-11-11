@@ -582,7 +582,199 @@ async def regfyl_business_screening_webhook(request: Request):
     except Exception as e:
         logger.error(f"Regfyl business screening webhook failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+# ============================================================================
+# PRETIUM WEBHOOK HANDLER (Tron USDT Transactions)
+# ============================================================================
+
+@router.post("/webhooks/pretium")
+async def pretium_webhook(
+    request: Request,
+    db_service = Depends(get_db_service)
+):
+    """
+    Handle Pretium transaction status callbacks
+    
+    Pretium sends status updates for:
+    - On-ramp: Fiat received → USDT credited
+    - Off-ramp: USDT received → Fiat disbursed
+    """
+    
+    try:
+        payload = await request.json()
+        logger.info(f"📨 Pretium webhook received: {payload.get('event')}")
         
+        # Extract transaction data
+        transaction_code = payload.get("transaction_code")
+        status = payload.get("status")  # PENDING, COMPLETE, FAILED
+        currency = payload.get("currency")
+        
+        if not transaction_code:
+            logger.error("❌ Missing transaction_code in Pretium webhook")
+            return {"status": "error", "message": "Missing transaction_code"}
+        
+        # Find transaction in database
+        # Try onramp first
+        tx_result = db_service.supabase.from_('onramp_transactions')\
+            .select('*')\
+            .eq('pretium_txn_code', transaction_code)\
+            .limit(1)\
+            .execute()
+        
+        tx_type = "onramp"
+        
+        if not tx_result.data or len(tx_result.data) == 0:
+            # Try offramp
+            tx_result = db_service.supabase.from_('offramp_transactions')\
+                .select('*')\
+                .eq('pretium_txn_code', transaction_code)\
+                .limit(1)\
+                .execute()
+            tx_type = "offramp"
+        
+        if not tx_result.data or len(tx_result.data) == 0:
+            logger.error(f"❌ Transaction not found for Pretium code: {transaction_code}")
+            return {"status": "error", "message": "Transaction not found"}
+        
+        tx_data = tx_result.data[0]
+        user_id = tx_data["user_id"]
+        crypto_amount = tx_data.get("crypto_amount") or tx_data.get("net_crypto_amount")
+        
+        # Process based on status
+        if status == "COMPLETE":
+            logger.info(f"✅ Pretium transaction completed: {transaction_code}")
+            
+            if tx_type == "onramp":
+                # Credit user's Tron wallet balance
+                await _credit_tron_balance(
+                    db_service,
+                    user_id,
+                    crypto_amount,
+                    transaction_code
+                )
+                
+                # Update onramp transaction
+                db_service.supabase.from_('onramp_transactions').update({
+                    'status': 'completed',
+                    'completed_at': datetime.now().isoformat(),
+                    'metadata': {
+                        **tx_data.get('metadata', {}),
+                        'pretium_status': status,
+                        'pretium_webhook': payload
+                    }
+                }).eq('pretium_txn_code', transaction_code).execute()
+                
+            else:  # offramp
+                # Update offramp transaction
+                db_service.supabase.from_('offramp_transactions').update({
+                    'status': 'completed',
+                    'completed_at': datetime.now().isoformat(),
+                    'metadata': {
+                        **tx_data.get('metadata', {}),
+                        'pretium_status': status,
+                        'pretium_webhook': payload
+                    }
+                }).eq('pretium_txn_code', transaction_code).execute()
+        
+        elif status == "FAILED":
+            logger.warning(f"⚠️ Pretium transaction failed: {transaction_code}")
+            
+            if tx_type == "offramp":
+                # Refund user's balance
+                await _refund_tron_balance(
+                    db_service,
+                    user_id,
+                    crypto_amount,
+                    transaction_code
+                )
+            
+            # Update transaction status
+            table = 'onramp_transactions' if tx_type == 'onramp' else 'offramp_transactions'
+            db_service.supabase.from_(table).update({
+                'status': 'failed',
+                'metadata': {
+                    **tx_data.get('metadata', {}),
+                    'pretium_status': status,
+                    'pretium_webhook': payload
+                }
+            }).eq('pretium_txn_code', transaction_code).execute()
+        
+        return {"status": "success", "message": "Webhook processed"}
+        
+    except Exception as e:
+        logger.error(f"💥 Pretium webhook processing failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def _credit_tron_balance(
+    db_service,
+    user_id: str,
+    amount: float,
+    transaction_code: str
+):
+    """Credit user's USDT_TRON balance after successful on-ramp"""
+    
+    try:
+        # Get current balance
+        balance_result = db_service.supabase.from_('wallet_balances')\
+            .select('usdt_tron_balance')\
+            .eq('user_id', user_id)\
+            .limit(1)\
+            .execute()
+        
+        if not balance_result.data or len(balance_result.data) == 0:
+            logger.error(f"❌ No wallet found for user {user_id}")
+            return
+        
+        current_balance = float(balance_result.data[0].get('usdt_tron_balance', 0))
+        new_balance = current_balance + float(amount)
+        
+        # Update balance
+        db_service.supabase.from_('wallet_balances').update({
+            'usdt_tron_balance': new_balance,
+            'updated_at': datetime.now().isoformat()
+        }).eq('user_id', user_id).execute()
+        
+        logger.info(f"✅ Credited {amount} USDT_TRON to user {user_id[:8]}... (Pretium tx: {transaction_code})")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to credit Tron balance: {e}")
+
+
+async def _refund_tron_balance(
+    db_service,
+    user_id: str,
+    amount: float,
+    transaction_code: str
+):
+    """Refund user's USDT_TRON balance after failed off-ramp"""
+    
+    try:
+        # Get current balance
+        balance_result = db_service.supabase.from_('wallet_balances')\
+            .select('usdt_tron_balance')\
+            .eq('user_id', user_id)\
+            .limit(1)\
+            .execute()
+        
+        if not balance_result.data or len(balance_result.data) == 0:
+            logger.error(f"❌ No wallet found for user {user_id}")
+            return
+        
+        current_balance = float(balance_result.data[0].get('usdt_tron_balance', 0))
+        new_balance = current_balance + float(amount)
+        
+        # Refund balance
+        db_service.supabase.from_('wallet_balances').update({
+            'usdt_tron_balance': new_balance,
+            'updated_at': datetime.now().isoformat()
+        }).eq('user_id', user_id).execute()
+        
+        logger.info(f"✅ Refunded {amount} USDT_TRON to user {user_id[:8]}... (Pretium tx: {transaction_code})")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to refund Tron balance: {e}")
+
 # ADD THIS HELPER METHOD after the other webhook handlers:
 
 async def handle_paystack_transfer_success(event_data):

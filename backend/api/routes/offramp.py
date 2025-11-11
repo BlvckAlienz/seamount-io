@@ -18,6 +18,7 @@ from backend.services.offramp_service import OfframpService
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.cashramp_service import CashrampService
 from backend.services.oracle_service import EnhancedOracleService
+from backend.services.payment_providers.pretium import PretiumProvider
 
 router = APIRouter(prefix="/offramp", tags=["Off-Ramp"])
 logger = logging.getLogger(__name__)
@@ -135,6 +136,9 @@ async def get_offramp_quote(
             "UGX": Decimal("0.030"),  # 3.0%
             "ZAR": Decimal("0.025"),  # 2.5%
             "TZS": Decimal("0.030"),  # 3.0%
+            "MWK": Decimal("0.025"),  # 2.5%
+            "ETB": Decimal("0.025"),  # 2.5%
+            "CDF": Decimal("0.030"),  # 3.0%
             "RWF": Decimal("0.030"),  # 3.0%
             "ZMW": Decimal("0.030"),  # 3.0%
         }
@@ -459,12 +463,55 @@ async def withdraw(
         withdrawal_fee = gross_fiat_amount * fee_rate
         net_fiat_amount = gross_fiat_amount - withdrawal_fee
         
-        # 📍 STEP 6: Smart routing (UPDATED PRIORITY ORDER)
+         # 🎯 STEP 6: Smart routing - Pretium for Tron, existing for others
         provider = None
         payout_result = None
         
-        # 🥇 TIER 1: CASHRAMP (P2P, instant settlement)
-        if recipient_details.get("payment_method") in ["auto", "mobile_money", "cashramp"]:
+        # 🥇 TIER 1: PRETIUM (Tron USDT exclusive)
+        if crypto_asset == "USDT_TRON":
+            try:
+                logger.info(f"🔵 Routing to Pretium for Tron off-ramp: {crypto_amount} USDT")
+                
+                pretium = PretiumProvider(settings)
+                
+                # Get user's Tron wallet for transaction hash
+                wallet_result = db_service.supabase.from_('multi_chain_addresses')\
+                    .select('address')\
+                    .eq('user_id', current_user["id"])\
+                    .eq('blockchain', 'tron')\
+                    .limit(1)\
+                    .execute()
+                
+                if not wallet_result.data or len(wallet_result.data) == 0:
+                    raise Exception("No Tron wallet found")
+                
+                tron_address = wallet_result.data[0]["address"]
+                
+                # User must send USDT to Pretium settlement wallet
+                # Generate transaction hash placeholder (will be updated by webhook)
+                tx_hash_placeholder = f"PENDING_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                
+                # Initialize Pretium off-ramp
+                payout_result = await pretium.initialize_offramp(
+                    user_id=current_user["id"],
+                    amount=float(net_fiat_amount),
+                    currency=currency,
+                    transaction_hash=tx_hash_placeholder,
+                    recipient_details=payload.recipient_details
+                )
+                
+                if payout_result and payout_result.get("success"):
+                    provider = "pretium"
+                    logger.info(f"✅ Pretium off-ramp initialized: {crypto_amount} USDT_TRON")
+                else:
+                    raise Exception(payout_result.get('error', 'Pretium failed'))
+                    
+            except Exception as pretium_error:
+                logger.warning(f"⚠️ Pretium failed: {pretium_error}")
+                # Fall through to Cashramp/Paystack
+        
+        # 🥈 TIER 2: CASHRAMP (P2P, instant settlement - existing logic)
+        if not provider and recipient_details.get("payment_method") in ["auto", "mobile_money", "cashramp"]:
             try:
                 cashramp = CashrampService(db_service)
                 
@@ -486,7 +533,7 @@ async def withdraw(
                 logger.warning(f"⚠️ Cashramp failed: {cashramp_error}")
                 # Fall through to Paystack
         
-        # 🥈 TIER 2: PAYSTACK (Bank transfers, Nigeria)
+        # 🥈 TIER 3: PAYSTACK (Bank transfers, Nigeria)
         if not provider and recipient_details.get("country") == "NG" and \
            recipient_details.get("payment_method") in ["auto", "bank_transfer"]:
             try:
@@ -511,7 +558,7 @@ async def withdraw(
                 logger.warning(f"⚠️ Paystack failed: {paystack_error}")
                 # Fall through to Flutterwave
         
-        # 🥉 TIER 3: FLUTTERWAVE (International fallback)
+        # 🥉 TIER 4: FLUTTERWAVE (International fallback)
         if not provider:
             try:
                 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
@@ -571,6 +618,8 @@ async def withdraw(
             "type": "offramp",
             "status": "processing",
             "provider": provider,
+            "pretium_txn_code": payout_result.get("transaction_code") if provider == "pretium" else None,
+            "pretium_reference": payout_result.get("reference") if provider == "pretium" else None,
             "crypto_asset": crypto_asset,
             "crypto_amount": float(crypto_amount),
             "fiat_currency": fiat_currency,

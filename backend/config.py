@@ -806,6 +806,34 @@ class Settings(BaseSettings):
     FLUTTERWAVE_SECRET_KEY: Optional[SecretStr] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
     
+    # ============================================================================
+    # PRETIUM AFRICA CONFIGURATION (Tron USDT Exclusive)
+    # ============================================================================
+    PRETIUM_CONSUMER_KEY: str = Field(
+        default="",
+        description="Pretium API consumer key (x-api-key header)"
+    )
+    PRETIUM_SECRET_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="Pretium API secret key (not used in requests, for future)"
+    )
+    PRETIUM_BASE_URL: str = Field(
+        default="https://api.xwift.africa",
+        description="Pretium API base URL"
+    )
+    PRETIUM_SETTLEMENT_WALLET: str = Field(
+        default="0x8005ee53E57aB11E11eAA4EFe07Ee3835Dc02F98",
+        description="Pretium Tron settlement wallet address"
+    )
+    PRETIUM_WEBHOOK_URL: str = Field(
+        default="https://seamount-api.onrender.com/webhooks/pretium",
+        description="Pretium webhook callback URL"
+    )
+    PRETIUM_CALLBACK_URL: str = Field(
+        default="https://seamount.io/payment-callback",
+        description="User redirect after payment"
+    )
+
     # KYC Provider (Regfyl)
     REGFYL_API_KEY: Optional[SecretStr] = None
     REGFYL_BASE_URL: str = Field(default="https://api.portal.regfyl.com")

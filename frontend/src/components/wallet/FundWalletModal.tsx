@@ -342,12 +342,18 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                       <SelectItem 
                         key={a.value} 
                         value={a.backend_key}
-                        className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 py-3 pl-8 cursor-pointer"
+                        className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
                       >
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <span className="text-xl">{a.icon}</span>
                             <span className="font-medium">{a.label}</span>
+                            {/* 🆕 PRETIUM BADGE FOR TRON ASSETS */}
+                            {a.backend_key === 'USDT_TRON' && (
+                              <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-green-500 text-white rounded">
+                                Pretium ⚡
+                              </span>
+                            )}
                           </div>
                           <span className="text-xs text-gray-600 dark:text-gray-400">{a.description}</span>
                         </div>
@@ -416,7 +422,13 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
             <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-              <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best payment provider (Paystack → Cashramp → Flutterwave) for fastest settlement and lowest fees.
+              <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best payment provider for fastest settlement and lowest fees:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li><strong>Pretium</strong> (Tron USDT) - Instant, 2.5% fee ⚡</li>
+                <li><strong>Paystack</strong> (Nigeria) - Most reliable, instant</li>
+                <li><strong>Flutterwave</strong> (Multi-currency) - International support</li>
+                <li><strong>Cashramp</strong> (Mobile money) - P2P option</li>
+              </ul>
             </AlertDescription>
           </Alert>
 
@@ -458,7 +470,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         </DialogFooter>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 text-center px-2 pb-2 font-medium">
-          ⚡ Crypto credited <strong>instantly to 30 seconds</strong> after payment confirmation.
+          ⚡ Crypto credited <strong>
+            {asset === 'USDT_TRON' ? 'instantly to 30 seconds (Pretium)' : 'instantly to 30 seconds'}
+          </strong> after payment confirmation.
         </p>
       </DialogContent>
     </Dialog>

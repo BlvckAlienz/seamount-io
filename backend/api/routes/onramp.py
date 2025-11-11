@@ -15,6 +15,7 @@ from backend.dependencies import get_current_user, get_db_service, get_audit_ser
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
 from backend.services.cashramp_service import CashrampService
+from backend.services.payment_providers.pretium import PretiumProvider
 from backend.services.revenue_tracking_service import RevenueTrackingService
 from backend.config import get_settings, TransactionType
 
@@ -87,15 +88,110 @@ async def initialize_onramp(
         except Exception as e:
             logger.error(f"Cashramp Service Check Failed: {e}")
 
-        # STEP 2: Smart routing with proper URL extraction
-        provider = None
-        payment_result = None
-        checkout_url = None
+        # ===================================================================
+        # STEP 2: SMART ROUTING - Pretium for Tron, existing for others
+        # ===================================================================
         
-        # TIER 1: PAYSTACK (Most reliable for NGN, 1.8% fee)
-        if request.currency == "NGN" and request.payment_method in ["auto", "paystack"]:
+        # 🎯 TIER 1: PRETIUM (Tron USDT exclusive, instant settlement)
+        if crypto_asset == "USDT_TRON":
             try:
-                logger.info(f"🔵 Attempting Paystack on-ramp (PRIMARY): {amount} {request.currency}")
+                logger.info(f"🔵 Routing to Pretium for Tron: {amount} {currency}")
+                
+                pretium = PretiumProvider(settings)
+                
+                # Get user's Tron wallet address
+                wallet_result = db_service.supabase.from_('multi_chain_addresses')\
+                    .select('address')\
+                    .eq('user_id', current_user["id"])\
+                    .eq('blockchain', 'tron')\
+                    .limit(1)\
+                    .execute()
+                
+                if not wallet_result.data or len(wallet_result.data) == 0:
+                    raise Exception("No Tron wallet found. Please create wallet first.")
+                
+                tron_address = wallet_result.data[0]["address"]
+                
+                # Get user phone number (required for Pretium)
+                user_phone = current_user.get("phone") or data.get("phone_number")
+                if not user_phone:
+                    raise Exception("Phone number required for Pretium on-ramp")
+                
+                # Initialize Pretium on-ramp
+                pretium_result = await pretium.initialize_onramp(
+                    user_id=current_user["id"],
+                    amount=float(amount),
+                    currency=currency,
+                    wallet_address=tron_address,
+                    phone_number=user_phone,
+                    mobile_network=data.get("mobile_network", "Safaricom")
+                )
+                
+                if pretium_result.get('success'):
+                    provider = "pretium"
+                    
+                    # Pretium uses polling-based status (no checkout URL)
+                    # Store transaction and return reference
+                    tx_id = f"ONRAMP_PRETIUM_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                    
+                    tx_data = {
+                        "id": tx_id,
+                        "user_id": current_user["id"],
+                        "type": "onramp",
+                        "status": "pending_payment",
+                        "provider": "pretium",
+                        "provider_name": "Pretium Africa",
+                        "currency": currency,
+                        "crypto_asset": crypto_asset,
+                        "amount_fiat": float(amount),
+                        "seamount_fee": pretium_result.get("seamount_fee", 0),
+                        "wallet_address": tron_address,
+                        "pretium_txn_code": pretium_result.get("transaction_code"),
+                        "pretium_reference": pretium_result.get("reference"),
+                        "user_email": current_user["email"],
+                        "user_country": request.user_country,
+                        "metadata": {
+                            "phone_number": user_phone,
+                            "mobile_network": data.get("mobile_network"),
+                            "pretium_status": pretium_result.get("status")
+                        },
+                        "estimated_settlement": "5-10 minutes",
+                        "created_at": datetime.now().isoformat()
+                    }
+                    
+                    db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+                    logger.info(f"✅ Pretium on-ramp initiated: {tx_id}")
+                    
+                    # Return success with polling instructions
+                    return {
+                        "success": True,
+                        "transaction_id": tx_id,
+                        "provider": "pretium",
+                        "transaction_code": pretium_result.get("transaction_code"),
+                        "status": "pending_payment",
+                        "message": pretium_result.get("message"),
+                        "amount_fiat": float(amount),
+                        "currency": currency,
+                        "crypto_asset": crypto_asset,
+                        "estimated_settlement": "5-10 minutes",
+                        "instructions": {
+                            "type": "mobile_money_prompt",
+                            "message": "Check your phone for payment prompt",
+                            "poll_status": True,
+                            "poll_interval": 10  # seconds
+                        }
+                    }
+                else:
+                    raise Exception(pretium_result.get('error', 'Pretium on-ramp failed'))
+                    
+            except Exception as pretium_error:
+                logger.warning(f"⚠️ Pretium failed, falling back: {pretium_error}")
+                # Fall through to existing providers
+        
+        # 🎯 TIER 2: PAYSTACK (Most reliable for NGN, existing logic)
+        if not provider and currency == "NGN" and payment_method in ["auto", "paystack"]:
+            try:
+                logger.info(f"🔵 Attempting Paystack on-ramp (TIER 2): {amount} {currency}")
                 paystack = PaystackProvider(settings)
                 
                 # Paystack fee: 2.5% (0.5% Seamount + 2.0% Paystack)
@@ -130,7 +226,7 @@ async def initialize_onramp(
                 logger.warning(f"Paystack (PRIMARY) failed: {paystack_error}")
                 # Fall through to Flutterwave
         
-        # TIER 2: FLUTTERWAVE (International + NGN backup, 2.5% fee)
+        # TIER 3: FLUTTERWAVE (International + NGN backup, 2.5% fee)
         if not checkout_url and request.payment_method in ["auto", "flutterwave"]:
             try:
                 logger.info(f"Attempting Flutterwave on-ramp (SECONDARY): {amount} {request.currency}")
@@ -168,7 +264,7 @@ async def initialize_onramp(
                 logger.warning(f"Flutterwave (SECONDARY) failed: {flutterwave_error}")
                 # Fall through to Cashramp
         
-        # TIER 3: CASHRAMP (P2P, currently under maintenance)
+        # TIER 4: CASHRAMP (P2P, currently under maintenance)
         if not checkout_url and request.payment_method in ["auto", "cashramp"]:
             try:
                 logger.info(f"Attempting Cashramp on-ramp (TERTIARY): {amount} {request.currency}")
