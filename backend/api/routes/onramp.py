@@ -622,7 +622,7 @@ async def get_onramp_quote(
                 "seamount_fee": float(seamount_fee_fiat),
                 "seamount_fee_pct": float(seamount_fee_rate * 100),  # e.g., 0.5%
                 "provider_fee": float(provider_fee_fiat),
-                "provider_fee_pct": float((total_fee_rate - seamount_rate) * 100),
+                "provider_fee_pct": float((total_fee_rate - seamount_fee_rate) * 100),
                 "total_fee": float(total_fee_fiat),
                 "total_fee_pct": float(total_fee_rate * 100),  # e.g., 2.5%
                 
