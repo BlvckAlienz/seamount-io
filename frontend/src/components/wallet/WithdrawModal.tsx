@@ -588,18 +588,26 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   type="button"
-                  variant={payoutMethod === 'bank_transfer' ? 'default' : 'outline'}
+                  variant="outline"
                   onClick={() => setPayoutMethod('bank_transfer')}
-                  className="h-12 text-base font-semibold"
+                  className={`h-12 text-base font-bold border-2 transition-all duration-200 ${
+                    payoutMethod === 'bank_transfer'
+                      ? 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20 dark:from-blue-400/30 dark:to-indigo-400/30 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-200 backdrop-blur-sm shadow-lg'
+                      : 'bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-100 hover:bg-gray-100/70 dark:hover:bg-gray-600/70 backdrop-blur-sm'
+                  }`}
                 >
                   <Building2 className="mr-2 h-5 w-5" />
                   Bank Transfer
                 </Button>
                 <Button
                   type="button"
-                  variant={payoutMethod === 'mobile_money' ? 'default' : 'outline'}
+                  variant="outline"
                   onClick={() => setPayoutMethod('mobile_money')}
-                  className="h-12 text-base font-semibold"
+                  className={`h-12 text-base font-bold border-2 transition-all duration-200 ${
+                    payoutMethod === 'mobile_money'
+                      ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 dark:from-green-400/30 dark:to-emerald-400/30 border-green-500 dark:border-green-400 text-green-700 dark:text-green-200 backdrop-blur-sm shadow-lg'
+                      : 'bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-100 hover:bg-gray-100/70 dark:hover:bg-gray-600/70 backdrop-blur-sm'
+                  }`}
                 >
                   <Smartphone className="mr-2 h-5 w-5" />
                   Mobile Money
