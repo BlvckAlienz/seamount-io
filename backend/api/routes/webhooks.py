@@ -9,7 +9,7 @@ import logging
 from decimal import Decimal
 from datetime import datetime
 
-from backend.dependencies import get_supabase_client
+from backend.dependencies import get_supabase_client, get_db_service
 from backend.config import get_settings, Settings
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.services.kyc_providers.regfyl import regfyl_service
