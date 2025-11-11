@@ -120,8 +120,26 @@ async def get_offramp_quote(
         # Convert to fiat currency
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
         
-        # 📍 STEP 4: Calculate fees (1.8% withdrawal fee)
-        fee_rate = Decimal("0.018")
+        # ✅ STEP 4: Calculate fees (currency-sensitive rates)
+        # OFF-RAMP FEE STRUCTURE:
+        # NGN (instant bank): 2.0%
+        # KES (mobile money): 2.5%
+        # GHS (mobile money): 2.5%
+        # UGX (mobile money): 3.0%
+        # International:      2.5-3.0%
+        
+        FEE_RATES = {
+            "NGN": Decimal("0.020"),  # 2.0%
+            "KES": Decimal("0.025"),  # 2.5%
+            "GHS": Decimal("0.025"),  # 2.5%
+            "UGX": Decimal("0.030"),  # 3.0%
+            "ZAR": Decimal("0.025"),  # 2.5%
+            "TZS": Decimal("0.030"),  # 3.0%
+            "RWF": Decimal("0.030"),  # 3.0%
+            "ZMW": Decimal("0.030"),  # 3.0%
+        }
+        
+        fee_rate = FEE_RATES.get(fiat_currency, Decimal("0.025"))  # Default 2.5%
         withdrawal_fee_fiat = gross_fiat_amount * fee_rate
         withdrawal_fee_usd = crypto_value_usd * fee_rate
         
@@ -151,7 +169,7 @@ async def get_offramp_quote(
                 "withdrawal_fee": float(withdrawal_fee_fiat),
                 "withdrawal_fee_usd": float(withdrawal_fee_usd),
                 "net_fiat_amount": float(net_fiat_amount),
-                "fee_percentage": 1.8,
+                "fee_percentage": float(fee_rate * 100),
                 
                 # Quote metadata
                 "valid_for_seconds": 300,
@@ -256,8 +274,19 @@ async def get_public_offramp_quote(request: Request):
         # Convert to fiat currency
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
         
-        # 📍 STEP 5: Calculate fees (1.8% withdrawal fee)
-        fee_rate = Decimal("0.018")
+        # ✅ STEP 5: Calculate fees (currency-sensitive rates)
+        FEE_RATES = {
+            "NGN": Decimal("0.020"),  # 2.0%
+            "KES": Decimal("0.025"),  # 2.5%
+            "GHS": Decimal("0.025"),  # 2.5%
+            "UGX": Decimal("0.030"),  # 3.0%
+            "ZAR": Decimal("0.025"),  # 2.5%
+            "TZS": Decimal("0.030"),  # 3.0%
+            "RWF": Decimal("0.030"),  # 3.0%
+            "ZMW": Decimal("0.030"),  # 3.0%
+        }
+        
+        fee_rate = FEE_RATES.get(fiat_currency, Decimal("0.025"))
         withdrawal_fee_fiat = gross_fiat_amount * fee_rate
         withdrawal_fee_usd = crypto_value_usd * fee_rate
         
@@ -287,7 +316,7 @@ async def get_public_offramp_quote(request: Request):
                 "withdrawal_fee": float(withdrawal_fee_fiat),
                 "withdrawal_fee_usd": float(withdrawal_fee_usd),
                 "net_fiat_amount": float(net_fiat_amount),
-                "fee_percentage": 1.8,
+                "fee_percentage": float(fee_rate * 100),
                 
                 # Quote metadata
                 "valid_for_seconds": 300,

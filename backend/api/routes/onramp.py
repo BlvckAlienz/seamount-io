@@ -349,8 +349,10 @@ async def initialize_onramp(
             "amount_fiat": float(amount),
             "currency": request.currency,
             "crypto_asset": request.crypto_asset,
+            "amount_paid": float(amount),
+            "amount_paid": float(amount),
             "seamount_fee": float(our_fee),
-            "net_amount": float(amount - our_fee),
+            "net_value": float(amount - our_fee),
             "estimated_crypto_amount": float(amount - our_fee),    
             "estimated_settlement": "5-10 minutes",
             "provider": provider,
@@ -588,21 +590,22 @@ async def get_onramp_quote(
         seamount_fee_usd = amount_usd * seamount_fee_rate
         provider_fee_usd = total_fee_usd - seamount_fee_usd
 
-        # User receives full requested amount (fees are added on top)
-        estimated_crypto = amount_usd / crypto_price_usd  # ✅ Full amount
+        # User pays requested amount, receives AFTER fees
+        net_usd_after_fees = amount_usd - total_fee_usd
+        estimated_crypto = net_usd_after_fees / crypto_price_usd
 
-        # Convert fees to fiat currency
+        # ✅ NEW: Fees are deducted, not added
         if currency != "USD":
             total_fee_fiat = total_fee_usd / fiat_to_usd_rate
             seamount_fee_fiat = seamount_fee_usd / fiat_to_usd_rate
             provider_fee_fiat = provider_fee_usd / fiat_to_usd_rate
-            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            net_fiat_after_fees = amount_fiat - total_fee_fiat  # ✅ Subtract
             usd_to_fiat_rate = Decimal("1") / fiat_to_usd_rate
         else:
             total_fee_fiat = total_fee_usd
             seamount_fee_fiat = seamount_fee_usd
             provider_fee_fiat = provider_fee_usd
-            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            net_fiat_after_fees = amount_fiat - total_fee_fiat  # ✅ Subtract
             usd_to_fiat_rate = Decimal("1")
         
         return {
@@ -626,9 +629,10 @@ async def get_onramp_quote(
                 "total_fee": float(total_fee_fiat),
                 "total_fee_pct": float(total_fee_rate * 100),  # e.g., 2.5%
                 
-                # ✅ WHAT USER PAYS & GETS:
-                "total_to_charge": float(total_to_charge_fiat),  # User pays this
-                "crypto_to_receive": float(estimated_crypto),    # User gets this
+                # ✅ NEW: User pays requested, gets amount minus fees
+                "amount_to_pay": float(amount_fiat),           # What user pays
+                "net_after_fees": float(net_fiat_after_fees),  # Value after fees
+                "crypto_to_receive": float(estimated_crypto),  # Crypto received
                 
                 "valid_for_seconds": 300,
                 "timestamp": datetime.now().isoformat(),
@@ -711,26 +715,27 @@ async def get_public_onramp_quote(request: Request):
                 detail="Cannot get live crypto prices. Please try again."
             )
         
-        # Calculate USD fees first
+        # ✅ NEW: Deduct fees from requested amount
         total_fee_usd = amount_usd * total_fee_rate
         seamount_fee_usd = amount_usd * seamount_fee_rate
         provider_fee_usd = total_fee_usd - seamount_fee_usd
+        
+        # User pays requested amount, receives AFTER fees
+        net_usd_after_fees = amount_usd - total_fee_usd
+        estimated_crypto = net_usd_after_fees / crypto_price_usd
 
-        # User receives full requested amount (fees are added on top)
-        estimated_crypto = amount_usd / crypto_price_usd  # ✅ Full amount
-
-        # Convert fees to fiat currency
+        # ✅ NEW: Fees are deducted, not added
         if currency != "USD":
             total_fee_fiat = total_fee_usd / fiat_to_usd_rate
             seamount_fee_fiat = seamount_fee_usd / fiat_to_usd_rate
             provider_fee_fiat = provider_fee_usd / fiat_to_usd_rate
-            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            net_fiat_after_fees = amount_fiat - total_fee_fiat  # ✅ Subtract
             usd_to_fiat_rate = Decimal("1") / fiat_to_usd_rate
         else:
             total_fee_fiat = total_fee_usd
             seamount_fee_fiat = seamount_fee_usd
             provider_fee_fiat = provider_fee_usd
-            total_to_charge_fiat = amount_fiat + total_fee_fiat
+            net_fiat_after_fees = amount_fiat - total_fee_fiat  # ✅ Subtract
             usd_to_fiat_rate = Decimal("1")
         
         return {
@@ -754,9 +759,10 @@ async def get_public_onramp_quote(request: Request):
                 "total_fee": float(total_fee_fiat),
                 "total_fee_pct": float(total_fee_rate * 100),
                 
-                # ✅ WHAT USER PAYS & GETS:
-                "total_to_charge": float(total_to_charge_fiat),
-                "crypto_to_receive": float(estimated_crypto),
+                # ✅ NEW: User pays requested, gets amount minus fees
+                "amount_to_pay": float(amount_fiat),           # What user pays
+                "net_after_fees": float(net_fiat_after_fees),  # Value after fees
+                "crypto_to_receive": float(estimated_crypto),  # Crypto received
                 
                 "valid_for_seconds": 300,
                 "timestamp": datetime.now().isoformat(),

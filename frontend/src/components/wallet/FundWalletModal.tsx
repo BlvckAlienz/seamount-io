@@ -253,7 +253,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700"
+        className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600"
         style={{ zIndex: 1000 }}
       >
         <DialogHeader className="border-b pb-4">
@@ -273,15 +273,15 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               Your Currency
             </Label>
             <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger id="currency" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+              <SelectTrigger id="currency" className="w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 h-12">
                 <SelectValue placeholder="Select your currency" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[300px] z-50">
+              <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 max-h-[300px] z-50">
                 {SUPPORTED_CURRENCIES.map((curr) => (
                   <SelectItem 
                     key={curr.code} 
                     value={curr.code} 
-                    className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3"
+                    className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 py-3 cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{curr.flag}</span>
@@ -304,7 +304,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 {selectedCurrency?.symbol}
               </span>
               <Input
-                className="pl-12 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-white h-12 text-lg font-medium transition-colors"
+                className="pl-12 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 focus:border-blue-500 dark:focus:border-blue-400 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 h-12 text-lg font-medium transition-colors"
                 id="amount"
                 type="number"
                 step="any"
@@ -326,10 +326,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               Crypto Asset to Receive
             </Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger id="asset" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+              <SelectTrigger id="asset" className="w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 h-12">
                 <SelectValue placeholder="Select crypto asset" />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
+              <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 max-h-[400px] z-50">
                 {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                   <div key={chain} className="py-2">
                     {/* Chain Header */}
@@ -342,7 +342,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                       <SelectItem 
                         key={a.value} 
                         value={a.backend_key}
-                        className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
+                        className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 py-3 pl-8 cursor-pointer"
                       >
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
@@ -378,12 +378,31 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Total Fee ({quote.total_fee_pct?.toFixed(1)}%):
+                  You Pay:
                 </span>
-                <span className="font-bold text-base text-gray-900 dark:text-white">
-                  {selectedCurrency?.symbol}{quote.total_fee?.toFixed(2)}
+                <span className="font-bold text-lg text-gray-900 dark:text-white">
+                  {selectedCurrency?.symbol}{parseFloat(amount).toLocaleString()}
                 </span>
               </div>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Fee ({quote.total_fee_pct?.toFixed(1)}%):
+                </span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  - {selectedCurrency?.symbol}{quote.total_fee?.toFixed(2)}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Net Value:
+                </span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  {selectedCurrency?.symbol}{quote.net_after_fees?.toFixed(2)}
+                </span>
+              </div>
+              
               <div className="flex justify-between items-center pt-2 border-t-2 border-blue-300 dark:border-blue-700">
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
                 <span className="font-bold text-xl text-green-600 dark:text-green-400">
@@ -432,7 +451,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             ) : (
               <>
                 <Wallet className="mr-2 h-5 w-5" />
-                Fund {selectedCurrency?.symbol}{amount || '0'}
+                Pay {selectedCurrency?.symbol}{amount || '0'}
               </>
             )}
           </Button>

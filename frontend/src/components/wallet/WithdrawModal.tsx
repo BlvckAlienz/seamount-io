@@ -418,7 +418,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-700"
+        className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600"
         style={{ zIndex: 1000 }}
       >
         <DialogHeader className="border-b pb-4">
@@ -683,15 +683,15 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-900 dark:text-white">Mobile Money Provider</Label>
                 <Select value={mobileProvider} onValueChange={setMobileProvider}>
-                  <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 h-12">
-                    <SelectValue placeholder="Select provider" />
+                  <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 h-12 text-gray-900 dark:text-gray-100">
+                    <SelectValue placeholder="Select provider" className="text-gray-900 dark:text-gray-100" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 z-50">
+                  <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 z-50">
                     {selectedCurrency?.mobile_providers?.map((provider) => (
                       <SelectItem 
                         key={provider} 
                         value={provider}
-                        className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                        className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
                       >
                         {MOBILE_PROVIDER_NAMES[provider] || provider}
                       </SelectItem>
@@ -707,9 +707,9 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                   placeholder="e.g., 0712345678"
                   value={mobileNumber}
                   onChange={(e) => setMobileNumber(e.target.value)}
-                  className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 h-12"
+                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 h-12"
                 />
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
                   Enter number registered with {mobileProvider ? MOBILE_PROVIDER_NAMES[mobileProvider] : 'mobile money'}
                 </p>
               </div>
