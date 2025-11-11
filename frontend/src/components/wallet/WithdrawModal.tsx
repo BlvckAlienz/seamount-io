@@ -558,7 +558,9 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Withdrawal Fee (1.8%):</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Withdrawal Fee ({quote.fee_percentage?.toFixed(1)}%):
+                </span>
                 <span className="font-bold text-base text-gray-900 dark:text-white">
                   {getCurrencySymbol(currency)}{quote.withdrawal_fee?.toFixed(2)}
                 </span>
