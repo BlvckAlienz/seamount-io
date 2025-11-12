@@ -31,24 +31,45 @@ class OnRampRequest(BaseModel):
 
 @router.post("/initialize")
 async def initialize_onramp(
-    request: OnRampRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db_service = Depends(get_db_service),
     audit_service = Depends(get_audit_service)
 ):
     """
     Initialize fiat → crypto on-ramp
-    PRIORITY: Cashramp (P2P) → Paystack (NGN) → Flutterwave (International)
+    PRIORITY: Pretium (Tron) → Paystack (NGN) → Flutterwave (International)
     """
     
     try:
         settings = get_settings()
-        amount = Decimal(str(request.amount_fiat))
         
-        # Simple fee calculation (no fee calculator dependency)
-        our_fee = Decimal("0")  # Will be set per provider
-
-        # STEP 1: Get user wallet address
+        # ✅ STEP 1: Extract payload FIRST (CRITICAL!)
+        data = await request.json()
+        amount = Decimal(str(data.get("amount_fiat", 0)))
+        currency = data.get("currency", "NGN")
+        crypto_asset = data.get("crypto_asset", "USDT_ALGO")  # ← MUST BE HERE
+        payment_method = data.get("payment_method", "auto")
+        user_country = data.get("user_country", "NG")
+        
+        # Validate amount
+        if amount <= 0:
+            raise HTTPException(
+                status_code=400, 
+                detail="Amount must be greater than 0"
+            )
+        
+        # Get asset config
+        asset_config = settings.SUPPORTED_ASSETS.get(crypto_asset)
+        if not asset_config:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported asset: {crypto_asset}"
+            )
+        
+        # ===================================================================
+        # STEP 2: Get user wallet address
+        # ===================================================================
         try:
             wallet_result = db_service.supabase.from_('user_wallets')\
                 .select('algorand_address')\
@@ -73,44 +94,33 @@ async def initialize_onramp(
                 detail=f"Database error: {str(e)}"
             )
         
-        # DEBUG: Provider Configuration Check
-        logger.info(f"PROVIDER CONFIGURATION CHECK:")
-        logger.info(f"Cashramp API Key: {'SET' if hasattr(settings, 'CASHRAMP_API_KEY') and settings.CASHRAMP_API_KEY else 'MISSING'}")
-        logger.info(f"Paystack Secret Key: {'SET' if hasattr(settings, 'PAYSTACK_SECRET_KEY') and settings.PAYSTACK_SECRET_KEY else 'MISSING'}")
-        logger.info(f"Flutterwave Secret Key: {'SET' if hasattr(settings, 'FLUTTERWAVE_SECRET_KEY') and settings.FLUTTERWAVE_SECRET_KEY else 'MISSING'}")
-
-        # Check if Cashramp service is available
-        cashramp_available = False
-        try:
-            cashramp = CashrampService(db_service)
-            cashramp_available = cashramp.is_available()
-            logger.info(f"Cashramp Service Available: {'YES' if cashramp_available else 'NO'}")
-        except Exception as e:
-            logger.error(f"Cashramp Service Check Failed: {e}")
-
         # ===================================================================
-        # STEP 2: SMART ROUTING - Pretium for Tron, existing for others
+        # STEP 3: SMART ROUTING - NOW crypto_asset is defined!
         # ===================================================================
+        provider = None
+        payment_result = None
+        checkout_url = None
         
-        # 🎯 TIER 1: PRETIUM (Tron USDT exclusive, instant settlement)
-        if crypto_asset == "USDT_TRON":
+        # 🎯 TIER 1: PRETIUM (Tron USDT exclusive)
+        if crypto_asset == "USDT_TRON":  # ← NOW THIS WORKS!
             try:
                 logger.info(f"🔵 Routing to Pretium for Tron: {amount} {currency}")
                 
+                from backend.services.payment_providers.pretium import PretiumProvider
                 pretium = PretiumProvider(settings)
                 
                 # Get user's Tron wallet address
-                wallet_result = db_service.supabase.from_('multi_chain_addresses')\
+                tron_wallet_result = db_service.supabase.from_('multi_chain_addresses')\
                     .select('address')\
                     .eq('user_id', current_user["id"])\
                     .eq('blockchain', 'tron')\
                     .limit(1)\
                     .execute()
                 
-                if not wallet_result.data or len(wallet_result.data) == 0:
+                if not tron_wallet_result.data or len(tron_wallet_result.data) == 0:
                     raise Exception("No Tron wallet found. Please create wallet first.")
                 
-                tron_address = wallet_result.data[0]["address"]
+                tron_address = tron_wallet_result.data[0]["address"]
                 
                 # Get user phone number (required for Pretium)
                 user_phone = current_user.get("phone") or data.get("phone_number")
@@ -131,7 +141,6 @@ async def initialize_onramp(
                     provider = "pretium"
                     
                     # Pretium uses polling-based status (no checkout URL)
-                    # Store transaction and return reference
                     tx_id = f"ONRAMP_PRETIUM_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
                     
                     tx_data = {
@@ -149,7 +158,7 @@ async def initialize_onramp(
                         "pretium_txn_code": pretium_result.get("transaction_code"),
                         "pretium_reference": pretium_result.get("reference"),
                         "user_email": current_user["email"],
-                        "user_country": request.user_country,
+                        "user_country": user_country,
                         "metadata": {
                             "phone_number": user_phone,
                             "mobile_network": data.get("mobile_network"),
@@ -162,7 +171,6 @@ async def initialize_onramp(
                     db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
                     logger.info(f"✅ Pretium on-ramp initiated: {tx_id}")
                     
-                    # Return success with polling instructions
                     return {
                         "success": True,
                         "transaction_id": tx_id,
@@ -178,7 +186,7 @@ async def initialize_onramp(
                             "type": "mobile_money_prompt",
                             "message": "Check your phone for payment prompt",
                             "poll_status": True,
-                            "poll_interval": 10  # seconds
+                            "poll_interval": 10
                         }
                     }
                 else:
@@ -363,7 +371,7 @@ async def initialize_onramp(
                 )
             )
         
-        # STEP 3: Store on-ramp transaction
+        # STEP 4: Store on-ramp transaction
         tx_id = f"ONRAMP_{current_user['id'][:8]}_{int(amount)}_{int(datetime.now().timestamp())}"
         
         tx_data = {
@@ -398,7 +406,7 @@ async def initialize_onramp(
             logger.error(f"Failed to store transaction: {db_error}")
             # Continue anyway - payment link is still valid
         
-        # STEP 4: Track revenue (optional, non-blocking)
+        # STEP 5: Track revenue (optional, non-blocking)
         try:
             revenue_service = RevenueTrackingService(db_service)
             await revenue_service.track_transaction_fee(
@@ -418,7 +426,7 @@ async def initialize_onramp(
         except Exception as revenue_error:
             logger.warning(f"Failed to track revenue: {revenue_error}")
         
-        # STEP 5: Log audit trail (optional, non-blocking)
+        # STEP 6: Log audit trail (optional, non-blocking)
         if audit_service:
             try:
                 await audit_service.log_event(
