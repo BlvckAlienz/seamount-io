@@ -194,16 +194,17 @@ async def get_backup_status(
         # Query backup status using RPC function
         # ============================================
         try:
+            # Just pass the clean UUID string - let PostgreSQL function handle it
             status = db.supabase.rpc(
                 'get_user_backup_status', 
-                {'p_user_id': f'{user_id_str}::uuid'}  # ← NEW: Force PostgreSQL UUID cast
+                {'p_user_id': user_id_str}  # ✅ Clean UUID string only
             ).execute()
         except Exception as e:
             logger.error(f"❌ RPC call failed: {e}")
-            # Fallback: Query view directly with explicit UUID cast
+            # Fallback: Query view directly - also just use clean string
             status = db.supabase.table('user_wallet_backup_status')\
                 .select('*')\
-                .eq('user_id', f'{user_id_str}::uuid')\
+                .eq('user_id', user_id_str)\
                 .execute()
         
         # ============================================
