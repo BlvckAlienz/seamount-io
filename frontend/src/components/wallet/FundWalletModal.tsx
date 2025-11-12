@@ -422,13 +422,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
             <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-              <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best payment provider for fastest settlement and lowest fees:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Pretium</strong> (Tron USDT) - Instant, 2.5% fee ⚡</li>
-                <li><strong>Paystack</strong> (Nigeria) - Most reliable, instant</li>
-                <li><strong>Flutterwave</strong> (Multi-currency) - International support</li>
-                <li><strong>Cashramp</strong> (Mobile money) - P2P option</li>
-              </ul>
+              <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best payment provider for fastest settlement and lowest fees.
             </AlertDescription>
           </Alert>
 

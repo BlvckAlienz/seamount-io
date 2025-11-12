@@ -381,19 +381,19 @@ async def initialize_onramp(
             "status": "pending_payment",
             "provider": provider,
             "provider_name": provider.title(),
-            "currency": request.currency,
-            "crypto_asset": request.crypto_asset,
+            "currency": currency,  # ✅ FIXED - use local variable
+            "crypto_asset": crypto_asset,  # ✅ FIXED - use local variable
             "amount_fiat": float(amount),
             "seamount_fee": float(our_fee),
-            "net_to_user": float(amount - our_fee),      # What user gets ($100)
+            "net_to_user": float(amount - our_fee),
             "wallet_address": wallet_address,
             "checkout_url": checkout_url,
             "user_email": current_user["email"],
-            "user_country": request.user_country,
+            "user_country": user_country,  # ✅ FIXED - use local variable
             "fee_breakdown": {
                 "seamount_fee": float(our_fee),
                 "provider": provider,
-                "currency": request.currency
+                "currency": currency  # ✅ FIXED - use local variable
             },
             "estimated_settlement": "5-10 minutes",
             "created_at": datetime.now().isoformat()
@@ -413,14 +413,14 @@ async def initialize_onramp(
                 user_id=current_user["id"],
                 transaction_type="on_ramp",
                 amount=amount,
-                fee_rate=Decimal("0.005"),  # 0.5% Seamount margin
+                fee_rate=Decimal("0.005"),
                 platform_fee=our_fee,
                 network_fee=Decimal("0.001"),
                 blockchain="algorand",
                 metadata={
                     "transaction_id": tx_id,
                     "provider": provider,
-                    "currency": request.currency
+                    "currency": currency  # ✅ FIXED
                 }
             )
         except Exception as revenue_error:
@@ -436,8 +436,8 @@ async def initialize_onramp(
                     details={
                         "provider": str(provider) if provider else "unknown",
                         "amount": float(amount) if amount else 0,
-                        "currency": str(request.currency) if request.currency else "unknown",
-                        "asset": str(request.crypto_asset) if request.crypto_asset else "unknown"
+                        "currency": str(currency),  # ✅ FIXED
+                        "asset": str(crypto_asset)  # ✅ FIXED
                     }
                 )
             except Exception as audit_error:
@@ -451,8 +451,8 @@ async def initialize_onramp(
             "checkout_url": checkout_url,  # ✅ CRITICAL: User needs this to pay
             "provider": provider,
             "amount_fiat": float(amount),
-            "currency": request.currency,
-            "crypto_asset": request.crypto_asset,
+            "currency": currency,
+            "crypto_asset": crypto_asset,
             "amount_paid": float(amount),
             "amount_paid": float(amount),
             "seamount_fee": float(our_fee),
