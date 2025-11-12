@@ -98,7 +98,7 @@ class PretiumProvider:
         self._validate_config()
         
         logger.info("✅ PretiumProvider initialized for Tron USDT")
-    
+
     def _validate_config(self):
         """Validate Pretium API credentials"""
         if not all([self.consumer_key, self.secret_key, self.base_url]):
@@ -216,7 +216,7 @@ class PretiumProvider:
             "shortcode": phone_number,
             "amount": int(amount),
             "mobile_network": mobile_network,
-            "chain": "TRON",
+            "chain": "Tron",
             "asset": "USDT",
             "address": wallet_address,
             "fee": int(seamount_fee),  # Pretium collects this for us
@@ -305,7 +305,7 @@ class PretiumProvider:
                 "amount": str(int(amount)),
                 "fee": str(int(seamount_fee)),
                 "mobile_network": recipient_details.get("mobile_network"),
-                "chain": "TRON",
+                "chain": "Tron",
                 "callback_url": f"{self.settings.PRETIUM_WEBHOOK_URL}/status"
             }
             
