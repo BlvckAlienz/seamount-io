@@ -102,6 +102,8 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [currency, setCurrency] = useState('NGN')
   const [asset, setAsset] = useState('USDT_ALGO')  // ✅ Use backend key
   const [loading, setLoading] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')  // ➕ NEW
+  const [showPhoneInput, setShowPhoneInput] = useState(false)  // ➕ NEW
   const [error, setError] = useState<string | null>(null)
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
@@ -168,6 +170,19 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     return () => clearTimeout(timer)
   }, [amount, currency, asset])  // ✅ Dependencies
 
+  // ➕ NEW: Show phone input when Pretium-supported asset is selected
+  useEffect(() => {
+    const pretiumAssets = ['USDT_TRON', 'TRX']
+    const pretiumCurrencies = ['NGN', 'KES', 'UGX', 'GHS', 'MWK', 'ETB', 'CDF']
+    
+    const needsPhone = pretiumAssets.includes(asset) && pretiumCurrencies.includes(currency)
+    setShowPhoneInput(needsPhone)
+    
+    if (!needsPhone) {
+      setPhoneNumber('')  // Clear phone when not needed
+    }
+  }, [asset, currency])
+
   // Handle fund wallet
   const handleFund = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -182,18 +197,40 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       return
     }
 
+    // ➕ NEW: Validate phone number for Pretium assets
+    if (showPhoneInput && !phoneNumber) {
+      toast.error('Phone number required for Tron deposits')
+      return
+    }
+    
+    if (showPhoneInput && phoneNumber.length < 10) {
+      toast.error('Please enter a valid phone number')
+      return
+    }
+    
     setLoading(true)
     setError(null)
 
     try {
       console.log('📤 Sending onramp request...')
       
-      const response = await api.post('/api/v1/onramp/initialize', {
+      const payload: any = {
         amount_fiat: parseFloat(amount),
         currency,
         crypto_asset: asset,
         payment_method: 'auto',
-      })
+      }
+      
+      // ➕ NEW: Include phone number for Pretium
+      if (showPhoneInput && phoneNumber) {
+        payload.phone_number = phoneNumber
+        payload.mobile_network = currency === 'KES' ? 'Safaricom' : 
+                                currency === 'UGX' ? 'MTN' : 
+                                currency === 'GHS' ? 'Airtel go' : 
+                                'Safaricom'  // Default for NGN
+      }
+      
+      const response = await api.post('/api/v1/onramp/initialize', payload)
 
       console.log('📦 Raw response:', response)
       
@@ -364,7 +401,32 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               </SelectContent>
             </Select>
           </div>
-
+          
+          {/* ➕ NEW: Phone Number Input (conditional) */}
+          {showPhoneInput && (
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-semibold text-gray-900 dark:text-white">
+                Phone Number
+              </Label>
+              <div className="relative">
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="e.g., 0812345678"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                  disabled={loading}
+                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 h-12 text-base"
+                  maxLength={15}
+                />
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-medium flex items-center gap-1">
+                <span className="text-blue-600">⚡</span>
+                Required for instant Pretium settlement (mobile money)
+              </p>
+            </div>
+          )}
+          
           {/* Quote Display */}
           {fetchingQuote && (
             <div className="flex items-center justify-center py-4">

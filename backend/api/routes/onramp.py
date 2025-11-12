@@ -51,6 +51,8 @@ async def initialize_onramp(
         crypto_asset = data.get("crypto_asset", "USDT_ALGO")  # ← MUST BE HERE
         payment_method = data.get("payment_method", "auto")
         user_country = data.get("user_country", "NG")
+        phone_number = data.get("phone_number")  # ➕ NEW: Extract from payload
+        mobile_network = data.get("mobile_network", "Safaricom")  # ➕ NEW: Default network
         
         # Validate amount
         if amount <= 0:
@@ -122,10 +124,15 @@ async def initialize_onramp(
                 
                 tron_address = tron_wallet_result.data[0]["address"]
                 
-                # Get user phone number (required for Pretium)
-                user_phone = current_user.get("phone") or data.get("phone_number")
+                # ✅ FIXED: Use phone_number from payload
+                user_phone = phone_number or current_user.get("phone")
                 if not user_phone:
                     raise Exception("Phone number required for Pretium on-ramp")
+                
+                # ✅ VALIDATION: Clean and format phone number
+                user_phone = user_phone.strip().replace(' ', '').replace('-', '')
+                if len(user_phone) < 10:
+                    raise Exception(f"Invalid phone number: {user_phone}")
                 
                 # Initialize Pretium on-ramp
                 pretium_result = await pretium.initialize_onramp(
@@ -134,7 +141,7 @@ async def initialize_onramp(
                     currency=currency,
                     wallet_address=tron_address,
                     phone_number=user_phone,
-                    mobile_network=data.get("mobile_network", "Safaricom")
+                    mobile_network=mobile_network
                 )
                 
                 if pretium_result.get('success'):
