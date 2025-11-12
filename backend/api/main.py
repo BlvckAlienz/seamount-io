@@ -511,8 +511,20 @@ app.include_router(seed_routes.router)
 # Wallet backup tracking
 try:
     from backend.api.routes.wallet_backup_routes import router as wallet_backup_router
-    app.include_router(wallet_backup_router)
+    
+    # Add prefix here (router file has NO prefix)
+    app.include_router(
+        wallet_backup_router, 
+        prefix="/api/v1/wallet-backup",
+        tags=["wallet-backup"]
+    )
+    
     logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
+    
+    # Log registered endpoints
+    for route in wallet_backup_router.routes:
+        full_path = f"/api/v1/wallet-backup{route.path}"
+        logger.info(f"   → {route.methods} {full_path}")
 except ImportError as e:
     logger.error(f"❌ Wallet backup routes import error: {e}")
 
