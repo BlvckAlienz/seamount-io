@@ -772,6 +772,30 @@ async def debug_db_test(supabase: Client = Depends(get_supabase_client)):
             "message": "Database connection failed"
         }
 
+@app.get("/api/debug/all-routes", tags=["Debug"])
+async def debug_all_routes():
+    """Debug endpoint to see ALL registered routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": getattr(route, "name", "N/A")
+            })
+    
+    routes_sorted = sorted(routes, key=lambda x: x["path"])
+    
+    # Filter for wallet-backup routes specifically
+    wallet_backup = [r for r in routes_sorted if "wallet-backup" in r["path"] or "wallet_backup" in r["path"]]
+    
+    return {
+        "total_routes": len(routes_sorted),
+        "wallet_backup_found": len(wallet_backup),
+        "wallet_backup_routes": wallet_backup,
+        "all_routes": routes_sorted
+    }
+
 @app.get("/api/debug/wallet-test/{user_id}", tags=["Debug"])
 async def debug_wallet_test(
     user_id: str,
