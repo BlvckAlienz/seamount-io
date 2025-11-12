@@ -242,9 +242,9 @@ async def initialize_onramp(
                 # Fall through to Flutterwave
         
         # TIER 3: FLUTTERWAVE (International + NGN backup, 2.5% fee)
-        if not checkout_url and request.payment_method in ["auto", "flutterwave"]:
+        if not checkout_url and payment_method in ["auto", "flutterwave"]:
             try:
-                logger.info(f"Attempting Flutterwave on-ramp (SECONDARY): {amount} {request.currency}")
+                logger.info(f"Attempting Flutterwave on-ramp (SECONDARY): {amount} {currency}")
                 flutterwave = FlutterwaveProvider(settings)
                 
                 # Flutterwave fee: 2.5-4.0% (0.5% Seamount + provider cost)
@@ -253,7 +253,7 @@ async def initialize_onramp(
                 
                 payment_result = await flutterwave.initialize_payment(
                     amount=float(provider_amount),  # Full amount to Flutterwave
-                    currency=request.currency,
+                    currency=currency,
                     email=current_user["email"],
                     tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
                     phone=current_user.get("phone"),
@@ -280,9 +280,9 @@ async def initialize_onramp(
                 # Fall through to Cashramp
         
         # TIER 4: CASHRAMP (P2P, currently under maintenance)
-        if not checkout_url and request.payment_method in ["auto", "cashramp"]:
+        if not checkout_url and payment_method in ["auto", "cashramp"]:
             try:
-                logger.info(f"Attempting Cashramp on-ramp (TERTIARY): {amount} {request.currency}")
+                logger.info(f"Attempting Cashramp on-ramp (TERTIARY): {amount} {currency}")
                 cashramp = CashrampService(db_service)
                 
                 if not cashramp.is_available():
@@ -291,7 +291,7 @@ async def initialize_onramp(
                 
                 payment_result = await cashramp.create_ngn_onramp(
                     user_id=current_user["id"],
-                    asset=request.crypto_asset,
+                    asset=crypro_asset,
                     amount_ngn=amount,
                     payment_method="p2p"
                 )
@@ -326,7 +326,7 @@ async def initialize_onramp(
                 logger.info("ACTIVATING EMERGENCY PAYSTACK FALLBACK...")
                 
                 # Only for NGN - Flutterwave for others
-                if request.currency == "NGN":
+                if currency == "NGN":
                     paystack = PaystackProvider(settings)
                     
                     payment_result = await paystack.initialize_payment(
@@ -348,7 +348,7 @@ async def initialize_onramp(
                     
                     payment_result = await flutterwave.initialize_payment(
                         amount=float(amount),
-                        currency=request.currency,
+                        currency=currency,
                         email=current_user["email"],
                         tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
                         name=current_user.get('first_name', 'User')
