@@ -590,7 +590,6 @@ async def regfyl_business_screening_webhook(request: Request):
 @router.post("/webhooks/pretium")
 async def pretium_webhook(
     request: Request,
-    db_service = Depends(get_db_service)
 ):
     """
     Handle Pretium transaction status callbacks

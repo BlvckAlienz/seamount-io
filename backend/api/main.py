@@ -530,7 +530,7 @@ except ImportError as e:
 
 try:
     from backend.api.routes.wallet_backup import router as wallet_backup_router
-    app.include_router(wallet_backup_router)
+    app.include_router(wallet_backup_router, prefix="/api/v1/wallet-backup")
     logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
 except ImportError as e:
     logger.error(f"❌ Wallet backup routes import error: {e}")

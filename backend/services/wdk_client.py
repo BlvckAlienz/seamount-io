@@ -17,13 +17,11 @@ logger = logging.getLogger(__name__)
 class CircuitBreaker:
     """Enhanced circuit breaker with per-chain isolation"""
     
-    def __init__(self, failure_threshold=8, recovery_timeout=45):  # More forgiving
+    def __init__(self, failure_threshold=20, recovery_timeout=90):  # More forgiving
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
-        self.failure_count = 0
-        self.last_failure_time = None
-        self.state = "CLOSED"
-        self.chain_status = {}  # Track per-chain health
+        self.warmup_grace_period = 60  # Don't count failures in first 60s
+        self.service_start_time = datetime.now()
     
     def can_execute(self, chain=None):
         # Allow specific chains even if general circuit is open
@@ -45,6 +43,11 @@ class CircuitBreaker:
             self.chain_status[chain] = "healthy"
     
     def record_failure(self, chain=None):
+        # Don't penalize failures during warmup
+        if (datetime.now() - self.service_start_time).total_seconds() < self.warmup_grace_period:
+            logger.info(f"⏳ Ignoring failure during warmup period")
+            return
+        
         self.failure_count += 1
         self.last_failure_time = datetime.now()
         

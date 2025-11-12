@@ -389,7 +389,14 @@ async def get_balances(
                 "wallet_exists": False
             }
         
-        logger.info(f"✅ Balances fetched for user {user_id}: ${result['total_usd']} total")
+        # wallet.py line 308
+        if result.get('fallback') or result.get('degraded'):
+            logger.warning(
+                f"⚠️ DEGRADED balances for user {user_id}: ${result['total_usd']} "
+                f"(source: {result.get('source', 'fallback')})"
+            )
+        else:
+            logger.info(f"✅ Balances fetched for user {user_id}: ${result['total_usd']} total")
         
         return result
         

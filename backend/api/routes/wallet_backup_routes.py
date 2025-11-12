@@ -13,7 +13,7 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/wallet-backup", tags=["wallet-backup"])
+router = APIRouter(tags=["wallet-backup"])  # No prefix here
 
 
 # ============================================
@@ -196,14 +196,14 @@ async def get_backup_status(
         try:
             status = db.supabase.rpc(
                 'get_user_backup_status', 
-                {'p_user_id': user_id_str}  # ✅ Pass validated UUID string
+                {'p_user_id': f'{user_id_str}::uuid'}  # ← NEW: Force PostgreSQL UUID cast
             ).execute()
         except Exception as e:
             logger.error(f"❌ RPC call failed: {e}")
             # Fallback: Query view directly with explicit UUID cast
             status = db.supabase.table('user_wallet_backup_status')\
                 .select('*')\
-                .eq('user_id', user_id_str)\
+                .eq('user_id', f'{user_id_str}::uuid')\
                 .execute()
         
         # ============================================
