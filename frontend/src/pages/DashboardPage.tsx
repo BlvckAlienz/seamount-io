@@ -627,11 +627,13 @@ const DashboardPage = () => {
           onOpenChange={setShowWithdrawModal} 
         />
         {/* Send Modal */}
-        // DELETE THIS OLD CODE:
         {showSendModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="relative">
-              <button onClick={() => setShowSendModal(false)} className="...">
+              <button
+                onClick={() => setShowSendModal(false)}
+                className="absolute -top-4 -right-4 bg-gray-800 hover:bg-gray-700 rounded-full p-2 text-white transition-colors z-10"
+              >
                 <X className="h-5 w-5" />
               </button>
               <SendForm onSuccess={() => setShowSendModal(false)} />
