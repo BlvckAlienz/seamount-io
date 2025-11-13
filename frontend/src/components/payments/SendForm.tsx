@@ -28,7 +28,6 @@ import {
   Activity,
   X
 } from 'lucide-react';
-import { QrReader } from 'react-qr-reader'; // Modern QR scanner with TypeScript
 
 // ============================================================================
 // CHAIN ASSET GROUPS (Matching your WalletDetailModal pattern)
@@ -147,27 +146,6 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       setValidationError(null);
     }
   }, [recipient, selectedChain]);
-
-  // ============================================================================
-  // QR SCANNER HANDLERS
-  // ============================================================================
-  const handleQrScan = (result: any, error: any) => {
-    if (result) {
-      // Extract address from QR (handle various formats)
-      let address = result?.text || result;
-      
-      // Remove common prefixes (bitcoin:, ethereum:, etc.)
-      address = address.replace(/^[a-z]+:/i, '');
-      
-      setRecipient(address);
-      setShowQrScanner(false);
-      toast.success('Address scanned successfully! âœ…');
-    }
-
-    if (error) {
-      console.info('QR Scanner ready...'); // Normal state, not an error
-    }
-  };
 
   // ============================================================================
   // PROCEED TO CONFIRMATION
@@ -321,15 +299,6 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                     validationError ? 'border-red-500 dark:border-red-500' : ''
                   }`}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowQrScanner(true)}
-                  disabled={loading}
-                  className="shrink-0 h-12 px-4 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
-                >
-                  <QrCode className="h-5 w-5" />
-                </Button>
               </div>
               
               {validationError && (
@@ -427,45 +396,6 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             >
               Review Transaction
               <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* QR SCANNER MODAL */}
-      <Dialog open={showQrScanner} onOpenChange={setShowQrScanner}>
-        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
-              <QrCode className="h-6 w-6 text-blue-600" />
-              Scan QR Code
-            </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
-              Point your camera at a QR code to scan the recipient address
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <div className="rounded-xl overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-black">
-              <QrReader
-                onResult={handleQrScan}
-                constraints={{ facingMode: 'environment' }}
-                containerStyle={{ width: '100%' }}
-                videoContainerStyle={{ paddingTop: '100%' }}
-              />
-            </div>
-            <p className="text-sm text-center text-gray-600 dark:text-gray-400 mt-3 font-medium">
-              Point camera at QR code containing wallet address
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowQrScanner(false)}
-              className="w-full h-12 text-base font-semibold"
-            >
-              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
