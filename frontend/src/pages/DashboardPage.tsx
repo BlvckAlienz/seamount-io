@@ -445,7 +445,6 @@ const DashboardPage = () => {
                 <span className="hidden sm:inline">Fund</span>
               </button>
               
-              // NEW CODE (ADD THIS):
               <button 
                 onClick={() => setShowSendModal(true)} 
                 className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
