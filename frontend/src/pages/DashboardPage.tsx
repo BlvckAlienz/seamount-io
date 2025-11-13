@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, Activity, RefreshCw, Shield, AlertTriangle,
+  TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine  // ← ADD THESE
+  Wallet, ArrowDownToLine // ← ADD THESE
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -19,8 +19,9 @@ import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatu
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 import { FundWalletModal } from '@/components/wallet/FundWalletModal.tsx';
 import { WithdrawModal } from '@/components/wallet/WithdrawModal.tsx';
-import { SendForm } from '@/components/payments/SendForm.tsx';
 import { toastInfo, toastWarning } from '@/lib/toast-helpers';
+import { WalletProvider } from '@/contexts/WalletContext';
+import { SendForm } from '@/components/payments/SendForm.tsx';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -150,6 +151,7 @@ const DashboardPage = () => {
   const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
   // Payment modal states
   const [showFundModal, setShowFundModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
@@ -388,242 +390,259 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
-              <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
-            </div>
-            
-            {/* Desktop Profile Menu */}
-            <div className="hidden md:block relative">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                </div>
-                <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
-              </button>
-              {showProfileMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Key className="h-4 w-4" />
-                      <span>Recovery Phrases</span>
-                    </button>
-                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Shield className="h-4 w-4" />
-                      <span>Verify</span>
-                    </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons - Responsive Layout */}
-          <div className="flex flex-wrap gap-2">
-            {/* Primary Actions */}
-            <button 
-              onClick={() => setShowFundModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Fund</span>
-            </button>
-            
-            <button 
-              onClick={() => toastInfo('Send functionality coming soon!')} 
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              <ArrowUpRight className="h-4 w-4" />
-              <span className="hidden sm:inline">Send</span>
-            </button>
-            
-            <button 
-              onClick={() => toastInfo('Swap functionality coming soon!')} 
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              <SwapIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Swap</span>
-            </button>
-            
-            <button 
-              onClick={() => toastInfo('Earn functionality coming soon!')} 
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Earn</span>
-            </button>
-            
-            <button 
-              onClick={() => setShowWithdrawModal(true)}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-            >
-              <ArrowDownToLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Withdraw</span>
-            </button>
-
-            {/* Mobile Profile Menu */}
-            <div className="md:hidden ml-auto relative">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                </div>
-              </button>
-              {showProfileMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Key className="h-4 w-4" />
-                      <span>Recovery Phrases</span>
-                    </button>
-                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Shield className="h-4 w-4" />
-                      <span>Verify</span>
-                    </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <NigerianUserBanner />
-        
-        {walletCreationStatus && !walletCreationStatus.overall_complete && (
-          <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
-        )}
-
-        <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
-
-        {/* Multi-Chain Wallets Section */}
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
-            <span className="text-sm text-gray-400">{createdChains} of {SUPPORTED_CHAINS.length} created</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {SUPPORTED_CHAINS.map(chain => (
-              <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
-            ))}
-          </div>
-        </div>
-
-        {/* Balance Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
+    <WalletProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-6 md:mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <div className="text-sm text-gray-400 mb-1">Total Balance</div>
-                <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
+                <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
               </div>
-              <button onClick={fetchportfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
-                <RefreshCw className="h-5 w-5" />
-              </button>
+              
+              {/* Desktop Profile Menu */}
+              <div className="hidden md:block relative">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                    {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
+                </button>
+                {showProfileMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                      <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                        <Key className="h-4 w-4" />
+                        <span>Recovery Phrases</span>
+                      </button>
+                      <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                        <Shield className="h-4 w-4" />
+                        <span>Verify</span>
+                      </button>
+                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Activity className="h-4 w-4 text-green-400 animate-pulse" />
-              <span className="text-green-400">Live Multi-Chain Balances</span>
+
+            {/* Action Buttons - Responsive Layout */}
+            <div className="flex flex-wrap gap-2">
+              {/* Primary Actions */}
+              <button 
+                onClick={() => setShowFundModal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Fund</span>
+              </button>
+              
+              // NEW CODE (ADD THIS):
+              <button 
+                onClick={() => setShowSendModal(true)} 
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+              
+              <button 
+                onClick={() => toastInfo('Swap functionality coming soon!')} 
+                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                <SwapIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Swap</span>
+              </button>
+              
+              <button 
+                onClick={() => toastInfo('Earn functionality coming soon!')} 
+                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="hidden sm:inline">Earn</span>
+              </button>
+              
+              <button 
+                onClick={() => setShowWithdrawModal(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              >
+                <ArrowDownToLine className="h-4 w-4" />
+                <span className="hidden sm:inline">Withdraw</span>
+              </button>
+
+              {/* Mobile Profile Menu */}
+              <div className="md:hidden ml-auto relative">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                    {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                </button>
+                {showProfileMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                      <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                        <Key className="h-4 w-4" />
+                        <span>Recovery Phrases</span>
+                      </button>
+                      <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                        <Shield className="h-4 w-4" />
+                        <span>Verify</span>
+                      </button>
+                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
-            <div className="text-sm text-gray-400 mb-2">Networks</div>
-            <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
-            <div className="space-y-2">
+
+          <NigerianUserBanner />
+          
+          {walletCreationStatus && !walletCreationStatus.overall_complete && (
+            <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
+          )}
+
+          <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
+
+          {/* Multi-Chain Wallets Section */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
+              <span className="text-sm text-gray-400">{createdChains} of {SUPPORTED_CHAINS.length} created</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {SUPPORTED_CHAINS.map(chain => (
-                <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
-                  <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
-                  {chain.name}
-                </div>
+                <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
               ))}
             </div>
           </div>
-        </div>
-        
-        {/* Quick Actions */}
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-          <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toastInfo('Send functionality coming soon!') },
-              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toastInfo('Swap feature coming soon!') },
-              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toastInfo('Yield farming coming soon!') },
-            ].map(action => (
-              <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
-                <action.icon className={`h-6 w-6 ${action.color}`} />
-                <span className="text-sm text-gray-300">{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Cross-Border Payments Banner */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
-              <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
-              <div className="flex flex-wrap items-center gap-4 text-xs">
-                <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
-                <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
+          {/* Balance Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-sm text-gray-400 mb-1">Total Balance</div>
+                  <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                </div>
+                <button onClick={fetchportfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
+                  <RefreshCw className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Activity className="h-4 w-4 text-green-400 animate-pulse" />
+                <span className="text-green-400">Live Multi-Chain Balances</span>
               </div>
             </div>
-            <button onClick={() => toastInfo('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
-              Send Money
-            </button>
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
+              <div className="text-sm text-gray-400 mb-2">Networks</div>
+              <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
+              <div className="space-y-2">
+                {SUPPORTED_CHAINS.map(chain => (
+                  <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
+                    {chain.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* Quick Actions */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
+            <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toastInfo('Send functionality coming soon!') },
+                { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toastInfo('Swap feature coming soon!') },
+                { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toastInfo('Yield farming coming soon!') },
+              ].map(action => (
+                <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
+                  <action.icon className={`h-6 w-6 ${action.color}`} />
+                  <span className="text-sm text-gray-300">{action.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cross-Border Payments Banner */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
+                <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
+                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
+                </div>
+              </div>
+              <button onClick={() => toastInfo('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
+                Send Money
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Modals */}
-      {selectedChain && (
-        <WalletDetailModal 
-          isOpen={showWalletModal} 
-          onClose={() => { 
-            setShowWalletModal(false); 
-            setSelectedChain(null); 
-          }} 
-          chain={selectedChain} 
-          chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
-          address={multiChainWallets[selectedChain]?.address || ''} 
-          balance={calculateChainBalance(selectedChain)} 
+        {/* Modals */}
+        {selectedChain && (
+          <WalletDetailModal 
+            isOpen={showWalletModal} 
+            onClose={() => { 
+              setShowWalletModal(false); 
+              setSelectedChain(null); 
+            }} 
+            chain={selectedChain} 
+            chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
+            address={multiChainWallets[selectedChain]?.address || ''} 
+            balance={calculateChainBalance(selectedChain)} 
+          />
+        )}
+        
+        {showRecoveryModal && (
+          <WalletRecoveryModal
+            isOpen={showBackupModal}
+            onClose={() => setShowBackupModal(false)}
+          />
+        )}
+        <FundWalletModal 
+          open={showFundModal} 
+          onOpenChange={setShowFundModal} 
         />
-      )}
-      
-      {showRecoveryModal && (
-        <WalletRecoveryModal
-          isOpen={showBackupModal}
-          onClose={() => setShowBackupModal(false)}
+        <WithdrawModal 
+          open={showWithdrawModal} 
+          onOpenChange={setShowWithdrawModal} 
         />
-      )}
-      <FundWalletModal 
-        open={showFundModal} 
-        onOpenChange={setShowFundModal} 
-      />
-      <WithdrawModal 
-        open={showWithdrawModal} 
-        onOpenChange={setShowWithdrawModal} 
-      />
-    </div>
+        {/* Send Modal */}
+        {showSendModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="relative">
+              <button
+                onClick={() => setShowSendModal(false)}
+                className="absolute -top-4 -right-4 bg-gray-800 hover:bg-gray-700 rounded-full p-2 text-white transition-colors z-10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <SendForm onSuccess={() => setShowSendModal(false)} />
+            </div>
+          </div>
+        )}
+      </div>
+    </WalletProvider>
   );
 };
 

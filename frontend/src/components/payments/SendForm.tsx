@@ -1,102 +1,140 @@
 // File: frontend/src/components/payments/SendForm.tsx
-/**
- * SendForm Component - Multi-chain crypto payments
- * Supports USDT, ALGO, BTC sends with KYC checks
- */
+// Multi-chain payment form with WalletContext integration
 
-import { useState } from 'react'
-import { toast } from 'sonner'
-import { api } from '@/lib/api'
-import { Button } from '@/components/ui/button.tsx'
-import { Input } from '@/components/ui/input.tsx'
-import { Label } from '@/components/ui/label.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx'
-import { Loader2, Send, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
-import { toastWarning } from '@/lib/toast-helpers';
+import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import { useWallet } from '@/contexts/WalletContext';
+import { Button } from '@/components/ui/button.tsx';
+import { Input } from '@/components/ui/input.tsx';
+import { Label } from '@/components/ui/label.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.tsx';
+import { Loader2, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert.tsx';
 
+// ============================================================================
+// SUPPORTED ASSETS
+// ============================================================================
+const SUPPORTED_ASSETS = [
+  { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ⱥ', chain: 'algorand' },
+  { value: 'USDCa', label: 'USD Coin (USDCa)', icon: '◎', chain: 'algorand' },
+  { value: 'USDT', label: 'Tether (USDT)', icon: '₮', chain: 'tron' },
+  { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿', chain: 'bitcoin' },
+  { value: 'ETH', label: 'Ethereum (ETH)', icon: 'Ξ', chain: 'ethereum' },
+  { value: 'MATIC', label: 'Polygon (MATIC)', icon: '⬣', chain: 'polygon' },
+];
+
+// ============================================================================
+// ADDRESS VALIDATION
+// ============================================================================
+const validateAddress = (address: string, chain: string): boolean => {
+  const patterns: { [key: string]: RegExp } = {
+    algorand: /^[A-Z2-7]{58}$/,
+    bitcoin: /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$/,
+    ethereum: /^0x[a-fA-F0-9]{40}$/,
+    polygon: /^0x[a-fA-F0-9]{40}$/,
+    tron: /^T[A-Za-z1-9]{33}$/
+  };
+  
+  return patterns[chain]?.test(address) || false;
+};
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
 interface SendFormProps {
-  onSuccess?: () => void
-  onKYCRequired?: () => void
+  onSuccess?: () => void;
 }
 
-export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
-  const [recipient, setRecipient] = useState('')
-  const [amount, setAmount] = useState('')
-  const [asset, setAsset] = useState('USDT')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [quote, setQuote] = useState<any>(null)
+export function SendForm({ onSuccess }: SendFormProps) {
+  const { balances, sendTransaction, loading: walletLoading } = useWallet();
+  
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [asset, setAsset] = useState('ALGO');
+  const [memo, setMemo] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Supported assets
-  const ASSETS = [
-    { value: 'USDT', label: 'Tether (USDT)', icon: '₮' },
-    { value: 'USDCa', label: 'USD Coin (USDCa)', icon: '◎' },
-    { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ⱥ' },
-    { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿' },
-  ]
+  // Get selected asset config
+  const selectedAssetConfig = SUPPORTED_ASSETS.find(a => a.value === asset);
+  const selectedChain = selectedAssetConfig?.chain || 'algorand';
+  
+  // Get available balance for selected asset
+  const availableBalance = balances[asset]?.balance || 0;
+  const balanceUSD = balances[asset]?.usd_value || 0;
 
-  // Get quote before sending
-  const fetchQuote = async () => {
-    if (!recipient || !amount || parseFloat(amount) <= 0) {
-      return
+  // ============================================================================
+  // VALIDATION
+  // ============================================================================
+  useEffect(() => {
+    if (recipient.length === 0) {
+      setValidationError(null);
+      return;
     }
 
-    try {
-      const response = await api.post<any>('/payments/quote', {
-        recipient,
-        asset,
-        amount: parseFloat(amount),
-      })
-
-      setQuote(response.data)
-      setError(null)
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to get quote')
-      setQuote(null)
+    if (!validateAddress(recipient, selectedChain)) {
+      setValidationError(`Invalid ${selectedChain} address format`);
+    } else {
+      setValidationError(null);
     }
-  }
+  }, [recipient, selectedChain]);
 
-  // Handle send transaction
+  // ============================================================================
+  // HANDLE SEND
+  // ============================================================================
   const handleSend = async () => {
+    // Validation
     if (!recipient || !amount || parseFloat(amount) <= 0) {
-      toast.error('Please fill in all fields')
-      return
+      toast.error('Please fill in all required fields');
+      return;
     }
 
-    setLoading(true)
-    setError(null)
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    const amountNum = parseFloat(amount);
+    if (amountNum > availableBalance) {
+      toast.error(`Insufficient balance. Available: ${availableBalance} ${asset}`);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      const response = await api.post<any>('/payments/send', {
+      const result = await sendTransaction({
         recipient,
         asset,
-        amount: parseFloat(amount),
-      })
+        amount: amountNum,
+        memo: memo || undefined
+      });
 
-      if (response.data?.kyc_required) {
-        toastWarning('KYC verification required')
-        onKYCRequired?.()
-      } else {
-        toast.success(`Successfully sent ${amount} ${asset} to ${recipient}`)
-        
+      if (result.success) {
         // Reset form
-        setRecipient('')
-        setAmount('')
-        setQuote(null)
+        setRecipient('');
+        setAmount('');
+        setMemo('');
         
-        onSuccess?.()
+        onSuccess?.();
+      } else {
+        setError(result.error || 'Transaction failed');
       }
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || 'Failed to send payment'
-      setError(errorMsg)
-      toast.error(errorMsg)
+      const errorMsg = err.response?.data?.detail || err.message || 'Transaction failed';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
@@ -105,7 +143,7 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
           Send Crypto
         </CardTitle>
         <CardDescription>
-          Send cryptocurrency to any wallet address
+          Send cryptocurrency across multiple chains
         </CardDescription>
       </CardHeader>
 
@@ -118,7 +156,7 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
               <SelectValue placeholder="Select asset" />
             </SelectTrigger>
             <SelectContent>
-              {ASSETS.map((a) => (
+              {SUPPORTED_ASSETS.map((a) => (
                 <SelectItem key={a.value} value={a.value}>
                   <span className="flex items-center gap-2">
                     <span className="text-lg">{a.icon}</span>
@@ -128,6 +166,12 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
               ))}
             </SelectContent>
           </Select>
+          
+          {/* Balance Display */}
+          <div className="text-sm text-muted-foreground">
+            Available: {availableBalance.toFixed(4)} {asset}
+            {balanceUSD > 0 && ` ($${balanceUSD.toFixed(2)})`}
+          </div>
         </div>
 
         {/* Recipient Address */}
@@ -135,48 +179,63 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
           <Label htmlFor="recipient">Recipient Address</Label>
           <Input
             id="recipient"
-            placeholder="Enter wallet address or @username"
+            placeholder={`Enter ${selectedChain} address`}
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             disabled={loading}
+            className={validationError ? 'border-red-500' : ''}
           />
+          {validationError && (
+            <div className="flex items-center gap-1 text-xs text-red-500">
+              <AlertCircle className="h-3 w-3" />
+              {validationError}
+            </div>
+          )}
+          {!validationError && recipient.length > 0 && (
+            <div className="flex items-center gap-1 text-xs text-green-500">
+              <CheckCircle2 className="h-3 w-3" />
+              Valid {selectedChain} address
+            </div>
+          )}
         </div>
 
         {/* Amount */}
         <div className="space-y-2">
           <Label htmlFor="amount">Amount</Label>
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onBlur={fetchQuote}
-            disabled={loading}
-          />
+          <div className="relative">
+            <Input
+              id="amount"
+              type="number"
+              step="0.000001"
+              min="0"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={() => setAmount(availableBalance.toString())}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-500 hover:text-blue-600 font-medium"
+              disabled={loading || availableBalance === 0}
+            >
+              MAX
+            </button>
+          </div>
         </div>
 
-        {/* Quote Display */}
-        {quote && (
-          <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Network Fee:</span>
-              <span className="font-medium">${quote.fee?.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Recipient Gets:</span>
-              <span className="font-medium">
-                {(parseFloat(amount) - (quote.fee || 0)).toFixed(4)} {asset}
-              </span>
-            </div>
-            <div className="flex justify-between pt-1 border-t">
-              <span className="text-muted-foreground">Total Cost:</span>
-              <span className="font-semibold">{amount} {asset}</span>
-            </div>
-          </div>
-        )}
+        {/* Memo (Optional) */}
+        <div className="space-y-2">
+          <Label htmlFor="memo">Memo (Optional)</Label>
+          <Input
+            id="memo"
+            placeholder="Add a note..."
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            disabled={loading}
+            maxLength={100}
+          />
+        </div>
 
         {/* Error Display */}
         {error && (
@@ -189,7 +248,7 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
         {/* Send Button */}
         <Button
           onClick={handleSend}
-          disabled={loading || !recipient || !amount || parseFloat(amount) <= 0}
+          disabled={loading || walletLoading || !recipient || !amount || parseFloat(amount) <= 0 || !!validationError}
           className="w-full"
         >
           {loading ? (
@@ -207,9 +266,9 @@ export function SendForm({ onSuccess, onKYCRequired }: SendFormProps) {
 
         {/* Fee Info */}
         <p className="text-xs text-muted-foreground text-center">
-          Network fees apply. KYC may be required for large amounts.
+          Network fees apply. Transaction will be routed through {selectedChain}.
         </p>
       </CardContent>
     </Card>
-  )
+  );
 }
