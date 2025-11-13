@@ -1,5 +1,5 @@
 // File: frontend/src/components/payments/SendForm.tsx
-// ✨ PRODUCTION-READY: Multi-chain Send with Confirmation Modal & QR Scanner
+// ✨ PRODUCTION-READY: Multi-chain Send with Confirmation Modal
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -22,11 +22,9 @@ import {
   Send, 
   AlertCircle, 
   CheckCircle2, 
-  QrCode,
   ArrowRight,
   Info,
-  Activity,
-  X
+  Activity
 } from 'lucide-react';
 
 // ============================================================================
@@ -120,7 +118,6 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showQrScanner, setShowQrScanner] = useState(false);
 
   // Get chain from selected asset
   const selectedChain = getChainFromAsset(asset);
@@ -283,23 +280,21 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               </div>
             </div>
 
-            {/* Recipient Address with QR Scanner */}
+            {/* Recipient Address */}
             <div className="space-y-2">
               <Label htmlFor="recipient" className="text-sm font-semibold text-gray-900 dark:text-white">
                 Recipient Address
               </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="recipient"
-                  placeholder={`Enter ${selectedChain} address`}
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
-                  disabled={loading}
-                  className={`flex-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base ${
-                    validationError ? 'border-red-500 dark:border-red-500' : ''
-                  }`}
-                />
-              </div>
+              <Input
+                id="recipient"
+                placeholder={`Enter ${selectedChain} address`}
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                disabled={loading}
+                className={`w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base ${
+                  validationError ? 'border-red-500 dark:border-red-500' : ''
+                }`}
+              />
               
               {validationError && (
                 <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 font-medium">
