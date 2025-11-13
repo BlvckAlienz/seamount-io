@@ -198,6 +198,3 @@ export const useWallet = () => {
   }
   return context;
 };
-
-// Make sure this export exists
-export { WalletProvider, useWallet };
