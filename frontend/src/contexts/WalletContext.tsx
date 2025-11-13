@@ -88,8 +88,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((asset: any) => {
-          balancesObj[asset.symbol || asset.asset] = {
-            balance: asset.balance,
+          // Use the symbol directly from API response
+          const assetKey = asset.symbol || asset.asset;
+          balancesObj[assetKey] = {
+            balance: asset.balance, // This should be the crypto amount, not USD
             chain: asset.chain,
             usd_value: asset.usd_value
           };
@@ -97,6 +99,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         setBalances(balancesObj);
         setTotalBalanceUSD(response.total_usd || 0);
+        
+        console.log('💰 WalletContext Balances:', balancesObj); // Debug log
       }
     } catch (error) {
       console.error('Failed to fetch balances:', error);

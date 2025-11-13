@@ -57,6 +57,18 @@ const ASSET_GROUPS = {
   ]
 };
 
+// Get available balance for selected asset - use the exact symbol from API
+const availableBalance = balances[asset]?.balance || 0;
+const balanceUSD = balances[asset]?.usd_value || 0;
+
+// ADD DEBUG LOGGING:
+console.log('🔍 SendForm Debug:', {
+  selectedAsset: asset,
+  availableBalance,
+  balanceUSD,
+  allBalances: balances
+});
+
 const ALL_ASSETS = [
   ...ASSET_GROUPS.algorand,
   ...ASSET_GROUPS.bitcoin,

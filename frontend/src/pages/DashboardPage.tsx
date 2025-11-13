@@ -302,21 +302,19 @@ const DashboardPage = () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/wallet/balances');
+      console.log('🔍 BALANCES API RESPONSE:', response.data); // DEBUG LOG
+      
       if (response.data.success) {
         setportfolioData({
           total_usd: response.data.total_usd,
           assets: response.data.assets,
           timestamp: response.data.timestamp
         });
-        if (response.data.wallet_addresses) {
-          setMultiChainWallets(response.data.wallet_addresses);
-        }
+        // ... rest of function
       }
     } catch (error: any) {
       console.error('portfolio fetch error:', error);
-      if (userProfile?.algorand_address) {
-        setportfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
-      }
+      // ... rest of error handling
     } finally {
       setLoading(false);
     }

@@ -8,13 +8,13 @@
  * ✅ Paystack fallback for bank verification
  */
 
-import { useState, useEffect } from 'react'
-import { toast } from 'sonner'
-import { api } from '@/lib/api'
-import { Button } from '@/components/ui/button.tsx'
-import { Input } from '@/components/ui/input.tsx'
-import { Label } from '@/components/ui/label.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button.tsx';
+import { Input } from '@/components/ui/input.tsx';
+import { Label } from '@/components/ui/label.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx';
 import {
   Dialog,
   DialogContent,
@@ -22,10 +22,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.tsx'
-import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
-import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Building2, Smartphone, Info } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+} from '@/components/ui/dialog.tsx';
+import { Alert, AlertDescription } from '@/components/ui/alert.tsx';
+import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Building2, Smartphone, Info } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWallet } from '@/contexts/WalletContext';
 
 interface WithdrawModalProps {
   open: boolean
@@ -198,6 +199,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
+  const { balances } = useWallet();
 
   // Payout method state
   const [payoutMethod, setPayoutMethod] = useState<'bank_transfer' | 'mobile_money'>('bank_transfer')
@@ -329,12 +331,13 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     }
   }
 
-  // Handle withdrawal
+  // ADD VALIDATION TO handleWithdraw FUNCTION:
   const handleWithdraw = async () => {
-    // Validation
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Please enter a valid amount')
-      return
+    // Add balance validation
+    const availableBalance = balances[asset]?.balance || 0;
+    if (parseFloat(amount) > availableBalance) {
+      toast.error(`Insufficient balance. Available: ${availableBalance.toFixed(6)} ${getAssetSymbol(asset)}`);
+      return;
     }
 
     if (payoutMethod === 'bank_transfer') {
@@ -464,7 +467,21 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               </SelectContent>
             </Select>
           </div>
-
+          
+          <div className="flex items-center justify-between text-sm mt-2">
+            <span className="text-gray-600 dark:text-gray-400">Available Balance:</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-gray-900 dark:text-white">
+                {balances[asset]?.balance?.toFixed(6) || '0.000000'} {getAssetSymbol(asset)}
+              </span>
+              {balances[asset]?.usd_value > 0 && (
+                <span className="text-gray-500 dark:text-gray-400">
+                  (${balances[asset]?.usd_value.toFixed(2)})
+                </span>
+              )}
+            </div>
+          </div>
+          
           {/* Crypto Amount */}
           <div className="space-y-2">
             <Label htmlFor="withdraw-amount" className="text-sm font-semibold text-gray-900 dark:text-white">
