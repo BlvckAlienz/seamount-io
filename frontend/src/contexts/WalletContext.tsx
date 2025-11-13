@@ -171,14 +171,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // CONTEXT VALUE
   // ============================================================================
   const value: WalletContextValue = {
-    wallets,
-    balances,
-    totalBalanceUSD,
-    loading,
-    fetchWallets,
-    fetchBalances,
-    sendTransaction,
-    refreshAll
+    wallets: wallets || {},
+    balances: balances || {},
+    totalBalanceUSD: totalBalanceUSD || 0,
+    loading: loading || false,
+    fetchWallets: fetchWallets || (async () => {}),
+    fetchBalances: fetchBalances || (async () => {}),
+    sendTransaction: sendTransaction || (async () => ({ success: false, error: 'Wallet not initialized' })),
+    refreshAll: refreshAll || (async () => {})
   };
 
   return (

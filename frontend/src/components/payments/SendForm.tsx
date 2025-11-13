@@ -119,6 +119,10 @@ interface SendFormProps {
 export function SendForm({ open, onOpenChange }: SendFormProps) {
   const { balances, sendTransaction, loading: walletLoading } = useWallet();
   
+  // ADD SAFE FALLBACKS IMMEDIATELY
+  const safeBalances = balances || {};
+  const safeSendTransaction = sendTransaction || (async () => ({ success: false, error: 'Wallet not connected' }));
+  
   // Form state
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -135,9 +139,9 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const selectedChain = getChainFromAsset(asset);
   const selectedAssetConfig = ALL_ASSETS.find(a => a.value === asset);
   
-  // Get available balance
-  const availableBalance = balances[asset]?.balance || 0;
-  const balanceUSD = balances[asset]?.usd_value || 0;
+  // Get available balance - USE SAFE BALANCES
+  const availableBalance = safeBalances[asset]?.balance || 0;
+  const balanceUSD = safeBalances[asset]?.usd_value || 0;
 
   // ============================================================================
   // ADDRESS VALIDATION
