@@ -1,5 +1,5 @@
 // File: frontend/src/components/payments/SendForm.tsx
-// ✨ PRODUCTION-READY: Multi-chain Send with Confirmation Modal
+// SAFE VERSION - Fixed balances reference error
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// CHAIN ASSET GROUPS (Matching your WalletDetailModal pattern)
+// CHAIN ASSET GROUPS
 // ============================================================================
 const ASSET_GROUPS = {
   algorand: [
@@ -57,18 +57,6 @@ const ASSET_GROUPS = {
   ]
 };
 
-// Get available balance for selected asset - use the exact symbol from API
-const availableBalance = balances[asset]?.balance || 0;
-const balanceUSD = balances[asset]?.usd_value || 0;
-
-// ADD DEBUG LOGGING:
-console.log('🔍 SendForm Debug:', {
-  selectedAsset: asset,
-  availableBalance,
-  balanceUSD,
-  allBalances: balances
-});
-
 const ALL_ASSETS = [
   ...ASSET_GROUPS.algorand,
   ...ASSET_GROUPS.bitcoin,
@@ -79,7 +67,7 @@ const ALL_ASSETS = [
 
 const CHAIN_NAMES: { [key: string]: string } = {
   'algorand': '🟢 Algorand',
-  'bitcoin': '🟠 Bitcoin',
+  'bitcoin': '🟠 Bitcoin', 
   'ethereum': '🔵 Ethereum',
   'polygon': '🟣 Polygon',
   'tron': '🔴 Tron'
@@ -117,11 +105,14 @@ interface SendFormProps {
 }
 
 export function SendForm({ open, onOpenChange }: SendFormProps) {
-  const { balances, sendTransaction, loading: walletLoading } = useWallet();
-  
-  // ADD SAFE FALLBACKS IMMEDIATELY
-  const safeBalances = balances || {};
-  const safeSendTransaction = sendTransaction || (async () => ({ success: false, error: 'Wallet not connected' }));
+  // SAFE WALLET HOOK USAGE
+  const walletContext = useWallet();
+  const safeBalances = walletContext?.balances || {};
+  const safeSendTransaction = walletContext?.sendTransaction || (async () => ({ 
+    success: false, 
+    error: 'Wallet not connected' 
+  }));
+  const walletLoading = walletContext?.loading || false;
   
   // Form state
   const [recipient, setRecipient] = useState('');
@@ -139,7 +130,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const selectedChain = getChainFromAsset(asset);
   const selectedAssetConfig = ALL_ASSETS.find(a => a.value === asset);
   
-  // Get available balance - USE SAFE BALANCES
+  // SAFE balance access
   const availableBalance = safeBalances[asset]?.balance || 0;
   const balanceUSD = safeBalances[asset]?.usd_value || 0;
 
@@ -193,7 +184,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
     setError(null);
 
     try {
-      const result = await sendTransaction({
+      const result = await safeSendTransaction({
         recipient,
         asset,
         amount: parseFloat(amount),
