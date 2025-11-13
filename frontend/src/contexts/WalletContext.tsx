@@ -88,10 +88,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((asset: any) => {
-          // Use the symbol directly from API response
-          const assetKey = asset.symbol || asset.asset;
-          balancesObj[assetKey] = {
-            balance: asset.balance, // This should be the crypto amount, not USD
+          balancesObj[asset.symbol || asset.asset] = {
+            balance: asset.balance,
             chain: asset.chain,
             usd_value: asset.usd_value
           };
@@ -99,8 +97,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         setBalances(balancesObj);
         setTotalBalanceUSD(response.total_usd || 0);
-        
-        console.log('💰 WalletContext Balances:', balancesObj); // Debug log
       }
     } catch (error) {
       console.error('Failed to fetch balances:', error);
@@ -171,14 +167,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // CONTEXT VALUE
   // ============================================================================
   const value: WalletContextValue = {
-    wallets: wallets || {},
-    balances: balances || {},
-    totalBalanceUSD: totalBalanceUSD || 0,
-    loading: loading || false,
-    fetchWallets: fetchWallets || (async () => {}),
-    fetchBalances: fetchBalances || (async () => {}),
-    sendTransaction: sendTransaction || (async () => ({ success: false, error: 'Wallet not initialized' })),
-    refreshAll: refreshAll || (async () => {})
+    wallets,
+    balances,
+    totalBalanceUSD,
+    loading,
+    fetchWallets,
+    fetchBalances,
+    sendTransaction,
+    refreshAll
   };
 
   return (

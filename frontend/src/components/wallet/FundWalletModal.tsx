@@ -7,13 +7,13 @@
  * ✅ Accurate settlement times
  */
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button.tsx';
-import { Input } from '@/components/ui/input.tsx';
-import { Label } from '@/components/ui/label.tsx';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx';
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import { Button } from '@/components/ui/button.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Label } from '@/components/ui/label.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
 import {
   Dialog,
   DialogContent,
@@ -21,10 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.tsx';
-import { Alert, AlertDescription } from '@/components/ui/alert.tsx';
-import { Loader2, Wallet, AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import { useWallet } from '@/contexts/WalletContext';
+} from '@/components/ui/dialog.tsx'
+import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
+import { Loader2, Wallet, AlertCircle, CheckCircle2, Info } from 'lucide-react'
 
 interface FundWalletModalProps {
   open: boolean
@@ -108,7 +107,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [quote, setQuote] = useState<any>(null)
   const [fetchingQuote, setFetchingQuote] = useState(false)
-  const { balances } = useWallet();
 
   // 🎯 CRITICAL: Call useAuth hook to get session
   const { session } = useAuth()
@@ -404,20 +402,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             </Select>
           </div>
           
-          <div className="flex items-center justify-between text-sm mt-2">
-            <span className="text-gray-600 dark:text-gray-400">Available Balance:</span>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-gray-900 dark:text-white">
-                {balances[asset]?.balance?.toFixed(6) || '0.000000'} {asset.split('_')[0]}
-              </span>
-              {balances[asset]?.usd_value > 0 && (
-                <span className="text-gray-500 dark:text-gray-400">
-                  (${balances[asset]?.usd_value.toFixed(2)})
-                </span>
-              )}
-            </div>
-          </div>
-
           {/* ➕ NEW: Phone Number Input (conditional) */}
           {showPhoneInput && (
             <div className="space-y-2">

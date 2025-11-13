@@ -1,9 +1,9 @@
 // File: frontend/src/components/payments/SendForm.tsx
-// SAFE VERSION - Fixed balances reference error
+// ✨ PRODUCTION-READY: Multi-chain Send with Confirmation Modal
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { useWallet } from '../../contexts/WalletContext';
+import { useWallet } from '@/contexts/WalletContext';
 import { Button } from '@/components/ui/button.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { Label } from '@/components/ui/label.tsx';
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// CHAIN ASSET GROUPS
+// CHAIN ASSET GROUPS (Matching your WalletDetailModal pattern)
 // ============================================================================
 const ASSET_GROUPS = {
   algorand: [
@@ -67,7 +67,7 @@ const ALL_ASSETS = [
 
 const CHAIN_NAMES: { [key: string]: string } = {
   'algorand': '🟢 Algorand',
-  'bitcoin': '🟠 Bitcoin', 
+  'bitcoin': '🟠 Bitcoin',
   'ethereum': '🔵 Ethereum',
   'polygon': '🟣 Polygon',
   'tron': '🔴 Tron'
@@ -105,14 +105,7 @@ interface SendFormProps {
 }
 
 export function SendForm({ open, onOpenChange }: SendFormProps) {
-  // SAFE WALLET HOOK USAGE
-  const walletContext = useWallet();
-  const safeBalances = walletContext?.balances || {};
-  const safeSendTransaction = walletContext?.sendTransaction || (async () => ({ 
-    success: false, 
-    error: 'Wallet not connected' 
-  }));
-  const walletLoading = walletContext?.loading || false;
+  const { balances, sendTransaction, loading: walletLoading } = useWallet();
   
   // Form state
   const [recipient, setRecipient] = useState('');
@@ -130,9 +123,9 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const selectedChain = getChainFromAsset(asset);
   const selectedAssetConfig = ALL_ASSETS.find(a => a.value === asset);
   
-  // SAFE balance access
-  const availableBalance = safeBalances[asset]?.balance || 0;
-  const balanceUSD = safeBalances[asset]?.usd_value || 0;
+  // Get available balance
+  const availableBalance = balances[asset]?.balance || 0;
+  const balanceUSD = balances[asset]?.usd_value || 0;
 
   // ============================================================================
   // ADDRESS VALIDATION
@@ -184,7 +177,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
     setError(null);
 
     try {
-      const result = await safeSendTransaction({
+      const result = await sendTransaction({
         recipient,
         asset,
         amount: parseFloat(amount),
