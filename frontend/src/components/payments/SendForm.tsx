@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { useWallet } from '@/contexts/WalletContext';
+import { useWallet } from '../../contexts/WalletContext';
 import { Button } from '@/components/ui/button.tsx';
 import { Input } from '@/components/ui/input.tsx';
 import { Label } from '@/components/ui/label.tsx';
