@@ -180,7 +180,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // ============================================================================
   // EXECUTE TRANSACTION
   // ============================================================================
-  // Before sending ASA, check if recipient is opted-in
+  // Check if recipient is opted-in before sending ASA
   if (asset !== 'ALGO') {
     const assetId = ALGORAND_ASSET_IDS[asset];
     const isOptedIn = checkAssetOptIn(recipient, assetId);
