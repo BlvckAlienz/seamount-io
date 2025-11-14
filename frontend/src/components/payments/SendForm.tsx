@@ -180,6 +180,20 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // ============================================================================
   // EXECUTE TRANSACTION
   // ============================================================================
+  // Before sending ASA, check if recipient is opted-in
+  if (asset !== 'ALGO') {
+    const assetId = ALGORAND_ASSET_IDS[asset];
+    const isOptedIn = await checkAssetOptIn(recipient, assetId);
+    
+    if (!isOptedIn) {
+      toast.error(
+        'Recipient must opt-in to receive this asset first',
+        { duration: 6000 }
+      );
+      return;
+    }
+  }
+  
   const handleConfirmSend = async () => {
     setLoading(true);
     setError(null);
@@ -330,7 +344,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                 setValidationError("Minimum 0.1 ALGO required to activate new account");
               }
             }
-            
+
             {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-sm font-semibold text-gray-900 dark:text-white">
