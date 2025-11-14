@@ -10,7 +10,7 @@
 import logging
 from decimal import Decimal, ROUND_UP
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from backend.config import settings, MultiChainBusinessModel, TransactionType
 from backend.services.database_service import DatabaseService
@@ -189,7 +189,7 @@ class FeeCalculatorService:
             fee_calculation.update({
                 "calculated_at": datetime.utcnow().isoformat(),
                 "calculator_version": "3.2_investor_optimized",
-                "expires_at": (datetime.utcnow().timestamp() + 300)
+                "expires_at": (datetime.utcnow() + timedelta(seconds=300)).isoformat()  # ✅ ISO STRING
             })
             
             logger.info(
@@ -293,11 +293,14 @@ class FeeCalculatorService:
                 "user_id": user_id,
                 "fee_data": fee_calculation,
                 "created_at": datetime.utcnow().isoformat(),
-                "expires_at": fee_calculation.get("expires_at", datetime.utcnow().timestamp() + 300)
+                "expires_at": fee_calculation.get(
+                    "expires_at", 
+                    (datetime.utcnow() + timedelta(seconds=300)).isoformat()  # ✅ ISO STRING
+                )
             }
             
             # Store via Supabase
-            await self.db_service.supabase.table('fee_calculations').insert(storage_data).execute()
+            self.db_service.supabase.table('fee_calculations').insert(storage_data).execute()
             
             fee_calculation["quote_id"] = quote_id
             

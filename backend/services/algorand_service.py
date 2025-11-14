@@ -105,33 +105,140 @@ class AlgorandService:
             raise
 
     async def transfer_asset(self, sender_private_key: str, receiver_address: str, 
-                           asset_id: int, amount: Decimal, memo: str = "") -> str:
-        """Transfer asset"""
+                        asset_id: int, amount: Decimal, memo: str = "") -> str:
+        """Transfer asset (handles both ALGO and ASA tokens) with comprehensive validation"""
         try:
+            # ✅ STEP 1: Validate receiver address FIRST
+            if not encoding.is_valid_address(receiver_address):
+                error_msg = f"Invalid receiver address: {receiver_address}"
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+            
+            logger.info(f"✅ Receiver address validated: {receiver_address[:10]}...")
+            
+            # ✅ STEP 1.5: Check if receiver account exists and enforce minimum for new accounts
+            try:
+                receiver_info = await self.get_account_info(receiver_address)
+                
+                if receiver_info is None:
+                    # Account doesn't exist yet
+                    logger.warning(f"⚠️ Receiver account does not exist yet: {receiver_address[:10]}...")
+                    
+                    if asset_id == 0:  # Native ALGO transfer
+                        # Enforce 0.1 ALGO minimum for account creation
+                        MIN_ACCOUNT_BALANCE = Decimal("0.1")
+                        
+                        if amount < MIN_ACCOUNT_BALANCE:
+                            error_msg = (
+                                f"Cannot create new account with {amount} ALGO. "
+                                f"Algorand requires minimum {MIN_ACCOUNT_BALANCE} ALGO to activate a new account. "
+                                f"Please send at least {MIN_ACCOUNT_BALANCE} ALGO for the first transaction."
+                            )
+                            logger.error(f"❌ {error_msg}")
+                            raise ValueError(error_msg)
+                        
+                        logger.info(f"✅ Amount {amount} ALGO meets minimum for new account creation")
+                    else:
+                        # ASA transfer to non-existent account
+                        error_msg = (
+                            f"Cannot send asset {asset_id} to non-existent account. "
+                            f"Receiver must first activate their account with at least 0.1 ALGO."
+                        )
+                        logger.error(f"❌ {error_msg}")
+                        raise ValueError(error_msg)
+                else:
+                    logger.info(f"✅ Receiver account exists with balance: {receiver_info.get('amount', 0) / 1_000_000} ALGO")
+                    
+            except ValueError:
+                # Re-raise validation errors
+                raise
+            except Exception as receiver_check_err:
+                # Non-critical: if we can't check receiver, proceed anyway
+                logger.warning(f"⚠️ Could not verify receiver account status: {receiver_check_err}")
+                logger.info("⏭️ Proceeding with transaction anyway...")
+                
+            # ✅ STEP 2: Get asset config and derive sender address
             asset_config = self._get_asset_config(asset_id)
             decimals = asset_config['decimals']
             
-            sender_address = account.address_from_private_key(sender_private_key)
+            # Derive sender address from private key
+            try:
+                sender_address = encoding.encode_address(
+                    encoding.decode_address(
+                        account.address_from_private_key(sender_private_key)
+                    )
+                )
+                logger.info(f"✅ Sender address derived: {sender_address[:10]}...")
+            except Exception as addr_err:
+                logger.error(f"❌ Failed to derive sender address: {addr_err}")
+                raise ValueError(f"Invalid private key format: {addr_err}")
+            
+            # ✅ STEP 3: Validate sender address
+            if not encoding.is_valid_address(sender_address):
+                error_msg = f"Derived sender address is invalid: {sender_address}"
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+            
+            # ✅ STEP 4: Get network params
             params = self.algod_client.suggested_params()
+            
+            # ✅ STEP 5: Convert amount to base units
             amount_base_units = int(amount * (10**decimals))
+            logger.info(f"💰 Amount: {amount} {asset_config.get('unit_name')} = {amount_base_units} base units")
             
-            txn = AssetTransferTxn(
-                sender=sender_address,
-                sp=params,
-                receiver=receiver_address,
-                amt=amount_base_units,
-                index=asset_id,
-                note=memo.encode()
-            )
+            # ✅ STEP 6: Prepare memo/note properly
+            note_bytes = None
+            if memo and len(memo.strip()) > 0:
+                note_bytes = memo.encode('utf-8')
+                logger.info(f"📝 Memo attached: {memo[:20]}...")
             
+            # ✅ STEP 7: Create appropriate transaction type
+            if asset_id == 0:
+                # Native ALGO transfer
+                logger.info(f"💰 Creating PaymentTxn for {amount} ALGO")
+                txn = PaymentTxn(
+                    sender=sender_address,
+                    sp=params,
+                    receiver=receiver_address,
+                    amt=amount_base_units,
+                    note=note_bytes
+                )
+            else:
+                # ASA token transfer
+                logger.info(f"🪙 Creating AssetTransferTxn for asset {asset_id}")
+                txn = AssetTransferTxn(
+                    sender=sender_address,
+                    sp=params,
+                    receiver=receiver_address,
+                    amt=amount_base_units,
+                    index=asset_id,
+                    note=note_bytes
+                )
+            
+            # ✅ STEP 8: Sign transaction
+            logger.info(f"✍️ Signing transaction...")
             signed_txn = txn.sign(sender_private_key)
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            await self.wait_for_confirmation(tx_id)
             
+            # ✅ STEP 9: Send transaction
+            logger.info(f"📤 Broadcasting transaction to network...")
+            tx_id = self.algod_client.send_transaction(signed_txn)
+            logger.info(f"🚀 Transaction broadcast: {tx_id}")
+            
+            # ✅ STEP 10: Wait for confirmation
+            logger.info(f"⏳ Waiting for confirmation...")
+            confirmation = await self.wait_for_confirmation(tx_id)
+            
+            logger.info(f"✅ Transaction confirmed in round {confirmation.get('confirmed-round')}: {tx_id}")
             return tx_id
-        except Exception as e:
-            logger.error(f"Asset transfer failed: {e}")
+            
+        except ValueError as val_err:
+            # Validation errors (address, amount, etc.)
+            logger.error(f"❌ Validation error: {val_err}")
             raise
+        except Exception as e:
+            # Catch-all for SDK errors
+            logger.error(f"❌ Transaction failed: {type(e).__name__}: {str(e)}")
+            raise Exception(f"Algorand transaction failed: {str(e)}")
 
     async def prepare_asset_opt_in(self, user_address: str, asset_id: int) -> Dict[str, Any]:
         """Prepare opt-in"""

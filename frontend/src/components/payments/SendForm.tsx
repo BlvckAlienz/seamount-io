@@ -317,7 +317,20 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                 </div>
               )}
             </div>
-
+            
+            if (validRecipientAddress && !recipientAccountExists) {
+              // Show warning
+              toast.warning(
+                "This is a new Algorand address. Minimum 0.1 ALGO required for first transaction.",
+                { duration: 5000 }
+              );
+              
+              // Enforce minimum in UI
+              if (amount < 0.1) {
+                setValidationError("Minimum 0.1 ALGO required to activate new account");
+              }
+            }
+            
             {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-sm font-semibold text-gray-900 dark:text-white">

@@ -417,19 +417,38 @@ class MultiChainWalletService:
             else:
                 result = await self._send_via_wdk(user_id, recipient, asset, amount, optimal_chain)
             
-            # Record transaction
-            await self.db.supabase.table('transactions').insert({
-                'user_id': user_id,
-                'transaction_type': 'send',
-                'asset': asset,
-                'amount': float(amount),
-                'from_chain': optimal_chain,
-                'to_address': recipient,
-                'tx_id': result['tx_id'],
-                'fee_amount': float(fee_calc['total_fee']),
-                'status': 'completed',
-                'created_at': datetime.utcnow().isoformat()
-            }).execute()
+            # Record transaction - mapped to existing schema
+            try:
+                transaction_data = {
+                    'user_id': user_id,
+                    'transaction_type': 'transfer',
+                    'status': 'completed',
+                    'amount': float(amount),
+                    'currency': asset,
+                    'to_address': recipient,
+                    'algorand_txn_id': result['tx_id'],
+                    'fee_amount': float(fee_calc['total_fee']),
+                    'fee_currency': 'USD',
+                    'created_at': datetime.utcnow().isoformat(),
+                    'metadata': {
+                        'chain': optimal_chain,
+                        'asset': asset,
+                        'memo': memo if memo else None,
+                        'estimated_arrival': self._estimate_arrival_time(optimal_chain)
+                    }
+                }
+                
+                # ✅ Supabase client is synchronous, don't use await
+                response = self.db.supabase.table('transactions').insert(transaction_data).execute()
+                
+                if response.data:
+                    logger.info(f"✅ Transaction recorded in database: {result['tx_id']} ({asset} on {optimal_chain})")
+                else:
+                    logger.warning(f"⚠️ Transaction insert returned no data (but may have succeeded)")
+                
+            except Exception as db_err:
+                # Non-fatal: blockchain transaction succeeded, just logging failed
+                logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
             
             return {
                 'success': True,
@@ -537,6 +556,18 @@ class MultiChainWalletService:
         if not wallet.data or len(wallet.data) == 0:
             raise Exception("Algorand wallet not found")
         
+        # ✅ FIX: Decrypt private key before using
+        from backend.services.seed_encryption_service import SeedEncryptionService
+        encryption_service = SeedEncryptionService()
+        
+        encrypted_key = wallet.data[0]['algorand_private_key']
+        try:
+            decrypted_private_key = encryption_service.decrypt_seed(encrypted_key)
+            logger.info(f"🔓 Successfully decrypted private key for user {user_id}")
+        except Exception as decrypt_err:
+            logger.error(f"❌ Private key decryption failed: {decrypt_err}")
+            raise Exception(f"Failed to decrypt wallet credentials: {decrypt_err}")
+        
         # ✅ Handle both plain and chain-suffixed asset keys
         lookup_key = asset.split('_')[0] if '_' in asset else asset
         asset_id = self.ALGORAND_ASSET_IDS.get(lookup_key)
@@ -549,9 +580,9 @@ class MultiChainWalletService:
         
         logger.info(f"📍 Sending {amount} {asset} (ASA ID: {asset_id}) on Algorand")
         
-        # Execute transaction
+        # Execute transaction with DECRYPTED key
         tx_id = await self.algorand.transfer_asset(
-            sender_private_key=wallet.data[0]['algorand_private_key'],
+            sender_private_key=decrypted_private_key,  # ✅ NOW USING DECRYPTED KEY
             receiver_address=recipient,
             asset_id=asset_id,
             amount=amount,
