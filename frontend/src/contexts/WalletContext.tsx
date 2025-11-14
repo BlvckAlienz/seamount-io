@@ -88,16 +88,30 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((asset: any) => {
-          // 🚨 DEBUG: Log what the API actually returns
-          console.log('🔍 API Asset:', {
-            symbol: asset.symbol,
-            asset: asset.asset,
-            balance: asset.balance,
-            chain: asset.chain
-          });
+          // 🚨 FIX: Derive asset key from chain since API doesn't return symbol
+          let assetKey: string;
           
-          // Use consistent key format: symbol without chain suffix
-          const assetKey = asset.symbol || asset.asset;
+          // Map chain to native asset symbol
+          const chainToAsset: { [key: string]: string } = {
+            'algorand': 'ALGO',
+            'bitcoin': 'BTC', 
+            'ethereum': 'ETH',
+            'polygon': 'MATIC',
+            'tron': 'TRX'
+          };
+          
+          // If asset has explicit symbol/asset field, use it; otherwise derive from chain
+          if (asset.symbol) {
+            assetKey = asset.symbol;
+          } else if (asset.asset) {
+            assetKey = asset.asset;
+          } else {
+            // Fallback: Use chain mapping
+            assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
+          }
+          
+          console.log(`✅ Mapped: ${asset.chain} → ${assetKey} (balance: ${asset.balance})`);
+          
           balancesObj[assetKey] = {
             balance: asset.balance,
             chain: asset.chain,

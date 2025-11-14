@@ -127,6 +127,14 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const availableBalance = balances[asset]?.balance || 0;
   const balanceUSD = balances[asset]?.usd_value || 0;
 
+  // 🚨 DEBUG: Verify balance lookup
+  console.log('🔍 SendForm Lookup:', {
+    requestedAsset: asset,
+    foundBalance: availableBalance,
+    availableKeys: Object.keys(balances),
+    fullBalancesObj: balances
+  });
+  
   // ============================================================================
   // ADDRESS VALIDATION
   // ============================================================================
