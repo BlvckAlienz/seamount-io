@@ -189,7 +189,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       toast.error(
         'Recipient must opt-in to receive this asset first',
         { duration: 6000 }
-      );
+      )
       return;
     }
   }
