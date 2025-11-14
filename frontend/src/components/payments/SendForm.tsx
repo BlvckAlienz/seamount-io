@@ -183,7 +183,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // Before sending ASA, check if recipient is opted-in
   if (asset !== 'ALGO') {
     const assetId = ALGORAND_ASSET_IDS[asset];
-    const isOptedIn = await checkAssetOptIn(recipient, assetId);
+    const isOptedIn = checkAssetOptIn(recipient, assetId);
     
     if (!isOptedIn) {
       toast.error(
