@@ -1,6 +1,7 @@
 # File: backend/services/fee_calculator.py
 """
-FIXED: Removed all B2C user tier logic
+✅ FIXED: Removed all B2C user tier logic
+✅ FIXED: Proper import from MultiChainBusinessModel class
 ✅ B2C users pay standard transaction fees - NO SUBSCRIPTION TIERS
 ✅ B2B API customers have license tiers (Builder/Scale/Enterprise)
 ✅ Revenue = transaction fees (B2C) + API subscriptions (B2B)
@@ -23,11 +24,16 @@ class FeeCalculatorService:
         self.db_service = db_service
         self.business_model = MultiChainBusinessModel()
         
+        # ✅ FIX: Cache pricing constants from business model class
+        self.USER_FACING_FEES = self.business_model.USER_FACING_FEES
+        self.PROVIDER_BASE_COSTS = self.business_model.PROVIDER_BASE_COSTS
+        self.SEAMOUNT_NET_MARGINS = self.business_model.SEAMOUNT_NET_MARGINS
+        
         # Cache exchange rates for 60 seconds
         self.rate_cache = {}
         self.cache_ttl = 60
         
-        logger.info("FeeCalculatorService initialized - B2C standard pricing, B2B API licensing")
+        logger.info("✅ FeeCalculatorService initialized - B2C standard pricing, B2B API licensing")
     
     async def calculate_transaction_fee(
         self,
@@ -48,12 +54,6 @@ class FeeCalculatorService:
         ✅ User sees transparent total fee
         """
         try:
-            from backend.config import (
-                USER_FACING_FEES, 
-                PROVIDER_BASE_COSTS, 
-                SEAMOUNT_NET_MARGINS
-            )
-            
             # ===================================================================
             # STEP 1: Determine provider and payment method
             # ===================================================================
@@ -94,7 +94,7 @@ class FeeCalculatorService:
                 amount_ngn = amount * usd_to_ngn_rate
                 
                 # Calculate Paystack fee in NGN
-                paystack_config = PROVIDER_BASE_COSTS["paystack"]
+                paystack_config = self.PROVIDER_BASE_COSTS["paystack"]
                 percentage_fee = amount_ngn * paystack_config["base_rate"]  # 1.5%
                 total_fee_ngn = percentage_fee + paystack_config["flat_fee_ngn"]  # + NGN 100
                 
@@ -108,7 +108,7 @@ class FeeCalculatorService:
                 
             else:
                 # Flutterwave has simple percentage fees
-                flutterwave_rates = PROVIDER_BASE_COSTS["flutterwave"]
+                flutterwave_rates = self.PROVIDER_BASE_COSTS["flutterwave"]
                 
                 if method == "card_local":
                     provider_fee_rate = flutterwave_rates["card_local"]  # 2.0%
@@ -124,7 +124,7 @@ class FeeCalculatorService:
             # ===================================================================
             # STEP 3: Add Seamount's margin (OUR REVENUE)
             # ===================================================================
-            seamount_margin_rate = SEAMOUNT_NET_MARGINS.get(fee_key, Decimal("0.005"))
+            seamount_margin_rate = self.SEAMOUNT_NET_MARGINS.get(fee_key, Decimal("0.005"))
             seamount_margin = amount * seamount_margin_rate
             
             # ===================================================================
@@ -201,7 +201,7 @@ class FeeCalculatorService:
             return fee_calculation
             
         except Exception as e:
-            logger.error(f"Fee calculation failed: {e}", exc_info=True)
+            logger.error(f"❌ Fee calculation failed: {e}", exc_info=True)
             raise ValueError(f"Could not calculate fees: {str(e)}")
     
     async def _is_api_customer(self, user_id: str) -> bool:
@@ -217,7 +217,7 @@ class FeeCalculatorService:
             return result.data is not None
             
         except Exception as e:
-            logger.warning(f"Could not check API customer status: {e}")
+            logger.warning(f"⚠️ Could not check API customer status: {e}")
             return False
     
     async def _get_api_license_tier(self, user_id: str):
@@ -238,7 +238,7 @@ class FeeCalculatorService:
             return LicenseTier.BUILDER  # Default for API customers
             
         except Exception as e:
-            logger.warning(f"Could not determine API license tier: {e}")
+            logger.warning(f"⚠️ Could not determine API license tier: {e}")
             from backend.config import LicenseTier
             return LicenseTier.BUILDER
     
@@ -302,4 +302,4 @@ class FeeCalculatorService:
             fee_calculation["quote_id"] = quote_id
             
         except Exception as e:
-            logger.error(f"Failed to store fee calculation: {e}")
+            logger.error(f"❌ Failed to store fee calculation: {e}")
