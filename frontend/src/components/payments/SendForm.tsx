@@ -134,7 +134,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
     availableKeys: Object.keys(balances),
     fullBalancesObj: balances
   });
-  
+
   // ============================================================================
   // ADDRESS VALIDATION
   // ============================================================================
@@ -406,7 +406,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
       {/* CONFIRMATION MODAL */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
+        <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
           <DialogHeader className="border-b pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
