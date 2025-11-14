@@ -88,7 +88,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((asset: any) => {
-          balancesObj[asset.symbol || asset.asset] = {
+          // 🚨 DEBUG: Log what the API actually returns
+          console.log('🔍 API Asset:', {
+            symbol: asset.symbol,
+            asset: asset.asset,
+            balance: asset.balance,
+            chain: asset.chain
+          });
+          
+          // Use consistent key format: symbol without chain suffix
+          const assetKey = asset.symbol || asset.asset;
+          balancesObj[assetKey] = {
             balance: asset.balance,
             chain: asset.chain,
             usd_value: asset.usd_value
