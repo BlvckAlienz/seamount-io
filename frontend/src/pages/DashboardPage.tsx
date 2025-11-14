@@ -567,7 +567,7 @@ const DashboardPage = () => {
             <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
-                { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => toastInfo('Send functionality coming soon!') },
+                { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => setShowSendModal(true) },
                 { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toastInfo('Swap feature coming soon!') },
                 { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toastInfo('Yield farming coming soon!') },
               ].map(action => (
@@ -590,7 +590,7 @@ const DashboardPage = () => {
                   <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
                 </div>
               </div>
-              <button onClick={() => toastInfo('Cross-border payments coming soon!')} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
+              <button onClick={() => setShowSendModal(true)} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
                 Send Money
               </button>
             </div>

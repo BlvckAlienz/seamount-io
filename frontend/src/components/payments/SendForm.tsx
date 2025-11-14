@@ -1,5 +1,5 @@
 // File: frontend/src/components/payments/SendForm.tsx
-// ✨ PRODUCTION-READY: Multi-chain Send with Confirmation Modal
+// ✅ PRODUCTION-READY: Toast shows DURING transaction (modal stays open)
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// CHAIN ASSET GROUPS (Matching your WalletDetailModal pattern)
+// CHAIN ASSET GROUPS
 // ============================================================================
 const ASSET_GROUPS = {
   algorand: [
@@ -127,14 +127,6 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const availableBalance = balances[asset]?.balance || 0;
   const balanceUSD = balances[asset]?.usd_value || 0;
 
-  // 🚨 DEBUG: Verify balance lookup
-  console.log('🔍 SendForm Lookup:', {
-    requestedAsset: asset,
-    foundBalance: availableBalance,
-    availableKeys: Object.keys(balances),
-    fullBalancesObj: balances
-  });
-
   // ============================================================================
   // ADDRESS VALIDATION
   // ============================================================================
@@ -178,22 +170,8 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   };
 
   // ============================================================================
-  // EXECUTE TRANSACTION
+  // ✅ EXECUTE TRANSACTION (TOAST SHOWS IMMEDIATELY - MODAL STAYS OPEN)
   // ============================================================================
-  // Check if recipient is opted-in before sending ASA
-  if (asset !== 'ALGO') {
-    const assetId = ALGORAND_ASSET_IDS[asset];
-    const isOptedIn = checkAssetOptIn(recipient, assetId);
-    
-    if (!isOptedIn) {
-      toast.error(
-        'Recipient must opt-in to receive this asset first',
-        { duration: 6000 }
-      )
-      return;
-    }
-  }
-  
   const handleConfirmSend = async () => {
     setLoading(true);
     setError(null);
@@ -207,23 +185,46 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       });
 
       if (result.success) {
-        // Reset form
-        setRecipient('');
-        setAmount('');
-        setMemo('');
-        setShowConfirmation(false);
+        // ✅ SHOW TOAST IMMEDIATELY (modal still open)
+        toast.success(
+          `✅ ${parseFloat(amount).toFixed(6)} ${asset} sent successfully!\n\nTx: ${result.tx_id?.substring(0, 12)}...`,
+          {
+            duration: 6000,
+            icon: '🚀',
+            style: {
+              zIndex: 99999, // ✅ CRITICAL: Appears above modal
+            }
+          }
+        );
         
-        // Close modal
-        onOpenChange(false);
+        // Close modals AFTER showing toast
+        setTimeout(() => {
+          setShowConfirmation(false);
+          onOpenChange(false);
+          
+          // Reset form
+          setRecipient('');
+          setAmount('');
+          setMemo('');
+        }, 1500); // Give user time to see success toast
         
-        toast.success('Transaction sent successfully! 🚀');
       } else {
         setError(result.error || 'Transaction failed');
+        toast.error(result.error || 'Transaction failed', {
+          style: {
+            zIndex: 99999,
+          }
+        });
       }
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || 'Transaction failed';
       setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, {
+        duration: 7000,
+        style: {
+          zIndex: 99999,
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -245,7 +246,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               Send Crypto
             </DialogTitle>
             <DialogDescription className="text-base text-gray-600 dark:text-gray-400 mt-2">
-              Send cryptocurrency to any wallet address. Fast, secure, and low-cost.
+              Send cryptocurrency via multi-chain networks. Fast, secure, and low-cost.
             </DialogDescription>
           </DialogHeader>
 
@@ -331,24 +332,11 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                 </div>
               )}
             </div>
-            
-            if (validRecipientAddress && !recipientAccountExists) {
-              // Show warning
-              toast.warning(
-                "This is a new Algorand address. Minimum 0.1 ALGO required for first transaction.",
-                { duration: 5000 }
-              );
-              
-              // Enforce minimum in UI
-              if (amount < 0.1) {
-                setValidationError("Minimum 0.1 ALGO required to activate new account");
-              }
-            }
 
             {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-sm font-semibold text-gray-900 dark:text-white">
-                Amount
+                Crypto Amount
               </Label>
               <div className="relative">
                 <Input
@@ -511,7 +499,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             <Button
               onClick={handleConfirmSend}
               disabled={loading}
-              className="w-full sm:w-auto h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 text-white transition-all duration-300 transform hover:scale-105 animate-pulse disabled:animate-none"
+              className="w-full sm:w-auto h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
             >
               {loading ? (
                 <>
