@@ -17,11 +17,17 @@ logger = logging.getLogger(__name__)
 class CircuitBreaker:
     """Enhanced circuit breaker with per-chain isolation"""
     
-    def __init__(self, failure_threshold=20, recovery_timeout=90):  # More forgiving
+    def __init__(self, failure_threshold=20, recovery_timeout=90):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
-        self.warmup_grace_period = 60  # Don't count failures in first 60s
+        self.warmup_grace_period = 60
         self.service_start_time = datetime.now()
+        
+        # ✅ FIX: Initialize missing attributes
+        self.state = "CLOSED"  # Circuit states: CLOSED, OPEN, HALF_OPEN
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.chain_status = {}  # Per-chain health tracking
     
     def can_execute(self, chain=None):
         # Allow specific chains even if general circuit is open

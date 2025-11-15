@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 class LicenseTier(str, Enum):
     """B2B API Licensing Tiers - Premium Pricing"""
-    BUILDER = "builder"      # $3,500/month
-    SCALE = "scale"          # $7,500/month  
-    ENTERPRISE = "enterprise" # $15,000+/month (custom)
+    BUILDER = "builder"      # $3,500/year
+    SCALE = "scale"          # $7,500/year  
+    ENTERPRISE = "enterprise" # $15,000+/year (custom)
 
 class BlockchainNetwork(str, Enum):
     """Supported Blockchain Networks (Post-WDK Integration)"""
@@ -62,7 +62,7 @@ class MultiChainBusinessModel:
     KEY PRINCIPLES:
     1. Abstract ALL blockchain complexity from users
     2. Optimize routing for lowest cost + fastest settlement
-    3. Premium B2B API pricing ($3.5k-$15k/month)
+    3. Premium B2B API pricing ($3.5k-$15k/year)
     4. Competitive B2C transaction fees (1.2-1.8%)
     5. Hidden revenue optimization (gas markups, spreads)
     """
@@ -465,17 +465,17 @@ class MultiChainBusinessModel:
         Calculate monthly revenue from API licensing client
         
         Example: Kenyan Microfinance Bank
-        - Tier: SCALE ($7,500/month)
+        - Tier: SCALE ($7,500/year)
         - API Calls: 150,000/month
         - Volume: $5M/month
         
-        Revenue: $7,500 (license) + $40,000 (0.8% × $5M) = $47,500/month
+        Revenue: $40,000 (0.8% × $5M) = $40,000/month
         """
         
         tier_config = MultiChainBusinessModel.API_LICENSE_PRICING[license_tier]
         
         # Base license fee
-        license_revenue = tier_config["monthly_fee"]
+        license_revenue = tier_config["yearly_fee"]
         
         # API overage fees
         overage_revenue = Decimal("0")
@@ -490,7 +490,7 @@ class MultiChainBusinessModel:
         transaction_revenue = monthly_volume_usd * transaction_fee_rate
         
         # Total revenue
-        total_monthly_revenue = license_revenue + overage_revenue + transaction_revenue
+        total_monthly_revenue = overage_revenue + transaction_revenue
         annual_revenue = total_monthly_revenue * 12
         
         return {
@@ -521,21 +521,21 @@ class KYCConfig:
     """KYC requirement thresholds and enforcement rules"""
     
     # Cumulative transaction threshold
-    THRESHOLD_USD = Decimal("5000.00")  # $5K cumulative (30 days)
+    THRESHOLD_USD = Decimal("100000.00")  # $100K cumulative (90 days)
     
     # Grace period before enforcement
-    GRACE_PERIOD_DAYS = 30
+    GRACE_PERIOD_DAYS = 90
     
     # Tracking window (rolling)
-    TRACKING_WINDOW_DAYS = 30
+    TRACKING_WINDOW_DAYS = 90
     
     # Exemptions (for testing/VIP)
     EXEMPTED_USER_IDS: Set[str] = set()
     
     # Prompt timing
-    WARNING_THRESHOLD = Decimal("4000.00")  # Show warning at $4K
-    SOFT_BLOCK_THRESHOLD = Decimal("4500.00")  # Require acknowledgment at $4.5K
-    HARD_BLOCK_THRESHOLD = Decimal("5000.00")  # Block transactions at $5K
+    WARNING_THRESHOLD = Decimal("90000.00")  # Show warning at $90K
+    SOFT_BLOCK_THRESHOLD = Decimal("95000.00")  # Require acknowledgment at $95K
+    HARD_BLOCK_THRESHOLD = Decimal("100000.00")  # Block transactions at $100K
     
     @staticmethod
     def calculate_remaining_limit(cumulative: Decimal) -> Decimal:
@@ -547,11 +547,11 @@ class KYCConfig:
         """Determine UI urgency level"""
         remaining = KYCConfig.calculate_remaining_limit(cumulative)
         
-        if remaining <= Decimal("500"):
+        if remaining <= Decimal("1000"):
             return "critical"  # Red banner
-        elif remaining <= Decimal("1000"):
+        elif remaining <= Decimal("5000"):
             return "warning"  # Orange banner
-        elif remaining <= Decimal("2000"):
+        elif remaining <= Decimal("10000"):
             return "info"  # Blue banner
         return "none"
 
@@ -648,6 +648,23 @@ class Settings(BaseSettings):
     TRON_NETWORK_URL: str = Field(default="https://api.trongrid.io")
     TRON_API_KEY: Optional[SecretStr] = Field(default=None)
 
+    # ============================================================================
+    # CENTRAL TREASURY ADDRESSES (Revenue Collection)
+    # ============================================================================
+    CENTRAL_TREASURY_ADDRESSES = {
+        'algorand': 'TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ',
+        'bitcoin': '',   # TODO: Create via platform
+        'ethereum': '',  # TODO: Create via platform
+        'polygon': '',   # TODO: Create via platform
+        'tron': ''       # TODO: Create via platform
+    }
+
+    # Private keys for treasury accounts (encrypted)
+    TREASURY_PRIVATE_KEYS: Dict[str, str] = {
+        'algorand': os.getenv('ALGORAND_TREASURY_PRIVATE_KEY', ''),
+        # Add others after creating accounts
+    }
+    
     # Supported Assets (Multi-Chain) - ALL CHAINS INCLUDING WDK
     SUPPORTED_ASSETS: Dict[str, Dict[str, Any]] = {
         # ========== ALGORAND NATIVE ==========
