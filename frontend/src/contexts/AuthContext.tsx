@@ -29,6 +29,7 @@ interface AuthContextType extends AuthState {
     options?: { firstName?: string; lastName?: string; countryCode?: string; captchaToken?: string }
   ) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string, options?: { captchaToken?: string }) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   enterDemoMode: () => void;
   onboardingStep?: number;
@@ -533,6 +534,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       userProfile: state.user,
       signUp,
       signIn,
+      resetPassword,
       signOut,
       enterDemoMode,
       updateOnboardingStep,
