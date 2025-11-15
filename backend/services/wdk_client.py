@@ -100,7 +100,7 @@ class WDKClient:
         self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
         # ✅ FIX: Read indexer URL from config (respects .env)
-        self.indexer_url = settings.WDK_API_URL if self.api_key else None
+        self.indexer_url = self.settings.WDK_API_URL if self.api_key else None
         logger.info(f"🔗 WDK Indexer URL: {self.indexer_url}")
             
         # Circuit breaker for service resilience
