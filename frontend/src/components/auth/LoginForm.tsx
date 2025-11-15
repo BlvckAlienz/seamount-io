@@ -135,12 +135,13 @@ const LoginForm: React.FC<LoginFormProps> = ({
         <ResetPassword 
           open={showResetPassword}
           onOpenChange={(isOpen) => {
+            console.log('🔐 [LoginForm] Reset modal state changing:', isOpen);
             setShowResetPassword(isOpen);
-            // Don't trigger any navigation on close
           }}
           onSuccess={() => {
+            console.log('✅ [LoginForm] Reset email sent successfully');
             toast.success('Reset instructions sent! Check your email.');
-            setShowResetPassword(false);
+            // DON'T close modal - let user close manually
           }}
         />
       </form>

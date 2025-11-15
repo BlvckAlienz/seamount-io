@@ -107,7 +107,16 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
+      console.log('🔔 Auth state changed:', event, session?.user?.id);
+      
+      // 🚨 CRITICAL: Ignore auth state changes during password reset flow
+      if (isResettingPasswordRef.current) {
+        console.log('🛑 [Auth Listener] IGNORING event - Password reset in progress', {
+          event,
+          refValue: isResettingPasswordRef.current
+        });
+        return; // ← BLOCK ALL AUTH CHANGES
+      }
       
       setState((prev) => ({ ...prev, session, loading: true }));
       
@@ -115,7 +124,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTimeout(async () => {
           await fetchUserProfile(5, 2000);
           
-          // âœ… CHECK IF WALLETS NEED TO BE CREATED
+          // ✅ CHECK IF WALLETS NEED TO BE CREATED
           if (event === 'SIGNED_IN') {
             try {
               const walletStatusResponse = await apiClient.get('/api/v1/wallet-creation/status');
@@ -124,19 +133,19 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const missingWallets = walletStatusResponse.data.summary?.missing_chains || [];
                 
                 if (missingWallets.length > 0) {
-                  console.log('[Auth] ðŸ“ User missing wallets, triggering creation...');
+                  console.log('[Auth] 🔑 User missing wallets, triggering creation...');
                   
                   setTimeout(async () => {
                     try {
                       const createResponse = await apiClient.post('/api/v1/wallet/create');
                       
                       if (createResponse.data.success) {
-                        console.log('[Auth] âœ… Wallets created on login:', createResponse.data.created_chains);
+                        console.log('[Auth] ✅ Wallets created on login:', createResponse.data.created_chains);
                         
                         sessionStorage.setItem('show_wallet_backup', 'true');
                         sessionStorage.setItem('new_wallets', JSON.stringify(createResponse.data.created_chains));
                         
-                        toast.success('ðŸŽ‰ Your wallets are ready! Please back them up.');
+                        toast.success('🔐 Your wallets are ready! Please back them up.');
                       }
                     } catch (createError) {
                       console.error('[Auth] Wallet creation on login failed:', createError);

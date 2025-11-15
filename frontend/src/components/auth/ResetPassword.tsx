@@ -30,19 +30,23 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
   
   const { resetPassword, loading, startPasswordReset, endPasswordReset } = useAuth();
   const state = useAuth(); // Add this to access full state
-  
+
   // 🔐 Control auto-navigation while modal is open
   useEffect(() => {
     if (open) {
-      console.log('[ResetPassword] Modal opened - blocking auto-navigation');
+      console.log('🔐 [ResetPassword] Modal OPENED - BLOCKING navigation');
       startPasswordReset();
     } else {
-      console.log('[ResetPassword] Modal closed - allowing auto-navigation');
-      endPasswordReset();
+      console.log('🔓 [ResetPassword] Modal CLOSED - ALLOWING navigation');
+      // Small delay to ensure form submission completes
+      setTimeout(() => {
+        endPasswordReset();
+      }, 100);
     }
     
-    // Cleanup on unmount
+    // Aggressive cleanup on unmount
     return () => {
+      console.log('🧹 [ResetPassword] Cleanup - ensuring navigation allowed');
       endPasswordReset();
     };
   }, [open, startPasswordReset, endPasswordReset]);
@@ -80,29 +84,33 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
     }
 
     setIsSubmitting(true);
-    
+  
     try {
-      const { success, error } = await resetPassword(email);
+      console.log('📧 [ResetPassword] Calling Supabase directly for:', email);
       
-      if (success) {
-        setSuccessMessage('If an account exists for this email, password reset instructions have been sent.');
-        setEmail('');
-        
-        // Auto-close after success or call onSuccess
-        if (onSuccess) {
-          setTimeout(() => {
-            onSuccess();
-            onOpenChange(false);
-          }, 3000);
-        }
-      } else {
-        setFormError(error || 'An unexpected error occurred. Please try again.');
+      // ⚠️ Call Supabase DIRECTLY - don't use resetPassword from AuthContext
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      console.log('📧 [ResetPassword] Supabase response:', { error: error ? error.message : 'none' });
+
+      if (error) {
+        console.error('[ResetPassword] Supabase error:', error);
+        setFormError('Unable to send reset email. Please try again later.');
+        return;
       }
-    } catch (error: any) {
-      setFormError(error.message || 'Failed to send reset instructions. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+
+      // ✅ Show success message
+      setSuccessMessage(
+        'If an account exists with this email, you will receive password reset instructions within 5 minutes. Check your spam folder if you don\'t see it.'
+      );
+      setEmail('');
+      
+      // Call onSuccess if provided (but don't auto-close)
+      if (onSuccess) {
+        onSuccess();
+      }
 
     // ✅ Record successful attempt
     emailMonitor.recordAttempt(email, 'password_reset');
