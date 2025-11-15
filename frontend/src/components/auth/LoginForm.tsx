@@ -18,6 +18,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   
   const { signIn, loading, error: authError } = useAuth();
 
@@ -68,7 +69,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
             {onForgotPassword && (
               <button 
                 type="button" 
-                onClick={onForgotPassword} 
+                onClick={() => setShowResetPassword(true)} 
                 className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
               >
                 Forgot password?
@@ -127,6 +128,15 @@ const LoginForm: React.FC<LoginFormProps> = ({
             </p>
           </div>
         )}
+
+        {/* 🔐 RESET PASSWORD MODAL - ADD THIS EXACTLY HERE */}
+        <ResetPassword 
+          open={showResetPassword}
+          onOpenChange={setShowResetPassword}
+          onSuccess={() => {
+            toast.success('Reset instructions sent! Check your email.');
+          }}
+        />
       </form>
     </div>
   );

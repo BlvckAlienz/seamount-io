@@ -267,6 +267,31 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
   
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('[Auth] Reset password error:', error);
+        setState((prev) => ({ ...prev, loading: false, error: error.message }));
+        return { success: false, error: error.message };
+      }
+
+      console.log('[Auth] Reset password email sent to:', email);
+      setState((prev) => ({ ...prev, loading: false, error: null }));
+      return { success: true };
+      
+    } catch (error: any) {
+      console.error('[Auth] Reset password exception:', error);
+      setState((prev) => ({ ...prev, loading: false, error: error.message }));
+      return { success: false, error: error.message };
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();

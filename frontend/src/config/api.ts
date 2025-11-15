@@ -20,6 +20,9 @@ const apiClient = axios.create({
 
 // FIXED: Proper API endpoints for Seamount 2.0
 const API_ENDPOINTS = {
+  AUTH: {
+    RESET_PASSWORD: '/api/v1/auth/reset-password',
+  },
   LEADS: {
     BUSINESS_CONTACT: '/api/v1/leads/business-contact',
   },
