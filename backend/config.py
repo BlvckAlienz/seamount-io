@@ -648,23 +648,6 @@ class Settings(BaseSettings):
     TRON_NETWORK_URL: str = Field(default="https://api.trongrid.io")
     TRON_API_KEY: Optional[SecretStr] = Field(default=None)
 
-    # ============================================================================
-    # CENTRAL TREASURY ADDRESSES (Revenue Collection)
-    # ============================================================================
-    CENTRAL_TREASURY_ADDRESSES = {
-        'algorand': 'TX4LYASI7ETNXKT4PN2VA5H4ZHZX4TRD53HNVAIYVARLYCJ7JXWRHTXIPQ',
-        'bitcoin': '',   # TODO: Create via platform
-        'ethereum': '',  # TODO: Create via platform
-        'polygon': '',   # TODO: Create via platform
-        'tron': ''       # TODO: Create via platform
-    }
-
-    # Private keys for treasury accounts (encrypted)
-    TREASURY_PRIVATE_KEYS: Dict[str, str] = {
-        'algorand': os.getenv('ALGORAND_TREASURY_PRIVATE_KEY', ''),
-        # Add others after creating accounts
-    }
-    
     # Supported Assets (Multi-Chain) - ALL CHAINS INCLUDING WDK
     SUPPORTED_ASSETS: Dict[str, Dict[str, Any]] = {
         # ========== ALGORAND NATIVE ==========
