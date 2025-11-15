@@ -115,6 +115,16 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           event,
           refValue: isResettingPasswordRef.current
         });
+        
+        // ⚠️ If it's a SIGNED_IN event during reset, force sign out immediately
+        if (event === 'SIGNED_IN') {
+          console.log('🚨 [Auth Listener] Forcing sign out - unwanted login during reset');
+          setTimeout(async () => {
+            await supabase.auth.signOut();
+            console.log('✅ [Auth Listener] Forced sign out complete');
+          }, 100);
+        }
+        
         return; // ← BLOCK ALL AUTH CHANGES
       }
       
@@ -307,38 +317,39 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signOut = async () => {
     try {
+      console.log('🚪 [Auth] Signing out - aggressive cleanup');
+      
+      // 1. Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Supabase signOut error:', error);
       }
       
+      // 2. Clear ALL storage
       localStorage.clear();
       sessionStorage.clear();
       
+      // 3. Clear ALL cookies (including Supabase auth cookies)
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
       
-      setState({
-        session: null,
-        user: null,
-        loading: false,
-        error: null,
-        isDemoMode: false,
-        role: 'alien',
-        isResettingPassword: false,
+      // 4. Clear Supabase-specific storage keys manually
+      const supabaseKeys = [
+        'supabase.auth.token',
+        'sb-auth-token',
+        'sb-refresh-token',
+        'sb-access-token'
+      ];
+      
+      supabaseKeys.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
       });
       
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Sign out error:', error);
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/';
-    }
-  };
+      console.log('✅ [Auth] All auth data cleared');
 
   const skipVerification = useCallback(() => {
     console.log('[Auth] Skipping verification');

@@ -61,7 +61,6 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
     console.log('3. Is resetting password flag:', state.isResettingPassword);
     console.log('4. Current pathname:', window.location.pathname);
     
-    // Check Supabase directly
     const { data: { session: supabaseSession } } = await supabase.auth.getSession();
     console.log('5. Supabase session (direct):', supabaseSession);
     console.log('============================');
@@ -73,38 +72,37 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
       return;
     }
 
-    // ⚠️ Check rate limiting (prevent spam)
-    if (emailMonitor.isRateLimited(email)) {
-      const remaining = emailMonitor.getRateLimitRemaining(email);
-      const minutes = Math.ceil(remaining / 60);
-      setFormError(
-        `Too many attempts. Please wait ${minutes} minute${minutes !== 1 ? 's' : ''} before trying again.`
-      );
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       console.log('📧 [ResetPassword] Calling Supabase directly for:', email);
       
-      // Diagnostic: Watch ALL auth events
-      const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
+      // 🔐 CRITICAL: Watch for SIGNED_IN events and ignore them
+      let authEventReceived = false;
+      const authWatcher = supabase.auth.onAuthStateChange((event, session) => {
         console.log('🔍 [DIAGNOSTIC] Auth event during reset:', {
           event,
           hasSession: !!session,
           userEmail: session?.user?.email
         });
+        
+        if (event === 'SIGNED_IN') {
+          authEventReceived = true;
+          console.log('⚠️ [ResetPassword] Detected SIGNED_IN event - will keep modal open');
+        }
       });
-
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      // Stop watching
-      unsubscribe.data.subscription.unsubscribe();
+      // Stop watching auth events
+      authWatcher.data.subscription.unsubscribe();
 
-      console.log('📧 [ResetPassword] Supabase response:', { error: error ? error.message : 'none' });
+      console.log('📧 [ResetPassword] Supabase response:', { 
+        error: error ? error.message : 'none',
+        signInEventDetected: authEventReceived
+      });
 
       if (error) {
         console.error('[ResetPassword] Supabase error:', error);
@@ -112,16 +110,18 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
         return;
       }
 
-      // ✅ Record successful attempt (INSIDE try block, after success)
-      emailMonitor.recordAttempt(email, 'password_reset');
+      // 🚨 If Supabase signed user in, FORCE SIGN OUT immediately
+      if (authEventReceived) {
+        console.log('🚨 [ResetPassword] Forcing sign out to prevent unwanted login');
+        await supabase.auth.signOut();
+        console.log('✅ [ResetPassword] User signed out successfully');
+      }
 
-      // ✅ Show success message
       setSuccessMessage(
         'If an account exists with this email, you will receive password reset instructions within 5 minutes. Check your spam folder if you don\'t see it.'
       );
       setEmail('');
       
-      // Call onSuccess if provided (but don't auto-close)
       if (onSuccess) {
         onSuccess();
       }
@@ -147,7 +147,18 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
 };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        // 🚨 CRITICAL: Don't allow closing while submitting
+        if (!isOpen && isSubmitting) {
+          console.log('🛑 [ResetPassword] Prevented close - submission in progress');
+          return;
+        }
+        console.log('🔐 [ResetPassword] Modal state changing:', isOpen);
+        onOpenChange(isOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-[425px] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white text-center">
