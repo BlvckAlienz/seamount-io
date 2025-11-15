@@ -99,9 +99,10 @@ class WDKClient:
         
         self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
-        # WDK Indexer API (balance queries, tx history)
-        self.indexer_url = "https://indexer-api.tether.io" if self.api_key else None
-        
+        # ✅ FIX: Read indexer URL from config (respects .env)
+        self.indexer_url = settings.WDK_API_URL if self.api_key else None
+        logger.info(f"🔗 WDK Indexer URL: {self.indexer_url}")
+            
         # Circuit breaker for service resilience
         self.circuit_breaker = CircuitBreaker()
         
@@ -112,12 +113,23 @@ class WDKClient:
         # ✅ Validate service connection on startup
         asyncio.create_task(self._validate_service_connection())
         
+        # ✅ Validate indexer URL is properly configured
         if self.indexer_url:
-            logger.info(f"✅ WDK Client initialized: {len(self.SUPPORTED_CHAINS)} chains, Indexer: ON")
-            logger.info(f"   Using API Key: {self.api_key[:10]}...")
+            logger.info(f"✅ WDK Indexer configured: {self.indexer_url}")
+            logger.info(f"   API Key: {self.api_key[:10]}...")
+            
+            # Test DNS resolution immediately
+            import socket
+            try:
+                domain = self.indexer_url.replace('https://', '').replace('http://', '').split('/')[0]
+                socket.gethostbyname(domain)
+                logger.info(f"✅ DNS resolution successful for {domain}")
+            except socket.gaierror as e:
+                logger.error(f"❌ DNS FAILED for {domain}: {e}")
+                logger.error(f"   Check your WDK_API_URL in .env: {self.settings.WDK_API_URL}")
+                self.indexer_url = None  # Disable indexer
         else:
-            logger.warning(f"⚠️ WDK Client initialized WITHOUT Indexer API key")
-            logger.warning(f"   Get key from: https://wdk-api.tether.io")
+            logger.warning(f"⚠️ WDK Indexer DISABLED - no API key configured")
     
     async def _validate_service_connection(self):
         """Validate WDK service is reachable on startup"""

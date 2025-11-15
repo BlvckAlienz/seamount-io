@@ -949,3 +949,9 @@ __all__ = [
     'TransactionType',
     'PricingRegion'
 ]
+
+# ✅ DEBUG: Verify .env is loaded
+if __name__ == "__main__":
+    test_settings = get_settings()
+    print(f"🔍 WDK_API_URL from config: {test_settings.WDK_API_URL}")
+    print(f"🔍 WDK_API_KEY present: {bool(test_settings.WDK_API_KEY)}")
