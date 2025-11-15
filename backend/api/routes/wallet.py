@@ -567,3 +567,21 @@ async def wallet_health_check(
                 "multi_chain_service": "error"
             }
         }
+    
+@router.get("/debug/circuit-breaker-status", tags=["Debug"])
+async def get_circuit_breaker_status(
+    wallet_service = Depends(get_multi_chain_wallet_service)
+):
+    """Check current circuit breaker state"""
+    
+    cb = wallet_service.wdk.circuit_breaker
+    
+    return {
+        "state": cb.state,
+        "failure_count": cb.failure_count,
+        "last_failure": cb.last_failure_time.isoformat() if cb.last_failure_time else None,
+        "time_since_failure": (datetime.now() - cb.last_failure_time).total_seconds() if cb.last_failure_time else None,
+        "recovery_timeout": cb.recovery_timeout,
+        "can_execute": cb.can_execute(),
+        "chain_status": cb.chain_status
+    }

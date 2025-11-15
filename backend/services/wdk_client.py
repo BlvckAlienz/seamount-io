@@ -30,15 +30,27 @@ class CircuitBreaker:
         self.chain_status = {}  # Per-chain health tracking
     
     def can_execute(self, chain=None):
+        """Check if requests can execute (with automatic recovery)"""
+        
         # Allow specific chains even if general circuit is open
         if chain and self.chain_status.get(chain) == "healthy":
+            logger.debug(f"✅ Allowing {chain} request (chain-specific bypass)")
             return True
-            
+        
+        # Check if circuit should recover
         if self.state == "OPEN":
-            if datetime.now() - self.last_failure_time > timedelta(seconds=self.recovery_timeout):
+            time_since_failure = (datetime.now() - self.last_failure_time).total_seconds() if self.last_failure_time else 999
+            
+            if time_since_failure > self.recovery_timeout:
+                # Automatic transition to HALF_OPEN (testing mode)
                 self.state = "HALF_OPEN"
+                logger.info(f"🔄 Circuit breaker transitioning to HALF_OPEN (testing recovery)")
                 return True
-            return False
+            else:
+                logger.warning(f"⚠️ Circuit breaker OPEN - retry in {self.recovery_timeout - time_since_failure:.0f}s")
+                return False
+        
+        # CLOSED or HALF_OPEN states allow execution
         return True
     
     def record_success(self, chain=None):
@@ -105,6 +117,12 @@ class WDKClient:
             
         # Circuit breaker for service resilience
         self.circuit_breaker = CircuitBreaker()
+
+        # ✅ FIX: Reset circuit breaker on startup (clear previous failures)
+        self.circuit_breaker.state = "CLOSED"
+        self.circuit_breaker.failure_count = 0
+        self.circuit_breaker.last_failure_time = None
+        logger.info("✅ Circuit breaker reset to CLOSED state on startup")
         
         # Service health tracking
         self.service_healthy = True
