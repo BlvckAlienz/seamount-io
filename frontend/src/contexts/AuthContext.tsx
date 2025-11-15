@@ -268,6 +268,8 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
   
+  // ⚠️ DEPRECATED: ResetPassword component calls Supabase directly
+  // Kept for backward compatibility if other components need it
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     
