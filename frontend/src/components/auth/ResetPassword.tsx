@@ -84,7 +84,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
     }
 
     setIsSubmitting(true);
-  
+
     try {
       console.log('📧 [ResetPassword] Calling Supabase directly for:', email);
       
@@ -101,6 +101,9 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
         return;
       }
 
+      // ✅ Record successful attempt (INSIDE try block, after success)
+      emailMonitor.recordAttempt(email, 'password_reset');
+
       // ✅ Show success message
       setSuccessMessage(
         'If an account exists with this email, you will receive password reset instructions within 5 minutes. Check your spam folder if you don\'t see it.'
@@ -111,10 +114,13 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
       if (onSuccess) {
         onSuccess();
       }
-
-    // ✅ Record successful attempt
-    emailMonitor.recordAttempt(email, 'password_reset');
-
+      
+    } catch (error: any) {
+      console.error('[ResetPassword] Exception:', error);
+      setFormError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
