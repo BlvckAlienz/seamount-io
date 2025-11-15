@@ -350,6 +350,24 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       console.log('✅ [Auth] All auth data cleared');
+      
+      // 5. Reset state
+      setState({
+        session: null,
+        user: null,
+        loading: false,
+        error: null,
+        isDemoMode: false,
+        role: 'alien',
+        isResettingPassword: false,
+      });
+      
+      navigate('/');
+      
+    } catch (error) {
+      console.error('[Auth] Sign out error:', error);
+    }
+  };
 
   const skipVerification = useCallback(() => {
     console.log('[Auth] Skipping verification');
