@@ -2,7 +2,7 @@
 // âœ… PRODUCTION READY - HYBRID WALLET DETECTION
 // Fast profile checks + API fallback for accuracy
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session } from '@supabase/supabase-js';
 import { apiClient } from '../config/api';
@@ -338,13 +338,18 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   // 🔐 Password Reset Flow Control
+  // Use ref for immediate flag check (no re-render delay)
+  const isResettingPasswordRef = useRef(false);
+
   const startPasswordReset = useCallback(() => {
-    console.log('[Auth] Starting password reset - pausing auto-navigation');
+    console.log('[Auth] 🔐 Starting password reset - blocking navigation');
+    isResettingPasswordRef.current = true;
     setState(prev => ({ ...prev, isResettingPassword: true }));
   }, []);
 
   const endPasswordReset = useCallback(() => {
-    console.log('[Auth] Ending password reset - resuming auto-navigation');
+    console.log('[Auth] 🔓 Ending password reset - allowing navigation');
+    isResettingPasswordRef.current = false;
     setState(prev => ({ ...prev, isResettingPassword: false }));
   }, []);
 
@@ -459,9 +464,21 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
   // HYBRID WALLET DETECTION - Fast profile check + API fallback
   useEffect(() => {
     const evaluateNavigation = async () => {
+      console.log('🚦 [Navigation] Evaluation started', {
+        isResettingPassword: state.isResettingPassword,
+        hasSession: !!state.session,
+        hasUser: !!state.user,
+        isLoading: state.loading,
+        currentPath: window.location.pathname
+      });
+
       // ⚠️ Don't navigate while user is resetting password
-      if (state.isResettingPassword) {
-        console.log('[Auth] Skipping navigation - password reset in progress');
+      // Check both ref (immediate) and state (for re-renders)
+      if (isResettingPasswordRef.current || state.isResettingPassword) {
+        console.log('🛑 [Navigation] BLOCKED - Password reset in progress', {
+          refValue: isResettingPasswordRef.current,
+          stateValue: state.isResettingPassword
+        });
         return;
       }
       
@@ -469,7 +486,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         const kycStatus = state.user.kyc_status || 'not_started';
         const currentPath = window.location.pathname;
         
-        console.log('[Auth Navigation] Entry:', {
+        console.log('✅ [Navigation] Conditions met for navigation check', {
           kycStatus,
           role: state.user.role,
           path: currentPath
@@ -538,7 +555,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     evaluateNavigation();
-  }, [state.session, state.user, state.loading, navigate]);
+  }, [state.session, state.user, state.loading, state.isResettingPassword, navigate]);
 
   const triggerWalletCreation = useCallback(async () => {
     try {

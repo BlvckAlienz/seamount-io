@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { emailMonitor } from '@/utils/emailMonitor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,8 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { resetPassword, loading, startPasswordReset, endPasswordReset } = useAuth();
-
+  const state = useAuth(); // Add this to access full state
+  
   // 🔐 Control auto-navigation while modal is open
   useEffect(() => {
     if (open) {
@@ -47,6 +49,19 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 🔍 DIAGNOSTIC: What is the actual auth state?
+    console.log('=== RESET PASSWORD DEBUG ===');
+    console.log('1. Current session:', state.session);
+    console.log('2. Current user:', state.user);
+    console.log('3. Is resetting password flag:', state.isResettingPassword);
+    console.log('4. Current pathname:', window.location.pathname);
+    
+    // Check Supabase directly
+    const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+    console.log('5. Supabase session (direct):', supabaseSession);
+    console.log('============================');
+
     setFormError(null);
     
     if (!email || !/\S+@\S+\.\S+/.test(email)) {

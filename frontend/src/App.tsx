@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { api } from '@/lib/api'; // 🎯 Use our fixed API client
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 // --- Core Components & Pages ---
 import ErrorBoundary from './components/ErrorBoundary';
@@ -107,6 +108,7 @@ const AppContent: React.FC = () => {
         <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
         <Route path="/contact" element={<InvestorContact />} />
         <Route path="/debug-auth" element={<AuthDebugPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Protected Routes */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
@@ -117,7 +119,7 @@ const AppContent: React.FC = () => {
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
         <Route path="/portfolio" element={<ProtectedRoute><portfolioPage /></ProtectedRoute>} />
         <Route path="/wallet-recovery" element={<ProtectedRoute><WalletRecovery /></ProtectedRoute>} />
-
+        
         {/* Admin Route */}
         <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
 
