@@ -88,6 +88,22 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
     try {
       console.log('📧 [ResetPassword] Calling Supabase directly for:', email);
       
+      // Diagnostic: Watch ALL auth events
+      const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('🔍 [DIAGNOSTIC] Auth event during reset:', {
+          event,
+          hasSession: !!session,
+          userEmail: session?.user?.email
+        });
+      });
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      // Stop watching
+      unsubscribe.data.subscription.unsubscribe();
+      
       // ⚠️ Call Supabase DIRECTLY - don't use resetPassword from AuthContext
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
