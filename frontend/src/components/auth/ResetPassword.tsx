@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { emailMonitor } from '@/utils/emailMonitor';
@@ -27,7 +27,23 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { resetPassword, loading } = useAuth();
+  const { resetPassword, loading, startPasswordReset, endPasswordReset } = useAuth();
+
+  // 🔐 Control auto-navigation while modal is open
+  useEffect(() => {
+    if (open) {
+      console.log('[ResetPassword] Modal opened - blocking auto-navigation');
+      startPasswordReset();
+    } else {
+      console.log('[ResetPassword] Modal closed - allowing auto-navigation');
+      endPasswordReset();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      endPasswordReset();
+    };
+  }, [open, startPasswordReset, endPasswordReset]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,16 +91,20 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
 
     // ✅ Record successful attempt
     emailMonitor.recordAttempt(email, 'password_reset');
-    
+
   };
 
   const handleClose = () => {
-    setEmail('');
-    setSuccessMessage('');
-    setFormError(null);
-    setIsSubmitting(false);
-    onOpenChange(false);
-  };
+  setEmail('');
+  setSuccessMessage('');
+  setFormError(null);
+  setIsSubmitting(false);
+  
+  // ⚠️ CRITICAL: Re-enable navigation before closing
+  endPasswordReset();
+  
+  onOpenChange(false);
+};
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

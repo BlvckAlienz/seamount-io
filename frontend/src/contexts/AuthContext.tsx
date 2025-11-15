@@ -19,6 +19,7 @@ interface AuthState {
   error: string | null;
   isDemoMode: boolean;
   role: 'tribe' | 'alien';
+  isResettingPassword: boolean;
 }
 
 interface AuthContextType extends AuthState {
@@ -38,9 +39,10 @@ interface AuthContextType extends AuthState {
   updateUserRole: (role: 'tribe' | 'alien') => void;
   triggerWalletCreation: () => Promise<boolean>;
   refreshProfile: () => Promise<void>;
-  // ADD THESE TWO PROPERTIES:
   kycStatus: string;
   skipVerification: () => void;
+  startPasswordReset: () => void;
+  endPasswordReset: () => void;     
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,6 +61,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     error: null,
     isDemoMode: false,
     role: 'alien',
+    isResettingPassword: false,
   });
    
   const navigate = useNavigate();
@@ -316,6 +319,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         error: null,
         isDemoMode: false,
         role: 'alien',
+        isResettingPassword: false,
       });
       
       window.location.href = '/';
@@ -331,6 +335,17 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('[Auth] Skipping verification');
     // This is a no-op for now, just to satisfy the TypeScript interface
     toastInfo('Verification skipped for demo purposes');
+  }, []);
+
+  // 🔐 Password Reset Flow Control
+  const startPasswordReset = useCallback(() => {
+    console.log('[Auth] Starting password reset - pausing auto-navigation');
+    setState(prev => ({ ...prev, isResettingPassword: true }));
+  }, []);
+
+  const endPasswordReset = useCallback(() => {
+    console.log('[Auth] Ending password reset - resuming auto-navigation');
+    setState(prev => ({ ...prev, isResettingPassword: false }));
   }, []);
 
   const enterDemoMode = () => {
@@ -351,6 +366,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       error: null,
       isDemoMode: true,
       role: 'alien',
+      isResettingPassword: false,
     });
     navigate('/dashboard');
   };
@@ -440,9 +456,15 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, role }));
   }, []);
 
-  // ðŸŽ¯ HYBRID WALLET DETECTION - Fast profile check + API fallback
+  // HYBRID WALLET DETECTION - Fast profile check + API fallback
   useEffect(() => {
     const evaluateNavigation = async () => {
+      // ⚠️ Don't navigate while user is resetting password
+      if (state.isResettingPassword) {
+        console.log('[Auth] Skipping navigation - password reset in progress');
+        return;
+      }
+      
       if (state.session && state.user && !state.loading) {
         const kycStatus = state.user.kyc_status || 'not_started';
         const currentPath = window.location.pathname;
@@ -462,7 +484,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
         
-        // ðŸš€ PHASE 1: Fast profile check (instant, 99% accurate)
+        // PHASE 1: Fast profile check (instant, 99% accurate)
         const quickCheck = state.user.onboarding_complete === true || 
                           state.user.kyc_level >= 1;
         
@@ -477,7 +499,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
         
-        // ðŸ” PHASE 2: API check only for critical paths (accurate fallback)
+        // PHASE 2: API check only for critical paths (accurate fallback)
         if (currentPath === '/dashboard' || currentPath === '/' || currentPath === '/landing') {
           console.log('[Auth] ðŸ” Running API wallet check...');
           
@@ -543,7 +565,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateUserRole,
       triggerWalletCreation,
       kycStatus: state.user?.kyc_status || 'not_started',
-      skipVerification
+      skipVerification,
+      startPasswordReset,
+      endPasswordReset     
     }}>
       {children}
     </AuthContext.Provider>

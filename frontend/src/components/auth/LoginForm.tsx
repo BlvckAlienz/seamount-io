@@ -131,12 +131,16 @@ const LoginForm: React.FC<LoginFormProps> = ({
           </div>
         )}
 
-        {/* 🔐 RESET PASSWORD MODAL - ADD THIS EXACTLY HERE */}
+        {/* 🔐 RESET PASSWORD MODAL - Blocks auto-navigation while open */}
         <ResetPassword 
           open={showResetPassword}
-          onOpenChange={setShowResetPassword}
+          onOpenChange={(isOpen) => {
+            setShowResetPassword(isOpen);
+            // Don't trigger any navigation on close
+          }}
           onSuccess={() => {
             toast.success('Reset instructions sent! Check your email.');
+            setShowResetPassword(false);
           }}
         />
       </form>
