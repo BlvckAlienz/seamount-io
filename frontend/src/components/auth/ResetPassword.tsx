@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { emailMonitor } from '@/utils/emailMonitor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,13 +27,11 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-// We're calling Supabase directly to avoid unnecessary abstraction
-// const { loading } = useAuth(); // ← Don't need this anymore
+  const { resetPassword, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    setSuccessMessage('');
     
     if (!email || !/\S+@\S+\.\S+/.test(email)) {
       setFormError('Please enter a valid email address');
@@ -54,37 +51,31 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
     setIsSubmitting(true);
     
     try {
-      // 🎯 CRITICAL: Don't trust Supabase's "success" - it always returns true
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      // ⚠️ Supabase returns success even if email doesn't exist (security feature)
-      if (error) {
-        // Only show error if Supabase had a technical failure
-        console.error('[ResetPassword] Supabase error:', error);
-        setFormError('Unable to send reset email. Please try again later.');
-        return;
+      const { success, error } = await resetPassword(email);
+      
+      if (success) {
+        setSuccessMessage('If an account exists for this email, password reset instructions have been sent.');
+        setEmail('');
+        
+        // Auto-close after success or call onSuccess
+        if (onSuccess) {
+          setTimeout(() => {
+            onSuccess();
+            onOpenChange(false);
+          }, 3000);
+        }
+      } else {
+        setFormError(error || 'An unexpected error occurred. Please try again.');
       }
-
-      // ✅ Record successful attempt
-      emailMonitor.recordAttempt(email, 'password_reset');
-
-      // ✅ Show generic success message (don't reveal if email exists)
-      setSuccessMessage(
-        'If an account exists with this email, you will receive password reset instructions within 5 minutes. Check your spam folder if you don\'t see it.'
-      );
-      setEmail('');
-      
-      // ⚠️ DON'T auto-close - let user read the message and close manually
-      // NO setTimeout, NO auto-redirect, NO onSuccess callback
-      
     } catch (error: any) {
-      console.error('[ResetPassword] Exception:', error);
-      setFormError('Network error. Please check your connection and try again.');
+      setFormError(error.message || 'Failed to send reset instructions. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+
+    // ✅ Record successful attempt
+    emailMonitor.recordAttempt(email, 'password_reset');
+    
   };
 
   const handleClose = () => {
@@ -113,23 +104,9 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ open, onOpenChange, onSuc
         {successMessage ? (
           <div className="py-6 text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <p className="text-gray-700 dark:text-gray-300 mb-4 text-lg font-medium">
+            <p className="text-gray-700 dark:text-gray-300 mb-6 text-lg font-medium">
               {successMessage}
             </p>
-            
-            {/* ✅ ADD HELPFUL NEXT STEPS */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-left">
-              <p className="text-sm text-gray-700 dark:text-gray-300 font-semibold mb-2">
-                📧 Next Steps:
-              </p>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>• Check your inbox for reset instructions</li>
-                <li>• Look in spam/junk folder if not in inbox</li>
-                <li>• Email may take up to 5 minutes to arrive</li>
-                <li>• Link expires in 1 hour for security</li>
-              </ul>
-            </div>
-            
             <Button 
               onClick={handleClose}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"

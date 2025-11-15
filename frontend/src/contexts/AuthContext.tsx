@@ -1,5 +1,5 @@
 // File: frontend/src/contexts/AuthContext.tsx
-// ✅ PRODUCTION READY - HYBRID WALLET DETECTION
+// âœ… PRODUCTION READY - HYBRID WALLET DETECTION
 // Fast profile checks + API fallback for accuracy
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -112,7 +112,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         setTimeout(async () => {
           await fetchUserProfile(5, 2000);
           
-          // ✅ CHECK IF WALLETS NEED TO BE CREATED
+          // âœ… CHECK IF WALLETS NEED TO BE CREATED
           if (event === 'SIGNED_IN') {
             try {
               const walletStatusResponse = await apiClient.get('/api/v1/wallet-creation/status');
@@ -121,19 +121,19 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const missingWallets = walletStatusResponse.data.summary?.missing_chains || [];
                 
                 if (missingWallets.length > 0) {
-                  console.log('[Auth] 📍 User missing wallets, triggering creation...');
+                  console.log('[Auth] ðŸ“ User missing wallets, triggering creation...');
                   
                   setTimeout(async () => {
                     try {
                       const createResponse = await apiClient.post('/api/v1/wallet/create');
                       
                       if (createResponse.data.success) {
-                        console.log('[Auth] ✅ Wallets created on login:', createResponse.data.created_chains);
+                        console.log('[Auth] âœ… Wallets created on login:', createResponse.data.created_chains);
                         
                         sessionStorage.setItem('show_wallet_backup', 'true');
                         sessionStorage.setItem('new_wallets', JSON.stringify(createResponse.data.created_chains));
                         
-                        toast.success('🎉 Your wallets are ready! Please back them up.');
+                        toast.success('ðŸŽ‰ Your wallets are ready! Please back them up.');
                       }
                     } catch (createError) {
                       console.error('[Auth] Wallet creation on login failed:', createError);
@@ -188,7 +188,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) throw error;
 
-      // ✅ CREATE USER PROFILE
+      // CREATE USER PROFILE
       if (data.user) {
         try {
           console.log('[Auth] Creating user profile for:', data.user.id);
@@ -204,24 +204,24 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profileResponse = await apiClient.post('/api/v1/user/profile', profileData);
           
           if (profileResponse.data.success) {
-            console.log('[Auth] ✅ Profile created:', profileResponse.data.profile);
+            console.log('[Auth] âœ… Profile created:', profileResponse.data.profile);
             
             if (!data.user.email_confirmed_at) {
               toast.success('Please check your email to confirm your account');
             } else {
-              console.log('[Auth] 📍 Triggering wallet creation...');
+              console.log('[Auth] ðŸ“ Triggering wallet creation...');
               
               setTimeout(async () => {
                 try {
                   const walletResponse = await apiClient.post('/api/v1/wallet/create');
                   
                   if (walletResponse.data.success) {
-                    console.log('[Auth] ✅ Wallets created:', walletResponse.data.created_chains);
+                    console.log('[Auth] âœ… Wallets created:', walletResponse.data.created_chains);
                     sessionStorage.setItem('show_wallet_backup', 'true');
                     sessionStorage.setItem('new_wallets', JSON.stringify(walletResponse.data.created_chains));
                   }
                 } catch (walletError) {
-                  console.error('[Auth] ❌ Wallet creation failed:', walletError);
+                  console.error('[Auth] âŒ Wallet creation failed:', walletError);
                 }
               }, 2000);
             }
@@ -268,8 +268,6 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
   
-  // ⚠️ DEPRECATED: ResetPassword component calls Supabase directly
-  // Kept for backward compatibility if other components need it
   const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     
@@ -414,10 +412,10 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
             profile.kyc_level >= 1;
           
           if (isOnboardingComplete && window.location.pathname === '/onboarding') {
-            console.log('✅ Onboarding completed, redirecting to dashboard');
+            console.log('âœ… Onboarding completed, redirecting to dashboard');
             navigate('/dashboard');
           } else if (!isOnboardingComplete && window.location.pathname === '/dashboard') {
-            console.log('🔄 Onboarding not complete, redirecting to onboarding');
+            console.log('ðŸ”„ Onboarding not complete, redirecting to onboarding');
             navigate('/onboarding');
           }
         }
@@ -442,7 +440,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, role }));
   }, []);
 
-  // 🎯 HYBRID WALLET DETECTION - Fast profile check + API fallback
+  // ðŸŽ¯ HYBRID WALLET DETECTION - Fast profile check + API fallback
   useEffect(() => {
     const evaluateNavigation = async () => {
       if (state.session && state.user && !state.loading) {
@@ -458,13 +456,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Tribe members always go to dashboard
         if (kycStatus === 'approved' || state.user.role === 'tribe') {
           if (currentPath !== '/dashboard' && !currentPath.startsWith('/settings')) {
-            console.log('[Auth] Tribe member → dashboard');
+            console.log('[Auth] Tribe member â†’ dashboard');
             navigate('/dashboard');
           }
           return;
         }
         
-        // 🚀 PHASE 1: Fast profile check (instant, 99% accurate)
+        // ðŸš€ PHASE 1: Fast profile check (instant, 99% accurate)
         const quickCheck = state.user.onboarding_complete === true || 
                           state.user.kyc_level >= 1;
         
@@ -473,15 +471,15 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If profile says user has wallet, trust it (fast path)
         if (quickCheck) {
           if (currentPath === '/' || currentPath === '/landing') {
-            console.log('[Auth] ✅ Quick check passed → dashboard');
+            console.log('[Auth] âœ… Quick check passed â†’ dashboard');
             navigate('/dashboard');
           }
           return;
         }
         
-        // 🔍 PHASE 2: API check only for critical paths (accurate fallback)
+        // ðŸ” PHASE 2: API check only for critical paths (accurate fallback)
         if (currentPath === '/dashboard' || currentPath === '/' || currentPath === '/landing') {
-          console.log('[Auth] 🔍 Running API wallet check...');
+          console.log('[Auth] ðŸ” Running API wallet check...');
           
           try {
             const response = await apiClient.get('/api/v1/wallet-creation/status');
@@ -496,12 +494,12 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (hasWallet) {
               // User has wallets via API - allow dashboard
               if (currentPath === '/' || currentPath === '/landing') {
-                console.log('[Auth] ✅ API check passed → dashboard');
+                console.log('[Auth] âœ… API check passed â†’ dashboard');
                 navigate('/dashboard');
               }
             } else {
               // No wallets - force onboarding
-              console.log('[Auth] ❌ No wallets detected → onboarding');
+              console.log('[Auth] âŒ No wallets detected â†’ onboarding');
               navigate('/onboarding');
             }
           } catch (error) {
@@ -509,7 +507,7 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
             
             // Fallback to profile check if API fails
             if (!quickCheck && (currentPath === '/dashboard' || currentPath === '/' || currentPath === '/landing')) {
-              console.log('[Auth] 🔄 Fallback: No wallet → onboarding');
+              console.log('[Auth] ðŸ”„ Fallback: No wallet â†’ onboarding');
               navigate('/onboarding');
             }
           }
