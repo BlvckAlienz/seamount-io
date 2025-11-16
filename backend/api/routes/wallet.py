@@ -444,8 +444,72 @@ async def send_payment(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Payment failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Payment failed: {str(e)}")
+        # ============================================================================
+        # 🚨 ENHANCED ERROR PARSING - Extract meaningful error messages
+        # ============================================================================
+        error_message = str(e)
+        
+        # Parse nested exception messages
+        if 'Algorand transaction failed:' in error_message:
+            # Extract the actual Algorand error
+            error_parts = error_message.split('Algorand transaction failed:')
+            if len(error_parts) > 1:
+                error_message = error_parts[1].strip()
+        
+        # Detect specific error types and provide user-friendly messages
+        user_message = 'Payment failed. Please try again.'
+        
+        if 'balance' in error_message.lower() and 'below min' in error_message.lower():
+            # New account minimum balance error
+            user_message = (
+                "❌ NEW ACCOUNT REQUIRES 0.1 ALGO MINIMUM\n\n"
+                "Algorand requires at least 0.1 ALGO to activate new accounts.\n"
+                "Please send 0.1 ALGO or more for the first transaction."
+            )
+        elif 'receiver not opted-in' in error_message.lower() or 'asset not opted-in' in error_message.lower():
+            # ASA opt-in error
+            user_message = (
+                "❌ RECIPIENT MUST OPT-IN TO ASSET\n\n"
+                "The recipient must add this asset to their wallet before receiving.\n"
+                "Ask them to opt-in to the asset first."
+            )
+        elif 'insufficient balance' in error_message.lower() or 'insufficient funds' in error_message.lower():
+            # Insufficient balance
+            user_message = (
+                "❌ INSUFFICIENT BALANCE\n\n"
+                "You don't have enough balance to complete this transaction.\n"
+                "Please check your balance and try again."
+            )
+        elif 'invalid address' in error_message.lower() or 'malformed address' in error_message.lower():
+            # Invalid address
+            user_message = (
+                "❌ INVALID RECIPIENT ADDRESS\n\n"
+                "The recipient address format is incorrect.\n"
+                "Please double-check the address."
+            )
+        elif 'transaction fee' in error_message.lower():
+            # Fee-related error
+            user_message = (
+                "❌ TRANSACTION FEE ERROR\n\n"
+                "Unable to calculate or pay transaction fees.\n"
+                "Please try again in a moment."
+            )
+        elif 'timeout' in error_message.lower() or 'timed out' in error_message.lower():
+            # Network timeout
+            user_message = (
+                "❌ NETWORK TIMEOUT\n\n"
+                "The blockchain network is slow or unresponsive.\n"
+                "Please wait a moment and try again."
+            )
+        
+        logger.error(f"❌ Payment failed for user {current_user['id']}: {error_message}")
+        
+        return {
+            'success': False,
+            'message': user_message,
+            'error': error_message,  # Technical error for debugging
+            'error_type': 'transaction_failed'
+        }
 
 @router.post("/validate-address")
 async def validate_address(

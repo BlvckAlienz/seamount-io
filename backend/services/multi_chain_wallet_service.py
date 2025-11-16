@@ -19,6 +19,7 @@ from backend.services.database_service import DatabaseService
 from backend.services.fee_calculator import FeeCalculatorService, TransactionType
 from backend.services.oracle_service import OracleService
 from backend.services.seed_encryption_service import SeedEncryptionService
+from backend.services.revenue_tracking_service import RevenueTrackingService
 
 logger = logging.getLogger(__name__)
 
@@ -417,8 +418,16 @@ class MultiChainWalletService:
             else:
                 result = await self._send_via_wdk(user_id, recipient, asset, amount, optimal_chain)
             
-            # Record transaction - mapped to existing schema
+            # ============================================================================
+            # RECORD TRANSACTION + FEE OWED
+            # ============================================================================
             try:
+                # Calculate fee owed to treasury
+                from backend.config import get_settings, CENTRAL_TREASURY_ADDRESSES
+                settings = get_settings()
+                treasury_address = CENTRAL_TREASURY_ADDRESSES.get(optimal_chain, '')
+                
+                # Main transaction record
                 transaction_data = {
                     'user_id': user_id,
                     'transaction_type': 'transfer',
@@ -434,21 +443,80 @@ class MultiChainWalletService:
                         'chain': optimal_chain,
                         'asset': asset,
                         'memo': memo if memo else None,
-                        'estimated_arrival': self._estimate_arrival_time(optimal_chain)
+                        'estimated_arrival': self._estimate_arrival_time(optimal_chain),
+                        'treasury_address': treasury_address,
+                        'fee_owed': float(fee_calc['platform_fee']),  # Track fee owed
+                        'fee_collected': False  # Will be updated when fee is collected
                     }
                 }
                 
-                # ✅ Supabase client is synchronous, don't use await
                 response = self.db.supabase.table('transactions').insert(transaction_data).execute()
                 
                 if response.data:
-                    logger.info(f"✅ Transaction recorded in database: {result['tx_id']} ({asset} on {optimal_chain})")
+                    transaction_id = response.data[0].get('id')
+                    logger.info(f"✅ Transaction recorded: {result['tx_id']} ({asset} on {optimal_chain})")
+                    
+                    # ============================================================================
+                    # 🔥 RECORD FEE OWED (For batch collection)
+                    # ============================================================================
+                    try:
+                        fee_owed_data = {
+                            'user_id': user_id,
+                            'transaction_id': transaction_id,
+                            'chain': optimal_chain,
+                            'asset': asset,
+                            'fee_amount': float(fee_calc['platform_fee']),
+                            'treasury_address': treasury_address,
+                            'status': 'pending',
+                            'created_at': datetime.utcnow().isoformat()
+                        }
+                        
+                        fee_insert = self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
+                        
+                        if fee_insert.data:
+                            logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
+                        else:
+                            logger.error(f"❌ Fee insert returned no data: {fee_insert}")
+                            # Check if table exists
+                            try:
+                                check = self.db.supabase.table('fees_owed').select('id').limit(1).execute()
+                                logger.info(f"✅ fees_owed table exists (found {len(check.data)} records)")
+                            except Exception as table_err:
+                                logger.error(f"❌ fees_owed table does not exist: {table_err}")
+                                logger.error("   Run this SQL in Supabase:")
+                                logger.error("   CREATE TABLE fees_owed (...)")
+                                
+                    except Exception as fee_err:
+                        logger.error(f"❌ Failed to record fee owed: {fee_err}")
+                        logger.error(f"   Fee data: {fee_owed_data}")
+                        # Don't block transaction
+                    
+                    self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
+                    logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
                 else:
-                    logger.warning(f"⚠️ Transaction insert returned no data (but may have succeeded)")
+                    logger.warning(f"⚠️ Transaction insert returned no data")
                 
-            except Exception as db_err:
-                # Non-fatal: blockchain transaction succeeded, just logging failed
-                logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
+                # Track revenue (for analytics)
+                try:
+                    revenue_service = RevenueTrackingService(self.db)  # ✅ Instantiate before using
+                    await revenue_service.track_transaction_fee(
+                        user_id=user_id,
+                        transaction_type="p2p_transfer",
+                        amount=amount,
+                        fee_rate=Decimal("0.007"),
+                        platform_fee=Decimal(str(fee_calc['platform_fee'])),
+                        network_fee=Decimal(str(fee_calc['network_fee'])),
+                        blockchain=optimal_chain,
+                        metadata={
+                            'transaction_id': result['tx_id'],
+                            'asset': asset,
+                            'memo': memo if memo else None,
+                            'fee_status': 'pending_collection'
+                        }
+                    )
+                except Exception as rev_err:
+                    # Non-fatal: don't block transaction
+                    logger.error(f"❌ Revenue tracking failed: {rev_err}")
             
             return {
                 'success': True,
