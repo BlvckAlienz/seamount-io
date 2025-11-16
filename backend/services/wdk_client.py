@@ -435,57 +435,320 @@ class WDKClient:
         self, 
         address: str, 
         chain: str,
+        asset: str = None,
         use_indexer: bool = True
     ) -> Dict[str, Any]:
-        """Get balance for address on specific chain"""
+        """
+        Get balance with intelligent routing based on asset type:
+        
+        NATIVE ASSETS (ETH, BTC, TRX, MATIC):
+        → Direct RPC (Alchemy, TronGrid, Blockchain.info)
+        
+        TOKEN ASSETS (USDT, USDC, XAUT):
+        → Try Tether Indexer → Fallback to Direct RPC
+        """
         
         if chain not in self.SUPPORTED_CHAINS:
             raise ValueError(f"Unsupported chain: {chain}")
         
-        # Try Indexer first (if available)
-        if use_indexer and self.indexer_url:
+        logger.info(f"🔍 Balance query: {chain} / {asset or 'native'} / {address[:10]}...")
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # DETERMINE ASSET TYPE
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        native_assets = {
+            'ethereum': 'ETH',
+            'bitcoin': 'BTC',
+            'tron': 'TRX',
+            'polygon': 'MATIC'
+        }
+        
+        # Map asset names to Tether Indexer token identifiers
+        tether_token_map = {
+            'USDT': 'usdt',
+            'USDT_ETH': 'usdt',
+            'USDT_POLYGON': 'usdt',
+            'USDT_TRON': 'usdt',
+            'USDC': 'usdt',  # Tether only indexes USDT, not USDC
+            'XAUT': 'xaut',
+            'goBTC': 'btc'
+        }
+        
+        # Determine if querying native or token
+        is_native = (
+            not asset or 
+            asset.upper() == native_assets.get(chain, '').upper()
+        )
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # PATH 1: NATIVE ASSETS → Direct RPC Only
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        if is_native:
+            logger.info(f"🎯 Native asset detected ({native_assets.get(chain)}) - using Direct RPC")
+            result = await self.get_balance_direct_rpc(address, chain)
+            
+            if result.get('success'):
+                return result
+            else:
+                # Graceful degradation
+                return {
+                    'balance': '0',
+                    'success': False,
+                    'chain': chain,
+                    'address': address,
+                    'error': 'Direct RPC failed for native asset',
+                    'source': 'fallback'
+                }
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # PATH 2: TOKEN ASSETS → Try Tether Indexer First
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        token_identifier = tether_token_map.get(asset.upper() if asset else None)
+        
+        if use_indexer and self.indexer_url and token_identifier:
             try:
+                logger.info(f"📡 TIER 1: Querying Tether Indexer for {token_identifier} on {chain}...")
+                
+                # ✅ CORRECT Tether API endpoint
+                endpoint = f'/api/v1/{chain}/{token_identifier}/{address}/token-balances'
+                
                 result = await self._make_request(
                     'GET', 
-                    f'/v1/balance/{chain}/{address}',
-                    use_indexer=True
+                    endpoint,
+                    use_indexer=True,
+                    max_retries=1  # Fail fast
                 )
-                return result
-            except Exception as e:
-                logger.warning(f"⚠️ Indexer failed, using direct query: {e}")
-        
-        # Direct query to WDK service
-        try:
-            async with aiohttp.ClientSession() as session:
-                headers = {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key
-                }
                 
-                # Use GET with query parameters
+                # Parse Tether's response format
+                if result.get('tokenBalance'):
+                    token_balance = result['tokenBalance']
+                    balance_amount = token_balance.get('amount', '0')
+                    
+                    logger.info(f"✅ TIER 1 SUCCESS: {token_identifier} balance from Tether Indexer")
+                    
+                    return {
+                        'balance': balance_amount,
+                        'success': True,
+                        'chain': chain,
+                        'token': token_identifier,
+                        'address': address,
+                        'source': 'tether_indexer',
+                        'raw': result
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ TIER 1 FAILED: {str(e)[:100]}...")
+        else:
+            if not token_identifier:
+                logger.debug(f"⚠️ Token {asset} not supported by Tether Indexer")
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # TIER 2: Your WDK Service (Optional Middle Layer)
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        try:
+            logger.debug(f"📡 TIER 2: Trying your WDK Service...")
+            
+            async with aiohttp.ClientSession() as session:
                 url = f"{self.base_url}/wallet/balance"
                 params = {
                     'chain': chain,
-                    'address': address
+                    'address': address,
+                    'asset': asset or 'native'
+                }
+                headers = {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
                 }
                 
-                async with session.get(url, headers=headers, params=params, timeout=30) as response:
-                    if response.status != 200:
-                        logger.warning(f"Balance query returned {response.status}")
-                        return {'balance': '0', 'success': False}
-                    
-                    result = await response.json()
-                    
-                    if not result.get('success'):
-                        logger.error(f"Balance query failed: {result.get('error')}")
-                        return {'balance': '0', 'success': False}
-                    
-                    return result
-                    
+                timeout = aiohttp.ClientTimeout(total=10)
+                
+                async with session.get(url, params=params, headers=headers, timeout=timeout) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        
+                        if result.get('success'):
+                            logger.info(f"✅ TIER 2 SUCCESS: Balance from WDK Service")
+                            result['source'] = 'wdk_service'
+                            return result
         except Exception as e:
-            logger.error(f"❌ Balance query failed for {chain}: {e}")
-            return {'balance': '0', 'success': False}
+            logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # TIER 3: Direct RPC (Final Fallback)
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        logger.info(f"🔄 TIER 3: Falling back to Direct RPC...")
+        result = await self.get_balance_direct_rpc(address, chain)
+        
+        if result.get('success'):
+            logger.info(f"✅ TIER 3 SUCCESS: Balance from Direct RPC")
+            return result
+        
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # COMPLETE FAILURE: Return Zero Balance
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        logger.error(f"❌ ALL TIERS FAILED for {chain}/{asset}: {address[:10]}...")
+        return {
+            'balance': '0',
+            'success': False,
+            'chain': chain,
+            'address': address,
+            'asset': asset,
+            'error': 'All balance query methods exhausted',
+            'source': 'complete_failure'
+        }
     
+    async def get_balance_direct_rpc(
+        self,
+        address: str,
+        chain: str
+    ) -> Dict[str, Any]:
+        """
+        TIER 3: Direct blockchain RPC queries
+        Works for ALL assets (native + tokens)
+        Slowest but most reliable
+        """
+        
+        try:
+            logger.info(f"🔄 Direct RPC: {chain} / {address[:10]}...")
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # BITCOIN
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            if chain == 'bitcoin':
+                async with aiohttp.ClientSession() as session:
+                    url = f"https://blockchain.info/balance?active={address}"
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    
+                    async with session.get(url, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            balance_satoshi = data.get(address, {}).get('final_balance', 0)
+                            balance_btc = Decimal(balance_satoshi) / Decimal('100000000')
+                            
+                            logger.info(f"✅ BTC balance: {balance_btc}")
+                            return {
+                                'balance': str(balance_btc),
+                                'success': True,
+                                'chain': 'bitcoin',
+                                'source': 'blockchain.info',
+                                'address': address
+                            }
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ETHEREUM
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            elif chain == 'ethereum':
+                if not self.settings.ALCHEMY_API_KEY_ETHEREUM:
+                    logger.error("❌ No Alchemy API key for Ethereum")
+                    return {'balance': '0', 'success': False, 'error': 'No Alchemy key'}
+                
+                alchemy_key = self.settings.ALCHEMY_API_KEY_ETHEREUM.get_secret_value()
+                url = f"https://eth-mainnet.g.alchemy.com/v2/{alchemy_key}"
+                
+                async with aiohttp.ClientSession() as session:
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "method": "eth_getBalance",
+                        "params": [address, "latest"],
+                        "id": 1
+                    }
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    
+                    async with session.post(url, json=payload, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            balance_wei = int(data.get('result', '0x0'), 16)
+                            balance_eth = Decimal(balance_wei) / Decimal('1000000000000000000')
+                            
+                            logger.info(f"✅ ETH balance: {balance_eth}")
+                            return {
+                                'balance': str(balance_eth),
+                                'success': True,
+                                'chain': 'ethereum',
+                                'source': 'alchemy',
+                                'address': address
+                            }
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # POLYGON
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            elif chain == 'polygon':
+                if not self.settings.ALCHEMY_API_KEY_POLYGON:
+                    logger.error("❌ No Alchemy API key for Polygon")
+                    return {'balance': '0', 'success': False, 'error': 'No Alchemy key'}
+                
+                alchemy_key = self.settings.ALCHEMY_API_KEY_POLYGON.get_secret_value()
+                url = f"https://polygon-mainnet.g.alchemy.com/v2/{alchemy_key}"
+                
+                async with aiohttp.ClientSession() as session:
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "method": "eth_getBalance",
+                        "params": [address, "latest"],
+                        "id": 1
+                    }
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    
+                    async with session.post(url, json=payload, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            balance_wei = int(data.get('result', '0x0'), 16)
+                            balance_matic = Decimal(balance_wei) / Decimal('1000000000000000000')
+                            
+                            logger.info(f"✅ MATIC balance: {balance_matic}")
+                            return {
+                                'balance': str(balance_matic),
+                                'success': True,
+                                'chain': 'polygon',
+                                'source': 'alchemy',
+                                'address': address
+                            }
+            
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # TRON
+            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            elif chain == 'tron':
+                async with aiohttp.ClientSession() as session:
+                    url = f"https://api.trongrid.io/v1/accounts/{address}"
+                    headers = {}
+                    
+                    if self.settings.TRON_API_KEY:
+                        headers["TRON-PRO-API-KEY"] = self.settings.TRON_API_KEY.get_secret_value()
+                    
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    
+                    async with session.get(url, headers=headers, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            accounts = data.get('data', [])
+                            
+                            if accounts and len(accounts) > 0:
+                                balance_sun = accounts[0].get('balance', 0)
+                                balance_trx = Decimal(balance_sun) / Decimal('1000000')
+                                
+                                logger.info(f"✅ TRX balance: {balance_trx}")
+                                return {
+                                    'balance': str(balance_trx),
+                                    'success': True,
+                                    'chain': 'tron',
+                                    'source': 'trongrid',
+                                    'address': address
+                                }
+            
+            # Chain not handled
+            logger.warning(f"⚠️ Chain {chain} not implemented in Direct RPC")
+            return {
+                'balance': '0',
+                'success': False,
+                'error': f'Direct RPC not implemented for {chain}'
+            }
+            
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ Direct RPC timeout for {chain}")
+            return {'balance': '0', 'success': False, 'error': 'RPC timeout'}
+        except Exception as e:
+            logger.error(f"❌ Direct RPC error for {chain}: {e}")
+            return {'balance': '0', 'success': False, 'error': str(e)}
+        
     async def get_balances_multi_chain(
         self, 
         addresses: Dict[str, str]
