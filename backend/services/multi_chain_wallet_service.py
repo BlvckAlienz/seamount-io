@@ -387,7 +387,9 @@ class MultiChainWalletService:
         """Send payment with auto-routing"""
         
         try:
-            # ✅ Validate inputs
+            # ============================================================================
+            # STEP 1: VALIDATE INPUTS
+            # ============================================================================
             if not asset or len(asset.strip()) == 0:
                 raise Exception("Asset cannot be empty")
             
@@ -399,11 +401,15 @@ class MultiChainWalletService:
             
             logger.info(f"💸 Initiating send: {amount} {asset} to {recipient[:10]}...")
             
-            # Auto-route to optimal chain
+            # ============================================================================
+            # STEP 2: AUTO-ROUTE TO OPTIMAL CHAIN
+            # ============================================================================
             optimal_chain = await self.auto_route_transaction(asset, amount, recipient)
             logger.info(f"🔀 Auto-routed {asset} to {optimal_chain}")
             
-            # Calculate fees
+            # ============================================================================
+            # STEP 3: CALCULATE FEES
+            # ============================================================================
             fee_calc = await self.fees.calculate_transaction_fee(
                 transaction_type=TransactionType.P2P_LOCAL,
                 amount=amount,
@@ -412,22 +418,42 @@ class MultiChainWalletService:
                 to_asset=asset
             )
             
-            # Execute transaction
+            # ============================================================================
+            # STEP 4: VERIFY WALLET EXISTS (CRITICAL)
+            # ============================================================================
+            if optimal_chain == 'algorand':
+                wallet_check = self.db.supabase.table('user_wallets')\
+                    .select('algorand_address')\
+                    .eq('user_id', user_id)\
+                    .execute()
+                
+                if not wallet_check.data or len(wallet_check.data) == 0:
+                    raise Exception(
+                        "❌ NO WALLET FOUND\n\n"
+                        "You don't have an Algorand wallet yet.\n"
+                        "Please create a wallet first by clicking 'Create Wallet' in the dashboard."
+                    )
+                
+                logger.info(f"✅ Algorand wallet verified for user {user_id}")
+            
+            # ============================================================================
+            # STEP 5: EXECUTE BLOCKCHAIN TRANSACTION
+            # ============================================================================
             if optimal_chain == 'algorand':
                 result = await self._send_via_algorand(user_id, recipient, asset, amount, memo)
             else:
                 result = await self._send_via_wdk(user_id, recipient, asset, amount, optimal_chain)
             
+            logger.info(f"✅ Blockchain transaction successful: {result['tx_id']}")
+            
             # ============================================================================
-            # RECORD TRANSACTION + FEE OWED
+            # STEP 6: RECORD TRANSACTION (NON-FATAL IF FAILS)
             # ============================================================================
             try:
-                # Calculate fee owed to treasury
                 from backend.config import get_settings, CENTRAL_TREASURY_ADDRESSES
                 settings = get_settings()
                 treasury_address = CENTRAL_TREASURY_ADDRESSES.get(optimal_chain, '')
                 
-                # Main transaction record
                 transaction_data = {
                     'user_id': user_id,
                     'transaction_type': 'transfer',
@@ -454,11 +480,9 @@ class MultiChainWalletService:
                 
                 if response.data:
                     transaction_id = response.data[0].get('id')
-                    logger.info(f"✅ Transaction recorded: {result['tx_id']} ({asset} on {optimal_chain})")
+                    logger.info(f"✅ Transaction recorded in DB: {transaction_id}")
                     
-                    # ============================================================================
-                    # 🔥 RECORD FEE OWED (For batch collection)
-                    # ============================================================================
+                    # Record fee owed (for batch collection)
                     try:
                         fee_owed_data = {
                             'user_id': user_id,
@@ -476,13 +500,10 @@ class MultiChainWalletService:
                         if fee_insert.data:
                             logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
                         else:
-                            logger.error(f"❌ Fee insert returned no data")
+                            logger.warning(f"⚠️ Fee insert returned no data (non-fatal)")
                             
                     except Exception as fee_err:
-                        logger.error(f"❌ Failed to record fee owed: {fee_err}")
-                        # Don't block transaction
-                else:
-                    logger.warning(f"⚠️ Transaction insert returned no data")
+                        logger.error(f"❌ Failed to record fee owed (non-fatal): {fee_err}")
                 
                 # Track revenue (for analytics)
                 try:
@@ -502,15 +523,16 @@ class MultiChainWalletService:
                             'fee_status': 'pending_collection'
                         }
                     )
+                    logger.info(f"📊 Revenue tracked successfully")
                 except Exception as rev_err:
-                    logger.error(f"❌ Revenue tracking failed: {rev_err}")
+                    logger.error(f"❌ Revenue tracking failed (non-fatal): {rev_err}")
                     
             except Exception as db_err:
-                # Non-fatal: transaction succeeded on chain
-                logger.error(f"❌ Database logging failed (transaction still succeeded): {db_err}")
+                # Non-fatal: blockchain transaction already succeeded
+                logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
             
             # ============================================================================
-            # RETURN SUCCESS RESPONSE
+            # STEP 7: RETURN SUCCESS RESPONSE
             # ============================================================================
             return {
                 'success': True,
@@ -523,11 +545,14 @@ class MultiChainWalletService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Payment failed: {e}")
+            # Catch ANY error in the entire transaction flow
+            error_msg = str(e)
+            logger.error(f"❌ Payment failed for user {user_id}: {error_msg}")
+            
             return {
                 'success': False,
                 'message': 'Payment failed. Please try again.',
-                'error': str(e)
+                'error': error_msg
             }
     
     # ========== HELPER METHODS ==========
