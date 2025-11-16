@@ -164,6 +164,10 @@ class FeeCalculatorService:
                 # Fee breakdown (transparent to user)
                 "provider_fee": float(provider_fee),
                 "seamount_fee": float(seamount_margin),
+
+                # ✅ BACKWARD COMPATIBILITY: Add aliases for wallet service
+                "platform_fee": float(seamount_margin),      # Alias for seamount_fee
+                "network_fee": float(provider_fee),          # Alias for provider_fee
                 
                 # Rates (for display)
                 "provider_fee_rate": float(provider_fee_rate * 100) if provider == "flutterwave" else float(provider_fee / amount * 100),
