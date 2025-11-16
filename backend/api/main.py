@@ -415,6 +415,23 @@ async def lifespan(app: FastAPI):
                     )
                     logger.info("✅ All dependencies initialized successfully")
                     
+                    # ============================================================================
+                    # START FEE COLLECTION SCHEDULER (Background Task)
+                    # ============================================================================
+                    try:
+                        from backend.services.fee_collection_scheduler import FeeCollectionScheduler
+                        
+                        scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
+                        await scheduler.start()
+                        
+                        logger.info("✅ Fee collection scheduler started (runs daily at 3:00 AM)")
+                        
+                        # Store reference for cleanup
+                        app.state.fee_scheduler = scheduler
+                        
+                    except Exception as sched_err:
+                        logger.error(f"❌ Fee collection scheduler failed to start: {sched_err}")
+
                     # Test business model calculations
                     try:
                         test_calc = settings.business_model.calculate_cross_border_economics(
@@ -454,6 +471,16 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"⚠️ WDK Deposit Monitor failed to start: {e}")
                 
+    # ============================================================================
+    # STOP FEE COLLECTION SCHEDULER
+    # ============================================================================
+    try:
+        if hasattr(app.state, 'fee_scheduler'):
+            await app.state.fee_scheduler.stop()
+            logger.info("✅ Fee collection scheduler stopped")
+    except Exception as sched_err:
+        logger.error(f"❌ Failed to stop scheduler: {sched_err}")
+        
     yield
     
     logger.info("--- Seamount API Shutting Down ---")
