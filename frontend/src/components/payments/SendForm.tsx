@@ -185,19 +185,19 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       });
 
       if (result.success) {
-        // ✅ SHOW TOAST IMMEDIATELY (modal still open)
+        // ✅ Show toast immediately (modal still open)
         toast.success(
           `✅ ${parseFloat(amount).toFixed(6)} ${asset} sent successfully!\n\nTx: ${result.tx_id?.substring(0, 12)}...`,
           {
             duration: 6000,
             icon: '🚀',
             style: {
-              zIndex: 99999, // ✅ CRITICAL: Appears above modal
+              zIndex: 99999,
             }
           }
         );
         
-        // Close modals AFTER showing toast
+        // Close modals after showing toast
         setTimeout(() => {
           setShowConfirmation(false);
           onOpenChange(false);
@@ -206,23 +206,54 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
           setRecipient('');
           setAmount('');
           setMemo('');
-        }, 1500); // Give user time to see success toast
+        }, 1500);
         
       } else {
         setError(result.error || 'Transaction failed');
         toast.error(result.error || 'Transaction failed', {
-          style: {
-            zIndex: 99999,
-          }
+          style: { zIndex: 99999 }
         });
       }
     } catch (err: any) {
-      const errorMsg = err.response?.data?.detail || err.message || 'Transaction failed';
+      // ============================================================================
+      // 🚨 ENHANCED ERROR HANDLING - Parse backend validation errors
+      // ============================================================================
+      let errorMsg = err.response?.data?.detail || err.message || 'Transaction failed';
+      
+      // Parse specific Algorand errors
+      if (errorMsg.includes('minimum') && errorMsg.includes('0.1 ALGO')) {
+        // New account needs 0.1 ALGO
+        errorMsg = `❌ NEW ACCOUNT ACTIVATION REQUIRED\n\n` +
+                  `Algorand requires 0.1 ALGO minimum to activate new accounts.\n\n` +
+                  `Current amount: ${amount} ALGO\n` +
+                  `Please send at least 0.1 ALGO for first transaction.`;
+      } else if (errorMsg.includes('opt-in') || errorMsg.includes('opted-in')) {
+        // ASA opt-in required
+        errorMsg = `❌ ASSET OPT-IN REQUIRED\n\n` +
+                  `Recipient must opt-in to ${asset} before receiving.\n\n` +
+                  `Ask them to:\n` +
+                  `1. Open their Algorand wallet\n` +
+                  `2. Add ${asset} asset\n` +
+                  `3. Try transaction again`;
+      } else if (errorMsg.includes('Insufficient balance')) {
+        // Balance error
+        errorMsg = `❌ INSUFFICIENT BALANCE\n\n` +
+                  `Available: ${availableBalance.toFixed(6)} ${asset}\n` +
+                  `Required: ${parseFloat(amount).toFixed(6)} ${asset} + fees`;
+      } else if (errorMsg.includes('Invalid') && errorMsg.includes('address')) {
+        // Address validation error
+        errorMsg = `❌ INVALID RECIPIENT ADDRESS\n\n` +
+                  `The ${selectedChain} address format is incorrect.\n` +
+                  `Please double-check the address.`;
+      }
+      
       setError(errorMsg);
       toast.error(errorMsg, {
-        duration: 7000,
+        duration: 10000, // Longer duration for detailed errors
         style: {
           zIndex: 99999,
+          maxWidth: '500px',
+          whiteSpace: 'pre-line' // Preserve line breaks
         }
       });
     } finally {

@@ -556,6 +556,31 @@ class KYCConfig:
         return "none"
 
 # ============================================================================
+# CENTRAL TREASURY ADDRESSES (Revenue Collection)
+# Stored outside Settings class to avoid Pydantic validation
+# ============================================================================
+CENTRAL_TREASURY_ADDRESSES: Dict[str, str] = {
+    'algorand': 'A2UV35WC4YB7BS2PXBCGMTCE2CM5N7HFUVZTD74B7UCCEY63KBKU6JUPLE',
+    'bitcoin': 'bc1qcz6lh9zg0y8v2k9cns8napzqenu0ak5lx3pf03',
+    'ethereum': '0x35186f2C63550f0EF35C28670947A0425879942b',
+    'polygon': '0x561e9a01999dEFB7956D455053F3FE6f88D47291',
+    'tron': 'T6368654a4F366597C66DfD6Ee40D001ef6'
+}
+
+# Validation function
+def validate_treasury_addresses() -> bool:
+    """Validate all treasury addresses are non-empty"""
+    for chain, address in CENTRAL_TREASURY_ADDRESSES.items():
+        if not address or len(address) < 20:
+            logger.warning(f"⚠️ Treasury address for {chain} is empty or invalid")
+            return False
+    return True
+
+# Validate on module load
+if not validate_treasury_addresses():
+    logger.error("❌ Some treasury addresses are invalid or missing")
+
+# ============================================================================
 # PYDANTIC SETTINGS CLASS (Environment Configuration)
 # ============================================================================
 
