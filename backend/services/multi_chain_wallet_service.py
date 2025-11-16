@@ -445,8 +445,8 @@ class MultiChainWalletService:
                         'memo': memo if memo else None,
                         'estimated_arrival': self._estimate_arrival_time(optimal_chain),
                         'treasury_address': treasury_address,
-                        'fee_owed': float(fee_calc['platform_fee']),  # Track fee owed
-                        'fee_collected': False  # Will be updated when fee is collected
+                        'fee_owed': float(fee_calc['platform_fee']),
+                        'fee_collected': False
                     }
                 }
                 
@@ -476,29 +476,17 @@ class MultiChainWalletService:
                         if fee_insert.data:
                             logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
                         else:
-                            logger.error(f"❌ Fee insert returned no data: {fee_insert}")
-                            # Check if table exists
-                            try:
-                                check = self.db.supabase.table('fees_owed').select('id').limit(1).execute()
-                                logger.info(f"✅ fees_owed table exists (found {len(check.data)} records)")
-                            except Exception as table_err:
-                                logger.error(f"❌ fees_owed table does not exist: {table_err}")
-                                logger.error("   Run this SQL in Supabase:")
-                                logger.error("   CREATE TABLE fees_owed (...)")
-                                
+                            logger.error(f"❌ Fee insert returned no data")
+                            
                     except Exception as fee_err:
                         logger.error(f"❌ Failed to record fee owed: {fee_err}")
-                        logger.error(f"   Fee data: {fee_owed_data}")
                         # Don't block transaction
-                    
-                    self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
-                    logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
                 else:
                     logger.warning(f"⚠️ Transaction insert returned no data")
                 
                 # Track revenue (for analytics)
                 try:
-                    revenue_service = RevenueTrackingService(self.db)  # ✅ Instantiate before using
+                    revenue_service = RevenueTrackingService(self.db)
                     await revenue_service.track_transaction_fee(
                         user_id=user_id,
                         transaction_type="p2p_transfer",
@@ -515,9 +503,15 @@ class MultiChainWalletService:
                         }
                     )
                 except Exception as rev_err:
-                    # Non-fatal: don't block transaction
                     logger.error(f"❌ Revenue tracking failed: {rev_err}")
+                    
+            except Exception as db_err:
+                # Non-fatal: transaction succeeded on chain
+                logger.error(f"❌ Database logging failed (transaction still succeeded): {db_err}")
             
+            # ============================================================================
+            # RETURN SUCCESS RESPONSE
+            # ============================================================================
             return {
                 'success': True,
                 'message': f'Payment sent! Your {asset} will arrive shortly. ✓',
