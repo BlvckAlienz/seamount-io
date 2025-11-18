@@ -13,7 +13,7 @@ jobs:
       - name: Health Check Python API
         run: |
           echo "🐍 Pinging Seamount Python API..."
-          curl -f https://seamount-api.onrender.com/api/v1/health || echo "Failed but continuing"
+          curl -f https://seamount-io-pr8a.onrender.com/api/v1/health || echo "Failed but continuing"
 
   ping-wdk-service:
     name: Ping WDK Service
@@ -22,4 +22,4 @@ jobs:
       - name: Health Check WDK Service
         run: |
           echo "⚡ Pinging Seamount WDK Service..."
-          curl -f https://seamount-wdk.onrender.com/health || echo "Failed but continuing"
+          curl -f https://seamount-wdk-ne5i.onrender.com/health || echo "Failed but continuing"
