@@ -416,10 +416,19 @@ class WDKClient:
         
         try:
             result = await self._make_request('POST', '/wallet/create', data=payload)
-            
+
+            # 🔍 DEBUG: Log full response
+            logger.info(f"🔍 WDK Response: {result}")
+
             if not result.get('success'):
                 error_msg = result.get('error', 'Unknown error')
-                logger.error(f"❌ WDK wallet creation failed: {error_msg}")
+                
+                # 🔍 Log FULL error details
+                logger.error(f"❌ WDK wallet creation failed")
+                logger.error(f"   Error message: {error_msg}")
+                logger.error(f"   Full response: {result}")
+                logger.error(f"   Request payload chains: {payload.get('chains')}")
+                
                 raise Exception(f"Wallet creation failed: {error_msg}")
             
             logger.info(f"✅ Wallets created on {len(result.get('wallets', {}))} chains")
