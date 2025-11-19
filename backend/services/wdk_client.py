@@ -703,51 +703,155 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            # TRON
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ══════════════════════════════════════════════════════
+            # TRON - BULLETPROOF IMPLEMENTATION
+            # ══════════════════════════════════════════════════════
             elif chain == 'tron':
-                async with aiohttp.ClientSession() as session:
-                    url = f"https://api.trongrid.io/v1/accounts/{address}"
-                    headers = {}
+                try:
+                    logger.info(f"🔍 Querying Tron balance for {address[:10]}...")
                     
-                    if self.settings.TRON_API_KEY:
-                        headers["TRON-PRO-API-KEY"] = self.settings.TRON_API_KEY.get_secret_value()
-                    
-                    timeout = aiohttp.ClientTimeout(total=15)
-                    
-                    async with session.get(url, headers=headers, timeout=timeout) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            accounts = data.get('data', [])
+                    async with aiohttp.ClientSession() as session:
+                        url = f"https://api.trongrid.io/v1/accounts/{address}"
+                        headers = {
+                            "Accept": "application/json"
+                        }
+                        
+                        # Add API key if configured
+                        if self.settings.TRON_API_KEY:
+                            api_key = self.settings.TRON_API_KEY.get_secret_value()
+                            headers["TRON-PRO-API-KEY"] = api_key
+                            logger.debug(f"🔑 Using Tron API key: {api_key[:10]}...")
+                        else:
+                            logger.warning("⚠️ No TRON_API_KEY configured - using public endpoint (rate limited)")
+                        
+                        timeout = aiohttp.ClientTimeout(total=15)
+                        
+                        async with session.get(url, headers=headers, timeout=timeout) as response:
+                            response_text = await response.text()
                             
-                            if accounts and len(accounts) > 0:
-                                balance_sun = accounts[0].get('balance', 0)
-                                balance_trx = Decimal(balance_sun) / Decimal('1000000')
-                                
-                                logger.info(f"✅ TRX balance: {balance_trx}")
+                            logger.info(f"📡 TronGrid response status: {response.status}")
+                            
+                            if response.status == 200:
+                                try:
+                                    data = await response.json() if response.content_type == 'application/json' else None
+                                    
+                                    if not data:
+                                        logger.error(f"❌ TronGrid returned non-JSON response: {response_text[:200]}")
+                                        return {
+                                            'balance': '0',
+                                            'success': False,
+                                            'error': 'Invalid JSON response from TronGrid',
+                                            'chain': 'tron'
+                                        }
+                                    
+                                    # TronGrid returns: {"data": [{"address": "...", "balance": 1000000, ...}]}
+                                    accounts = data.get('data', [])
+                                    
+                                    if not accounts or len(accounts) == 0:
+                                        # Account exists but has no balance (new account)
+                                        logger.info(f"ℹ️ Tron account {address[:10]}... exists but has 0 balance")
+                                        return {
+                                            'balance': '0',
+                                            'success': True,
+                                            'chain': 'tron',
+                                            'source': 'trongrid',
+                                            'address': address
+                                        }
+                                    
+                                    # Extract balance (in SUN, 1 TRX = 1,000,000 SUN)
+                                    account_data = accounts[0]
+                                    balance_sun = account_data.get('balance', 0)
+                                    balance_trx = Decimal(balance_sun) / Decimal('1000000')
+                                    
+                                    logger.info(f"✅ TRX balance: {balance_trx} TRX ({balance_sun} SUN)")
+                                    
+                                    return {
+                                        'balance': str(balance_trx),
+                                        'success': True,
+                                        'chain': 'tron',
+                                        'source': 'trongrid',
+                                        'address': address,
+                                        'raw_balance_sun': balance_sun
+                                    }
+                                    
+                                except (ValueError, KeyError) as parse_err:
+                                    logger.error(f"❌ Failed to parse TronGrid response: {parse_err}")
+                                    logger.error(f"   Raw response: {response_text[:500]}")
+                                    return {
+                                        'balance': '0',
+                                        'success': False,
+                                        'error': f'JSON parse error: {parse_err}',
+                                        'chain': 'tron'
+                                    }
+                            
+                            elif response.status == 404:
+                                # Account doesn't exist on Tron network yet
+                                logger.info(f"ℹ️ Tron account {address[:10]}... not found (404)")
                                 return {
-                                    'balance': str(balance_trx),
+                                    'balance': '0',
                                     'success': True,
                                     'chain': 'tron',
                                     'source': 'trongrid',
-                                    'address': address
+                                    'address': address,
+                                    'note': 'Account not activated yet'
                                 }
-            
-            # Chain not handled
-            logger.warning(f"⚠️ Chain {chain} not implemented in Direct RPC")
-            return {
-                'balance': '0',
-                'success': False,
-                'error': f'Direct RPC not implemented for {chain}'
-            }
-            
-        except asyncio.TimeoutError:
-            logger.error(f"⏱️ Direct RPC timeout for {chain}")
-            return {'balance': '0', 'success': False, 'error': 'RPC timeout'}
-        except Exception as e:
-            logger.error(f"❌ Direct RPC error for {chain}: {e}")
-            return {'balance': '0', 'success': False, 'error': str(e)}
+                            
+                            elif response.status == 429:
+                                # Rate limit hit
+                                logger.error(f"⚠️ TronGrid rate limit exceeded (429)")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': 'Rate limit exceeded - add TRON_API_KEY to .env',
+                                    'chain': 'tron'
+                                }
+                            
+                            elif response.status in [500, 502, 503, 504]:
+                                # TronGrid server error
+                                logger.error(f"❌ TronGrid server error: {response.status}")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': f'TronGrid service unavailable ({response.status})',
+                                    'chain': 'tron'
+                                }
+                            
+                            else:
+                                # Other HTTP errors
+                                logger.error(f"❌ TronGrid unexpected status {response.status}: {response_text[:200]}")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': f'HTTP {response.status}',
+                                    'chain': 'tron'
+                                }
+                
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ TronGrid timeout for {address[:10]}...")
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': 'TronGrid API timeout',
+                        'chain': 'tron'
+                    }
+                
+                except aiohttp.ClientError as http_err:
+                    logger.error(f"❌ TronGrid HTTP error: {http_err}")
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': f'Network error: {http_err}',
+                        'chain': 'tron'
+                    }
+                
+                except Exception as e:
+                    logger.error(f"❌ Unexpected error querying Tron balance: {e}", exc_info=True)
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': str(e),
+                        'chain': 'tron'
+                    }
         
     async def get_balances_multi_chain(
         self, 
