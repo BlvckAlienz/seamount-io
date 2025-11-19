@@ -7,15 +7,30 @@ Regenerates wallets using corrected WDK client
 import asyncio
 import logging
 import sys
+import os
 from pathlib import Path
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# 🔧 FIX: Add project root to Python path
+# Current file: backend/scripts/migrate_tron_wallets.py
+# Go up 2 levels to reach project root
+script_dir = Path(__file__).resolve().parent  # backend/scripts/
+backend_dir = script_dir.parent                # backend/
+project_root = backend_dir.parent              # project root
 
-from supabase import create_client
+# Add project root to path FIRST
+sys.path.insert(0, str(project_root))
+
+# Debug: Print paths to verify
+print(f"📍 Script location: {Path(__file__).resolve()}")
+print(f"📁 Project root: {project_root}")
+print(f"🐍 Python will search: {sys.path[0]}")
+print()
+
+# Now imports should work
 from backend.config import get_settings
 from backend.services.wdk_client import WDKClient
 from backend.services.seed_encryption_service import SeedEncryptionService
+from supabase import create_client
 from mnemonic import Mnemonic
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
