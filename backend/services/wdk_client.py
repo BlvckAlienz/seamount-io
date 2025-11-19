@@ -610,9 +610,9 @@ class WDKClient:
         try:
             logger.info(f"🔄 Direct RPC: {chain} / {address[:10]}...")
             
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╔════════════════════════════════════════════════
             # BITCOIN
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╚════════════════════════════════════════════════
             if chain == 'bitcoin':
                 async with aiohttp.ClientSession() as session:
                     url = f"https://blockchain.info/balance?active={address}"
@@ -633,9 +633,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╔════════════════════════════════════════════════
             # ETHEREUM
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╚════════════════════════════════════════════════
             elif chain == 'ethereum':
                 if not self.settings.ALCHEMY_API_KEY_ETHEREUM:
                     logger.error("❌ No Alchemy API key for Ethereum")
@@ -668,9 +668,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╔════════════════════════════════════════════════
             # POLYGON
-            # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            # ╚════════════════════════════════════════════════
             elif chain == 'polygon':
                 if not self.settings.ALCHEMY_API_KEY_POLYGON:
                     logger.error("❌ No Alchemy API key for Polygon")
@@ -703,9 +703,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ══════════════════════════════════════════════════════
+            # ╔════════════════════════════════════════════════════════════
             # TRON - BULLETPROOF IMPLEMENTATION
-            # ══════════════════════════════════════════════════════
+            # ╚════════════════════════════════════════════════════════════
             elif chain == 'tron':
                 try:
                     logger.info(f"🔍 Querying Tron balance for {address[:10]}...")
@@ -852,6 +852,27 @@ class WDKClient:
                         'error': str(e),
                         'chain': 'tron'
                     }
+            
+            # ╔════════════════════════════════════════════════
+            # UNSUPPORTED CHAIN
+            # ╚════════════════════════════════════════════════
+            else:
+                logger.warning(f"⚠️ Chain {chain} not implemented in Direct RPC")
+                return {
+                    'balance': '0',
+                    'success': False,
+                    'error': f'Chain {chain} not supported',
+                    'chain': chain
+                }
+        
+        except Exception as e:
+            logger.error(f"❌ Direct RPC failed for {chain}: {e}")
+            return {
+                'balance': '0',
+                'success': False,
+                'error': f'Direct RPC error: {str(e)}',
+                'chain': chain
+            }  
         
     async def get_balances_multi_chain(
         self, 
