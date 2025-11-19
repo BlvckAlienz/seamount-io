@@ -11,7 +11,23 @@ const bitcoin = require('bitcoinjs-lib');
 const bip39 = require('bip39');
 const BIP32Factory = require('bip32').default;
 const ecc = require('tiny-secp256k1');
-const TronWeb = require('tronweb');
+
+// ✅ FIX: TronWeb v6.x exports constructor as named export
+const TronWebModule = require('tronweb');
+
+// CRITICAL: Check TronWeb property FIRST (not default)
+const TronWeb = TronWebModule.TronWeb || TronWebModule.default || TronWebModule;
+
+// Verify import worked
+if (typeof TronWeb !== 'function') {
+    console.error('❌ TronWeb import failed.');
+    console.error('   Module structure:', Object.keys(TronWebModule));
+    console.error('   TronWeb type:', typeof TronWebModule.TronWeb);
+    console.error('   default type:', typeof TronWebModule.default);
+    throw new Error('TronWeb constructor not found');
+}
+
+console.log('✅ TronWeb v6.x loaded successfully');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -179,7 +195,7 @@ async function createBitcoinWallet(mnemonic, index = 0) {
 
 async function createTronWallet(mnemonic, index = 0) {
     try {
-        console.log('🔧 Creating Tron wallet using TronWeb...');
+        console.log('🔧 Creating Tron wallet using TronWeb v6...');
         
         // Derive private key from mnemonic using BIP-44 path for Tron
         const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -190,17 +206,29 @@ async function createTronWallet(mnemonic, index = 0) {
         const child = root.derivePath(path);
         const privateKey = child.privateKey.toString('hex');
         
-        // Create TronWeb instance
+        console.log(`🔑 Private key derived (${privateKey.length} chars)`);
+        
+        // Create TronWeb instance (v6.x compatible)
         const tronWeb = new TronWeb({
-            fullHost: 'https://api.trongrid.io'
+            fullHost: 'https://api.trongrid.io',
+            // v6 sometimes needs explicit headers
+            headers: { 'TRON-PRO-API-KEY': process.env.TRON_API_KEY || '' }
         });
+        
+        console.log('✅ TronWeb instance created');
         
         // Generate Tron address from private key (proper Base58Check encoding)
         const address = tronWeb.address.fromPrivateKey(privateKey);
         
+        console.log(`🔍 Generated address: ${address} (${address.length} chars)`);
+        
         // 🚨 CRITICAL VALIDATION
-        if (!address || address.length !== 34) {
-            throw new Error(`Invalid Tron address generated: ${address} (length: ${address?.length})`);
+        if (!address || typeof address !== 'string') {
+            throw new Error(`Invalid Tron address type: ${typeof address}`);
+        }
+        
+        if (address.length !== 34) {
+            throw new Error(`Invalid Tron address length: ${address.length} (expected 34)`);
         }
         
         if (!address.startsWith('T')) {
@@ -217,6 +245,7 @@ async function createTronWallet(mnemonic, index = 0) {
         
     } catch (error) {
         console.error('❌ TRON wallet creation failed:', error.message);
+        console.error('   Stack trace:', error.stack);
         throw error;
     }
 }
