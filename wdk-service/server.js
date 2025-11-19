@@ -11,6 +11,7 @@ const bitcoin = require('bitcoinjs-lib');
 const bip39 = require('bip39');
 const BIP32Factory = require('bip32').default;
 const ecc = require('tiny-secp256k1');
+const TronWeb = require('tronweb');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -178,18 +179,42 @@ async function createBitcoinWallet(mnemonic, index = 0) {
 
 async function createTronWallet(mnemonic, index = 0) {
     try {
-        // TRON uses same derivation as Ethereum (BIP-44 path m/44'/195'/0'/0/0)
-        const evmWallet = await createEVMWallet(mnemonic, index);
+        console.log('🔧 Creating Tron wallet using TronWeb...');
         
-        // Simple TRON address conversion (prefix with T)
-        // In production, use TronWeb library for proper conversion
-        const tronAddress = 'T' + evmWallet.address.slice(2, 36);
+        // Derive private key from mnemonic using BIP-44 path for Tron
+        const seed = await bip39.mnemonicToSeed(mnemonic);
+        const root = bip32.fromSeed(seed);
+        
+        // Tron uses BIP-44 path: m/44'/195'/0'/0/0 (195 = Tron coin type)
+        const path = `m/44'/195'/0'/0/${index}`;
+        const child = root.derivePath(path);
+        const privateKey = child.privateKey.toString('hex');
+        
+        // Create TronWeb instance
+        const tronWeb = new TronWeb({
+            fullHost: 'https://api.trongrid.io'
+        });
+        
+        // Generate Tron address from private key (proper Base58Check encoding)
+        const address = tronWeb.address.fromPrivateKey(privateKey);
+        
+        // 🚨 CRITICAL VALIDATION
+        if (!address || address.length !== 34) {
+            throw new Error(`Invalid Tron address generated: ${address} (length: ${address?.length})`);
+        }
+        
+        if (!address.startsWith('T')) {
+            throw new Error(`Invalid Tron address prefix: ${address[0]} (should be T)`);
+        }
+        
+        console.log(`✅ Valid Tron address: ${address.slice(0, 6)}...${address.slice(-4)}`);
         
         return {
-            address: tronAddress,
-            privateKey: evmWallet.privateKey,
-            path: evmWallet.path
+            address: address,
+            privateKey: privateKey,
+            path: path
         };
+        
     } catch (error) {
         console.error('❌ TRON wallet creation failed:', error.message);
         throw error;

@@ -235,7 +235,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                The platform is currently down due to maintenance operations. Services will resume shortly!
+                Powered by Algorand • Securitize Markets (FINRA/SIPC Member) • Tether WDK
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
