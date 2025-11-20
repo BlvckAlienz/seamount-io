@@ -204,6 +204,133 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
             logger.error(f"💥 Paystack payout exception: {e}")
             return {"success": False, "message": str(e)}
     
+    async def create_transfer_recipient(
+        self, 
+        account_number: str, 
+        account_name: str, 
+        bank_code: str
+    ) -> Dict[str, Any]:
+        """
+        ✅ Step 1: Create transfer recipient (beneficiary)
+        This recipient_code can be reused for future transfers
+        """
+        url = f"{self.base_url}/transferrecipient"
+        payload = {
+            "type": "nuban",  # Nigerian Uniform Bank Account Number
+            "name": account_name,
+            "account_number": account_number,
+            "bank_code": bank_code,
+            "currency": "NGN"
+        }
+        
+        try:
+            data = await self._request_with_retry('POST', url, json=payload)
+            
+            if data.get('status') and data.get('data'):
+                recipient_code = data['data']['recipient_code']
+                logger.info(f"✅ Transfer recipient created: {recipient_code}")
+                
+                return {
+                    "success": True,
+                    "recipient_code": recipient_code,
+                    "account_name": data['data']['details']['account_name'],
+                    "account_number": data['data']['details']['account_number'],
+                    "bank_name": data['data']['details']['bank_name']
+                }
+            else:
+                error_msg = data.get('message', 'Recipient creation failed')
+                logger.error(f"❌ Paystack recipient creation failed: {error_msg}")
+                return {"success": False, "message": error_msg}
+                
+        except Exception as e:
+            logger.error(f"💥 Paystack recipient creation exception: {e}")
+            return {"success": False, "message": str(e)}
+
+    async def execute_transfer(
+        self, 
+        amount: Decimal, 
+        recipient_code: str, 
+        reference: str,
+        reason: str = "Seamount withdrawal"
+    ) -> Dict[str, Any]:
+        """
+        ✅ Step 2: Execute transfer from Paystack balance to user account
+        
+        REQUIREMENTS:
+        - Your Paystack account must have sufficient NGN balance
+        - OTP must be disabled for automated transfers
+        """
+        url = f"{self.base_url}/transfer"
+        
+        # Convert to kobo (NGN subunit)
+        amount_kobo = int(float(amount) * 100)
+        
+        payload = {
+            "source": "balance",  # Transfer from Paystack balance
+            "reason": reason,
+            "amount": amount_kobo,
+            "recipient": recipient_code,
+            "reference": reference
+        }
+        
+        try:
+            data = await self._request_with_retry('POST', url, json=payload)
+            
+            if data.get('status') and data.get('data'):
+                transfer_data = data['data']
+                
+                logger.info(
+                    f"✅ Paystack transfer initiated: {reference} "
+                    f"Status: {transfer_data.get('status')}"
+                )
+                
+                return {
+                    "success": True,
+                    "transfer_code": transfer_data.get('transfer_code'),
+                    "reference": transfer_data.get('reference'),
+                    "status": transfer_data.get('status'),  # pending, success, failed
+                    "amount": float(amount),
+                    "recipient": transfer_data.get('recipient'),
+                    "message": data.get('message')
+                }
+            else:
+                error_msg = data.get('message', 'Transfer failed')
+                logger.error(f"❌ Paystack transfer failed: {error_msg}")
+                return {"success": False, "message": error_msg}
+                
+        except Exception as e:
+            logger.error(f"💥 Paystack transfer exception: {e}")
+            return {"success": False, "message": str(e)}
+
+    async def verify_transfer(self, reference: str) -> Dict[str, Any]:
+        """
+        ✅ Step 3: Verify transfer status
+        """
+        url = f"{self.base_url}/transfer/verify/{reference}"
+        
+        try:
+            data = await self._request_with_retry('GET', url)
+            
+            if data.get('status') and data.get('data'):
+                transfer_data = data['data']
+                status = transfer_data.get('status')
+                
+                return {
+                    "success": status in ['success', 'pending'],
+                    "verified": status == 'success',
+                    "status": status,
+                    "amount": transfer_data.get('amount', 0) / 100,
+                    "reference": reference,
+                    "failure_reason": transfer_data.get('failure_reason'),
+                    "transfer_code": transfer_data.get('transfer_code')
+                }
+            else:
+                return {"success": False, "message": data.get('message')}
+                
+        except Exception as e:
+            logger.error(f"💥 Paystack transfer verification exception: {e}")
+            return {"success": False, "message": str(e)}
+    
     async def verify_payout(self, reference: str) -> Dict[str, Any]:
         """Verify payout status"""
         url = f"{self.base_url}/transfer/verify/{reference}"

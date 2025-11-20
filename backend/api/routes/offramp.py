@@ -13,7 +13,14 @@ import logging
 import aiohttp
 
 from backend.config import get_settings
-from backend.dependencies import get_current_user, get_db_service, get_audit_service
+from backend.dependencies import (
+    get_current_user, 
+    get_db_service, 
+    get_audit_service,
+    get_multi_chain_wallet_service  # ✅ ADD THIS IF MISSING
+)
+from backend.services.multi_chain_wallet_service import MultiChainWalletService  # ✅ ADD THIS
+from backend.config import CENTRAL_TREASURY_ADDRESSES  # ✅ ADD THIS
 from backend.services.offramp_service import OfframpService
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.cashramp_service import CashrampService
@@ -370,40 +377,35 @@ async def withdraw(
         crypto_asset = request.crypto_asset
         recipient_details = request.recipient_details
         
-        # ✅ STEP 1: Get user's actual balance from database
+        # ✅ STEP 1: Get user's actual balance using MultiChainWalletService
         try:
-            balance_query = db_service.supabase.from_('wallet_balances')\
-                .select('*')\
-                .eq('user_id', current_user["id"])\
-                .limit(1)\
-                .execute()
+            # Use the wallet service to get balances (same as /api/v1/wallet/balances)
+            wallet_service = get_multi_chain_wallet_service()
+            balance_response = await wallet_service.get_user_balances(current_user["id"])
             
-            if not balance_query.data:
-                raise HTTPException(status_code=400, detail="Wallet not found. Please create wallet first.")
+            if not balance_response or not balance_response.get("assets"):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Wallet not found. Please create wallet first."
+                )
             
-            balance_row = balance_query.data[0]
+            # Find balance for requested asset
+            user_balance = None
+            for asset_data in balance_response["assets"]:
+                # Check all possible asset identifiers
+                if (asset_data.get("asset") == crypto_asset or 
+                    asset_data.get("symbol") == crypto_asset or 
+                    asset_data.get("chain") == crypto_asset.lower()):
+                    user_balance = Decimal(str(asset_data.get("balance", 0)))
+                    break
             
-            # Map crypto asset to balance column
-            ASSET_TO_COLUMN = {
-                'ALGO': 'algo_balance',
-                'USDT_ALGO': 'usdt_balance',
-                'USDCa': 'usdca_balance',
-                'goBTC': 'gobtc_balance',
-                'goETH': 'goeth_balance',
-                'BTC': 'btc_balance',
-                'ETH': 'eth_balance',
-                'MATIC': 'matic_balance',
-                'TRX': 'trx_balance',
-                'USDT_TRON': 'usdt_tron_balance'
-            }
+            if user_balance is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No balance found for asset {crypto_asset}"
+                )
             
-            balance_column = ASSET_TO_COLUMN.get(crypto_asset)
-            if not balance_column:
-                raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
-            
-            current_balance = Decimal(str(balance_row.get(balance_column, 0)))
-            
-            logger.info(f"💰 User {current_user['id']} balance: {current_balance} {crypto_asset}")
+            logger.info(f"💰 User {current_user['id']} balance: {user_balance} {crypto_asset}")
             
             # ✅ Check sufficient balance (NO MINIMUM!)
             if current_balance < crypto_amount:
@@ -457,43 +459,73 @@ async def withdraw(
         
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
         
-        # Calculate fee (1.8%)
-        fee_rate = Decimal("0.018")
+        # Calculate fee (2.0%)
+        fee_rate = Decimal("0.02")
         withdrawal_fee = gross_fiat_amount * fee_rate
         net_fiat_amount = gross_fiat_amount - withdrawal_fee
         
-        # ✅ STEP 3: Execute payout via Paystack or Flutterwave
+        # ✅ STEP 3: Execute payout via Paystack Transfer API (NEW IMPLEMENTATION)
         payment_method = recipient_details.get("payment_method", "bank_transfer")
         provider = None
         payout_result = None
-        
+        tx_ref = f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+
         # Try Paystack first (NGN only, best rates)
         if fiat_currency == "NGN" and payment_method == "bank_transfer":
             try:
-                logger.info(f"🏦 Routing to Paystack for {net_fiat_amount} NGN")
+                logger.info(f"🏦 Routing to Paystack Transfer API for {net_fiat_amount} NGN")
                 
                 paystack = PaystackProvider(settings)
                 
-                bank_details = {
-                    "account_name": recipient_details.get("account_name"),
-                    "account_number": recipient_details.get("account_number"),
-                    "bank_code": recipient_details.get("bank_code")
-                }
-                
-                payout_result = await paystack.initiate_payout(
-                    amount=net_fiat_amount,
-                    bank_details=bank_details,
-                    tx_ref=f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                # Step 1: Create transfer recipient (or retrieve if exists)
+                recipient_result = await paystack.create_transfer_recipient(
+                    account_number=recipient_details.get("account_number"),
+                    account_name=recipient_details.get("account_name"),
+                    bank_code=recipient_details.get("bank_code")
                 )
                 
-                if payout_result and payout_result.get("success"):
+                if not recipient_result.get("success"):
+                    raise Exception(f"Recipient creation failed: {recipient_result.get('message')}")
+                
+                recipient_code = recipient_result["recipient_code"]
+                logger.info(f"✅ Recipient created: {recipient_code}")
+                
+                # Step 2: Execute transfer from Paystack balance
+                transfer_result = await paystack.execute_transfer(
+                    amount=net_fiat_amount,
+                    recipient_code=recipient_code,
+                    reference=tx_ref,
+                    reason=f"Seamount withdrawal - {crypto_asset} → {fiat_currency}"
+                )
+                
+                if transfer_result and transfer_result.get("success"):
                     provider = "paystack"
-                    logger.info(f"✅ Paystack payout initiated")
+                    payout_result = transfer_result
+                    logger.info(f"✅ Paystack transfer initiated: {tx_ref}")
                 else:
-                    raise Exception(payout_result.get('message', 'Paystack failed'))
+                    error_msg = transfer_result.get('message', 'Transfer failed')
                     
+                    # Check if it's a balance issue
+                    if "insufficient" in error_msg.lower() or "balance" in error_msg.lower():
+                        logger.error(
+                            f"❌ CRITICAL: Paystack balance insufficient! "
+                            f"Required: {net_fiat_amount} NGN. Please fund your Paystack account."
+                        )
+                        raise HTTPException(
+                            status_code=503,
+                            detail=(
+                                "Withdrawal temporarily unavailable. "
+                                "Our payment provider balance is low. "
+                                "Please contact support or try again later."
+                            )
+                        )
+                    
+                    raise Exception(error_msg)
+                    
+            except HTTPException:
+                raise
             except Exception as paystack_error:
-                logger.warning(f"⚠️ Paystack failed: {paystack_error}")
+                logger.error(f"❌ Paystack failed: {paystack_error}")
                 # Fall through to Flutterwave
         
         # Fallback to Flutterwave (multi-currency, mobile money)
@@ -529,45 +561,127 @@ async def withdraw(
                     detail="Payment providers unavailable. Please try again later."
                 )
         
-        # ✅ STEP 4: Deduct from user balance
+        # ============================================================================
+        # ✅ STEP 4: TRANSFER CRYPTO TO TREASURY (Using existing send logic)
+        # ============================================================================
         try:
-            new_balance = current_balance - crypto_amount
+            from backend.config import CENTRAL_TREASURY_ADDRESSES
+            from backend.services.multi_chain_wallet_service import MultiChainWalletService
             
-            update_query = db_service.supabase.from_('wallet_balances')\
-                .update({balance_column: float(new_balance), 'updated_at': 'NOW()'})\
-                .eq('user_id', current_user["id"])\
-                .execute()
+            # Get treasury address for this asset's blockchain
+            blockchain = asset_config["blockchain"]
+            treasury_address = CENTRAL_TREASURY_ADDRESSES.get(blockchain)
             
-            logger.info(f"✅ Deducted {crypto_amount} {crypto_asset} from user {current_user['id']}")
+            if not treasury_address:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"No treasury address configured for {blockchain}"
+                )
             
-        except Exception as balance_error:
-            logger.error(f"❌ Failed to update balance: {balance_error}")
-            raise HTTPException(status_code=500, detail="Failed to process withdrawal")
+            logger.info(
+                f"🏦 Initiating treasury transfer: {crypto_amount} {crypto_asset} "
+                f"from user {current_user['id']} to treasury {treasury_address[:12]}..."
+            )
+            
+            # ✅ USE EXISTING SEND LOGIC (handles everything: decryption, signing, etc.)
+            wallet_service = get_multi_chain_wallet_service()
+            
+            treasury_result = await wallet_service.send_payment(
+                user_id=current_user["id"],
+                recipient=treasury_address,
+                asset=crypto_asset,
+                amount=crypto_amount,
+                memo=f"Offramp withdrawal: {tx_ref}"
+            )
+            
+            # Check if transfer succeeded
+            if not treasury_result.get("success"):
+                error_msg = treasury_result.get("error", "Treasury transfer failed")
+                logger.error(f"❌ Treasury transfer failed: {error_msg}")
+                
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to transfer crypto to treasury: {error_msg}"
+                )
+            
+            treasury_tx_id = treasury_result.get("transaction_id")
+            
+            logger.info(
+                f"✅ Treasury transfer successful! "
+                f"TX: {treasury_tx_id} | "
+                f"Amount: {crypto_amount} {crypto_asset} | "
+                f"Destination: {treasury_address[:12]}..."
+            )
+            
+            # Store treasury transfer details for liquidity provider
+            treasury_transfer_data = {
+                "blockchain": blockchain,
+                "tx_hash": treasury_tx_id,
+                "treasury_address": treasury_address,
+                "amount": float(crypto_amount),
+                "asset": crypto_asset,
+                "estimated_arrival": treasury_result.get("estimated_arrival", "5 seconds")
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as treasury_error:
+            logger.error(f"💥 Treasury transfer exception: {treasury_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Treasury transfer failed: {str(treasury_error)}"
+            )
         
-        # ✅ STEP 5: Store transaction record
+        # ============================================================================
+        # ✅ STEP 5: STORE TRANSACTION RECORD (with treasury proof)
+        # ============================================================================
         tx_id = f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
-        
+
         tx_data = {
+            # Identification
             "id": tx_id,
             "user_id": current_user["id"],
-            "type": "offramp",
-            "status": "processing",
-            "provider": provider,
+            "status": "processing",  # You'll mark 'completed' after LP confirms
+            
+            # Crypto Side (what was deducted)
             "crypto_asset": crypto_asset,
             "crypto_amount": float(crypto_amount),
+            
+            # 🚨 TREASURY PROOF (for liquidity provider)
+            "treasury_tx_hash": treasury_transfer_data["tx_hash"],  # Blockchain TX ID
+            "treasury_address": treasury_transfer_data["treasury_address"],  # Where it went
+            
+            # Fiat Side (what user receives)
             "fiat_currency": fiat_currency,
-            "gross_fiat_amount": float(gross_fiat_amount),
-            "withdrawal_fee": float(withdrawal_fee),
             "net_fiat_amount": float(net_fiat_amount),
+            "withdrawal_fee": float(withdrawal_fee),
+            
+            # Recipient Details (for LP to credit)
             "recipient_details": recipient_details,
+            
+            # Pricing Info
             "exchange_rate": float(usd_to_fiat_rate),
-            "created_at": datetime.now().isoformat()
+            "crypto_price_usd": float(crypto_price_usd),
+            
+            # Timestamps
+            "created_at": datetime.now().isoformat(),
+            
+            # Provider (will be 'liquidity_provider' for your flow)
+            "provider": "manual_liquidity_provider",
+            
+            # Metadata
+            "metadata": {
+                "treasury_transfer": treasury_transfer_data,
+                "estimated_settlement": "2-5 minutes via liquidity provider"
+            }
         }
-        
+
         try:
             await db_service.supabase.from_('offramp_transactions').insert(tx_data).execute()
+            logger.info(f"✅ Offramp transaction recorded: {tx_id}")
         except Exception as db_error:
-            logger.error(f"❌ Failed to store transaction: {db_error}")
+            logger.error(f"❌ Failed to store transaction record: {db_error}")
+            # Non-fatal: crypto already transferred, user will still get money
         
         # Log audit
         if audit_service:

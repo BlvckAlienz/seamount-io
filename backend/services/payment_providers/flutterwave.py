@@ -117,54 +117,129 @@ class FlutterwaveProvider:
             logger.error(f"Unexpected error in verify_payment: {e}", exc_info=True)
             raise
 
-    async def initiate_payout(self, amount: Decimal, bank_details: Dict, tx_ref: str) -> Dict[str, Any]:
+    async def initiate_payout(
+        self, 
+        amount: Decimal, 
+        bank_details: Dict, 
+        tx_ref: str
+    ) -> Dict[str, Any]:
         """
-        ✅ Initiate fiat payout to user's bank account
-        Supports multiple currencies (NGN, KES, GHS, etc.)
+        ✅ Initiate fiat payout using Flutterwave Transfer API
+        
+        REQUIREMENTS:
+        - Flutterwave account must have sufficient balance in target currency
+        - Transfers must be enabled on your account (Dashboard > Settings > Transfers)
+        
+        Supports multiple currencies (NGN, KES, GHS, USD, etc.)
         """
         url = f"{self.base_url}/transfers"
         headers = {"Authorization": f"Bearer {self.secret_key}"}
         
         currency = bank_details.get("currency", "NGN")
+        account_number = bank_details.get("account_number")
+        bank_code = bank_details.get("bank_code")
+        
+        # Validate required fields
+        if not all([account_number, bank_code]):
+            return {
+                "success": False, 
+                "message": "Account number and bank code required"
+            }
         
         payload = {
-            "account_bank": bank_details.get("bank_code"),
-            "account_number": bank_details.get("account_number"),
+            "account_bank": bank_code,
+            "account_number": account_number,
             "amount": float(amount),
             "narration": f"Seamount Withdrawal {tx_ref}",
             "currency": currency,
             "reference": tx_ref,
-            "callback_url": f"{self.settings.API_BASE_URL}/webhooks/flutterwave/payout",
-            "debit_currency": currency
+            "callback_url": f"{self.settings.API_BASE_URL}/webhooks/flutterwave/transfer",
+            "debit_currency": currency  # Currency to debit from Flutterwave balance
         }
-
-        # Validate required fields
-        if not all([payload["account_bank"], payload["account_number"]]):
-            return {"success": False, "message": "Bank code and account number required"}
-
-        logger.info(f"💳 Initiating Flutterwave payout: {amount} {currency} to {bank_details.get('account_name')}")
+        
+        logger.info(
+            f"💳 Initiating Flutterwave transfer: {amount} {currency} "
+            f"to {bank_details.get('account_name', 'N/A')}"
+        )
 
         try:
             async with aiohttp.ClientSession(headers=headers) as session:
-                async with session.post(url, json=payload) as response:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
                     data = await response.json()
-                    response.raise_for_status()
                     
-                    if data.get("status") == "success":
-                        logger.info(f"✅ Flutterwave payout initiated: {tx_ref}")
+                    if response.status == 200 and data.get("status") == "success":
+                        transfer_data = data.get("data", {})
+                        
+                        logger.info(f"✅ Flutterwave transfer initiated: {tx_ref}")
+                        
                         return {
                             "success": True,
-                            "reference": data["data"]["reference"],
-                            "message": "Payout initiated successfully"
+                            "id": transfer_data.get("id"),
+                            "reference": transfer_data.get("reference"),
+                            "status": transfer_data.get("status"),  # NEW, PENDING, SUCCESS, FAILED
+                            "message": "Transfer initiated successfully",
+                            "amount": float(amount),
+                            "currency": currency
                         }
                     else:
-                        error_msg = data.get("message", "Payout failed")
-                        logger.error(f"❌ Flutterwave payout failed: {error_msg}")
-                        return {"success": False, "message": error_msg}
+                        error_msg = data.get("message", "Transfer failed")
                         
+                        # Check for balance issues
+                        if "insufficient" in error_msg.lower() or "balance" in error_msg.lower():
+                            logger.error(
+                                f"❌ CRITICAL: Flutterwave balance insufficient! "
+                                f"Required: {amount} {currency}"
+                            )
+                            return {
+                                "success": False,
+                                "message": "Payment provider balance low. Contact support.",
+                                "error_code": "INSUFFICIENT_BALANCE"
+                            }
+                        
+                        logger.error(f"❌ Flutterwave transfer failed: {error_msg}")
+                        return {"success": False, "message": error_msg}
+                            
         except aiohttp.ClientError as e:
-            logger.error(f"💥 Flutterwave API error: {e}")
-            return {"success": False, "message": "Payment provider unavailable"}
+            logger.error(f"💥 Flutterwave network error: {e}")
+            return {
+                "success": False, 
+                "message": "Payment provider temporarily unavailable"
+            }
         except Exception as e:
-            logger.error(f"💥 Flutterwave payout exception: {e}")
+            logger.error(f"💥 Flutterwave transfer exception: {e}")
+            return {"success": False, "message": str(e)}
+
+    async def verify_transfer(self, transfer_id: str) -> Dict[str, Any]:
+        """
+        ✅ Verify Flutterwave transfer status
+        """
+        url = f"{self.base_url}/transfers/{transfer_id}"
+        headers = {"Authorization": f"Bearer {self.secret_key}"}
+        
+        try:
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    data = await response.json()
+                    
+                    if response.status == 200 and data.get("status") == "success":
+                        transfer_data = data.get("data", {})
+                        status = transfer_data.get("status")
+                        
+                        return {
+                            "success": True,
+                            "verified": status in ["SUCCESSFUL", "SUCCESS"],
+                            "status": status,
+                            "amount": transfer_data.get("amount"),
+                            "currency": transfer_data.get("currency"),
+                            "complete_message": transfer_data.get("complete_message"),
+                            "failure_reason": transfer_data.get("failure_message")
+                        }
+                    else:
+                        return {
+                            "success": False, 
+                            "message": data.get("message", "Verification failed")
+                        }
+                        
+        except Exception as e:
+            logger.error(f"💥 Flutterwave verification failed: {e}")
             return {"success": False, "message": str(e)}
