@@ -608,7 +608,8 @@ const DashboardPage = () => {
             chain={selectedChain} 
             chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
             address={multiChainWallets[selectedChain]?.address || ''} 
-            balance={calculateChainBalance(selectedChain)} 
+            balance={calculateChainBalance(selectedChain)}
+            onOpenFundModal={() => setShowFundModal(true)}  // ✅ NEW PROP
           />
         )}
         

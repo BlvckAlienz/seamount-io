@@ -14,6 +14,7 @@ interface WalletDetailModalProps {
   chainName: string;
   address: string;
   balance: number;
+  onOpenFundModal: () => void;  // ✅ NEW PROP
 }
 
 interface AssetPriceData {
@@ -86,7 +87,8 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   chain,
   chainName,
   address,
-  balance
+  balance,
+  onOpenFundModal  // ✅ NEW PROP
 }) => {
   const [selectedAsset, setSelectedAsset] = useState<string>('');
   const [priceData, setPriceData] = useState<AssetPriceData[]>([]);
@@ -451,30 +453,25 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     );
   };
   
-  const handleBuyAsset = async () => {
+  const handleBuyAsset = () => {
     if (!selectedAsset) {
       toast.error('Please select an asset first');
       return;
     }
     
-    try {
-      const response = await apiClient.post('/api/v1/onramp/initialize', {
-          amount_fiat: 10000,
-          currency: "NGN",
-          crypto_asset: selectedAsset,  // ← Changed from 'asset' to 'crypto_asset'
-          user_country: "NG",
-          payment_method: "auto"  // Let backend choose best provider
-      });
-      
-      if (response.data.payment_url) {
-        window.open(response.data.payment_url, '_blank');
-      } else {
-        toast.error('Payment initialization failed');
-      }
-    } catch (error) {
-      console.error('Buy asset error:', error);
-      toast.error('Failed to initiate purchase');
-    }
+    // Store selected asset in sessionStorage for FundWalletModal to read
+    sessionStorage.setItem('preselected_asset', selectedAsset);
+    
+    // Close this modal
+    onClose();
+    
+    // Open FundWalletModal
+    onOpenFundModal();
+    
+    toast.success(`Opening funding options for ${selectedAsset}`, {
+      duration: 2000,
+      icon: '💰'
+    });
   };
 
   const getExplorerUrl = (chain: string, address: string) => {

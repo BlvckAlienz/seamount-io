@@ -159,6 +159,25 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
   };
 
+  // Pre-select asset from WalletDetailModal "Buy" button
+  useEffect(() => {
+    if (open) {
+      const preselectedAsset = sessionStorage.getItem('preselected_asset');
+      if (preselectedAsset) {
+        setAsset(preselectedAsset);
+        sessionStorage.removeItem('preselected_asset'); // Clear after use
+      }
+    }
+  }, [open]);
+
+  // Existing useEffect...
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // ... existing code
+    }, 500)
+    // ...
+  }, [amount, currency, asset])
+
   // ✅ FIXED: Import useEffect from React
   useEffect(() => {
     const timer = setTimeout(() => {
