@@ -102,7 +102,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     
     // 🎯 TIER 1: Backend Oracle API
     try {
-      const response = await apiClient.get(`/api/v1/oracle/price/${assetName}`);
+      const response = await apiClient.get(`/api/oracle/price/${assetName}`);
       
       if (response.data.success && response.data.price) {
         const price = parseFloat(response.data.price);
