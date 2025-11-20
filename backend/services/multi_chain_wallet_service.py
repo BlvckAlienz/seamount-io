@@ -686,7 +686,14 @@ class MultiChainWalletService:
         amount: Decimal, 
         chain: str
     ) -> Dict:
-        """Send transaction via WDK chains"""
+        """
+        Send transaction via WDK chains (Bitcoin, Ethereum, Polygon, Tron)
+        
+        FLOW:
+        1. Get wallet credentials from database
+        2. Call WDK client with decrypted seed
+        3. Return transaction result
+        """
         
         # Get wallet credentials
         wallet = self.db.supabase.table('multi_chain_addresses')\
@@ -696,22 +703,37 @@ class MultiChainWalletService:
             .execute()
         
         if not wallet.data or len(wallet.data) == 0:
-            raise Exception(f"Wallet not found on {chain}")
+            raise Exception(f"No {chain} wallet found for user")
         
-        logger.info(f"📍 Sending {amount} {asset} via WDK on {chain}")
+        from_address = wallet.data[0]['address']
+        encrypted_seed = wallet.data[0]['encrypted_seed']
         
-        # Execute transaction
+        logger.info(f"🔒 Sending {amount} {asset} via WDK on {chain}")
+        logger.info(f"   From: {from_address[:10]}...")
+        logger.info(f"   To: {recipient[:10]}...")
+        
+        # Execute transaction via WDK
         result = await self.wdk.send_transaction(
-            from_address=wallet.data[0]['address'],
+            from_address=from_address,
             to_address=recipient,
             amount=amount,
             asset=asset,
             chain=chain,
-            encrypted_seed=wallet.data[0]['encrypted_seed'],
-            enable_gasless=True
+            encrypted_seed=encrypted_seed,
+            enable_gasless=True  # Enable for supported chains (Polygon)
         )
         
-        return {'tx_id': result['tx_id'], 'chain': chain}
+        if not result.get('success'):
+            raise Exception(result.get('error', f'{chain} transaction failed'))
+        
+        logger.info(f"✅ WDK transaction successful: {result['tx_id']}")
+        
+        return {
+            'tx_id': result['tx_id'],
+            'chain': chain,
+            'gasless_used': result.get('gasless_used', False),
+            'fee': result.get('fee', 0)
+        }
     
     def _estimate_arrival_time(self, chain: str) -> str:
         """Estimate transaction arrival time"""

@@ -329,7 +329,7 @@ class EnhancedOracleService:
                     continue
             
             # Fallback to recent average
-            fallback_rate = Decimal("1620.00")  # Recent NGN/USD rate
+            fallback_rate = Decimal("1450.00")  # Recent NGN/USD rate
             return fallback_rate, {
                 'source': 'fallback',
                 'timestamp': datetime.now().isoformat(),

@@ -564,7 +564,7 @@ CENTRAL_TREASURY_ADDRESSES: Dict[str, str] = {
     'bitcoin': 'bc1qcz6lh9zg0y8v2k9cns8napzqenu0ak5lx3pf03',
     'ethereum': '0x35186f2C63550f0EF35C28670947A0425879942b',
     'polygon': '0x561e9a01999dEFB7956D455053F3FE6f88D47291',
-    'tron': 'T6368654a4F366597C66DfD6Ee40D001ef6'
+    'tron': 'TCX2tuTEoF5HKHpX4Sd7MZPNF1gum8Kox5'
 }
 
 # Validation function
