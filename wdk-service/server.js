@@ -674,6 +674,211 @@ app.post('/wallet/send', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
+// BITCOIN SEND TRANSACTION
+// ============================================================================
+app.post('/wallet/bitcoin/send', validateApiKey, async (req, res) => {
+    try {
+        const { plaintext_seed, from_address, to_address, amount_satoshis } = req.body;
+
+        if (!plaintext_seed || !to_address || !amount_satoshis) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, and amount_satoshis required' 
+            });
+        }
+
+        console.log(`💸 Bitcoin: Sending ${amount_satoshis} sats to ${to_address.slice(0, 10)}...`);
+
+        // Create Bitcoin wallet
+        const btcWallet = await createBitcoinWallet(plaintext_seed);
+        
+        // TODO: Implement actual Bitcoin transaction
+        // This requires:
+        // 1. Fetch UTXOs for from_address
+        // 2. Select UTXOs (coin selection)
+        // 3. Build transaction
+        // 4. Sign with private key
+        // 5. Broadcast to network
+        
+        // For now, return mock response
+        console.log('⚠️ Bitcoin send not yet implemented - requires UTXO management');
+        
+        return res.status(501).json({
+            success: false,
+            error: 'Bitcoin send transactions require UTXO management',
+            message: 'Coming in next release. Use Algorand or EVM chains for now.',
+            recommended_alternative: 'Use Ethereum or Polygon with gasless transactions'
+        });
+        
+    } catch (error) {
+        console.error('❌ Bitcoin send failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ============================================================================
+// ETHEREUM/POLYGON TOKEN SEND (ERC-20: USDT, USDC)
+// ============================================================================
+app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { chain } = req.params;
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount,
+            gasless 
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        if (!['ethereum', 'polygon'].includes(chain)) {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}. Use ethereum or polygon.` 
+            });
+        }
+
+        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
+
+        // Create EVM wallet
+        const evmWallet = await createEVMWallet(plaintext_seed);
+        const provider = providers[chain];
+        
+        if (!provider) {
+            throw new Error(`Provider not configured for ${chain}`);
+        }
+        
+        // Connect wallet to provider
+        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+        
+        // ERC-20 ABI (minimal, for transfer function)
+        const ERC20_ABI = [
+            'function transfer(address to, uint256 amount) returns (bool)',
+            'function balanceOf(address owner) view returns (uint256)'
+        ];
+        
+        // Create contract instance
+        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
+        
+        // Check balance
+        const balance = await tokenContract.balanceOf(wallet.address);
+        console.log(`💰 Token balance: ${ethers.formatUnits(balance, 6)}`);
+        
+        if (balance < amount) {
+            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance}`);
+        }
+        
+        // Send token transfer transaction
+        console.log(`⚙️ Building ${chain} token transfer...`);
+        
+        const tx = await tokenContract.transfer(to_address, amount);
+        
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        console.log(`⏳ Waiting for confirmation...`);
+        
+        // Wait for confirmation
+        const receipt = await tx.wait(1);
+        
+        console.log(`✅ Token transfer confirmed!`);
+        console.log(`   Block: ${receipt.blockNumber}`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        
+        // Calculate costs
+        const gasPrice = receipt.gasPrice || tx.gasPrice;
+        const gasCostWei = receipt.gasUsed * gasPrice;
+        const gasCostEth = ethers.formatEther(gasCostWei);
+        
+        return res.json({
+            success: true,
+            tx_hash: receipt.hash,
+            chain: chain,
+            block_number: receipt.blockNumber,
+            gas_used: receipt.gasUsed.toString(),
+            gas_price: gasPrice.toString(),
+            gas_cost_eth: gasCostEth,
+            status: receipt.status === 1 ? 'confirmed' : 'failed',
+            gasless_used: gasless || false,
+            timestamp: new Date().toISOString(),
+            explorer_url: getExplorerUrl(chain, receipt.hash)
+        });
+        
+    } catch (error) {
+        console.error(`❌ ${req.params.chain} token send failed:`, error);
+        
+        let errorMessage = error.message;
+        if (error.code === 'INSUFFICIENT_FUNDS') {
+            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
+        } else if (error.message.includes('Insufficient token balance')) {
+            errorMessage = error.message;
+        }
+        
+        return res.status(400).json({ 
+            success: false,
+            error: errorMessage,
+            error_code: error.code,
+            chain: req.params.chain
+        });
+    }
+});
+
+// ============================================================================
+// TRON TOKEN SEND (TRC-20: USDT)
+// ============================================================================
+app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+
+        // Create Tron wallet
+        const tronWallet = await createTronWallet(plaintext_seed);
+        
+        // TODO: Implement actual Tron token transaction
+        // This requires TronWeb SDK
+        
+        console.log('⚠️ Tron token send not yet implemented - requires TronWeb SDK');
+        
+        return res.status(501).json({
+            success: false,
+            error: 'Tron token transactions require TronWeb SDK',
+            message: 'Coming in next release. Use Ethereum or Polygon for USDT/USDC.',
+            recommended_alternative: 'Use Polygon with gasless transactions for USDT'
+        });
+        
+    } catch (error) {
+        console.error('❌ Tron token send failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ============================================================================
 // HELPER: Get Blockchain Explorer URL
 // ============================================================================
 
@@ -746,6 +951,179 @@ app.post('/wallet/send', validateApiKey, async (req, res) => {
         });
     }
 });
+
+// ============================================================================
+// ETHEREUM/POLYGON TOKEN SEND (ERC-20: USDT, USDC)
+// ============================================================================
+app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { chain } = req.params;
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount,
+            gasless 
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        if (!['ethereum', 'polygon'].includes(chain)) {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}. Use ethereum or polygon.` 
+            });
+        }
+
+        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
+
+        // Create EVM wallet
+        const evmWallet = await createEVMWallet(plaintext_seed);
+        const provider = providers[chain];
+        
+        if (!provider) {
+            throw new Error(`Provider not configured for ${chain}`);
+        }
+        
+        // Connect wallet to provider
+        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+        
+        // ERC-20 ABI (minimal, for transfer function)
+        const ERC20_ABI = [
+            'function transfer(address to, uint256 amount) returns (bool)',
+            'function balanceOf(address owner) view returns (uint256)'
+        ];
+        
+        // Create contract instance
+        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
+        
+        // Check balance
+        const balance = await tokenContract.balanceOf(wallet.address);
+        console.log(`💰 Token balance: ${ethers.formatUnits(balance, 6)}`);
+        
+        if (balance < amount) {
+            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance}`);
+        }
+        
+        // Send token transfer transaction
+        console.log(`⚙️ Building ${chain} token transfer...`);
+        
+        const tx = await tokenContract.transfer(to_address, amount);
+        
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        console.log(`⏳ Waiting for confirmation...`);
+        
+        // Wait for confirmation
+        const receipt = await tx.wait(1);
+        
+        console.log(`✅ Token transfer confirmed!`);
+        console.log(`   Block: ${receipt.blockNumber}`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        
+        // Calculate costs
+        const gasPrice = receipt.gasPrice || tx.gasPrice;
+        const gasCostWei = receipt.gasUsed * gasPrice;
+        const gasCostEth = ethers.formatEther(gasCostWei);
+        
+        return res.json({
+            success: true,
+            tx_hash: receipt.hash,
+            chain: chain,
+            block_number: receipt.blockNumber,
+            gas_used: receipt.gasUsed.toString(),
+            gas_price: gasPrice.toString(),
+            gas_cost_eth: gasCostEth,
+            status: receipt.status === 1 ? 'confirmed' : 'failed',
+            gasless_used: gasless || false,
+            timestamp: new Date().toISOString(),
+            explorer_url: getExplorerUrl(chain, receipt.hash)
+        });
+        
+    } catch (error) {
+        console.error(`❌ ${req.params.chain} token send failed:`, error);
+        
+        let errorMessage = error.message;
+        if (error.code === 'INSUFFICIENT_FUNDS') {
+            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
+        } else if (error.message.includes('Insufficient token balance')) {
+            errorMessage = error.message;
+        }
+        
+        return res.status(400).json({ 
+            success: false,
+            error: errorMessage,
+            error_code: error.code,
+            chain: req.params.chain
+        });
+    }
+});
+
+// ============================================================================
+// TRON TOKEN SEND (TRC-20: USDT) - Phase 2
+// ============================================================================
+app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+
+        // Create Tron wallet
+        const tronWallet = await createTronWallet(plaintext_seed);
+        
+        // TODO: Implement actual Tron token transaction
+        // This requires TronWeb SDK integration
+        
+        console.log('⏸️ Tron token send not yet implemented - requires TronWeb SDK');
+        
+        return res.status(501).json({
+            success: false,
+            error: 'Tron token transactions coming in Phase 2',
+            message: 'Use Ethereum or Polygon for USDT/USDC for now.',
+            recommended_alternative: 'Use Polygon with gasless transactions for USDT'
+        });
+        
+    } catch (error) {
+        console.error('❌ Tron token send failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ============================================================================
+// HELPER: Get Blockchain Explorer URL
+// ============================================================================
+function getExplorerUrl(chain, txHash) {
+    const explorers = {
+        ethereum: `https://etherscan.io/tx/${txHash}`,
+        polygon: `https://polygonscan.com/tx/${txHash}`,
+        bitcoin: `https://blockstream.info/tx/${txHash}`,
+        tron: `https://tronscan.org/#/transaction/${txHash}`
+    };
+    
+    return explorers[chain] || `https://etherscan.io/tx/${txHash}`;
+}
 
 // Global error handler
 app.use((err, req, res, next) => {

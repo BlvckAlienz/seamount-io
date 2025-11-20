@@ -1173,6 +1173,204 @@ class WDKClient:
         """Check if gasless transactions available"""
         return chain.lower() in self.GASLESS_CHAINS
     
+    # ============================================================================
+    # SEND TRANSACTIONS (Multi-Chain)
+    # ============================================================================
+    
+    async def send_transaction(
+        self,
+        from_address: str,
+        to_address: str,
+        amount: Decimal,
+        asset: str,
+        chain: str,
+        encrypted_seed: str,
+        enable_gasless: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Send transaction via WDK - Supports BTC, ETH, MATIC, TRX
+        
+        CHAIN-SPECIFIC IMPLEMENTATIONS:
+        - Bitcoin: Native BTC only (UTXO management in Phase 2)
+        - Ethereum: ETH + ERC-20 tokens (USDT, USDC)
+        - Polygon: MATIC + ERC-20 tokens (USDT, USDC) + Gasless
+        - Tron: TRX + TRC-20 tokens (USDT)
+        
+        Returns:
+            {
+                'tx_id': 'transaction_hash',
+                'chain': 'ethereum',
+                'fee': 0.0015,
+                'gasless_used': False,
+                'success': True
+            }
+        """
+        
+        if chain not in self.SUPPORTED_CHAINS:
+            raise ValueError(f"Unsupported chain: {chain}")
+        
+        logger.info(f"🚀 WDK Transaction: {amount} {asset} on {chain}")
+        
+        # Decrypt seed for signing
+        from backend.services.seed_encryption_service import SeedEncryptionService
+        encryption_service = SeedEncryptionService()
+        
+        try:
+            plaintext_seed = encryption_service.decrypt_seed(encrypted_seed)
+            logger.info(f"🔓 Seed decrypted successfully")
+        except Exception as decrypt_err:
+            logger.error(f"❌ Seed decryption failed: {decrypt_err}")
+            raise Exception(f"Cannot decrypt wallet seed: {decrypt_err}")
+        
+        # ========================================================================
+        # BITCOIN TRANSACTIONS (Phase 2 - UTXO Management)
+        # ========================================================================
+        if chain == 'bitcoin':
+            logger.warning(f"⏸️ Bitcoin sends require UTXO management (coming in Phase 2)")
+            
+            # Return user-friendly error
+            raise Exception(
+                "Bitcoin sends coming soon! "
+                "Use Ethereum or Polygon for instant transfers. "
+                "Bitcoin requires UTXO selection (complex implementation)."
+            )
+        
+        # ========================================================================
+        # ETHEREUM & POLYGON TRANSACTIONS (EVM chains)
+        # ========================================================================
+        elif chain in ['ethereum', 'polygon']:
+            # Determine if native currency or token
+            is_native = (
+                (chain == 'ethereum' and asset == 'ETH') or
+                (chain == 'polygon' and asset == 'MATIC')
+            )
+            
+            if is_native:
+                # Native currency transfer (ETH or MATIC)
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount_wei': str(int(amount * 10**18)),  # ETH/MATIC to wei
+                    'chain': chain,
+                    'gasless': enable_gasless and chain == 'polygon'  # Only Polygon supports gasless
+                }
+                
+                endpoint = f'/wallet/{chain}/send'
+                
+            else:
+                # ERC-20 token transfer (USDT, USDC, etc.)
+                from backend.config import get_settings
+                settings = get_settings()
+                
+                # Get token contract address
+                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_{chain.upper()}")
+                if not asset_config:
+                    raise Exception(f"Asset {asset} not configured for {chain}")
+                
+                token_address = asset_config.get('contract_address')
+                if not token_address:
+                    raise Exception(f"No contract address for {asset} on {chain}")
+                
+                decimals = asset_config.get('decimals', 6)
+                amount_base = int(amount * (10 ** decimals))
+                
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'token_address': token_address,
+                    'amount': str(amount_base),
+                    'chain': chain,
+                    'gasless': enable_gasless and chain == 'polygon'
+                }
+                
+                endpoint = f'/wallet/{chain}/send-token'
+            
+            try:
+                result = await self._make_request('POST', endpoint, data=payload)
+                
+                if not result.get('success'):
+                    raise Exception(result.get('error', f'{chain} transaction failed'))
+                
+                return {
+                    'tx_id': result['tx_hash'],
+                    'chain': chain,
+                    'fee': result.get('gas_used', 0),
+                    'gasless_used': result.get('gasless', False),
+                    'success': True
+                }
+                
+            except Exception as evm_error:
+                logger.error(f"❌ {chain} transaction failed: {evm_error}")
+                raise
+        
+        # ========================================================================
+        # TRON TRANSACTIONS
+        # ========================================================================
+        elif chain == 'tron':
+            # Determine if native TRX or TRC-20 token
+            is_native = (asset == 'TRX')
+            
+            if is_native:
+                # Native TRX transfer
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount_sun': int(amount * 1_000_000),  # TRX to sun
+                    'chain': 'tron'
+                }
+                
+                endpoint = '/wallet/tron/send'
+                
+            else:
+                # TRC-20 token transfer (USDT)
+                from backend.config import get_settings
+                settings = get_settings()
+                
+                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
+                if not asset_config:
+                    raise Exception(f"Asset {asset} not configured for Tron")
+                
+                token_address = asset_config.get('contract_address')
+                if not token_address:
+                    raise Exception(f"No contract address for {asset} on Tron")
+                
+                decimals = asset_config.get('decimals', 6)
+                amount_base = int(amount * (10 ** decimals))
+                
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'token_address': token_address,
+                    'amount': str(amount_base),
+                    'chain': 'tron'
+                }
+                
+                endpoint = '/wallet/tron/send-token'
+            
+            try:
+                result = await self._make_request('POST', endpoint, data=payload)
+                
+                if not result.get('success'):
+                    raise Exception(result.get('error', 'Tron transaction failed'))
+                
+                return {
+                    'tx_id': result['tx_hash'],
+                    'chain': 'tron',
+                    'fee': result.get('energy_used', 0),
+                    'success': True
+                }
+                
+            except Exception as tron_error:
+                logger.error(f"❌ Tron transaction failed: {tron_error}")
+                raise
+        
+        else:
+            raise ValueError(f"Chain {chain} not implemented yet")
+        
     async def health_check(self) -> Dict[str, Any]:
         """Check WDK service health"""
         try:

@@ -114,12 +114,13 @@ const PaymentFlow: React.FC<PaymentFlowProps> = ({ userId, onComplete }) => {
 
   const initiateNGNOnRamp = async (amountNGN: number) => {
     try {
-      const { data } = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
+      const { data } = await apiClient.post('/api/v1/onramp/initialize', {
         user_id: user?.id || '',
         user_email: user?.email || '',
         user_phone: user?.phone || user?.phone_number || '',
         amount_fiat: amountNGN,
-        currency: "NGN"
+        currency: "NGN",
+        payment_method: "auto"
       });
       
       window.location.href = data.payment_url;

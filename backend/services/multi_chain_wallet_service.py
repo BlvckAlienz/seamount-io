@@ -691,8 +691,13 @@ class MultiChainWalletService:
         
         FLOW:
         1. Get wallet credentials from database
-        2. Call WDK client with decrypted seed
+        2. Call WDK client with encrypted seed
         3. Return transaction result
+        
+        SAFETY:
+        - Does NOT touch Algorand logic (separate method: _send_via_algorand)
+        - Validates wallet exists before attempting send
+        - Handles all WDK errors gracefully
         """
         
         # Get wallet credentials
@@ -713,27 +718,44 @@ class MultiChainWalletService:
         logger.info(f"   To: {recipient[:10]}...")
         
         # Execute transaction via WDK
-        result = await self.wdk.send_transaction(
-            from_address=from_address,
-            to_address=recipient,
-            amount=amount,
-            asset=asset,
-            chain=chain,
-            encrypted_seed=encrypted_seed,
-            enable_gasless=True  # Enable for supported chains (Polygon)
-        )
-        
-        if not result.get('success'):
-            raise Exception(result.get('error', f'{chain} transaction failed'))
-        
-        logger.info(f"✅ WDK transaction successful: {result['tx_id']}")
-        
-        return {
-            'tx_id': result['tx_id'],
-            'chain': chain,
-            'gasless_used': result.get('gasless_used', False),
-            'fee': result.get('fee', 0)
-        }
+        try:
+            result = await self.wdk.send_transaction(
+                from_address=from_address,
+                to_address=recipient,
+                amount=amount,
+                asset=asset,
+                chain=chain,
+                encrypted_seed=encrypted_seed,
+                enable_gasless=True  # Enable for supported chains (Polygon)
+            )
+            
+            if not result.get('success'):
+                raise Exception(result.get('error', f'{chain} transaction failed'))
+            
+            logger.info(f"✅ WDK transaction successful: {result['tx_id']}")
+            
+            return {
+                'tx_id': result['tx_id'],
+                'chain': chain,
+                'gasless_used': result.get('gasless_used', False),
+                'fee': result.get('fee', 0)
+            }
+            
+        except Exception as wdk_error:
+            logger.error(f"❌ WDK send failed: {wdk_error}")
+            
+            # Re-raise with user-friendly message
+            error_msg = str(wdk_error)
+            
+            # Parse specific errors
+            if 'UTXO' in error_msg or 'Bitcoin' in error_msg:
+                error_msg = "Bitcoin sends coming soon! Use Ethereum or Polygon for now."
+            elif 'Insufficient' in error_msg:
+                error_msg = f"Insufficient {asset} balance or gas fees."
+            elif 'Invalid address' in error_msg:
+                error_msg = f"Invalid {chain} address format."
+            
+            raise Exception(error_msg)
     
     def _estimate_arrival_time(self, chain: str) -> str:
         """Estimate transaction arrival time"""

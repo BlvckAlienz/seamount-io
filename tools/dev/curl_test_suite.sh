@@ -1,6 +1,6 @@
 #!/bin/bash
 
-API_URL="https://seamount-api.onrender.com/api/v1"
+API_URL="https://seamount-io-pr8a.onrender.com/api/v1"
 BEARER_TOKEN="I6hCDIA5CkpdCKEsrQdqflpzckUoDKBkJ446zY88+2lPeGozVPYHT+1nikdAjD2Twmu3S2PrhJNbDtQqPRvh6Q=="
 API_KEY="smnt_test_-GKRaXHivxucWFE-m_Tz4MQLMT_IxKQ1VcXxD1gOcxw"
 
@@ -10,7 +10,7 @@ echo "----------------------------------------"
 
 # Health check
 echo "[1] Health check..."
-curl -s -X GET "https://seamount-api.onrender.com/" | jq .
+curl -s -X GET "https://seamount-io-pr8a.onrender.com/" | jq .
 
 # Investor contact
 echo "[2] Investor contact..."

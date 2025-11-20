@@ -625,7 +625,7 @@ class Settings(BaseSettings):
     # TETHER WDK CONFIGURATION
     # ========================================================================
     WDK_SERVICE_URL: str = Field(
-        default="https://seamount-wdk.onrender.com",
+        default="https://seamount-wdk-ne5i.onrender.com",
         description="Your deployed WDK microservice (Node.js)"
     )
 
@@ -851,7 +851,7 @@ class Settings(BaseSettings):
         description="Pretium Tron settlement wallet address"
     )
     PRETIUM_WEBHOOK_URL: str = Field(
-        default="https://seamount-api.onrender.com/webhooks/pretium",
+        default="https://seamount-io-pr8a.onrender.com/webhooks/pretium",
         description="Pretium webhook callback URL"
     )
     PRETIUM_CALLBACK_URL: str = Field(
@@ -887,7 +887,7 @@ class Settings(BaseSettings):
     # Operational
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
-    API_BASE_URL: str = Field(default="https://seamount-api.onrender.com")
+    API_BASE_URL: str = Field(default="https://seamount-io-pr8a.onrender.com")
     FRONTEND_URL: str = Field(default="http://localhost:3000")
     
     # Business Model

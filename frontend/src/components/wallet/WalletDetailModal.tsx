@@ -458,12 +458,12 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     }
     
     try {
-      const response = await apiClient.post('/api/v1/payments/on-ramp/ngn', {
-        user_id: 'current-user-id',
-        user_email: 'user@example.com',
-        amount_fiat: 10000,
-        currency: "NGN",
-        asset: selectedAsset
+      const response = await apiClient.post('/api/v1/onramp/initialize', {
+          amount_fiat: 10000,
+          currency: "NGN",
+          crypto_asset: selectedAsset,  // ← Changed from 'asset' to 'crypto_asset'
+          user_country: "NG",
+          payment_method: "auto"  // Let backend choose best provider
       });
       
       if (response.data.payment_url) {
