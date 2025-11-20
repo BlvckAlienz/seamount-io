@@ -149,7 +149,10 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
             raise
     
     async def initiate_payout(self, amount: Decimal, bank_details: Dict, tx_ref: str) -> Dict[str, Any]:
-        """Initiate bank transfer to Nigerian account"""
+        """
+        ✅ Initiate bank transfer to Nigerian account
+        Uses Paystack Transfer API for instant payouts
+        """
         
         # Step 1: Create transfer recipient
         recipient_url = f"{self.base_url}/transferrecipient"
@@ -165,9 +168,12 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
             recipient_data = await self._request_with_retry('POST', recipient_url, json=recipient_payload)
             
             if not recipient_data.get('status'):
-                return {"success": False, "message": f"Failed to create recipient: {recipient_data.get('message')}"}
+                error_msg = recipient_data.get('message', 'Failed to create recipient')
+                logger.error(f"❌ Paystack recipient creation failed: {error_msg}")
+                return {"success": False, "message": error_msg}
             
             recipient_code = recipient_data['data']['recipient_code']
+            logger.info(f"✅ Paystack recipient created: {recipient_code}")
             
             # Step 2: Initiate transfer
             transfer_url = f"{self.base_url}/transfer"
@@ -176,12 +182,13 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
                 "reason": f"Seamount Withdrawal {tx_ref}",
                 "amount": int(float(amount) * 100),  # Convert to kobo
                 "recipient": recipient_code,
-                "reference": f"payout_{tx_ref}"
+                "reference": tx_ref
             }
             
             transfer_data = await self._request_with_retry('POST', transfer_url, json=transfer_payload)
             
             if transfer_data.get('status'):
+                logger.info(f"✅ Paystack transfer initiated: {tx_ref}")
                 return {
                     "success": True,
                     "reference": transfer_data['data']['reference'],
@@ -189,11 +196,13 @@ class PaystackProvider:  # Changed from PaystackProcessor to PaystackProvider
                     "message": "Payout initiated successfully"
                 }
             else:
-                return {"success": False, "message": transfer_data.get('message', 'Transfer failed')}
+                error_msg = transfer_data.get('message', 'Transfer failed')
+                logger.error(f"❌ Paystack transfer failed: {error_msg}")
+                return {"success": False, "message": error_msg}
                 
         except Exception as e:
             logger.error(f"💥 Paystack payout exception: {e}")
-            raise
+            return {"success": False, "message": str(e)}
     
     async def verify_payout(self, reference: str) -> Dict[str, Any]:
         """Verify payout status"""

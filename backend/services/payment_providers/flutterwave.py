@@ -119,29 +119,30 @@ class FlutterwaveProvider:
 
     async def initiate_payout(self, amount: Decimal, bank_details: Dict, tx_ref: str) -> Dict[str, Any]:
         """
-        Initiates a fiat payout to a user's bank account. This is a critical flow.
+        ✅ Initiate fiat payout to user's bank account
+        Supports multiple currencies (NGN, KES, GHS, etc.)
         """
         url = f"{self.base_url}/transfers"
         headers = {"Authorization": f"Bearer {self.secret_key}"}
         
-        # This payload must be constructed based on the bank_details provided.
-        # It requires bank_code, account_number, etc.
+        currency = bank_details.get("currency", "NGN")
+        
         payload = {
-            "account_bank": bank_details.get("bank_code"), # e.g., "044" for Access Bank
+            "account_bank": bank_details.get("bank_code"),
             "account_number": bank_details.get("account_number"),
             "amount": float(amount),
             "narration": f"Seamount Withdrawal {tx_ref}",
-            "currency": bank_details.get("currency", "NGN"),
-            "reference": f"payout_{tx_ref}",
-            "callback_url": f"https://seamount-api-final.vercel.app/api/v1/webhooks/payout-status", # Your backend webhook
-            "debit_currency": bank_details.get("currency", "NGN")
+            "currency": currency,
+            "reference": tx_ref,
+            "callback_url": f"{self.settings.API_BASE_URL}/webhooks/flutterwave/payout",
+            "debit_currency": currency
         }
 
-        # Basic validation
+        # Validate required fields
         if not all([payload["account_bank"], payload["account_number"]]):
-            raise ValueError("Bank code and account number are required for payout.")
+            return {"success": False, "message": "Bank code and account number required"}
 
-        logger.info(f"Initiating payout of {amount} {payload['currency']} for tx_ref: {tx_ref}")
+        logger.info(f"💳 Initiating Flutterwave payout: {amount} {currency} to {bank_details.get('account_name')}")
 
         try:
             async with aiohttp.ClientSession(headers=headers) as session:
@@ -150,18 +151,20 @@ class FlutterwaveProvider:
                     response.raise_for_status()
                     
                     if data.get("status") == "success":
+                        logger.info(f"✅ Flutterwave payout initiated: {tx_ref}")
                         return {
                             "success": True,
                             "reference": data["data"]["reference"],
-                            "message": "Payout initiated successfully."
+                            "message": "Payout initiated successfully"
                         }
                     else:
-                        logger.error(f"Payout initiation failed for tx_ref {tx_ref}: {data.get('message')}")
-                        return {"success": False, "message": data.get("message")}
+                        error_msg = data.get("message", "Payout failed")
+                        logger.error(f"❌ Flutterwave payout failed: {error_msg}")
+                        return {"success": False, "message": error_msg}
                         
         except aiohttp.ClientError as e:
-            logger.error(f"Flutterwave API request failed during payout: {e}")
-            raise HTTPException(status_code=503, detail="Payout service is currently unavailable.")
+            logger.error(f"💥 Flutterwave API error: {e}")
+            return {"success": False, "message": "Payment provider unavailable"}
         except Exception as e:
-            logger.error(f"Unexpected error in initiate_payout: {e}", exc_info=True)
-            raise
+            logger.error(f"💥 Flutterwave payout exception: {e}")
+            return {"success": False, "message": str(e)}

@@ -358,12 +358,10 @@ async def withdraw(
     audit_service = Depends(get_audit_service)
 ):
     """
-    Initialize crypto → fiat withdrawal
-    
-    PRIORITY ORDER:
-    🥇 Cashramp (P2P, instant settlement)
-    🥈 Paystack (Bank transfers, Nigeria)
-    🥉 Flutterwave (International fallback)
+    Execute crypto → fiat withdrawal
+    ✅ Checks actual user balance
+    ✅ Executes payout via Paystack/Flutterwave
+    ✅ NO MINIMUM RESTRICTIONS
     """
     
     try:
@@ -372,37 +370,42 @@ async def withdraw(
         crypto_asset = request.crypto_asset
         recipient_details = request.recipient_details
         
-        if crypto_amount <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Amount must be greater than 0"
-            )
-        
-        # 📍 STEP 1: Get asset config
-        asset_config = settings.SUPPORTED_ASSETS.get(crypto_asset)
-        if not asset_config:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported asset: {crypto_asset}"
-            )
-        
-        # 📍 STEP 2: Verify user has sufficient balance
+        # ✅ STEP 1: Get user's actual balance from database
         try:
-            balance_result = db_service.supabase.from_('wallet_balances')\
+            balance_query = db_service.supabase.from_('wallet_balances')\
                 .select('*')\
                 .eq('user_id', current_user["id"])\
                 .limit(1)\
                 .execute()
             
-            if not balance_result.data:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Wallet not found"
-                )
+            if not balance_query.data:
+                raise HTTPException(status_code=400, detail="Wallet not found. Please create wallet first.")
             
-            balance = balance_result.data[0]
-            current_balance = Decimal(str(balance.get('usdt_balance', 0)))
+            balance_row = balance_query.data[0]
             
+            # Map crypto asset to balance column
+            ASSET_TO_COLUMN = {
+                'ALGO': 'algo_balance',
+                'USDT_ALGO': 'usdt_balance',
+                'USDCa': 'usdca_balance',
+                'goBTC': 'gobtc_balance',
+                'goETH': 'goeth_balance',
+                'BTC': 'btc_balance',
+                'ETH': 'eth_balance',
+                'MATIC': 'matic_balance',
+                'TRX': 'trx_balance',
+                'USDT_TRON': 'usdt_tron_balance'
+            }
+            
+            balance_column = ASSET_TO_COLUMN.get(crypto_asset)
+            if not balance_column:
+                raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
+            
+            current_balance = Decimal(str(balance_row.get(balance_column, 0)))
+            
+            logger.info(f"💰 User {current_user['id']} balance: {current_balance} {crypto_asset}")
+            
+            # ✅ Check sufficient balance (NO MINIMUM!)
             if current_balance < crypto_amount:
                 raise HTTPException(
                     status_code=400,
@@ -413,26 +416,25 @@ async def withdraw(
             raise
         except Exception as e:
             logger.error(f"❌ Balance check failed: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to verify balance"
-            )
+            raise HTTPException(status_code=500, detail="Failed to check balance")
         
-        # 📍 STEP 3: Get crypto price
+        # ✅ STEP 2: Get asset config & calculate amounts
+        asset_config = settings.SUPPORTED_ASSETS.get(crypto_asset)
+        if not asset_config:
+            raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
+        
+        # Get crypto price
         oracle_service = EnhancedOracleService(db_service)
-        oracle_symbol = asset_config.get("oracle_symbol", "bitcoin")
+        oracle_symbol = asset_config.get("oracle_symbol", "algorand")
         
         try:
             crypto_price_usd, price_metadata = await oracle_service.get_asset_price(oracle_symbol)
             crypto_value_usd = crypto_amount * crypto_price_usd
-        except Exception as price_error:
-            logger.error(f"❌ Price oracle failed: {price_error}")
-            raise HTTPException(
-                status_code=503,
-                detail="Cannot get live crypto prices. Please try again."
-            )
+        except Exception as e:
+            logger.error(f"❌ Price oracle failed: {e}")
+            raise HTTPException(status_code=503, detail="Cannot get live prices")
         
-        # 📍 STEP 4: Get forex rate
+        # Get forex rate
         fiat_currency = recipient_details.get("currency", "NGN")
         
         if fiat_currency == "USD":
@@ -448,155 +450,91 @@ async def withdraw(
                             rates_data = await response.json()
                             usd_to_fiat_rate = Decimal(str(rates_data["rates"].get(fiat_currency, 1)))
                         else:
-                            raise Exception(f"ExchangeRate-API returned {response.status}")
-            except Exception as forex_error:
-                logger.error(f"❌ Forex API failed: {forex_error}")
-                raise HTTPException(
-                    status_code=503,
-                    detail="Cannot get live exchange rates. Please try again."
-                )
+                            raise Exception("Forex API failed")
+            except Exception as e:
+                logger.error(f"❌ Forex failed: {e}")
+                raise HTTPException(status_code=503, detail="Cannot get exchange rates")
         
         gross_fiat_amount = crypto_value_usd * usd_to_fiat_rate
         
-        # 📍 STEP 5: Calculate fees
+        # Calculate fee (1.8%)
         fee_rate = Decimal("0.018")
         withdrawal_fee = gross_fiat_amount * fee_rate
         net_fiat_amount = gross_fiat_amount - withdrawal_fee
         
-         # 🎯 STEP 6: Smart routing - Pretium for Tron, existing for others
+        # ✅ STEP 3: Execute payout via Paystack or Flutterwave
+        payment_method = recipient_details.get("payment_method", "bank_transfer")
         provider = None
         payout_result = None
         
-        # 🥇 TIER 1: PRETIUM (Tron USDT exclusive)
-        if crypto_asset == "USDT_TRON":
+        # Try Paystack first (NGN only, best rates)
+        if fiat_currency == "NGN" and payment_method == "bank_transfer":
             try:
-                logger.info(f"🔵 Routing to Pretium for Tron off-ramp: {crypto_amount} USDT")
+                logger.info(f"🏦 Routing to Paystack for {net_fiat_amount} NGN")
                 
-                pretium = PretiumProvider(settings)
-                
-                # Get user's Tron wallet for transaction hash
-                wallet_result = db_service.supabase.from_('multi_chain_addresses')\
-                    .select('address')\
-                    .eq('user_id', current_user["id"])\
-                    .eq('blockchain', 'tron')\
-                    .limit(1)\
-                    .execute()
-                
-                if not wallet_result.data or len(wallet_result.data) == 0:
-                    raise Exception("No Tron wallet found")
-                
-                tron_address = wallet_result.data[0]["address"]
-                
-                # User must send USDT to Pretium settlement wallet
-                # Generate transaction hash placeholder (will be updated by webhook)
-                tx_hash_placeholder = f"PENDING_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
-                
-                # Initialize Pretium off-ramp
-                payout_result = await pretium.initialize_offramp(
-                    user_id=current_user["id"],
-                    amount=float(net_fiat_amount),
-                    currency=currency,
-                    transaction_hash=tx_hash_placeholder,
-                    recipient_details=payload.recipient_details
-                )
-                
-                if payout_result and payout_result.get("success"):
-                    provider = "pretium"
-                    logger.info(f"✅ Pretium off-ramp initialized: {crypto_amount} USDT_TRON")
-                else:
-                    raise Exception(payout_result.get('error', 'Pretium failed'))
-                    
-            except Exception as pretium_error:
-                logger.warning(f"⚠️ Pretium failed: {pretium_error}")
-                # Fall through to Cashramp/Paystack
-        
-        # 🥈 TIER 2: CASHRAMP (P2P, instant settlement - existing logic)
-        if not provider and recipient_details.get("payment_method") in ["auto", "mobile_money", "cashramp"]:
-            try:
-                cashramp = CashrampService(db_service)
-                
-                payout_result = await cashramp.create_payout(
-                    user_id=current_user["id"],
-                    crypto_amount=float(crypto_amount),
-                    crypto_asset=crypto_asset,
-                    fiat_amount=float(net_fiat_amount),
-                    recipient_details=recipient_details
-                )
-                
-                if payout_result and payout_result.get("success"):
-                    provider = "cashramp"
-                    logger.info(f"✅ Cashramp offramp initialized: {crypto_amount} {crypto_asset}")
-                else:
-                    logger.warning("⚠️ Cashramp payout failed or returned no success")
-                    
-            except Exception as cashramp_error:
-                logger.warning(f"⚠️ Cashramp failed: {cashramp_error}")
-                # Fall through to Paystack
-        
-        # 🥈 TIER 3: PAYSTACK (Bank transfers, Nigeria)
-        if not provider and recipient_details.get("country") == "NG" and \
-           recipient_details.get("payment_method") in ["auto", "bank_transfer"]:
-            try:
                 paystack = PaystackProvider(settings)
                 
-                payout_result = await paystack.create_payout(
-                    amount=float(net_fiat_amount),
-                    currency=fiat_currency,
-                    account_number=recipient_details.get("account_number"),
-                    bank_code=recipient_details.get("bank_code"),
-                    recipient_name=recipient_details.get("account_name"),
-                    reason=f"Withdrawal: {crypto_amount} {crypto_asset}"
+                bank_details = {
+                    "account_name": recipient_details.get("account_name"),
+                    "account_number": recipient_details.get("account_number"),
+                    "bank_code": recipient_details.get("bank_code")
+                }
+                
+                payout_result = await paystack.initiate_payout(
+                    amount=net_fiat_amount,
+                    bank_details=bank_details,
+                    tx_ref=f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
                 )
                 
                 if payout_result and payout_result.get("success"):
                     provider = "paystack"
-                    logger.info(f"✅ Paystack offramp initialized: {crypto_amount} {crypto_asset}")
+                    logger.info(f"✅ Paystack payout initiated")
                 else:
-                    logger.warning("⚠️ Paystack payout failed")
+                    raise Exception(payout_result.get('message', 'Paystack failed'))
                     
             except Exception as paystack_error:
                 logger.warning(f"⚠️ Paystack failed: {paystack_error}")
                 # Fall through to Flutterwave
         
-        # 🥉 TIER 4: FLUTTERWAVE (International fallback)
+        # Fallback to Flutterwave (multi-currency, mobile money)
         if not provider:
             try:
-                from backend.services.payment_providers.flutterwave import FlutterwaveProvider
+                logger.info(f"🌍 Routing to Flutterwave for {net_fiat_amount} {fiat_currency}")
+                
                 flutterwave = FlutterwaveProvider(settings)
                 
-                payout_result = await flutterwave.create_payout(
-                    amount=float(net_fiat_amount),
-                    currency=fiat_currency,
-                    account_number=recipient_details.get("account_number"),
-                    bank_code=recipient_details.get("bank_code"),
-                    recipient_name=recipient_details.get("account_name")
+                bank_details = {
+                    "account_name": recipient_details.get("account_name"),
+                    "account_number": recipient_details.get("account_number"),
+                    "bank_code": recipient_details.get("bank_code"),
+                    "currency": fiat_currency
+                }
+                
+                payout_result = await flutterwave.initiate_payout(
+                    amount=net_fiat_amount,
+                    bank_details=bank_details,
+                    tx_ref=f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
                 )
                 
                 if payout_result and payout_result.get("success"):
                     provider = "flutterwave"
-                    logger.info(f"✅ Flutterwave offramp initialized: {crypto_amount} {crypto_asset}")
+                    logger.info(f"✅ Flutterwave payout initiated")
                 else:
-                    raise Exception("Flutterwave payout failed")
+                    raise Exception(payout_result.get('message', 'Flutterwave failed'))
                     
-            except Exception as flutterwave_error:
-                logger.error(f"❌ All providers failed! Last error: {flutterwave_error}")
+            except Exception as fw_error:
+                logger.error(f"❌ All providers failed! Last error: {fw_error}")
                 raise HTTPException(
                     status_code=503,
-                    detail="All payment providers unavailable. Please try again later."
+                    detail="Payment providers unavailable. Please try again later."
                 )
         
-        if not provider:
-            raise HTTPException(
-                status_code=503,
-                detail="No payment provider could process this withdrawal"
-            )
-        
-        # 📍 STEP 7: Deduct from user balance
+        # ✅ STEP 4: Deduct from user balance
         try:
             new_balance = current_balance - crypto_amount
             
-            await db_service.supabase.from_('wallet_balances')\
-                .update({'usdt_balance': float(new_balance), 'updated_at': 'NOW()'})\
+            update_query = db_service.supabase.from_('wallet_balances')\
+                .update({balance_column: float(new_balance), 'updated_at': 'NOW()'})\
                 .eq('user_id', current_user["id"])\
                 .execute()
             
@@ -604,12 +542,9 @@ async def withdraw(
             
         except Exception as balance_error:
             logger.error(f"❌ Failed to update balance: {balance_error}")
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to process withdrawal. Please contact support."
-            )
+            raise HTTPException(status_code=500, detail="Failed to process withdrawal")
         
-        # 📍 STEP 8: Store withdrawal record
+        # ✅ STEP 5: Store transaction record
         tx_id = f"OFFRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
         
         tx_data = {
@@ -618,8 +553,6 @@ async def withdraw(
             "type": "offramp",
             "status": "processing",
             "provider": provider,
-            "pretium_txn_code": payout_result.get("transaction_code") if provider == "pretium" else None,
-            "pretium_reference": payout_result.get("reference") if provider == "pretium" else None,
             "crypto_asset": crypto_asset,
             "crypto_amount": float(crypto_amount),
             "fiat_currency": fiat_currency,
@@ -636,7 +569,7 @@ async def withdraw(
         except Exception as db_error:
             logger.error(f"❌ Failed to store transaction: {db_error}")
         
-        # 📍 STEP 9: Log audit trail
+        # Log audit
         if audit_service:
             try:
                 await audit_service.log_event(
@@ -664,17 +597,14 @@ async def withdraw(
             "currency": fiat_currency,
             "withdrawal_fee": float(withdrawal_fee),
             "status": "processing",
-            "estimated_settlement": "1-2 hours" if provider != "cashramp" else "< 5 seconds"
+            "estimated_settlement": "1-2 hours"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"💥 Withdrawal failed: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Withdrawal failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Withdrawal failed: {str(e)}")
 
 
 # ============================================

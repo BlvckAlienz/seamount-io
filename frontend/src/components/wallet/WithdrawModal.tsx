@@ -189,6 +189,8 @@ const MOBILE_PROVIDER_NAMES: { [key: string]: string } = {
 }
 
 export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
+  // ✅ Get actual wallet balances
+  const { balances, loading: walletLoading, fetchBalances } = useWallet()
   // Core state
   const [amount, setAmount] = useState('')
   const [asset, setAsset] = useState('USDT_ALGO')
@@ -212,6 +214,16 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [mobileNumber, setMobileNumber] = useState('')
 
   const { session } = useAuth()
+
+  // ✅ Fetch balances when modal opens
+  useEffect(() => {
+    if (open && session) {
+      fetchBalances()
+    }
+  }, [open, session])
+
+  // ✅ Get available balance for selected asset
+  const availableBalance = balances[asset]?.balance || 0
 
   // Get selected currency details
   const selectedCurrency = WITHDRAWAL_CURRENCIES.find(c => c.code === currency)
@@ -470,25 +482,48 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             <Label htmlFor="withdraw-amount" className="text-sm font-semibold text-gray-900 dark:text-white">
               Amount to Withdraw
             </Label>
+            
+            {/* ✅ Show available balance */}
+            {availableBalance > 0 ? (
+              <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
+                <span className="font-bold text-blue-700 dark:text-blue-300">
+                  {availableBalance.toFixed(4)} {getAssetSymbol(asset)}
+                </span>
+              </div>
+            ) : (
+              <Alert variant="destructive" className="border-2">
+                <AlertCircle className="h-5 w-5" />
+                <AlertDescription className="font-medium">
+                  No {getAssetSymbol(asset)} balance found. Please fund your wallet first.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="relative">
               <Input
                 id="withdraw-amount"
                 type="number"
                 step="0.01"
                 min="0.01"
+                max={availableBalance}
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                disabled={loading}
+                disabled={loading || availableBalance === 0}
                 className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium pr-20"
               />
               <span className="absolute right-3 top-3 text-gray-600 dark:text-gray-400 font-semibold text-lg">
                 {getAssetSymbol(asset)}
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-              Minimum: 1 {getAssetSymbol(asset)}
-            </p>
+            
+            {/* ✅ REMOVE MINIMUM MESSAGE - allow any amount */}
+            {parseFloat(amount) > availableBalance && (
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                ⚠️ Amount exceeds available balance
+              </p>
+            )}
           </div>
 
           {/* Currency Selection */}
