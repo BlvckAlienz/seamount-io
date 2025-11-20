@@ -202,6 +202,49 @@ async def skip_kyc_verification(
         logger.error(f"Skip KYC error: {e}")
         raise HTTPException(status_code=500, detail="Failed to skip verification")
 
+@router.get("/kyc-status")
+async def get_current_user_kyc_status(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+) -> Dict[str, Any]:
+    """
+    🆕 Get KYC status for CURRENT authenticated user
+    Endpoint: /api/v1/kyc/kyc-status (no user_id needed)
+    """
+    try:
+        user_id = current_user.get('id')
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User not authenticated")
+        
+        # Fetch fresh profile from database
+        profile_response = supabase.table('user_profiles').select(
+            'kyc_status, kyc_level, kyc_completed_at, kyc_rejection_reason, role, verification_skipped'
+        ).eq('id', user_id).execute()
+        
+        if not profile_response.data:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        
+        profile = profile_response.data[0]
+        
+        return {
+            "success": True,
+            "user_id": user_id,
+            "kyc_status": profile.get('kyc_status', 'not_started'),
+            "kyc_level": profile.get('kyc_level', 0),
+            "completed_at": profile.get('kyc_completed_at'),
+            "rejection_reason": profile.get('kyc_rejection_reason'),
+            "role": profile.get('role', 'alien'),
+            "verification_skipped": profile.get('verification_skipped', False),
+            "can_upgrade": profile.get('kyc_level', 0) < 3,
+            "requires_verification": profile.get('kyc_status') not in ['verified', 'approved']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[KYC Status] Error fetching status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch KYC status")
+    
 @router.post("/webhook")
 async def kyc_webhook_handler(
     request: Request,
