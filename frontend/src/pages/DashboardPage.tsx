@@ -333,7 +333,7 @@ const DashboardPage = () => {
 
   const fetchKYCStatus = async () => {
     try {
-      const response = await apiClient.get('/api/v1/users/kyc-status');
+      const response = await apiClient.get('/api/users/kyc-status');
       if (response.data) {
         setKycInfo({
           status: response.data.status || 'not_started',
