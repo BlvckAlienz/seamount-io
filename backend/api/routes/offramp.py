@@ -398,20 +398,20 @@ async def withdraw(
                     asset_data.get("chain") == crypto_asset.lower()):
                     user_balance = Decimal(str(asset_data.get("balance", 0)))
                     break
-            
+
             if user_balance is None:
                 raise HTTPException(
                     status_code=400,
                     detail=f"No balance found for asset {crypto_asset}"
                 )
-            
+
             logger.info(f"💰 User {current_user['id']} balance: {user_balance} {crypto_asset}")
-            
+
             # ✅ Check sufficient balance (NO MINIMUM!)
-            if current_balance < crypto_amount:
+            if user_balance < crypto_amount:  # <-- FIXED VARIABLE NAME
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Insufficient balance. Available: {current_balance} {crypto_asset}"
+                    detail=f"Insufficient balance. Available: {user_balance} {crypto_asset}"
                 )
                 
         except HTTPException:
