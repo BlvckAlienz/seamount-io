@@ -282,25 +282,49 @@ class MultiChainWalletService:
                         if account_info:
                             # Native ALGO balance
                             algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
-                            if algo_balance > 0:
-                                try:
-                                    algo_price = await self.oracle.get_algorand_price()
-                                    balances['ALGO'] = {
-                                        'balance': float(algo_balance),
-                                        'chain': 'algorand',
-                                        'usd_value': float(algo_balance * algo_price)
-                                    }
-                                    total_usd += algo_balance * algo_price
-                                except Exception as price_err:
-                                    logger.warning(f"⚠️ Price lookup failed for ALGO: {price_err}")
-                                    balances['ALGO'] = {
-                                        'balance': float(algo_balance),
-                                        'chain': 'algorand',
-                                        'usd_value': 0.0
-                                    }
+                            
+                            # ✅ BONUS FIX: ALWAYS report balance (even if 0)
+                            try:
+                                algo_price = await self.oracle.get_algorand_price()
+                                balances['ALGO'] = {
+                                    'asset': 'ALGO',  # ✅ FIX 1: Add asset field
+                                    'symbol': 'ALGO',  # ✅ FIX 2: Add symbol field (for compatibility)
+                                    'balance': float(algo_balance),
+                                    'chain': 'algorand',
+                                    'usd_value': float(algo_balance * algo_price)
+                                }
+                                total_usd += algo_balance * algo_price
+                            except Exception as price_err:
+                                logger.warning(f"⚠️ Price lookup failed for ALGO: {price_err}")
+                                balances['ALGO'] = {
+                                    'asset': 'ALGO',
+                                    'symbol': 'ALGO',
+                                    'balance': float(algo_balance),
+                                    'chain': 'algorand',
+                                    'usd_value': 0.0
+                                }
+                        else:
+                            # ✅ NEW: Account exists but no data (0 balance)
+                            logger.info(f"ℹ️ Algorand account {algo_address[:10]}... has 0 balance")
+                            balances['ALGO'] = {
+                                'asset': 'ALGO',
+                                'symbol': 'ALGO',
+                                'balance': 0.0,
+                                'chain': 'algorand',
+                                'usd_value': 0.0
+                            }
             
             except Exception as algo_err:
                 logger.warning(f"⚠️ Algorand balance query failed: {algo_err}")
+                # ✅ NEW: Still report 0 balance on error (prevents "No balance found" errors)
+                balances['ALGO'] = {
+                    'asset': 'ALGO',
+                    'symbol': 'ALGO',
+                    'balance': 0.0,
+                    'chain': 'algorand',
+                    'usd_value': 0.0,
+                    'error': str(algo_err)
+                }
             
             # 2. Get WDK chain balances
             try:
@@ -319,32 +343,45 @@ class MultiChainWalletService:
                             balance_data = await self.wdk.get_balance(address, chain)
                             balance = Decimal(str(balance_data.get('balance', 0)))
                             
-                            if balance > 0:
-                                native_asset = self._get_native_asset(chain)
+                            # ✅ BONUS FIX: ALWAYS report balance (even if 0)
+                            native_asset = self._get_native_asset(chain)
+                            
+                            try:
+                                # Get price from oracle
+                                price = await self.oracle.get_asset_price(native_asset.lower())
+                                usd_value = balance * price
                                 
-                                try:
-                                    # Get price from oracle
-                                    price = await self.oracle.get_asset_price(native_asset.lower())
-                                    usd_value = balance * price
-                                    
-                                    balances[native_asset] = {
-                                        'balance': float(balance),
-                                        'chain': chain,
-                                        'usd_value': float(usd_value)
-                                    }
-                                    total_usd += usd_value
-                                    
-                                except Exception as price_error:
-                                    logger.warning(f"⚠️ Price lookup failed for {chain}: {price_error}")
-                                    balances[native_asset] = {
-                                        'balance': float(balance),
-                                        'chain': chain,
-                                        'usd_value': 0.0
-                                    }
+                                balances[native_asset] = {
+                                    'asset': native_asset,  # ✅ FIX 1: Add asset field
+                                    'symbol': native_asset,  # ✅ FIX 2: Add symbol field
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': float(usd_value)
+                                }
+                                total_usd += usd_value
+                                
+                            except Exception as price_error:
+                                logger.warning(f"⚠️ Price lookup failed for {chain}: {price_error}")
+                                balances[native_asset] = {
+                                    'asset': native_asset,
+                                    'symbol': native_asset,
+                                    'balance': float(balance),
+                                    'chain': chain,
+                                    'usd_value': 0.0
+                                }
                         
                         except Exception as balance_err:
                             logger.error(f"❌ Balance query failed for {chain}: {balance_err}")
-                            continue
+                            # ✅ NEW: Still report 0 balance on error
+                            native_asset = self._get_native_asset(chain)
+                            balances[native_asset] = {
+                                'asset': native_asset,
+                                'symbol': native_asset,
+                                'balance': 0.0,
+                                'chain': chain,
+                                'usd_value': 0.0,
+                                'error': str(balance_err)
+                            }
             
             except Exception as wdk_err:
                 logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
