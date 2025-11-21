@@ -50,32 +50,50 @@ class EnhancedOracleService:
         self.asset_mapping = {
             'binance': {
                 'bitcoin': 'BTCUSDT',
-                'ethereum': 'ETHUSDT', 
+                'btc': 'BTCUSDT',  # ➕ ADD
+                'ethereum': 'ETHUSDT',
+                'eth': 'ETHUSDT',  # ➕ ADD
                 'algorand': 'ALGOUSDT',
-                'tether': 'USDCUSDT',  # Proxy for USDT rate
+                'algo': 'ALGOUSDT',  # ➕ ADD
+                'tether': 'USDCUSDT',
+                'usdt': 'USDCUSDT',  # ➕ ADD
                 'matic': 'MATICUSDT',
                 'tron': 'TRXUSDT',
+                'trx': 'TRXUSDT',  # ➕ ADD
                 'solana': 'SOLUSDT',
+                'sol': 'SOLUSDT',  # ➕ ADD
                 'ton': 'TONUSDT'
             },
             'coingecko': {
                 'bitcoin': 'bitcoin',
+                'btc': 'bitcoin',  # ➕ ADD
                 'ethereum': 'ethereum',
+                'eth': 'ethereum',  # ➕ ADD
                 'algorand': 'algorand',
+                'algo': 'algorand',  # ➕ ADD
                 'tether': 'tether',
+                'usdt': 'tether',  # ➕ ADD
                 'matic': 'matic-network',
                 'tron': 'tron',
+                'trx': 'tron',  # ➕ ADD
                 'solana': 'solana',
+                'sol': 'solana',  # ➕ ADD
                 'ton': 'the-open-network'
             },
             'dia': {
                 'bitcoin': 'BTC',
-                'ethereum': 'ETH', 
+                'btc': 'BTC',  # ➕ ADD
+                'ethereum': 'ETH',
+                'eth': 'ETH',  # ➕ ADD
                 'algorand': 'ALGO',
+                'algo': 'ALGO',  # ➕ ADD
                 'tether': 'USDT',
+                'usdt': 'USDT',  # ➕ ADD
                 'matic': 'MATIC',
                 'tron': 'TRX',
+                'trx': 'TRX',  # ➕ ADD
                 'solana': 'SOL',
+                'sol': 'SOL',  # ➕ ADD
                 'ton': 'TON'
             }
         }
@@ -287,12 +305,18 @@ class EnhancedOracleService:
         """Emergency fallback rates when all oracles fail"""
         emergency_rates = {
             'bitcoin': Decimal("63500.00"),
+            'btc': Decimal("63500.00"),  # ➕ ADD
             'ethereum': Decimal("2650.00"),
+            'eth': Decimal("2650.00"),  # ➕ ADD
             'algorand': Decimal("0.18"),
+            'algo': Decimal("0.18"),  # ➕ ADD
             'tether': Decimal("1.00"),
+            'usdt': Decimal("1.00"),  # ➕ ADD
             'matic': Decimal("0.75"),
             'tron': Decimal("0.12"),
+            'trx': Decimal("0.12"),  # ➕ ADD
             'solana': Decimal("150.00"),
+            'sol': Decimal("150.00"),  # ➕ ADD
             'ton': Decimal("2.50")
         }
         

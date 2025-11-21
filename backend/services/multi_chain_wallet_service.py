@@ -348,7 +348,7 @@ class MultiChainWalletService:
                             
                             try:
                                 # Get price from oracle
-                                price = await self.oracle.get_asset_price(native_asset.lower())
+                                price, price_metadata = await self.oracle.get_asset_price(native_asset.lower())
                                 usd_value = balance * price
                                 
                                 balances[native_asset] = {
