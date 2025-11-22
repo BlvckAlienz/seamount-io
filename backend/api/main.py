@@ -233,6 +233,14 @@ except ImportError as e:
     routers_available['wallet_connect'] = None
 
 try:
+    from backend.api.routes.swap_routes import router as swap_router
+    routers_available['swap'] = swap_router
+    logger.info("âœ… Swap router imported")
+except ImportError as e:
+    logger.error(f"âŒ Swap router import error: {e}")
+    routers_available['swap'] = None
+
+try:
     from backend.api.routes.yield_routes import router as yield_router
     routers_available['yield'] = yield_router
     logger.info("✅ Yield router imported")
@@ -567,13 +575,6 @@ try:
 except ImportError as e:
     logger.error(f"❌ Failed to import wallet creation routes: {e}")
 
-try:
-    from backend.api.routes.wallet_backup import router as wallet_backup_router
-    app.include_router(wallet_backup_router, prefix="/api/v1/wallet-backup")
-    logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
-except ImportError as e:
-    logger.error(f"❌ Wallet backup routes import error: {e}")
-
 if routers_available.get('kyc'):
     app.include_router(routers_available['kyc'], prefix="/api/v1/kyc", tags=["KYC"])
     logger.info("✅ KYC router registered at /api/v1/kyc")
@@ -634,6 +635,10 @@ if routers_available.get('wallet_connect'):
     app.include_router(routers_available['wallet_connect'], prefix="/api/v1", tags=["Wallet Connect"])
     logger.info("✅ Wallet connect router registered at /api/v1")
 
+if routers_available.get('swap'):
+    app.include_router(routers_available['swap'], prefix="/api/v1", tags=["Swap"])
+    logger.info("âœ… Swap router registered at /api/v1/swap")
+    
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")

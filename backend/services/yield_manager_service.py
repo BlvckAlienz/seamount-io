@@ -19,6 +19,7 @@ from backend.services.algorand_service import AlgorandService
 from backend.services.database_service import DatabaseService
 from backend.services.audit_service import AuditService
 from backend.services.oracle_service import EnhancedOracleService
+from backend.services.seed_encryption_service import SeedEncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +45,13 @@ class YieldManagerService:
         db_service: DatabaseService,
         audit_service: AuditService,
         oracle_service: EnhancedOracleService,
-        algorand_service: AlgorandService  # âž• NEW PARAM
+        algorand_service: AlgorandService 
     ):
         self.db = db_service
         self.audit = audit_service
         self.oracle = oracle_service
         
-        # âœ… INITIALIZE REAL DEFI SERVICE
+        # INITIALIZE REAL DEFI SERVICE
         self.defi_service = AlgorandDeFiService(
             algod_client=algorand_service.algod_client
         )
@@ -59,7 +60,7 @@ class YieldManagerService:
         self.management_fee_rate = Decimal("0.02")  # 2% annual
         self.performance_fee_rate = Decimal("0.20")  # 20% of profits
         
-        # âœ… UPDATED TIERS (Your requirements)
+        # UPDATED TIERS (Your requirements)
         self.tiers = {
             YieldTier.PRIME: {  # Changed from STABLE
                 "target_apy": Decimal("0.0525"),  # 5.25% NET
@@ -83,7 +84,11 @@ class YieldManagerService:
         }
         
         logger.info("YieldManagerService initialized with REAL DeFi (MainNet)")
-    
+
+        # Initialize encryption service
+        self.encryption_service = SeedEncryptionService()
+        logger.info("Encryption service initialized for yield operations")
+
     async def stake_funds(
         self,
         user_id: str,
@@ -93,6 +98,7 @@ class YieldManagerService:
     ) -> Dict[str, Any]:
         """
         Stake funds into yield-generating tier
+        âœ… NOW INCLUDES: Real DeFi deployment with secure key handling
         """
         
         try:
@@ -101,6 +107,32 @@ class YieldManagerService:
             
             # Validate balance
             await self._validate_balance(user_id, asset, amount_decimal)
+            
+            # âœ… GET USER WALLET CREDENTIALS (CRITICAL!)
+            wallet_query = """
+                SELECT algorand_address, algorand_private_key 
+                FROM user_wallets 
+                WHERE user_id = %s
+            """
+            wallet_result = await self.db.execute_query(wallet_query, (user_id,))
+            
+            if not wallet_result or len(wallet_result) == 0:
+                raise ValueError(
+                    "❌ NO WALLET FOUND\n\n"
+                    "You don't have an Algorand wallet yet.\n"
+                    "Please create a wallet first."
+                )
+            
+            user_address = wallet_result[0]["algorand_address"]
+            encrypted_key = wallet_result[0]["algorand_private_key"]
+            
+            # âœ… DECRYPT PRIVATE KEY
+            try:
+                decrypted_private_key = self.encryption_service.decrypt_seed(encrypted_key)
+                logger.info(f"🔓 Decrypted key for staking operation")
+            except Exception as decrypt_err:
+                logger.error(f"❌ Decryption failed: {decrypt_err}")
+                raise ValueError(f"Failed to decrypt wallet: {decrypt_err}")
             
             # Get tier config
             tier_config = self.tiers[tier]
@@ -135,9 +167,14 @@ class YieldManagerService:
             
             await self.db.log_event("yield_stakes", stake_data)
             
-            # Allocate to strategies
+            # âœ… ALLOCATE TO STRATEGIES WITH REAL DEFI (Pass decrypted key)
             await self._allocate_to_strategies(
-                stake_id, amount_decimal, tier_config["strategies"], asset
+                stake_id=stake_id,
+                total_amount=amount_decimal,
+                strategies=tier_config["strategies"],
+                asset=asset,
+                user_address=user_address,
+                user_private_key=decrypted_private_key  # âœ… PASS DECRYPTED KEY
             )
             
             # Log audit
@@ -153,7 +190,7 @@ class YieldManagerService:
                 }
             )
             
-            logger.info(f"Stake created: {stake_id} - {amount} {asset} in {tier.value} tier")
+            logger.info(f"âœ… Stake created: {stake_id} - {amount} {asset} in {tier.value} tier")
             
             return {
                 "success": True,
@@ -172,7 +209,7 @@ class YieldManagerService:
             }
             
         except Exception as e:
-            logger.error(f"Stake creation failed: {e}")
+            logger.error(f"Stake creation failed: {e}", exc_info=True)
             raise
     
     async def _validate_balance(self, user_id: str, asset: str, amount: Decimal):

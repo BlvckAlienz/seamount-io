@@ -22,6 +22,8 @@ import { WithdrawModal } from '@/components/wallet/WithdrawModal.tsx';
 import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 import { WalletProvider } from '@/contexts/WalletContext';
 import { SendForm } from '@/components/payments/SendForm.tsx';
+import { SwapModal } from '@/components/modals/SwapModal';
+import { EarnModal } from '@/components/modals/EarnModal';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -153,6 +155,8 @@ const DashboardPage = () => {
   const [showFundModal, setShowFundModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showEarnModal, setShowEarnModal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
 
@@ -454,7 +458,7 @@ const DashboardPage = () => {
               </button>
               
               <button 
-                onClick={() => toastInfo('Swap functionality coming soon!')} 
+                onClick={() => setShowSwapModal(true)}
                 className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
               >
                 <SwapIcon className="h-4 w-4" />
@@ -462,7 +466,7 @@ const DashboardPage = () => {
               </button>
               
               <button 
-                onClick={() => toastInfo('Earn functionality coming soon!')} 
+                onClick={() => setShowEarnModal(true)}
                 className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
               >
                 <TrendingUp className="h-4 w-4" />
@@ -568,8 +572,8 @@ const DashboardPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
                 { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => setShowSendModal(true) },
-                { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => toastInfo('Swap feature coming soon!') },
-                { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => toastInfo('Yield farming coming soon!') },
+                { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => setShowSwapModal(true) },
+                { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => setShowEarnModal(true) },
               ].map(action => (
                 <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
                   <action.icon className={`h-6 w-6 ${action.color}`} />
@@ -631,6 +635,16 @@ const DashboardPage = () => {
         <SendForm 
           open={showSendModal} 
           onOpenChange={setShowSendModal} 
+        />
+        {/* Swap Modal */}
+        <SwapModal 
+          open={showSwapModal} 
+          onOpenChange={setShowSwapModal} 
+        />
+        {/* Earn Modal */}
+        <EarnModal 
+          open={showEarnModal} 
+          onOpenChange={setShowEarnModal} 
         />
       </div>
     </WalletProvider>

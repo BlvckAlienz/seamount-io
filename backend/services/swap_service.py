@@ -18,6 +18,7 @@ from backend.services.algorand_service import AlgorandService
 from backend.services.database_service import DatabaseService
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.services.revenue_tracking_service import RevenueTrackingService
+from backend.services.seed_encryption_service import SeedEncryptionService
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ class SwapService:
         self.wallet_service = wallet_service
         self.revenue_service = revenue_service
         
+        # Initialize encryption service for secure key handling
+        self.encryption_service = SeedEncryptionService()
+        logger.info("âœ… Encryption service initialized for swap operations")
+
         # INITIALIZE REAL DEX SERVICE (MainNet)
         self.dex_service = AlgorandDeFiService(
             algod_client=algorand_service.algod_client
@@ -246,28 +251,60 @@ class SwapService:
         min_amount_out: Decimal
     ) -> str:
         """
-        Execute swap on Algorand DEX (Pact Finance)
+        Execute swap on Algorand DEX using our DeFi service
+        âœ… PRODUCTION: Uses same encryption pattern as multi_chain_wallet_service
         """
-        # Get user's Algorand wallet
-        user_wallet = await self.wallet_service.get_user_wallet(user_id, "algorand")
+        try:
+            # Get user's wallet credentials from database
+            wallet_query = """
+                SELECT algorand_address, algorand_private_key 
+                FROM user_wallets 
+                WHERE user_id = %s
+            """
+            wallet_result = await self.db_service.execute_query(
+                wallet_query, 
+                (user_id,)
+            )
+            
+            if not wallet_result or len(wallet_result) == 0:
+                raise ValueError(
+                    "❌ NO WALLET FOUND\n\n"
+                    "You don't have an Algorand wallet yet.\n"
+                    "Please create a wallet first in the dashboard."
+                )
+            
+            user_address = wallet_result[0]["algorand_address"]
+            encrypted_key = wallet_result[0]["algorand_private_key"]
+            
+            # âœ… DECRYPT PRIVATE KEY (Same pattern as multi_chain_wallet_service)
+            try:
+                decrypted_private_key = self.encryption_service.decrypt_seed(encrypted_key)
+                logger.info(f"🔓 Successfully decrypted key for swap operation")
+            except Exception as decrypt_err:
+                logger.error(f"❌ Private key decryption failed: {decrypt_err}")
+                raise Exception(f"Failed to decrypt wallet credentials: {decrypt_err}")
+            
+            # Get ASA IDs from config
+            from_asa_id = self.settings.SUPPORTED_ASSETS[from_asset]["asa_id"]
+            to_asa_id = self.settings.SUPPORTED_ASSETS[to_asset]["asa_id"]
+            
+            # âœ… Execute swap via DeFi service with DECRYPTED key
+            tx_id = await self.dex_service.execute_swap(
+                user_address=user_address,
+                user_private_key=decrypted_private_key,  # âœ… NOW DECRYPTED
+                from_asset_id=from_asa_id,
+                to_asset_id=to_asa_id,
+                amount_in=amount_in,
+                min_amount_out=min_amount_out
+            )
+            
+            logger.info(f"âœ… Swap executed successfully: {tx_id}")
+            return tx_id
+            
+        except Exception as e:
+            logger.error(f"DEX swap execution failed: {e}", exc_info=True)
+            raise
         
-        # Get ASA IDs
-        from_asa_id = self.settings.SUPPORTED_ASSETS[from_asset]["asa_id"]
-        to_asa_id = self.settings.SUPPORTED_ASSETS[to_asset]["asa_id"]
-        
-        # Execute swap via Algorand service
-        tx_id = await self.algorand_service.swap_assets(
-            sender_address=user_wallet["address"],
-            sender_key=user_wallet["private_key"],
-            from_asa_id=from_asa_id,
-            to_asa_id=to_asa_id,
-            amount_in=int(amount_in * 1_000_000),  # Convert to micro-units
-            min_amount_out=int(min_amount_out * 1_000_000),
-            dex="pact"
-        )
-        
-        return tx_id
-    
     async def _get_price_ratio(self, from_asset: str, to_asset: str) -> Decimal:
         """
         Fallback: Get price ratio from oracle service
