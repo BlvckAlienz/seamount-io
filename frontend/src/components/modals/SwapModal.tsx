@@ -28,6 +28,43 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
   const [loading, setLoading] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [error, setError] = useState('');
+  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [fetchingBalances, setFetchingBalances] = useState(false);
+
+  // ➕ Fetch balances when modal opens
+  useEffect(() => {
+    const fetchBalances = async () => {
+      if (!open) return;
+      
+      setFetchingBalances(true);
+      try {
+        const response = await apiClient.get('/api/v1/wallet/balances');
+        
+        if (response?.data?.success && response.data.assets) {
+          const balanceMap: Record<string, number> = {};
+          
+          response.data.assets.forEach((asset: any) => {
+            // Map asset keys to display format
+            const assetKey = asset.asset || asset.symbol || asset.chain?.toUpperCase();
+            if (assetKey) {
+              balanceMap[assetKey] = asset.balance || 0;
+            }
+          });
+          
+          setBalances(balanceMap);
+          console.log('✅ Swap balances loaded:', balanceMap);
+        }
+      } catch (err) {
+        console.error('Failed to fetch balances:', err);
+        // Don't block UI if balance fetch fails
+        setBalances({});
+      } finally {
+        setFetchingBalances(false);
+      }
+    };
+    
+    fetchBalances();
+  }, [open]);
 
   // âœ… Auto-fetch quote when amount/assets change
   useEffect(() => {
@@ -146,6 +183,17 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
             From
           </label>
+
+          {/* ➕ Balance Display */}
+          {balances[fromAsset] !== undefined && (
+            <div className="flex justify-between items-center px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
+              <span className="font-bold text-blue-700 dark:text-blue-300">
+                {balances[fromAsset].toFixed(6)} {fromAsset}
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <input
               type="number"
@@ -154,6 +202,17 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
               placeholder="0.00"
               className="flex-1 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-4 py-3 text-gray-900 dark:text-white text-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
+            {/* ➕ MAX Button */}
+            {balances[fromAsset] > 0 && (
+              <button
+                type="button"
+                onClick={() => setAmount(balances[fromAsset].toString())}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
+              >
+                MAX
+              </button>
+            )}
+
             <select
               value={fromAsset}
               onChange={(e) => setFromAsset(e.target.value)}
@@ -253,10 +312,26 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           </div>
         )}
 
+        {/* ➕ Insufficient Balance Warning */}
+        {parseFloat(amount) > 0 && balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset] && (
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-900 dark:text-red-100 font-medium">
+              Insufficient balance. You have {balances[fromAsset].toFixed(6)} {fromAsset} available.
+            </p>
+          </div>
+        )}
+
         {/* Swap Button - âœ… SOLID COLOR LIKE YOURS */}
         <button
           onClick={executeSwap}
-          disabled={!quote || swapping || loading || !!error}
+          disabled={
+            !quote || 
+            swapping || 
+            loading || 
+            !!error ||
+            (balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset])  // ➕ Balance check
+          }
           className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-lg transition-all h-12 flex items-center justify-center gap-2"
         >
           {swapping ? (

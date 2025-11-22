@@ -59,13 +59,14 @@ class AlgorandDeFiService:
         
         # Initialize Pact client (MainNet default)
         try:
+            # ✅ FIX: algod as POSITIONAL argument, network as KEYWORD
             self.pact = pactsdk.PactClient(
-                algod_client=self.algod,
-                network="mainnet"  # âœ… EXPLICIT MAINNET
+                self.algod,           # ← Positional (REQUIRED)
+                network="mainnet"     # ← Keyword (optional)
             )
-            logger.info("âœ… Pact DEX client initialized (MainNet)")
+            logger.info("✅ Pact DEX client initialized (MainNet)")
         except Exception as e:
-            logger.error(f"âŒ Pact initialization failed: {e}")
+            logger.error(f"❌ Pact initialization failed: {e}")
             raise
     
     # ========================================================================

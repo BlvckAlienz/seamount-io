@@ -13,7 +13,8 @@ from typing import Dict, Any
 from backend.dependencies import (
     get_current_user,
     get_multi_chain_wallet_service,
-    get_database_service
+    get_database_service,
+    get_algorand_service
 )
 
 logger = logging.getLogger(__name__)
@@ -37,27 +38,34 @@ class SwapExecuteRequest(BaseModel):
 async def get_swap_quote(
     request: SwapQuoteRequest,
     current_user: Dict = Depends(get_current_user),
-    wallet_service = Depends(get_multi_chain_wallet_service)
+    wallet_service = Depends(get_multi_chain_wallet_service),
+    algorand_service = Depends(get_algorand_service),  # ➕ ADD
+    db_service = Depends(get_database_service)         # ➕ ADD
 ):
     """
     Get real-time swap quote from Pact DEX (MainNet)
     """
     try:
         logger.info(
-            f"Swap quote: {request.amount} {request.from_asset} â†' {request.to_asset}"
+            f"Swap quote: {request.amount} {request.from_asset} → {request.to_asset}"
         )
         
-        # Get quote from swap service
+        # ✅ PROPER SERVICE INITIALIZATION
         from backend.services.swap_service import SwapService
         from backend.config import get_settings
         
         settings = get_settings()
+        
+        # ✅ Initialize revenue service (required by SwapService)
+        from backend.services.revenue_tracking_service import RevenueTrackingService
+        revenue_service = RevenueTrackingService(db_service)
+        
         swap_service = SwapService(
             settings=settings,
-            algorand_service=wallet_service.algorand_service,
-            db_service=wallet_service.db_service,
+            algorand_service=algorand_service,      # ✅ Direct injection
+            db_service=db_service,                  # ✅ Direct injection
             wallet_service=wallet_service,
-            revenue_service=wallet_service.revenue_service
+            revenue_service=revenue_service         # ✅ Properly initialized
         )
         
         quote = await swap_service.get_swap_quote(
@@ -83,6 +91,7 @@ async def execute_swap(
     request: SwapExecuteRequest,
     current_user: Dict = Depends(get_current_user),
     wallet_service = Depends(get_multi_chain_wallet_service),
+    algorand_service = Depends(get_algorand_service),  # ➕ ADD
     db_service = Depends(get_database_service)
 ):
     """
@@ -92,21 +101,24 @@ async def execute_swap(
     """
     try:
         logger.info(
-            f"Executing swap: {request.amount} {request.from_asset} â†' "
+            f"Executing swap: {request.amount} {request.from_asset} → "
             f"{request.to_asset} for user {current_user['id']}"
         )
         
-        # Initialize swap service
+        # ✅ PROPER SERVICE INITIALIZATION
         from backend.services.swap_service import SwapService
         from backend.config import get_settings
+        from backend.services.revenue_tracking_service import RevenueTrackingService
         
         settings = get_settings()
+        revenue_service = RevenueTrackingService(db_service)
+        
         swap_service = SwapService(
             settings=settings,
-            algorand_service=wallet_service.algorand_service,
+            algorand_service=algorand_service,      # ✅ Direct injection
             db_service=db_service,
             wallet_service=wallet_service,
-            revenue_service=wallet_service.revenue_service
+            revenue_service=revenue_service
         )
         
         # Execute swap
@@ -117,7 +129,7 @@ async def execute_swap(
             amount=Decimal(str(request.amount))
         )
         
-        logger.info(f"âœ… Swap successful: {result['tx_id']}")
+        logger.info(f"✅ Swap successful: {result['tx_id']}")
         
         return {
             "success": True,
