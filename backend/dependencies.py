@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from backend.services.oracle_service import OracleService
     from backend.services.fee_calculator import FeeCalculatorService
     from backend.services.wallet_creation_service import WalletCreationService
+    from backend.services.algorand_defi_service import AlgorandDeFiService
 
 else:
     # Runtime imports for actual service instantiation
@@ -306,6 +307,23 @@ def get_multi_chain_wallet_service() -> "MultiChainWalletService":
             )
     
     return _multi_chain_wallet_service
+
+def get_defi_service() -> "AlgorandDeFiService":
+    """Get DeFi service instance (Pact + Folks Finance)"""
+    global _defi_service
+    
+    if _defi_service is None:
+        try:
+            algorand_service = get_algorand_service()
+            _defi_service = AlgorandDeFiService(
+                algod_client=algorand_service.algod_client
+            )
+            logger.info("âœ… DeFi service initialized (MainNet)")
+        except Exception as e:
+            logger.error(f"âŒ DeFi service init failed: {e}")
+            raise HTTPException(503, "DeFi service unavailable")
+    
+    return _defi_service
 
 def get_kyc_service() -> "KYCService":
     """Get KYC service instance"""

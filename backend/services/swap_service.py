@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 # Core Dependencies
 from backend.config import Settings, get_settings
+from backend.services.algorand_defi_service import AlgorandDeFiService
 from backend.services.algorand_service import AlgorandService
 from backend.services.database_service import DatabaseService
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
@@ -40,20 +41,12 @@ class SwapService:
         self.wallet_service = wallet_service
         self.revenue_service = revenue_service
         
-        # Algorand DEX Integration
-        self.PACT_DEX_URL = "https://api.pact.fi"  # Pact Finance API
-        self.FOLKS_FINANCE_URL = "https://api.folks.finance"
+        # INITIALIZE REAL DEX SERVICE (MainNet)
+        self.dex_service = AlgorandDeFiService(
+            algod_client=algorand_service.algod_client
+        )
         
-        # Supported swap pairs on Algorand
-        self.SUPPORTED_PAIRS = {
-            "USDT": ["ALGO", "USDCa", "goBTC", "goETH"],
-            "USDCa": ["ALGO", "USDT", "goBTC", "goETH"],
-            "ALGO": ["USDT", "USDCa", "goBTC", "goETH"],
-            "goBTC": ["USDT", "USDCa", "ALGO"],
-            "goETH": ["USDT", "USDCa", "ALGO"],
-        }
-        
-        logger.info("SwapService initialized with Algorand DEX integration")
+        logger.info("SwapService initialized with Pact DEX (MainNet)")
 
     def _determine_fee_tier(self, from_asset: str, to_asset: str) -> Decimal:
         """

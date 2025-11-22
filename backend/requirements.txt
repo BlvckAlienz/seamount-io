@@ -39,7 +39,8 @@ slowapi==0.1.9
 redis==5.0.1
 
 # Blockchain
-py-algorand-sdk==2.6.0
+py-algorand-sdk==2.11.1
+pactsdk==0.7.1
 web3==6.15.0
 mnemonic==0.21  # ✅ BIP39 seed phrase generation
 algokit-utils==3.0.0
