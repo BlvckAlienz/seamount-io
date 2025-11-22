@@ -28,6 +28,36 @@ class SwapService:
     NOW WITH REAL ALGORAND DEX INTEGRATION!
     """
 
+    # ➕ ADD THIS MAPPING
+    # 🗺️ Frontend-to-Backend Asset Key Mapping
+    ASSET_KEY_MAPPING = {
+        # Frontend sends simple names, we map to config keys
+        "USDT": "USDT_ALGO",
+        "USDT_ETH": "USDT_ETH",
+        "USDT_POLYGON": "USDT_POLYGON",
+        "USDT_TRON": "USDT_TRON",
+        "USDC_ETH": "USDC_ETH",
+        "USDC_POLYGON": "USDC_POLYGON",
+        # Everything else passes through
+        "ALGO": "ALGO",
+        "USDCa": "USDCa",
+        "goBTC": "goBTC",
+        "goETH": "goETH",
+        "BTC": "BTC",
+        "ETH": "ETH",
+        "MATIC": "MATIC",
+        "TRX": "TRX",
+    }
+
+    # ➕ SUPPORTED SWAP PAIRS (Pact Finance MainNet)
+    SUPPORTED_PAIRS = {
+        "ALGO": ["USDT", "USDCa", "goBTC", "goETH"],
+        "USDT": ["ALGO", "USDCa", "goBTC", "goETH"],
+        "USDCa": ["ALGO", "USDT", "goBTC", "goETH"],
+        "goBTC": ["ALGO", "USDT", "USDCa", "goETH"],
+        "goETH": ["ALGO", "USDT", "USDCa", "goBTC"],
+    }
+
     def __init__(
         self, 
         settings: Settings, 
@@ -55,22 +85,23 @@ class SwapService:
 
     def _determine_fee_tier(self, from_asset: str, to_asset: str) -> Decimal:
         """
-        Determine the appropriate fee tier based on asset types.
-        Uses premium fee structure from BusinessModelConfig.
+        Determine fee tier. Expects mapped keys (e.g., USDT_ALGO not USDT)
         """
         supported_assets = self.settings.SUPPORTED_ASSETS
         
-        # Check if assets are stable or volatile
-        from_stable = supported_assets.get(from_asset, {}).get("is_stable", False)
-        to_stable = supported_assets.get(to_asset, {}).get("is_stable", False)
+        # Get configs (keys are already mapped)
+        from_config = supported_assets.get(from_asset, {})
+        to_config = supported_assets.get(to_asset, {})
         
-        # Apply premium fee structure
+        from_stable = from_config.get("is_stable", False)
+        to_stable = to_config.get("is_stable", False)
+        
         if from_stable and to_stable:
-            return Decimal("0.010")  # Stable to stable: 1.0%
+            return Decimal("0.010")  # 1.0% stable-to-stable
         elif from_stable or to_stable:
-            return Decimal("0.015")  # Stable to volatile: 1.5%
+            return Decimal("0.015")  # 1.5% stable-to-volatile
         else:
-            return Decimal("0.020")  # Volatile to volatile: 2.0%
+            return Decimal("0.020")  # 2.0% volatile-to-volatile
 
     async def get_swap_quote(
         self, 
@@ -80,72 +111,98 @@ class SwapService:
     ) -> Dict[str, Any]:
         """
         Get a real-time swap quote from Algorand DEX with premium fees.
+        ✅ FIXED: Maps frontend keys to backend config keys
         """
         try:
-            # Validate swap pair
+            # ✅ FIX: Map frontend asset names to backend config keys
+            from_asset_key = self.ASSET_KEY_MAPPING.get(from_asset, from_asset)
+            to_asset_key = self.ASSET_KEY_MAPPING.get(to_asset, to_asset)
+            
+            logger.info(
+                f"📊 Asset mapping: {from_asset} → {from_asset_key}, "
+                f"{to_asset} → {to_asset_key}"
+            )
+            
+            # Validate swap pair (use original names for validation)
             if to_asset not in self.SUPPORTED_PAIRS.get(from_asset, []):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Swap pair {from_asset}/{to_asset} not supported"
                 )
             
-            # Get ASA IDs
-            from_asa_id = self.settings.SUPPORTED_ASSETS[from_asset]["asa_id"]
-            to_asa_id = self.settings.SUPPORTED_ASSETS[to_asset]["asa_id"]
+            # Get asset configs using mapped keys
+            from_asset_config = self.settings.SUPPORTED_ASSETS.get(from_asset_key)
+            to_asset_config = self.settings.SUPPORTED_ASSETS.get(to_asset_key)
             
-            # 🚀 REAL DEX QUOTE (Using Pact Finance)
-            import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.PACT_DEX_URL}/api/quote",
-                    json={
-                        "from_asset": from_asa_id,
-                        "to_asset": to_asa_id,
-                        "amount": str(amount),
-                    }
-                ) as response:
-                    if response.status == 200:
-                        dex_quote = await response.json()
-                        amount_out_before_fees = Decimal(str(dex_quote["output_amount"]))
-                        price_impact = Decimal(str(dex_quote.get("price_impact", 0.005)))
-                    else:
-                        # Fallback to oracle-based pricing
-                        price_ratio = await self._get_price_ratio(from_asset, to_asset)
-                        amount_out_before_fees = amount * price_ratio
-                        price_impact = Decimal("0.005")
+            if not from_asset_config:
+                logger.error(f"❌ Config not found for: {from_asset} (mapped to {from_asset_key})")
+                logger.error(f"Available keys: {list(self.settings.SUPPORTED_ASSETS.keys())}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Asset configuration not found for {from_asset}"
+                )
             
-            # Determine fee tier
-            fee_rate = self._determine_fee_tier(from_asset, to_asset)
+            if not to_asset_config:
+                logger.error(f"❌ Config not found for: {to_asset} (mapped to {to_asset_key})")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Asset configuration not found for {to_asset}"
+                )
             
-            # Calculate fee amount
+            from_asset_id = from_asset_config["asset_id"]
+            to_asset_id = to_asset_config["asset_id"]
+            
+            logger.info(
+                f"📊 Fetching quote: {amount} {from_asset} (ID: {from_asset_id}) "
+                f"→ {to_asset} (ID: {to_asset_id})"
+            )
+            
+            # Use the AlgorandDeFiService for real quotes
+            dex_quote = await self.dex_service.get_swap_quote(
+                from_asset_id=from_asset_id,
+                to_asset_id=to_asset_id,
+                amount_in=amount
+            )
+            
+            # Extract DEX quote data
+            amount_out_before_fees = Decimal(str(dex_quote["amount_out"]))
+            price_impact = Decimal(str(dex_quote["price_impact"]))
+            
+            # Determine fee tier (use mapped keys)
+            fee_rate = self._determine_fee_tier(from_asset_key, to_asset_key)
+            
+            # Calculate platform fee
             fee_amount = amount_out_before_fees * fee_rate
-            min_fee = Decimal("1.00")  # $1 minimum fee
+            min_fee = Decimal("1.00")
             if fee_amount < min_fee:
                 fee_amount = min_fee
-                
+            
             # Calculate final amount out
             amount_out = amount_out_before_fees - fee_amount
             
             logger.info(
-                f"Swap quote: {amount} {from_asset} → {amount_out} {to_asset} "
-                f"with {fee_rate*100}% fee (${fee_amount})"
+                f"✅ Quote generated: {amount} {from_asset} → {amount_out} {to_asset} "
+                f"(Fee: {fee_rate*100}% = ${fee_amount})"
             )
             
             return {
-                "from_asset": from_asset,
+                "from_asset": from_asset,  # Return original names for frontend
                 "to_asset": to_asset,
                 "amount_in": float(amount),
                 "amount_out": float(amount_out),
                 "fee_amount": float(fee_amount),
                 "fee_rate": float(fee_rate),
                 "price_impact": float(price_impact),
-                "min_amount_out": float(amount_out * Decimal("0.995")),  # 0.5% slippage
-                "dex": "pact_finance",
+                "min_amount_out": float(amount_out * Decimal("0.995")),
+                "dex": dex_quote["dex"],
+                "pool_id": dex_quote.get("pool_id"),
             }
             
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error(f"Failed to generate swap quote: {e}")
-            raise HTTPException(status_code=500, detail="Could not generate swap quote")
+            logger.error(f"Failed to generate swap quote: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Swap quote failed: {str(e)}")
 
     async def execute_swap(
         self, 
