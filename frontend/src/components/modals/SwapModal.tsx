@@ -1,5 +1,5 @@
-// 📍 FILE: frontend/src/components/modals/SwapModal.tsx
-// âœ… PRODUCTION SWAP MODAL - Real DeFi Integration
+// 📁 FILE: frontend/src/components/modals/SwapModal.tsx
+// ✅ PRODUCTION SWAP MODAL - Mobile-First Responsive Design
 
 import React, { useState, useEffect } from 'react';
 import { X, ArrowDownUp, TrendingUp, AlertCircle, Check, Loader2 } from 'lucide-react';
@@ -11,7 +11,6 @@ interface SwapModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Supported assets on Algorand (from your config)
 const SUPPORTED_ASSETS = [
   { symbol: 'USDT', name: 'Tether USD', decimals: 6 },
   { symbol: 'ALGO', name: 'Algorand', decimals: 6 },
@@ -31,7 +30,7 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [fetchingBalances, setFetchingBalances] = useState(false);
 
-  // ➕ Fetch balances when modal opens
+  // Fetch balances when modal opens
   useEffect(() => {
     const fetchBalances = async () => {
       if (!open) return;
@@ -44,7 +43,6 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           const balanceMap: Record<string, number> = {};
           
           response.data.assets.forEach((asset: any) => {
-            // Map asset keys to display format
             const assetKey = asset.asset || asset.symbol || asset.chain?.toUpperCase();
             if (assetKey) {
               balanceMap[assetKey] = asset.balance || 0;
@@ -52,11 +50,9 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           });
           
           setBalances(balanceMap);
-          console.log('✅ Swap balances loaded:', balanceMap);
         }
       } catch (err) {
         console.error('Failed to fetch balances:', err);
-        // Don't block UI if balance fetch fails
         setBalances({});
       } finally {
         setFetchingBalances(false);
@@ -66,7 +62,7 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
     fetchBalances();
   }, [open]);
 
-  // âœ… Auto-fetch quote when amount/assets change
+  // Auto-fetch quote when amount/assets change
   useEffect(() => {
     if (!amount || parseFloat(amount) <= 0 || !open) {
       setQuote(null);
@@ -75,7 +71,7 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
 
     const timer = setTimeout(() => {
       fetchQuote();
-    }, 500); // Debounce 500ms
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [amount, fromAsset, toAsset, open]);
@@ -125,12 +121,10 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           `✅ Swap successful! Received ${response.data.amount_out.toFixed(4)} ${toAsset}`
         );
 
-        // Reset form
         setAmount('');
         setQuote(null);
         onOpenChange(false);
 
-        // Trigger balance refresh (you can emit event here)
         window.dispatchEvent(new Event('wallet-balance-updated'));
       } else {
         throw new Error(response.data.error || 'Swap failed');
@@ -152,71 +146,77 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-2 sm:p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
 
-      {/* Modal - âœ… UPDATED TO MATCH YOUR FUND/WITHDRAW STYLE */}
+      {/* Modal - 📱 RESPONSIVE CONTAINER */}
       <div 
-        className="relative bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-2xl p-6 w-full max-w-[500px] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 mx-4"
-        style={{ zIndex: 1000 }}  // âœ… INLINE STYLE LIKE YOURS
+        className="relative bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-[500px] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto"
+        style={{ zIndex: 1000 }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <ArrowDownUp className="h-6 w-6 text-purple-600" />
-            Swap Assets
+        {/* Header - 📱 COMPACT ON MOBILE */}
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <ArrowDownUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
+            <span className="hidden xs:inline">Swap Assets</span>
+            <span className="xs:hidden">Swap</span>
           </h2>
           <button
             onClick={() => onOpenChange(false)}
-            className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors p-1"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* From Asset */}
-        <div className="mb-4">
-          <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
+        {/* From Asset - 📱 STACKED LAYOUT ON MOBILE */}
+        <div className="mb-3 sm:mb-4">
+          <label className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 block">
             From
           </label>
 
-          {/* ➕ Balance Display */}
+          {/* Balance Display - 📱 COMPACT */}
           {balances[fromAsset] !== undefined && (
-            <div className="flex justify-between items-center px-3 py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
-              <span className="font-bold text-blue-700 dark:text-blue-300">
+            <div className="flex justify-between items-center px-2 sm:px-3 py-1.5 sm:py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Available:</span>
+              <span className="font-bold text-xs sm:text-sm text-blue-700 dark:text-blue-300">
                 {balances[fromAsset].toFixed(6)} {fromAsset}
               </span>
             </div>
           )}
 
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="flex-1 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-4 py-3 text-gray-900 dark:text-white text-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            {/* ➕ MAX Button */}
-            {balances[fromAsset] > 0 && (
-              <button
-                type="button"
-                onClick={() => setAmount(balances[fromAsset].toString())}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
-              >
-                MAX
-              </button>
-            )}
+          {/* Input + Asset Selector - 📱 RESPONSIVE */}
+          <div className="flex flex-col xs:flex-row gap-2">
+            <div className="relative flex-1">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 pr-14 sm:pr-16"
+              />
+              
+              {/* MAX Button - 📱 RESPONSIVE */}
+              {balances[fromAsset] > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAmount(balances[fromAsset].toString())}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 sm:px-3 py-1 text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-md sm:rounded-lg transition-colors"
+                >
+                  MAX
+                </button>
+              )}
+            </div>
 
+            {/* Asset Dropdown - 📱 FULL WIDTH ON SMALL SCREENS */}
             <select
               value={fromAsset}
               onChange={(e) => setFromAsset(e.target.value)}
-              className="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full xs:w-auto bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               {SUPPORTED_ASSETS.map((asset) => (
                 <option key={asset.symbol} value={asset.symbol}>
@@ -227,33 +227,33 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           </div>
         </div>
 
-        {/* Swap Direction Button */}
-        <div className="flex justify-center my-2">
+        {/* Swap Direction Button - 📱 TOUCH-FRIENDLY */}
+        <div className="flex justify-center my-2 sm:my-3">
           <button
             onClick={swapAssets}
-            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-2 border-gray-300 dark:border-gray-500 rounded-full p-2 transition-all hover:scale-110"
+            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-2 border-gray-300 dark:border-gray-500 rounded-full p-2 sm:p-2.5 transition-all hover:scale-110 active:scale-95"
           >
-            <ArrowDownUp className="h-5 w-5 text-purple-600" />
+            <ArrowDownUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
           </button>
         </div>
 
-        {/* To Asset */}
-        <div className="mb-6">
-          <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
+        {/* To Asset - 📱 RESPONSIVE */}
+        <div className="mb-4 sm:mb-6">
+          <label className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 block">
             To
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col xs:flex-row gap-2">
             <input
               type="text"
               value={quote ? quote.amount_out.toFixed(4) : '0.00'}
               readOnly
               placeholder="0.00"
-              className="flex-1 bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-4 py-3 text-gray-900 dark:text-white text-lg focus:outline-none"
+              className="flex-1 bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-base sm:text-lg focus:outline-none"
             />
             <select
               value={toAsset}
               onChange={(e) => setToAsset(e.target.value)}
-              className="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full xs:w-auto bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               {SUPPORTED_ASSETS.filter((a) => a.symbol !== fromAsset).map((asset) => (
                 <option key={asset.symbol} value={asset.symbol}>
@@ -264,65 +264,65 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           </div>
         </div>
 
-        {/* Quote Details */}
+        {/* Quote Details - 📱 COMPACT SPACING */}
         {quote && !error && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4 space-y-2">
-            <div className="flex justify-between text-sm">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-gray-700 dark:text-gray-300">Rate</span>
               <span className="text-gray-900 dark:text-white font-medium">
                 1 {fromAsset} = {(quote.amount_out / parseFloat(amount)).toFixed(6)} {toAsset}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-gray-700 dark:text-gray-300">Price Impact</span>
-              <span className={`font-medium ${quote.price_impact > 2 ? 'text-red-600' : 'text-green-600'}`}>
-                {(quote.price_impact * 100).toFixed(2)}%
+              <span className={`font-medium ${Math.abs(quote.price_impact) > 2 ? 'text-red-600' : 'text-green-600'}`}>
+                {quote.price_impact.toFixed(2)}%
               </span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-gray-700 dark:text-gray-300">Platform Fee</span>
               <span className="text-gray-900 dark:text-white">${quote.fee_amount.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-xs sm:text-sm">
               <span className="text-gray-700 dark:text-gray-300">Network Fee</span>
               <span className="text-gray-900 dark:text-white">~$0.001</span>
             </div>
-            <div className="border-t-2 border-blue-300 dark:border-blue-700 pt-2 mt-2 flex justify-between">
-              <span className="text-gray-900 dark:text-white font-semibold">You receive</span>
-              <span className="text-gray-900 dark:text-white font-bold">
+            <div className="border-t-2 border-blue-300 dark:border-blue-700 pt-1.5 sm:pt-2 mt-1.5 sm:mt-2 flex justify-between">
+              <span className="text-gray-900 dark:text-white font-semibold text-xs sm:text-sm">You receive</span>
+              <span className="text-gray-900 dark:text-white font-bold text-sm sm:text-base">
                 {quote.amount_out.toFixed(4)} {toAsset}
               </span>
             </div>
           </div>
         )}
 
-        {/* Error Display */}
+        {/* Error Display - 📱 COMPACT */}
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-900 dark:text-red-100 font-medium">{error}</p>
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-2.5 sm:p-3 mb-3 sm:mb-4 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs sm:text-sm text-red-900 dark:text-red-100 font-medium">{error}</p>
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading State - 📱 COMPACT */}
         {loading && !error && (
-          <div className="flex items-center justify-center py-4 text-gray-600 dark:text-gray-400">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            <span className="font-medium">Fetching best rate...</span>
+          <div className="flex items-center justify-center py-3 sm:py-4 text-gray-600 dark:text-gray-400">
+            <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
+            <span className="font-medium text-xs sm:text-sm">Fetching best rate...</span>
           </div>
         )}
 
-        {/* ➕ Insufficient Balance Warning */}
+        {/* Insufficient Balance Warning - 📱 COMPACT */}
         {parseFloat(amount) > 0 && balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset] && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-900 dark:text-red-100 font-medium">
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-2.5 sm:p-3 mb-3 sm:mb-4 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs sm:text-sm text-red-900 dark:text-red-100 font-medium">
               Insufficient balance. You have {balances[fromAsset].toFixed(6)} {fromAsset} available.
             </p>
           </div>
         )}
 
-        {/* Swap Button - âœ… SOLID COLOR LIKE YOURS */}
+        {/* Swap Button - 📱 TOUCH-FRIENDLY */}
         <button
           onClick={executeSwap}
           disabled={
@@ -330,25 +330,25 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
             swapping || 
             loading || 
             !!error ||
-            (balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset])  // ➕ Balance check
+            (balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset])
           }
-          className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-lg transition-all h-12 flex items-center justify-center gap-2"
+          className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm sm:text-base active:scale-95"
         >
           {swapping ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
               Swapping...
             </>
           ) : (
             <>
-              <ArrowDownUp className="h-5 w-5" />
+              <ArrowDownUp className="h-4 w-4 sm:h-5 sm:w-5" />
               Swap Now
             </>
           )}
         </button>
 
-        {/* Disclaimer */}
-        <p className="text-xs text-gray-600 dark:text-gray-400 text-center mt-4 font-medium">
+        {/* Disclaimer - 📱 COMPACT */}
+        <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 text-center mt-3 sm:mt-4 font-medium">
           Powered by Pact Finance DEX on Algorand MainNet
         </p>
       </div>
