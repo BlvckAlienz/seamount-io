@@ -58,6 +58,24 @@ class SwapService:
         "goETH": ["ALGO", "USDT", "USDCa", "goBTC"],
     }
 
+    # âœ… NEW COMPETITIVE FEE STRUCTURE
+    COMPETITIVE_FEE_STRUCTURE = {
+        # TIER 1: Market Rate (Compete on Volume)
+        "stable_to_stable": Decimal("0.003"),    # 0.3% (vs Quidax 0.15%)
+        "stable_to_volatile": Decimal("0.005"),  # 0.5% (vs Luno 0.25%)
+        "volatile_to_volatile": Decimal("0.008"), # 0.8% (vs Busha 0.5-1%)
+        
+        # TIER 2: Premium Services (Justify Higher Fee)
+        "with_yield_stake": Decimal("0.002"),    # 0.2% (discount if staking)
+        "high_frequency": Decimal("0.001"),      # 0.1% (>$10k/month volume)
+        
+        # TIER 3: Cross-Border (Where You Have Edge)
+        "cross_border": Decimal("0.012"),        # 1.2% (still cheaper than WU)
+    }
+    
+    # âœ… MINIMUM FEE: $0.50 (vs old $1.00)
+    MINIMUM_FEE = Decimal("0.50")
+    
     def __init__(
         self, 
         settings: Settings, 
@@ -72,92 +90,89 @@ class SwapService:
         self.wallet_service = wallet_service
         self.revenue_service = revenue_service
         
-        # Initialize encryption service for secure key handling
+        # Initialize encryption service
         self.encryption_service = SeedEncryptionService()
-        logger.info("âœ… Encryption service initialized for swap operations")
-
-        # INITIALIZE REAL DEX SERVICE (MainNet)
+        
+        # âœ… Initialize real DEX service (MainNet)
         self.dex_service = AlgorandDeFiService(
             algod_client=algorand_service.algod_client
         )
         
-        logger.info("SwapService initialized with Pact DEX (MainNet)")
+        logger.info("âœ… SwapService initialized with competitive fees")
 
-    def _determine_fee_tier(self, from_asset: str, to_asset: str) -> Decimal:
+    def _determine_fee_tier(self, from_asset: str, to_asset: str, user_id: str = None) -> Decimal:
         """
-        Determine fee tier. Expects mapped keys (e.g., USDT_ALGO not USDT)
+        âœ… UPDATED: Competitive fee calculation
+        Returns: Fee rate (e.g., 0.003 = 0.3%)
         """
         supported_assets = self.settings.SUPPORTED_ASSETS
         
-        # Get configs (keys are already mapped)
+        # Get asset configs
         from_config = supported_assets.get(from_asset, {})
         to_config = supported_assets.get(to_asset, {})
         
         from_stable = from_config.get("is_stable", False)
         to_stable = to_config.get("is_stable", False)
         
+        # âœ… TIER 1: Asset type-based fees
         if from_stable and to_stable:
-            return Decimal("0.010")  # 1.0% stable-to-stable
+            fee_rate = self.COMPETITIVE_FEE_STRUCTURE["stable_to_stable"]  # 0.3%
         elif from_stable or to_stable:
-            return Decimal("0.015")  # 1.5% stable-to-volatile
+            fee_rate = self.COMPETITIVE_FEE_STRUCTURE["stable_to_volatile"]  # 0.5%
         else:
-            return Decimal("0.020")  # 2.0% volatile-to-volatile
+            fee_rate = self.COMPETITIVE_FEE_STRUCTURE["volatile_to_volatile"]  # 0.8%
+        
+        # âœ… TIER 2: Volume-based discounts (future feature)
+        # TODO: Check user monthly volume and apply discounts
+        # if user_monthly_volume > 10000:
+        #     fee_rate = self.COMPETITIVE_FEE_STRUCTURE["high_frequency"]
+        
+        # âœ… TIER 3: Yield staking discount (future feature)
+        # TODO: Check if user has active yield stakes
+        # if user_has_active_stake:
+        #     fee_rate = min(fee_rate, self.COMPETITIVE_FEE_STRUCTURE["with_yield_stake"])
+        
+        logger.info(f"đź'° Fee rate: {float(fee_rate * 100)}% for {from_asset}â†'{to_asset}")
+        
+        return fee_rate
 
     async def get_swap_quote(
         self, 
         from_asset: str, 
         to_asset: str, 
-        amount: Decimal
+        amount: Decimal,
+        user_id: str = None  # âœ… NEW: For future volume discounts
     ) -> Dict[str, Any]:
         """
-        Get a real-time swap quote from Algorand DEX with premium fees.
-        ✅ FIXED: Maps frontend keys to backend config keys
+        âœ… UPDATED: Competitive fees + proper rate calculation
         """
         try:
-            # ✅ FIX: Map frontend asset names to backend config keys
-            from_asset_key = self.ASSET_KEY_MAPPING.get(from_asset, from_asset)
-            to_asset_key = self.ASSET_KEY_MAPPING.get(to_asset, to_asset)
-            
-            logger.info(
-                f"📊 Asset mapping: {from_asset} → {from_asset_key}, "
-                f"{to_asset} → {to_asset_key}"
-            )
-            
-            # Validate swap pair (use original names for validation)
+            # Validate swap pair
             if to_asset not in self.SUPPORTED_PAIRS.get(from_asset, []):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Swap pair {from_asset}/{to_asset} not supported"
                 )
             
-            # Get asset configs using mapped keys
-            from_asset_config = self.settings.SUPPORTED_ASSETS.get(from_asset_key)
-            to_asset_config = self.settings.SUPPORTED_ASSETS.get(to_asset_key)
+            # Get asset configs
+            from_asset_config = self.settings.SUPPORTED_ASSETS.get(from_asset)
+            to_asset_config = self.settings.SUPPORTED_ASSETS.get(to_asset)
             
-            if not from_asset_config:
-                logger.error(f"❌ Config not found for: {from_asset} (mapped to {from_asset_key})")
-                logger.error(f"Available keys: {list(self.settings.SUPPORTED_ASSETS.keys())}")
+            if not from_asset_config or not to_asset_config:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Asset configuration not found for {from_asset}"
-                )
-            
-            if not to_asset_config:
-                logger.error(f"❌ Config not found for: {to_asset} (mapped to {to_asset_key})")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Asset configuration not found for {to_asset}"
+                    detail="Asset configuration not found"
                 )
             
             from_asset_id = from_asset_config["asset_id"]
             to_asset_id = to_asset_config["asset_id"]
             
             logger.info(
-                f"📊 Fetching quote: {amount} {from_asset} (ID: {from_asset_id}) "
-                f"→ {to_asset} (ID: {to_asset_id})"
+                f"đź"Š Fetching quote: {amount} {from_asset} (ID: {from_asset_id}) "
+                f"â†' {to_asset} (ID: {to_asset_id})"
             )
             
-            # Use the AlgorandDeFiService for real quotes
+            # âœ… Get REAL quote from Pact DEX
             dex_quote = await self.dex_service.get_swap_quote(
                 from_asset_id=from_asset_id,
                 to_asset_id=to_asset_id,
@@ -167,35 +182,42 @@ class SwapService:
             # Extract DEX quote data
             amount_out_before_fees = Decimal(str(dex_quote["amount_out"]))
             price_impact = Decimal(str(dex_quote["price_impact"]))
+            exchange_rate = Decimal(str(dex_quote["exchange_rate"]))
             
-            # Determine fee tier (use mapped keys)
-            fee_rate = self._determine_fee_tier(from_asset_key, to_asset_key)
+            # âœ… NEW COMPETITIVE FEE CALCULATION
+            fee_rate = self._determine_fee_tier(from_asset, to_asset, user_id)
             
-            # Calculate platform fee
-            fee_amount = amount_out_before_fees * fee_rate
-            min_fee = Decimal("1.00")
-            if fee_amount < min_fee:
-                fee_amount = min_fee
+            # Calculate platform fee on OUTPUT amount
+            platform_fee = amount_out_before_fees * fee_rate
+            
+            # Apply minimum fee
+            if platform_fee < self.MINIMUM_FEE:
+                platform_fee = self.MINIMUM_FEE
             
             # Calculate final amount out
-            amount_out = amount_out_before_fees - fee_amount
+            amount_out = amount_out_before_fees - platform_fee
             
             logger.info(
-                f"✅ Quote generated: {amount} {from_asset} → {amount_out} {to_asset} "
-                f"(Fee: {fee_rate*100}% = ${fee_amount})"
+                f"âœ… Quote generated: {amount} {from_asset} â†' {amount_out} {to_asset} "
+                f"(Rate: 1 {from_asset} = {exchange_rate} {to_asset}, "
+                f"Fee: {fee_rate*100}% = ${platform_fee})"
             )
             
             return {
-                "from_asset": from_asset,  # Return original names for frontend
+                "from_asset": from_asset,
                 "to_asset": to_asset,
                 "amount_in": float(amount),
                 "amount_out": float(amount_out),
-                "fee_amount": float(fee_amount),
+                "amount_out_before_fees": float(amount_out_before_fees),  # âœ… NEW
+                "fee_amount": float(platform_fee),
                 "fee_rate": float(fee_rate),
+                "fee_percentage": float(fee_rate * 100),  # âœ… NEW: For UI display
+                "exchange_rate": float(exchange_rate),  # âœ… NEW: Explicit rate
                 "price_impact": float(price_impact),
-                "min_amount_out": float(amount_out * Decimal("0.995")),
+                "min_amount_out": float(amount_out * Decimal("0.995")),  # 0.5% buffer
                 "dex": dex_quote["dex"],
                 "pool_id": dex_quote.get("pool_id"),
+                "network_fee": 0.001,  # Algorand network fee
             }
             
         except HTTPException:
@@ -213,20 +235,65 @@ class SwapService:
     ) -> Dict[str, Any]:
         """
         Execute an asset swap with real DEX integration.
+        âœ… ADDED: Rate validation to prevent bad swaps
         """
         try:
+            # âœ… SAFETY CHECK 1: Max swap amount
+            MAX_SWAP_AMOUNT = Decimal("1000.00")  # $1000 max
+            if amount > MAX_SWAP_AMOUNT:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Swap amount exceeds safety limit of ${MAX_SWAP_AMOUNT}"
+                )
+            
             # Get current wallet balances
             balances = await self.wallet_service.get_wallet_balances(user_id)
             
             # Check if user has sufficient balance
-            if balances.get(from_asset, Decimal("0")) < amount:
+            user_balance = balances.get(from_asset, Decimal("0"))
+            if user_balance < amount:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Insufficient {from_asset} balance"
+                    detail=f"Insufficient {from_asset} balance. Available: {user_balance}"
                 )
             
             # Get swap quote
-            quote = await self.get_swap_quote(from_asset, to_asset, amount)
+            quote = await self.get_swap_quote(from_asset, to_asset, amount, user_id)
+            
+            # âœ… SAFETY CHECK 2: Validate exchange rate makes sense
+            exchange_rate = quote["exchange_rate"]
+            
+            # Known reasonable ranges (can be expanded)
+            RATE_VALIDATIONS = {
+                ("USDT", "ALGO"): (1.5, 5.0),    # 1 USDT = 1.5-5 ALGO
+                ("ALGO", "USDT"): (0.2, 0.7),    # 1 ALGO = $0.20-$0.70
+                ("USDT", "USDCa"): (0.98, 1.02), # 1 USDT = 0.98-1.02 USDC
+            }
+            
+            if (from_asset, to_asset) in RATE_VALIDATIONS:
+                min_rate, max_rate = RATE_VALIDATIONS[(from_asset, to_asset)]
+                if exchange_rate < min_rate or exchange_rate > max_rate:
+                    logger.error(
+                        f"âŒ INVALID RATE: 1 {from_asset} = {exchange_rate} {to_asset} "
+                        f"(expected {min_rate}-{max_rate})"
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Exchange rate outside expected range "
+                            f"({exchange_rate:.6f}). Please try again later."
+                        )
+                    )
+            
+            # âœ… SAFETY CHECK 3: Price impact limit
+            if quote["price_impact"] > 0.10:  # 10% max
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Price impact too high ({quote['price_impact']*100:.1f}%). "
+                        f"Try a smaller amount."
+                    )
+                )
             
             # 🚀 EXECUTE REAL SWAP ON ALGORAND DEX
             swap_tx_id = await self._execute_dex_swap(
