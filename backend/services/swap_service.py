@@ -195,17 +195,100 @@ class SwapService:
                 f"-> {to_asset} (ID: {to_asset_id})"
             )
             
-            # Get REAL quote from Pact DEX
-            dex_quote = await self.dex_service.get_swap_quote(
-                from_asset_id=from_asset_id,
-                to_asset_id=to_asset_id,
-                amount_in=amount
+            # ✅ STEP 1: Get TRUE market rates from Oracle (95% confidence)
+            logger.info(f"🔍 Fetching Oracle prices for {from_asset}/{to_asset}")
+
+            try:
+                # Get USD prices for both assets
+                from_asset_oracle = from_asset_config.get("oracle_symbol", from_asset.lower())
+                to_asset_oracle = to_asset_config.get("oracle_symbol", to_asset.lower())
+                
+                # Use our battle-tested Oracle service
+                from_price_usd, from_meta = await self.algorand_service.oracle_service.get_asset_price(from_asset_oracle)
+                to_price_usd, to_meta = await self.algorand_service.oracle_service.get_asset_price(to_asset_oracle)
+                
+                # Calculate TRUE exchange rate
+                oracle_exchange_rate = from_price_usd / to_price_usd
+                oracle_amount_out = amount * oracle_exchange_rate
+                
+                logger.info(
+                    f"📊 Oracle Rates:\n"
+                    f"  {from_asset}: ${from_price_usd} (source: {from_meta.get('source')})\n"
+                    f"  {to_asset}: ${to_price_usd} (source: {to_meta.get('source')})\n"
+                    f"  Exchange Rate: 1 {from_asset} = {oracle_exchange_rate:.6f} {to_asset}\n"
+                    f"  Expected Output: {oracle_amount_out:.6f} {to_asset}"
+                )
+                
+            except Exception as oracle_err:
+                logger.error(f"❌ Oracle price fetch failed: {oracle_err}")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Price oracle unavailable: {str(oracle_err)}"
+                )
+
+            # ✅ STEP 2: Get Pact DEX quote (for liquidity/fees info)
+            try:
+                dex_quote = await self.dex_service.get_swap_quote(
+                    from_asset_id=from_asset_id,
+                    to_asset_id=to_asset_id,
+                    amount_in=amount
+                )
+                
+                # Extract Pact data
+                pact_amount_out = Decimal(str(dex_quote["amount_out"]))
+                pact_exchange_rate = Decimal(str(dex_quote.get("exchange_rate", 0)))
+                price_impact = Decimal(str(dex_quote["price_impact"]))
+                
+                logger.info(
+                    f"🔗 Pact DEX Quote:\n"
+                    f"  Amount Out: {pact_amount_out:.6f} {to_asset}\n"
+                    f"  Exchange Rate: {pact_exchange_rate:.6f}\n"
+                    f"  Price Impact: {price_impact:.2f}%"
+                )
+                
+            except Exception as pact_err:
+                logger.warning(f"⚠️ Pact DEX failed: {pact_err}. Using Oracle-only quote.")
+                # Fallback: Use pure Oracle quote
+                pact_amount_out = oracle_amount_out
+                pact_exchange_rate = oracle_exchange_rate
+                price_impact = Decimal("0")
+
+            # ✅ STEP 3: VALIDATE Pact vs Oracle (detect inversions)
+            rate_difference_pct = abs(
+                (pact_exchange_rate - oracle_exchange_rate) / oracle_exchange_rate * 100
             )
-            
-            # Extract DEX quote data
-            amount_out_before_fees = Decimal(str(dex_quote["amount_out"]))
-            price_impact = Decimal(str(dex_quote["price_impact"]))
-            exchange_rate = Decimal(str(dex_quote["exchange_rate"]))
+
+            logger.info(f"🔍 Rate Validation: {rate_difference_pct:.2f}% difference")
+
+            # 🚨 CRITICAL: Detect inverted or broken rates
+            if rate_difference_pct > 50:  # More than 50% off = likely inverted
+                logger.error(
+                    f"❌ INVERTED RATE DETECTED!\n"
+                    f"  Oracle Rate: 1 {from_asset} = {oracle_exchange_rate:.6f} {to_asset}\n"
+                    f"  Pact Rate:   1 {from_asset} = {pact_exchange_rate:.6f} {to_asset}\n"
+                    f"  Difference: {rate_difference_pct:.2f}%\n"
+                    f"  🔧 Using Oracle rate instead!"
+                )
+                
+                # Use Oracle rate as truth
+                exchange_rate = oracle_exchange_rate
+                amount_out_before_fees = oracle_amount_out
+                
+                # Recalculate price impact based on liquidity (estimate)
+                price_impact = min(Decimal("5"), amount / Decimal("10000")) # Rough estimate
+                
+            elif rate_difference_pct > 10:  # 10-50% off = warning
+                logger.warning(
+                    f"⚠️ Large rate discrepancy ({rate_difference_pct:.2f}%)\n"
+                    f"  Using Oracle rate for safety"
+                )
+                exchange_rate = oracle_exchange_rate
+                amount_out_before_fees = oracle_amount_out
+                
+            else:  # Within 10% = Pact is reliable
+                logger.info(f"✅ Pact rate validated ({rate_difference_pct:.2f}% difference)")
+                exchange_rate = oracle_exchange_rate  # Still use Oracle as base
+                amount_out_before_fees = pact_amount_out  # But trust Pact's actual output
             
             # NEW COMPETITIVE FEE CALCULATION
             fee_rate = self._determine_fee_tier(from_asset, to_asset, user_id)

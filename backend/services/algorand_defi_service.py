@@ -133,6 +133,40 @@ class AlgorandDeFiService:
             
             # âœ… VALIDATION: Detect inverted rates
             if from_asset.unit_name == "USDT" and to_asset.unit_name == "ALGO":
+                # 🚨 CRITICAL: Additional inversion detection
+                # If rate is suspiciously small (< 0.01), it's likely inverted
+                if exchange_rate < 0.01:
+                    logger.error(
+                        f"❌ INVERTED RATE DETECTED: {exchange_rate:.8f}\n"
+                        f"   This means 1 {from_asset.unit_name} = {exchange_rate} {to_asset.unit_name}\n"
+                        f"   Trying pool in reverse order..."
+                    )
+                    
+                    # 🔄 Try fetching pool in opposite direction
+                    try:
+                        reverse_pools = self.pact.fetch_pools_by_assets(to_asset, from_asset)
+                        if reverse_pools:
+                            reverse_pool = max(reverse_pools, key=lambda p: p.state.total_liquidity)
+                            reverse_pool.update_state()
+                            
+                            # Calculate reverse rate
+                            reverse_swap = reverse_pool.prepare_swap(
+                                asset=to_asset,
+                                amount=int(amount_out_raw * 1_000_000),  # Use output as input
+                                slippage_pct=1.0
+                            )
+                            
+                            reverse_effect = reverse_swap.effect
+                            corrected_rate = float(amount_in) / (reverse_effect.amount_received / 1_000_000)
+                            
+                            logger.info(f"✅ Corrected rate: 1 {from_asset.unit_name} = {corrected_rate:.6f} {to_asset.unit_name}")
+                            
+                            # Update exchange rate
+                            exchange_rate = corrected_rate
+                            
+                    except Exception as reverse_err:
+                        logger.error(f"❌ Reverse pool fetch failed: {reverse_err}")
+                        # Rate stays inverted - will be caught by swap_service validation
                 # Expected: 1 USDT = ~2.5 ALGO (ALGO price ~$0.40)
                 if exchange_rate < 1.5 or exchange_rate > 5.0:
                     logger.error(
