@@ -19,7 +19,10 @@ from backend.services.database_service import DatabaseService
 from backend.services.multi_chain_wallet_service import MultiChainWalletService as WalletService
 from backend.services.revenue_tracking_service import RevenueTrackingService
 from backend.services.seed_encryption_service import SeedEncryptionService
+from backend.dependencies import get_oracle_service
+from backend.services.oracle_service import OracleService
 
+oracle_service = get_oracle_service()
 logger = logging.getLogger(__name__)
 
 class SwapService:
@@ -73,13 +76,15 @@ class SwapService:
         algorand_service: AlgorandService, 
         db_service: DatabaseService,
         wallet_service: WalletService,
-        revenue_service: RevenueTrackingService
+        revenue_service: RevenueTrackingService,
+        oracle_service: OracleService
     ):
         self.settings = settings
         self.algorand_service = algorand_service
         self.db_service = db_service
         self.wallet_service = wallet_service
         self.revenue_service = revenue_service
+        self.oracle_service = oracle_service
         
         # Initialize encryption service
         self.encryption_service = SeedEncryptionService()
@@ -204,8 +209,8 @@ class SwapService:
                 to_asset_oracle = to_asset_config.get("oracle_symbol", to_asset.lower())
                 
                 # Use our battle-tested Oracle service
-                from_price_usd, from_meta = await self.algorand_service.oracle_service.get_asset_price(from_asset_oracle)
-                to_price_usd, to_meta = await self.algorand_service.oracle_service.get_asset_price(to_asset_oracle)
+                from_price_usd, from_meta = await self.oracle_service.get_asset_price(from_asset_oracle)
+                to_price_usd, to_meta = await self.oracle_service.get_asset_price(to_asset_oracle)
                 
                 # Calculate TRUE exchange rate
                 oracle_exchange_rate = from_price_usd / to_price_usd
