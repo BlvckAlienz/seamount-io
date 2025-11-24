@@ -40,7 +40,11 @@ const YIELD_TIERS = [
   },
 ];
 
-const SUPPORTED_ASSETS = ['USDT', 'USDC', 'ALGO'];
+const SUPPORTED_ASSETS = [
+  { symbol: 'USDT', displayName: 'Tether USD (Algorand)' },
+  { symbol: 'USDCa', displayName: 'USD Coin (Algorand)' },
+  { symbol: 'ALGO', displayName: 'Algorand' }
+];
 
 export const EarnModal: React.FC<EarnModalProps> = ({ open, onOpenChange }) => {
   const [selectedTier, setSelectedTier] = useState('prime');
@@ -177,11 +181,11 @@ export const EarnModal: React.FC<EarnModalProps> = ({ open, onOpenChange }) => {
             <select
               value={asset}
               onChange={(e) => setAsset(e.target.value)}
-              className="w-full bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              className="..."
             >
               {SUPPORTED_ASSETS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
+                <option key={a.symbol} value={a.symbol}>
+                  {a.displayName}
                 </option>
               ))}
             </select>

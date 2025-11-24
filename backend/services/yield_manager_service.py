@@ -8,7 +8,7 @@ Revenue: 2% management fee + 20% performance fee
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from decimal import Decimal, ROUND_DOWN
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from enum import Enum
 import asyncio
@@ -214,8 +214,12 @@ class YieldManagerService:
     async def _validate_balance(self, user_id: str, asset: str, amount: Decimal):
         """Validate user has sufficient balance"""
         
-        query = f"SELECT {asset.lower()}_balance FROM wallet_balances WHERE user_id = %s"
-        result = await self.db.execute_query(query, (user_id,))
+        # ✅ REPLACE WITH:
+        result = await self.db.query(
+            "wallet_balances",
+            filters={"user_id": user_id},
+            columns=[f"{asset.lower()}_balance"]
+        )
         
         if not result:
             raise ValueError("Wallet not found")
@@ -228,18 +232,23 @@ class YieldManagerService:
     async def _debit_balance(self, user_id: str, asset: str, amount: Decimal, reference: str):
         """Debit user balance"""
         
-        query = f"SELECT {asset.lower()}_balance FROM wallet_balances WHERE user_id = %s"
-        result = await self.db.execute_query(query, (user_id,))
-        
+        result = await self.db.query(
+            "wallet_balances",
+            filters={"user_id": user_id},
+            columns=[f"{asset.lower()}_balance"]
+        )
+
+        if not result:
+            raise ValueError("Wallet not found")
+
         current = Decimal(str(result[0][f"{asset.lower()}_balance"]))
         new_balance = current - amount
-        
-        update_query = f"""
-            UPDATE wallet_balances 
-            SET {asset.lower()}_balance = %s, updated_at = NOW()
-            WHERE user_id = %s
-        """
-        await self.db.execute_query(update_query, (float(new_balance), user_id))
+
+        await self.db.update(
+            "wallet_balances",
+            data={f"{asset.lower()}_balance": float(new_balance)},
+            filters={"user_id": user_id}
+        )
         
         logger.info(f"Debited {amount} {asset} from user {user_id}")
     
@@ -318,8 +327,10 @@ class YieldManagerService:
         
         try:
             # Get stake details
-            query = "SELECT * FROM yield_stakes WHERE id = %s"
-            result = await self.db.execute_query(query, (stake_id,))
+            result = await self.db.query(
+                "yield_stakes",
+                filters={"id": stake_id}
+            )
             
             if not result:
                 raise ValueError(f"Stake not found: {stake_id}")
@@ -341,8 +352,10 @@ class YieldManagerService:
             accrued_yield = principal * daily_rate * Decimal(str(days_elapsed))
             
             # Get strategy performances
-            strategies_query = "SELECT * FROM strategy_allocations WHERE stake_id = %s"
-            strategies = await self.db.execute_query(strategies_query, (stake_id,))
+            strategies = await self.db.query(
+                "strategy_allocations",
+                filters={"stake_id": stake_id}
+            )
             
             strategy_details = []
             total_strategy_value = Decimal("0")
@@ -417,8 +430,10 @@ class YieldManagerService:
         
         try:
             # Get stake
-            query = "SELECT * FROM yield_stakes WHERE id = %s AND user_id = %s"
-            result = await self.db.execute_query(query, (stake_id, user_id))
+            result = await self.db.query(
+                "yield_stakes",
+                filters={"id": stake_id, "user_id": user_id}
+            )
             
             if not result:
                 raise ValueError("Stake not found")
@@ -458,12 +473,15 @@ class YieldManagerService:
                 status = "active"
             else:
                 # Complete unstake
-                update_query = """
-                    UPDATE yield_stakes 
-                    SET status = 'unstaked', unstaked_at = NOW(), final_value = %s
-                    WHERE id = %s
-                """
-                await self.db.execute_query(update_query, (float(unstake_amount), stake_id))
+                await self.db.update(
+                    "yield_stakes",
+                    data={
+                        "status": "unstaked",
+                        "unstaked_at": datetime.utcnow().isoformat(),
+                        "final_value": float(unstake_amount)
+                    },
+                    filters={"id": stake_id}
+                )
                 status = "unstaked"
             
             # Record revenue
@@ -505,18 +523,23 @@ class YieldManagerService:
     async def _credit_balance(self, user_id: str, asset: str, amount: Decimal, reference: str):
         """Credit user balance"""
         
-        query = f"SELECT {asset.lower()}_balance FROM wallet_balances WHERE user_id = %s"
-        result = await self.db.execute_query(query, (user_id,))
-        
+        result = await self.db.query(
+            "wallet_balances",
+            filters={"user_id": user_id},
+            columns=[f"{asset.lower()}_balance"]
+        )
+
+        if not result:
+            raise ValueError("Wallet not found")
+
         current = Decimal(str(result[0][f"{asset.lower()}_balance"]))
         new_balance = current + amount
-        
-        update_query = f"""
-            UPDATE wallet_balances 
-            SET {asset.lower()}_balance = %s, updated_at = NOW()
-            WHERE user_id = %s
-        """
-        await self.db.execute_query(update_query, (float(new_balance), user_id))
+
+        await self.db.update(
+            "wallet_balances",
+            data={f"{asset.lower()}_balance": float(new_balance)},
+            filters={"user_id": user_id}
+        )
         
         logger.info(f"Credited {amount} {asset} to user {user_id}")
     
@@ -542,15 +565,15 @@ class YieldManagerService:
     async def get_user_stakes(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all stakes for a user"""
         
-        query = """
-            SELECT id, tier, asset, principal_amount, current_value, 
-                   target_apy, total_earned, status, created_at
-            FROM yield_stakes 
-            WHERE user_id = %s
-            ORDER BY created_at DESC
-        """
-        
-        stakes = await self.db.execute_query(query, (user_id,))
+        stakes = await self.db.query(
+            "yield_stakes",
+            filters={"user_id": user_id},
+            columns=[
+                "id", "tier", "asset", "principal_amount", "current_value",
+                "target_apy", "total_earned", "status", "created_at"
+            ],
+            order_by={"created_at": "desc"}
+        )
         
         result = []
         for stake in stakes:

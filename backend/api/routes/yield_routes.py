@@ -275,8 +275,11 @@ async def get_stake_details(
         result = await service.calculate_current_yield(stake_id)
         
         # Verify ownership
-        query = "SELECT user_id FROM yield_stakes WHERE id = %s"
-        stake_check = await db_service.execute_query(query, (stake_id,))
+        stake_check = await db_service.query(
+            "yield_stakes",
+            filters={"id": stake_id},
+            columns=["user_id"]
+        )
         
         if not stake_check or stake_check[0]["user_id"] != current_user["id"]:
             raise HTTPException(status_code=404, detail="Stake not found")
