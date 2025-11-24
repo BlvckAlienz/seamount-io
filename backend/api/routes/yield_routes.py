@@ -26,6 +26,7 @@ from backend.services.yield_manager_service import (
 from backend.services.database_service import DatabaseService
 from backend.services.audit_service import AuditService
 from backend.services.oracle_service import EnhancedOracleService
+from backend.services.algorand_service import AlgorandService
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
