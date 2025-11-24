@@ -540,7 +540,120 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error retrieving encrypted key: {str(e)}")
             raise
+    
+    async def query(
+        self,
+        table: str,
+        filters: Optional[Dict[str, Any]] = None,
+        columns: Optional[List[str]] = None,
+        order_by: Optional[Dict[str, str]] = None,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Universal query wrapper for Supabase tables
+        
+        🎯 PURPOSE: Yield manager needs this for wallet_balances queries
+        
+        Args:
+            table: Table name (e.g., "wallet_balances", "yield_stakes")
+            filters: {"user_id": "abc123", "status": "active"}
+            columns: ["usdt_balance", "algo_balance"] or None for all
+            order_by: {"created_at": "desc"}
+            limit: Max rows to return
+        
+        Returns:
+            List of matching rows as dicts
+        
+        Example:
+            result = await db.query(
+                "wallet_balances",
+                filters={"user_id": user_id},
+                columns=["usdt_balance"]
+            )
+        """
+        try:
+            logger.debug(f"[DB] Query: {table} | Filters: {filters}")
+            
+            # Build query
+            if columns:
+                query = self.supabase.from_(table).select(",".join(columns))
+            else:
+                query = self.supabase.from_(table).select("*")
+            
+            # Apply filters
+            if filters:
+                for column, value in filters.items():
+                    query = query.eq(column, value)
+            
+            # Apply ordering
+            if order_by:
+                for column, direction in order_by.items():
+                    ascending = (direction.lower() == "asc")
+                    query = query.order(column, desc=(not ascending))
+            
+            # Apply limit
+            if limit:
+                query = query.limit(limit)
+            
+            # Execute using asyncio.to_thread (matches your pattern)
+            response = await asyncio.to_thread(lambda: query.execute())
+            
+            logger.debug(f"[DB] Query returned {len(response.data) if response.data else 0} rows")
+            return response.data if response.data else []
+            
+        except Exception as e:
+            logger.error(f"[DB] Query failed: {table} | {e}")
+            logger.error(traceback.format_exc())
+            return []
 
+    async def update(
+        self,
+        table: str,
+        data: Dict[str, Any],
+        filters: Dict[str, Any]
+    ) -> bool:
+        """
+        Update records matching filters
+        
+        🎯 PURPOSE: Yield manager needs this for wallet balance updates
+        
+        Args:
+            table: Table name (e.g., "wallet_balances")
+            data: {"usdt_balance": 1500.0, "updated_at": "..."}
+            filters: {"user_id": "abc123"}
+        
+        Returns:
+            True if successful
+        
+        Example:
+            success = await db.update(
+                "wallet_balances",
+                data={"usdt_balance": new_balance},
+                filters={"user_id": user_id}
+            )
+        """
+        try:
+            logger.debug(f"[DB] Update: {table} | Data: {data} | Filters: {filters}")
+            
+            # Build update query
+            query = self.supabase.from_(table).update(data)
+            
+            # Apply filters
+            for column, value in filters.items():
+                query = query.eq(column, value)
+            
+            # Execute using asyncio.to_thread
+            response = await asyncio.to_thread(lambda: query.execute())
+            
+            success = bool(response.data)
+            logger.debug(f"[DB] Update {'succeeded' if success else 'failed'}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"[DB] Update failed: {table} | {e}")
+            logger.error(traceback.format_exc())
+            return False
+        
     async def get_user_wallet(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get complete wallet information for user"""
         try:
