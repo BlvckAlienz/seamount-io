@@ -15,7 +15,8 @@ from backend.dependencies import (
     get_current_user, 
     get_db_service, 
     get_audit_service,
-    get_oracle_service
+    get_oracle_service,
+    get_algorand_service
 )
 from backend.services.yield_manager_service import (
     YieldManagerService, 
@@ -99,7 +100,8 @@ async def stake_funds(
     current_user: dict = Depends(get_current_user),
     db_service: DatabaseService = Depends(get_db_service),
     audit_service: AuditService = Depends(get_audit_service),
-    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service),
+    algorand_service: AlgorandService = Depends(get_algorand_service)  # ➕ ADD THIS
 ):
     """
     Stake funds into yield-generating tier
@@ -131,7 +133,7 @@ async def stake_funds(
             )
         
         # Initialize service
-        service = YieldManagerService(db_service, audit_service, oracle_service)
+        service = YieldManagerService(db_service, audit_service, oracle_service, algorand_service)
         
         # Create stake
         result = await service.stake_funds(
@@ -165,7 +167,8 @@ async def unstake_funds(
     current_user: dict = Depends(get_current_user),
     db_service: DatabaseService = Depends(get_db_service),
     audit_service: AuditService = Depends(get_audit_service),
-    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service),
+    algorand_service: AlgorandService = Depends(get_algorand_service) 
 ):
     """
     Unstake funds from yield tier
@@ -181,7 +184,7 @@ async def unstake_funds(
         logger.info(f"Unstake request: {current_user['id']} - {unstake_request.stake_id}")
         
         # Initialize service
-        service = YieldManagerService(db_service, audit_service, oracle_service)
+        service = YieldManagerService(db_service, audit_service, oracle_service, algorand_service)
         
         # Execute unstake
         result = await service.unstake_funds(
@@ -213,7 +216,8 @@ async def get_user_stakes(
     current_user: dict = Depends(get_current_user),
     db_service: DatabaseService = Depends(get_db_service),
     audit_service: AuditService = Depends(get_audit_service),
-    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service),
+    algorand_service: AlgorandService = Depends(get_algorand_service)
 ):
     """
     Get all stakes for current user
@@ -224,7 +228,7 @@ async def get_user_stakes(
     try:
         logger.info(f"Fetching stakes for user: {current_user['id']}")
         
-        service = YieldManagerService(db_service, audit_service, oracle_service)
+        service = YieldManagerService(db_service, audit_service, oracle_service, algorand_service)
         
         stakes = await service.get_user_stakes(current_user["id"])
         
