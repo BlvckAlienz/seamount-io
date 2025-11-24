@@ -264,34 +264,114 @@ export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
           </div>
         </div>
 
-        {/* Quote Details - 📱 COMPACT SPACING */}
+        {/* Quote Details */}
         {quote && !error && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
-            <div className="flex justify-between text-xs sm:text-sm">
-              <span className="text-gray-700 dark:text-gray-300">Rate</span>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4 space-y-2">
+            {/* NEW: Show explicit exchange rate */}
+            <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b-2 border-blue-200 dark:border-blue-700">
+              <span className="text-gray-700 dark:text-gray-300 font-semibold">Exchange Rate</span>
+              <span className="text-gray-900 dark:text-white font-bold">
+                1 {fromAsset} = {quote.exchange_rate?.toFixed(6)} {toAsset}
+              </span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">Amount Before Fees</span>
               <span className="text-gray-900 dark:text-white font-medium">
-                1 {fromAsset} = {(quote.amount_out / parseFloat(amount)).toFixed(6)} {toAsset}
+                {quote.amount_out_before_fees?.toFixed(4)} {toAsset}
               </span>
             </div>
-            <div className="flex justify-between text-xs sm:text-sm">
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-700 dark:text-gray-300">
+                Platform Fee ({quote.fee_percentage?.toFixed(1)}%)
+              </span>
+              <span className="text-orange-600 dark:text-orange-400 font-medium">
+                - {quote.fee_amount?.toFixed(4)} {toAsset}
+              </span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
               <span className="text-gray-700 dark:text-gray-300">Price Impact</span>
-              <span className={`font-medium ${Math.abs(quote.price_impact) > 2 ? 'text-red-600' : 'text-green-600'}`}>
-                {quote.price_impact.toFixed(2)}%
+              <span className={`font-medium ${
+                quote.price_impact > 5 
+                  ? 'text-red-600' 
+                  : quote.price_impact > 2 
+                  ? 'text-orange-600' 
+                  : 'text-green-600'
+              }`}>
+                {quote.price_impact?.toFixed(2)}%
               </span>
             </div>
-            <div className="flex justify-between text-xs sm:text-sm">
-              <span className="text-gray-700 dark:text-gray-300">Platform Fee</span>
-              <span className="text-gray-900 dark:text-white">${quote.fee_amount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-xs sm:text-sm">
+            
+            <div className="flex justify-between text-sm">
               <span className="text-gray-700 dark:text-gray-300">Network Fee</span>
               <span className="text-gray-900 dark:text-white">~$0.001</span>
             </div>
-            <div className="border-t-2 border-blue-300 dark:border-blue-700 pt-1.5 sm:pt-2 mt-1.5 sm:mt-2 flex justify-between">
-              <span className="text-gray-900 dark:text-white font-semibold text-xs sm:text-sm">You receive</span>
-              <span className="text-gray-900 dark:text-white font-bold text-sm sm:text-base">
-                {quote.amount_out.toFixed(4)} {toAsset}
-              </span>
+            
+            <div className="border-t-2 border-blue-300 dark:border-blue-700 pt-3 mt-3 flex justify-between items-center">
+              <span className="text-gray-900 dark:text-white font-semibold">You Receive</span>
+              <div className="text-right">
+                <div className="text-gray-900 dark:text-white font-bold text-lg">
+                  {quote.amount_out?.toFixed(4)} {toAsset}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Min: {quote.min_amount_out?.toFixed(4)} {toAsset}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NEW: Rate Validation Warning */}
+        {quote && quote.exchange_rate && (
+          (() => {
+            // Calculate expected rate range based on asset pair
+            const expectedRates: { [key: string]: { min: number; max: number } } = {
+              'USDT-ALGO': { min: 1.5, max: 5.0 },   // 1 USDT = 1.5-5 ALGO
+              'ALGO-USDT': { min: 0.2, max: 0.7 },   // 1 ALGO = $0.20-$0.70
+              'USDT-USDCa': { min: 0.98, max: 1.02 }, // 1:1 stables
+            };
+            
+            const pairKey = `${fromAsset}-${toAsset}`;
+            const expected = expectedRates[pairKey];
+            
+            if (expected) {
+              const rate = quote.exchange_rate;
+              const isOutOfRange = rate < expected.min || rate > expected.max;
+              
+              if (isOutOfRange) {
+                return (
+                  <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-red-900 dark:text-red-100 font-semibold">
+                        ⚠️ Unusual Exchange Rate Detected
+                      </p>
+                      <p className="text-xs text-red-800 dark:text-red-200 mt-1">
+                        Rate: 1 {fromAsset} = {rate.toFixed(6)} {toAsset}<br />
+                        Expected: {expected.min} - {expected.max}<br />
+                        <strong>This quote may be inaccurate. Please double-check before proceeding.</strong>
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+            }
+            
+            return null;
+          })()
+        )}
+
+        {/* NEW: Price Impact Warning */}
+        {quote && quote.price_impact > 5 && (
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-red-900 dark:text-red-100 font-semibold">High Price Impact!</p>
+              <p className="text-xs text-red-800 dark:text-red-200 mt-1">
+                This swap will significantly affect the pool price. Consider reducing your amount.
+              </p>
             </div>
           </div>
         )}
