@@ -24,9 +24,8 @@ from backend.services.seed_encryption_service import SeedEncryptionService
 logger = logging.getLogger(__name__)
 
 class YieldTier(str, Enum):
-    STABLE = "stable"      # 7.5% APY - Low risk
-    GROWTH = "growth"      # 9.0% APY - Medium risk
-    ALPHA = "alpha"        # 11.0% APY - High risk (delta-neutral)
+    PRIME = "prime"        # 5.25% APY - Low risk (Folks Finance)
+    ALPHA = "alpha"        # 8.2% APY - Medium risk (Pact+Folks)
 
 class YieldStrategy(str, Enum):
     FOLKS_FINANCE = "folks_finance"        # Lending protocol
@@ -595,8 +594,7 @@ class YieldManagerService:
         """Get user recommendation for tier"""
         
         recommendations = {
-            YieldTier.STABLE: "Conservative investors seeking stable returns above traditional savings",
-            YieldTier.GROWTH: "Balanced investors comfortable with moderate risk for higher returns",
+            YieldTier.PRIME: "Conservative investors seeking stable returns above traditional savings",
             YieldTier.ALPHA: "Experienced traders seeking maximum yield with managed risk exposure"
         }
         
