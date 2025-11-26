@@ -212,45 +212,133 @@ class YieldManagerService:
             raise
     
     async def _validate_balance(self, user_id: str, asset: str, amount: Decimal):
-        """Validate user has sufficient balance"""
+        """Validate user has sufficient balance by querying Algorand blockchain"""
         
-        # ✅ REPLACE WITH:
-        result = await self.db.query(
-            "wallet_balances",
-            filters={"user_id": user_id},
-            columns=[f"{asset.lower()}_balance"]
-        )
-        
-        if not result:
-            raise ValueError("Wallet not found")
-        
-        balance = Decimal(str(result[0][f"{asset.lower()}_balance"]))
-        
-        if balance < amount:
-            raise ValueError(f"Insufficient balance. Available: {balance}, Required: {amount}")
+        try:
+            # Step 1: Get user's Algorand wallet address
+            wallet_result = await self.db.query(
+                "user_wallets",
+                filters={"user_id": user_id},
+                columns=["algorand_address"]
+            )
+            
+            if not wallet_result or len(wallet_result) == 0:
+                raise ValueError(
+                    "❌ NO WALLET FOUND\n\n"
+                    "You don't have an Algorand wallet yet.\n"
+                    "Please visit the Wallet page and click 'Create Wallet' to get started."
+                )
+            
+            algorand_address = wallet_result[0].get("algorand_address")
+            
+            if not algorand_address:
+                raise ValueError(
+                    "❌ WALLET ADDRESS MISSING\n\n"
+                    "Your wallet exists but has no Algorand address.\n"
+                    "Please contact support or recreate your wallet."
+                )
+            
+            # Step 2: Map asset symbol to Algorand asset ID
+            ASSET_ID_MAP = {
+                "USDT": 312769,      # Tether USD (Algorand ASA)
+                "USDCa": 31566704,   # USD Coin (Algorand ASA)
+                "ALGO": 0            # Native ALGO (asset_id = 0)
+            }
+            
+            asset_upper = asset.upper()
+            asset_id = ASSET_ID_MAP.get(asset_upper)
+            
+            if asset_id is None:
+                supported = ", ".join(ASSET_ID_MAP.keys())
+                raise ValueError(
+                    f"❌ UNSUPPORTED ASSET: {asset}\n\n"
+                    f"Supported assets for yield farming: {supported}"
+                )
+            
+            # Step 3: Get real-time balance from Algorand blockchain
+            from backend.services.algorand_service import AlgorandService
+            from backend.config import get_settings
+            
+            algorand_service = AlgorandService(get_settings())
+            balance = await algorand_service.get_asset_balance(algorand_address, asset_id)
+            
+            logger.info(
+                f"✅ Balance check: User {user_id[:8]}... "
+                f"({algorand_address[:10]}...) has {balance} {asset_upper}"
+            )
+            
+            # Step 4: Validate sufficient balance
+            if balance < amount:
+                raise ValueError(
+                    f"❌ INSUFFICIENT BALANCE\n\n"
+                    f"Available: {balance} {asset_upper}\n"
+                    f"Required: {amount} {asset_upper}\n"
+                    f"Shortfall: {amount - balance} {asset_upper}\n\n"
+                    f"Please deposit more {asset_upper} to your wallet first."
+                )
+            
+            logger.info(
+                f"✅ Validation passed: {amount} {asset_upper} <= {balance} {asset_upper}"
+            )
+            
+            return balance  # Return balance for potential use
+            
+        except ValueError as e:
+            # Re-raise validation errors with user-friendly messages
+            logger.warning(f"⚠️ Balance validation failed: {e}")
+            raise
+        except Exception as e:
+            # Log unexpected errors with full traceback
+            logger.error(f"❌ Unexpected balance validation error: {e}", exc_info=True)
+            raise ValueError(
+                f"Failed to check balance: {str(e)}\n\n"
+                f"This is a system error. Please try again or contact support."
+            )
     
     async def _debit_balance(self, user_id: str, asset: str, amount: Decimal, reference: str):
-        """Debit user balance"""
+        """
+        Log stake transaction for audit trail.
         
-        result = await self.db.query(
-            "wallet_balances",
-            filters={"user_id": user_id},
-            columns=[f"{asset.lower()}_balance"]
-        )
-
-        if not result:
-            raise ValueError("Wallet not found")
-
-        current = Decimal(str(result[0][f"{asset.lower()}_balance"]))
-        new_balance = current - amount
-
-        await self.db.update(
-            "wallet_balances",
-            data={f"{asset.lower()}_balance": float(new_balance)},
-            filters={"user_id": user_id}
-        )
+        NOTE: Actual funds remain in user's Algorand wallet until deployed to 
+        Folks Finance smart contract via _allocate_to_strategies().
+        This method only creates an audit record.
+        """
         
-        logger.info(f"Debited {amount} {asset} from user {user_id}")
+        try:
+            # Create transaction record for audit trail
+            transaction_id = f"TXN_{reference}_{uuid4().hex[:8].upper()}"
+            
+            transaction_record = {
+                "id": transaction_id,
+                "user_id": user_id,
+                "blockchain": "algorand",
+                "transaction_type": "yield_stake_debit",
+                "asset": asset.upper(),
+                "amount": float(amount),
+                "status": "pending_deployment",
+                "metadata": {
+                    "stake_id": reference,
+                    "operation": "yield_farming_stake",
+                    "note": "Funds reserved for yield farming deployment"
+                },
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Log to multi_chain_transactions table (safe, no balance updates)
+            await self.db.insert("multi_chain_transactions", transaction_record)
+            
+            logger.info(
+                f"✅ Logged stake debit: {amount} {asset.upper()} "
+                f"for stake {reference} | TXN: {transaction_id}"
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to log debit transaction: {e}", exc_info=True)
+            # Don't fail the stake - transaction logging is non-critical
+            logger.warning(
+                f"⚠️ Continuing stake {reference} without transaction log "
+                f"(logging failed but stake will proceed)"
+            )
     
     async def _allocate_to_strategies(
         self,
@@ -521,27 +609,49 @@ class YieldManagerService:
             raise
     
     async def _credit_balance(self, user_id: str, asset: str, amount: Decimal, reference: str):
-        """Credit user balance"""
+        """
+        Log unstake transaction for audit trail.
         
-        result = await self.db.query(
-            "wallet_balances",
-            filters={"user_id": user_id},
-            columns=[f"{asset.lower()}_balance"]
-        )
-
-        if not result:
-            raise ValueError("Wallet not found")
-
-        current = Decimal(str(result[0][f"{asset.lower()}_balance"]))
-        new_balance = current + amount
-
-        await self.db.update(
-            "wallet_balances",
-            data={f"{asset.lower()}_balance": float(new_balance)},
-            filters={"user_id": user_id}
-        )
+        NOTE: Actual funds are returned from Folks Finance smart contract 
+        directly to user's Algorand wallet via on-chain transaction.
+        This method only creates an audit record.
+        """
         
-        logger.info(f"Credited {amount} {asset} to user {user_id}")
+        try:
+            # Create transaction record for audit trail
+            transaction_id = f"TXN_{reference}_{uuid4().hex[:8].upper()}"
+            
+            transaction_record = {
+                "id": transaction_id,
+                "user_id": user_id,
+                "blockchain": "algorand",
+                "transaction_type": "yield_unstake_credit",
+                "asset": asset.upper(),
+                "amount": float(amount),
+                "status": "completed",
+                "metadata": {
+                    "stake_id": reference,
+                    "operation": "yield_farming_unstake",
+                    "note": "Funds returned from yield farming"
+                },
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Log to multi_chain_transactions table
+            await self.db.insert("multi_chain_transactions", transaction_record)
+            
+            logger.info(
+                f"✅ Logged unstake credit: {amount} {asset.upper()} "
+                f"for stake {reference} | TXN: {transaction_id}"
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to log credit transaction: {e}", exc_info=True)
+            # Don't fail the unstake - transaction logging is non-critical
+            logger.warning(
+                f"⚠️ Continuing unstake {reference} without transaction log "
+                f"(logging failed but unstake will proceed)"
+            )
     
     async def _record_revenue(
         self, 
