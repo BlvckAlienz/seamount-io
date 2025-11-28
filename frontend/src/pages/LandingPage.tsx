@@ -813,7 +813,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <Mail className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
                 </div>
                 <h3 className="text-lg sm:text-xl font-bold mb-2 text-gray-900">Email Us</h3>
-                <p className="text-sm sm:text-base text-gray-600">support@seamount.io</p>
+                <p className="text-sm sm:text-base text-gray-600">business@seamount.io</p>
               </div>
 
               <div className="glass-card rounded-2xl p-4 sm:p-6 text-center shadow-sm hover-lift">
