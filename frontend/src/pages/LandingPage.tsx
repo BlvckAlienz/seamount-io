@@ -734,6 +734,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <div className="w-2 h-2 bg-amber-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
                     <span><strong className="text-gray-900">Liquidity Optimization:</strong> Turn working capital into revenue-generating assets</span>
                   </li>
+                  <li className="flex items-start">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <span><strong className="text-gray-900">Compliance Infrastructure:</strong> Immutable audit trails and verifiable consent records for GAID 2025, ISA 2025 digital assets, and cross-border data sovereignty</span>
+                  </li>
                 </ul>
               </div>
 
