@@ -53,34 +53,41 @@ class EmailService:
     async def send_email(
         self, 
         subject: str, 
-        recipients: List[str], 
-        body: str
+        to_emails: List[str],  # ✅ FIXED: Changed from 'recipients'
+        html_content: str  # ✅ FIXED: Changed from 'body'
     ) -> bool:
-        """Send email with fallback to logging if service unavailable"""
+        """
+        Send email with fallback to logging if service unavailable
+        
+        Args:
+            subject: Email subject line
+            to_emails: List of recipient email addresses
+            html_content: HTML email body content
+        """
         
         if not self.enabled:
             # Mock mode - just log
-            logger.info(f"📧 [MOCK EMAIL] To: {recipients}")
+            logger.info(f"📧 [MOCK EMAIL] To: {to_emails}")
             logger.info(f"📧 [MOCK EMAIL] Subject: {subject}")
-            logger.debug(f"📧 [MOCK EMAIL] Body: {body[:200]}...")
+            logger.debug(f"📧 [MOCK EMAIL] Body: {html_content[:200]}...")
             return True
         
         try:
-            from fastapi_mail import MessageSchema
+            from fastapi_mail import MessageSchema, MessageType
             
             message = MessageSchema(
                 subject=subject,
-                recipients=recipients,
-                body=body,
-                subtype="html"
+                recipients=to_emails,  # ✅ fastapi_mail uses 'recipients' internally
+                body=html_content,
+                subtype=MessageType.html
             )
             
             await self.mail_client.send_message(message)
-            logger.info(f"✅ Email sent to {recipients}")
+            logger.info(f"✅ Email sent successfully to {to_emails}")
             return True
             
         except Exception as e:
             logger.error(f"❌ Email send failed: {e}")
-            # Fallback to logging
-            logger.info(f"📧 [FALLBACK LOG] To: {recipients}, Subject: {subject}")
+            # Fallback to logging (non-critical failure)
+            logger.info(f"📧 [FALLBACK LOG] To: {to_emails}, Subject: {subject}")
             return False

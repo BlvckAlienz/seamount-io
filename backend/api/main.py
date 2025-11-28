@@ -772,29 +772,231 @@ async def create_wallet(
 
 @app.post("/api/v1/leads/business-contact", tags=["Public"])
 @limiter.limit("3/minute")
-async def business_contact(request: Request, payload: BusinessLeadPayload):
-    """Submit business lead inquiry"""
-    supabase = get_supabase_client()
-    notifier = get_notification_service()
-    
+async def business_contact(
+    request: Request, 
+    payload: BusinessLeadPayload,
+    background_tasks: BackgroundTasks
+):
+    """
+    📧 Submit business lead inquiry
+    ✅ Saves to database
+    ✅ Sends email to business@seamount.io (non-blocking)
+    ✅ Returns toast-ready response
+    """
     try:
-        res = supabase.table('business_leads').insert(payload.model_dump()).execute()
-        if not res.data:
-            raise Exception("Failed to save lead")
+        supabase = get_supabase_client()
         
-        subject = f"New Seamount Business Lead: {payload.business_name or payload.name}"
-        body = f"<p><b>Name:</b> {payload.name}</p><p><b>Company:</b> {payload.business_name or 'N/A'}</p><p><b>Email:</b> {payload.email}</p><p><b>Message:</b> {payload.message or 'N/A'}</p>"
+        # 1️⃣ VALIDATE INPUT
+        if not payload.name or not payload.email:
+            raise HTTPException(
+                status_code=400,
+                detail="Name and email are required"
+            )
         
-        asyncio.create_task(notifier.email_service.send_email(
-            subject,
-            ["business@seamount.io"],
-            body
-        ))
+        # 2️⃣ SAVE TO DATABASE
+        lead_data = {
+            "name": payload.name,
+            "email": payload.email,
+            "business_name": payload.business_name,
+            "message": payload.message
+            # created_at and updated_at are handled by database defaults
+        }
         
-        return {"message": "Your request has been submitted successfully. We'll get in touch."}
+        logger.info(f"[Business Lead] 💾 Attempting to save: {payload.name} <{payload.email}>")
+        
+        db_result = supabase.table('business_leads').insert(lead_data).execute()
+        
+        if not db_result.data:
+            logger.error("[Business Lead] ❌ Database insert failed - no data returned")
+            raise HTTPException(
+                status_code=500, 
+                detail="Failed to save your inquiry. Please try again."
+            )
+        
+        saved_lead = db_result.data[0]
+        logger.info(f"[Business Lead] ✅ Saved successfully - ID: {saved_lead['id']}")
+        
+        # 3️⃣ SEND EMAIL IN BACKGROUND (Non-blocking)
+        async def send_lead_notification():
+            """Background task to send email notification"""
+            try:
+                from backend.services.email_service import EmailService
+                email_service = EmailService(get_settings_cached())
+                
+                subject = f"🚀 New Business Lead: {payload.business_name or payload.name}"
+                
+                # Build professional HTML email
+                html_body = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{ 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                            line-height: 1.6; 
+                            color: #1f2937;
+                            margin: 0;
+                            padding: 0;
+                        }}
+                        .container {{ 
+                            max-width: 600px; 
+                            margin: 0 auto; 
+                            background: #ffffff;
+                        }}
+                        .header {{ 
+                            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+                            color: white; 
+                            padding: 30px 20px;
+                            text-align: center;
+                        }}
+                        .header h1 {{
+                            margin: 0;
+                            font-size: 24px;
+                            font-weight: 700;
+                        }}
+                        .header p {{
+                            margin: 10px 0 0 0;
+                            opacity: 0.9;
+                            font-size: 14px;
+                        }}
+                        .content {{ 
+                            padding: 30px 20px;
+                            background: #f9fafb;
+                        }}
+                        table {{ 
+                            width: 100%; 
+                            border-collapse: collapse;
+                            background: white;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        }}
+                        td {{ 
+                            padding: 16px 20px;
+                            border-bottom: 1px solid #e5e7eb;
+                        }}
+                        tr:last-child td {{
+                            border-bottom: none;
+                        }}
+                        .label {{ 
+                            font-weight: 600;
+                            width: 140px;
+                            color: #6b7280;
+                            font-size: 14px;
+                        }}
+                        .value {{ 
+                            color: #111827;
+                            font-size: 15px;
+                        }}
+                        .value a {{
+                            color: #6366f1;
+                            text-decoration: none;
+                        }}
+                        .value a:hover {{
+                            text-decoration: underline;
+                        }}
+                        .action-box {{
+                            margin-top: 20px;
+                            padding: 20px;
+                            background: #fef3c7;
+                            border-left: 4px solid #f59e0b;
+                            border-radius: 4px;
+                        }}
+                        .action-box strong {{
+                            color: #92400e;
+                            font-size: 15px;
+                        }}
+                        .footer {{
+                            padding: 20px;
+                            text-align: center;
+                            color: #6b7280;
+                            font-size: 13px;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>📧 New Business Inquiry</h1>
+                            <p>Seamount.io Lead Management</p>
+                        </div>
+                        <div class="content">
+                            <table>
+                                <tr>
+                                    <td class="label">👤 Name:</td>
+                                    <td class="value">{payload.name}</td>
+                                </tr>
+                                <tr>
+                                    <td class="label">✉️ Email:</td>
+                                    <td class="value">
+                                        <a href="mailto:{payload.email}">{payload.email}</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="label">🏢 Company:</td>
+                                    <td class="value">{payload.business_name or '<em>Not provided</em>'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="label">💬 Message:</td>
+                                    <td class="value">{payload.message or '<em>No message provided</em>'}</td>
+                                </tr>
+                                <tr>
+                                    <td class="label">🕐 Received:</td>
+                                    <td class="value">{datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}</td>
+                                </tr>
+                            </table>
+                            <div class="action-box">
+                                <strong>⚡ Action Required:</strong><br>
+                                Please respond within 24 hours to maintain our service commitment.
+                            </div>
+                        </div>
+                        <div class="footer">
+                            <p>Lead ID: {saved_lead['id']}</p>
+                            <p>This is an automated notification from Seamount.io</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                # Send email
+                email_sent = await email_service.send_email(
+                    subject=subject,
+                    to_emails=["business@seamount.io"],
+                    html_content=html_body
+                )
+                
+                if email_sent:
+                    logger.info(f"[Business Lead] ✅ Email sent to business@seamount.io")
+                else:
+                    logger.warning(f"[Business Lead] ⚠️ Email send returned False (check email service)")
+                
+            except Exception as email_error:
+                # Non-critical: Don't fail the user's request if email fails
+                logger.error(f"[Business Lead] ⚠️ Email notification failed (non-critical): {email_error}")
+                logger.error(f"[Business Lead] Stack trace: {traceback.format_exc()}")
+        
+        # Queue email to send in background (won't block response)
+        background_tasks.add_task(send_lead_notification)
+        
+        # 4️⃣ RETURN SUCCESS RESPONSE (User sees this immediately)
+        return {
+            "success": True,
+            "message": "Thank you for your interest! A member of our team will be in touch within 24 hours.",
+            "lead_id": saved_lead['id']
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Business contact submission failed: {e}")
-        raise HTTPException(status_code=500, detail="Could not process your request")
+        error_id = str(uuid4())[:8]
+        logger.error(f"[Business Lead] ❌ Unexpected error [{error_id}]: {str(e)}")
+        logger.error(f"[Business Lead] Stack trace: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Could not process your request. Please contact support with Error ID: {error_id}"
+        )
 
 # ===== DEBUG ENDPOINTS =====
 

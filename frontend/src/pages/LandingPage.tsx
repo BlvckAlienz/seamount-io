@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowRight, Globe, Shield, Zap, DollarSign, Briefcase, Mail, MapPin, Phone, ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Lock, Wallet, CreditCard, Layers, Coins, LineChart } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface LandingPageProps {
   onOpenAuth: (view: 'login' | 'register') => void;
@@ -115,17 +116,65 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   }, [isClient, calc.amount, calc.period, oracleData.btcVolatility, oracleData.fundingRate]);
 
   const handleContactSubmit = async () => {
-    setFormStatus('sending');
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setFormStatus('success');
-      setFormState({ name: '', businessName: '', email: '', message: '' });
-      setTimeout(() => setFormStatus('idle'), 3000);
-    } catch {
-      setFormStatus('error');
-      setTimeout(() => setFormStatus('idle'), 3000);
-    }
-  };
+      // Validation
+      if (!formState.name || !formState.email) {
+        toast.error('Please fill in your name and email');
+        return;
+      }
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formState.email)) {
+        toast.error('Please enter a valid email address');
+        return;
+      }
+      
+      setFormStatus('sending');
+      
+      try {
+        const response = await fetch('/api/v1/leads/business-contact', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formState.name,
+            business_name: formState.businessName,
+            email: formState.email,
+            message: formState.message
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.detail || 'Failed to submit inquiry');
+        }
+        
+        // ✅ SUCCESS
+        setFormStatus('success');
+        toast.success(result.message || 'Thank you! We\'ll be in touch within 24 hours.');
+        
+        // Clear form
+        setFormState({ 
+          name: '', 
+          businessName: '', 
+          email: '', 
+          message: '' 
+        });
+        
+        // Reset status after 3 seconds
+        setTimeout(() => setFormStatus('idle'), 3000);
+        
+      } catch (error: any) {
+        console.error('[Business Contact] Error:', error);
+        setFormStatus('error');
+        toast.error(error.message || 'Failed to submit. Please try again.');
+        
+        // Reset status after 3 seconds
+        setTimeout(() => setFormStatus('idle'), 3000);
+      }
+    };
 
   useEffect(() => {
     if (!isClient) return;
