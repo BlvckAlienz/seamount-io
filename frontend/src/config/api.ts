@@ -63,7 +63,17 @@ apiClient.interceptors.request.use(
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      // ✅ DEBUG: Log full session state
+      console.log('[API Auth] Session check:', {
+        hasSession: !!session,
+        hasToken: !!session?.access_token,
+        userId: session?.user?.id,
+        error: error?.message,
+        url: config.url,
+      });
+      
       const token = session?.access_token;
       
       if (token) {
@@ -75,10 +85,9 @@ apiClient.interceptors.request.use(
         // 🔧 FIX: Force set Authorization header
         config.headers['Authorization'] = `Bearer ${token}`;
         
-        console.log(`[API Auth] ✅ Token attached (length: ${token.length})`);
-        console.log(`[API Auth] ✅ Authorization header set for ${config.url}`);
+        console.log(`[API Auth] ✅ Token attached (${token.substring(0, 20)}...) for ${config.url}`);
       } else {
-        console.warn(`[API Auth] ⚠️ NO TOKEN available for ${config.url}`);
+        console.error(`[API Auth] ❌ NO TOKEN for ${config.url} - Session:`, session);
       }
     } catch (error) {
       console.error('[API Auth Error] Failed to get session:', error);
