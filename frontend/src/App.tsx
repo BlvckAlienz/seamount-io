@@ -17,6 +17,7 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import LandingPage from './pages/LandingPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
+import AdminDashboard from './pages/AdminDashboard';
 import portfolioPage from './pages/portfolioPage';
 import TradingPage from './pages/TradingPage';
 import PaymentsPage from './pages/PaymentsPage';
