@@ -428,6 +428,16 @@ const DashboardPage = () => {
                         <Shield className="h-4 w-4" />
                         <span>Verify</span>
                       </button>
+                      {/* 🚨 Admin link (only show if is_admin=true) */}
+                      {current_user?.is_admin && (
+                        <button 
+                          onClick={() => navigate('/admin')} 
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors"
+                        >
+                          <Shield className="h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </button>
+                      )}
                       <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
                         <LogOut className="h-4 w-4" />
                         <span>Logout</span>

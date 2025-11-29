@@ -643,6 +643,14 @@ if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
 
+# ===== ADMIN ROUTES =====
+try:
+    from backend.api.routes.admin import router as admin_router
+    app.include_router(admin_router, prefix="/api/v1", tags=["Admin"])
+    logger.info("✅ Admin routes registered at /api/v1/admin")
+except ImportError as e:
+    logger.error(f"❌ Admin routes import error: {e}")
+
 # ===== CORE API ENDPOINTS =====
 
 @app.get("/api/v1/health", tags=["System"])
