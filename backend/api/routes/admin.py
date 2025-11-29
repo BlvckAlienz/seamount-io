@@ -51,7 +51,7 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 @router.get("/transactions/overview")
 async def get_transactions_overview(
-    hours: int = Query(24, ge=1, le=168),  # 1 hour to 7 days
+    hours: int = Query(24, ge=1, le=168),
     admin: dict = Depends(require_admin),
     db: DatabaseService = Depends(get_db_service)
 ):
@@ -67,54 +67,34 @@ async def get_transactions_overview(
     try:
         time_filter = datetime.utcnow() - timedelta(hours=hours)
         
-        # Query main transactions table
-        overview_query = """
-            SELECT 
-                COUNT(*) as total_count,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
-                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
-                COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing_count,
-                SUM(CASE WHEN status = 'completed' THEN CAST(amount AS NUMERIC) ELSE 0 END) as total_volume,
-                transaction_type,
-                currency
-            FROM transactions
-            WHERE created_at >= %s
-            GROUP BY transaction_type, currency
-        """
-        
-        # Execute via Supabase RPC or direct query
-        # Note: For RLS compliance, this uses service role context
-        results = db.supabase.rpc(
-            'admin_transaction_overview',
-            {'since_timestamp': time_filter.isoformat()}
-        ).execute()
-        
-        if not results.data:
-            # Fallback: Direct table query (requires service role)
-            results = db.supabase.table('transactions')\
-                .select('transaction_type, status, amount, currency')\
-                .gte('created_at', time_filter.isoformat())\
-                .execute()
+        # ✅ DIRECT TABLE QUERY (no RPC needed)
+        transactions = db.supabase.table('transactions')\
+            .select('id, transaction_type, status, amount, currency')\
+            .gte('created_at', time_filter.isoformat())\
+            .execute()
         
         # Process results
-        total_transactions = 0
+        total_transactions = len(transactions.data) if transactions.data else 0
         total_volume = Decimal('0')
         success_count = 0
         failed_count = 0
+        processing_count = 0
         
         type_breakdown = {}
         
-        for row in (results.data or []):
-            total_transactions += 1
-            status = row.get('status')
+        for row in (transactions.data or []):
+            status = row.get('status', 'unknown')
             amount = Decimal(str(row.get('amount', 0)))
             tx_type = row.get('transaction_type', 'unknown')
             
+            # Count statuses
             if status == 'completed':
                 success_count += 1
                 total_volume += amount
             elif status == 'failed':
                 failed_count += 1
+            elif status == 'processing':
+                processing_count += 1
             
             # Group by type
             if tx_type not in type_breakdown:
@@ -133,6 +113,7 @@ async def get_transactions_overview(
                 'total_transactions': total_transactions,
                 'success_count': success_count,
                 'failed_count': failed_count,
+                'processing_count': processing_count,
                 'success_rate': round(success_rate, 2),
                 'total_volume_usd': float(total_volume),
                 'avg_transaction_size': float(total_volume / success_count) if success_count > 0 else 0
