@@ -6,7 +6,7 @@ import {
   TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine // ← ADD THESE
+  Wallet, ArrowDownToLine
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -133,7 +133,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
 // Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
-  const navigate = useNavigate(); // 🔥 ADD THIS LINE - useNavigate MUST be called here
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [portfolioData, setportfolioData] = useState<any>(null);
   const [kycInfo, setKycInfo] = useState({
@@ -210,7 +210,7 @@ const DashboardPage = () => {
   { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
   { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
   { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
-  { id: 'tron', name: 'TRON', symbol: 'TRX' } // ✅ Newly added
+  { id: 'tron', name: 'TRON', symbol: 'TRX' }
 ];
 
   // Update the validation useEffect to only expect 5 chains
@@ -448,6 +448,7 @@ const DashboardPage = () => {
                   </>
                 )}
               </div>
+            </div>
 
             {/* Action Buttons - Responsive Layout */}
             <div className="flex flex-wrap gap-2">
@@ -624,7 +625,7 @@ const DashboardPage = () => {
             chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
             address={multiChainWallets[selectedChain]?.address || ''} 
             balance={calculateChainBalance(selectedChain)}
-            onOpenFundModal={() => setShowFundModal(true)}  // ✅ NEW PROP
+            onOpenFundModal={() => setShowFundModal(true)}
           />
         )}
         
@@ -642,17 +643,14 @@ const DashboardPage = () => {
           open={showWithdrawModal} 
           onOpenChange={setShowWithdrawModal} 
         />
-        {/* Send Modal */}
         <SendForm 
           open={showSendModal} 
           onOpenChange={setShowSendModal} 
         />
-        {/* Swap Modal */}
         <SwapModal 
           open={showSwapModal} 
           onOpenChange={setShowSwapModal} 
         />
-        {/* Earn Modal */}
         <EarnModal 
           open={showEarnModal} 
           onOpenChange={setShowEarnModal} 
