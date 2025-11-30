@@ -40,6 +40,7 @@ export const AdminDashboard: React.FC = () => {
   const [liveFeed, setLiveFeed] = useState<any[]>([]);
   const [timeRange, setTimeRange] = useState(24);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [revenueData, setRevenueData] = useState<any>(null);
   
   // Access control
   useEffect(() => {
@@ -81,6 +82,14 @@ export const AdminDashboard: React.FC = () => {
         setLiveFeed(feedRes.data.transactions);
       }
       
+      // ✅ Fetch revenue summary
+      const revenueRes = await apiClient.get('/api/v1/admin/revenue/summary?days=30');
+      console.log('💰 [Admin] Revenue response:', revenueRes.data);
+
+      if (revenueRes.data.success) {
+        setRevenueData(revenueRes.data);
+      }
+
     } catch (error: any) {
       console.error('❌ [Admin] Dashboard error:', error);
       if (error.response?.status === 403) {
@@ -240,20 +249,42 @@ export const AdminDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Collected Revenue</div>
-              <div className="text-2xl font-bold text-green-400">$12,450.00</div>
+              <div className="text-2xl font-bold text-green-400">
+                ${(revenueData?.revenue_summary?.total_collected || 0).toFixed(2)}
+              </div>
               <div className="text-xs text-gray-500 mt-1">From completed transactions</div>
             </div>
             
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Uncollected Fees</div>
-              <div className="text-2xl font-bold text-yellow-400">$3,240.00</div>
+              <div className="text-2xl font-bold text-yellow-400">
+                ${(revenueData?.uncollected_fees?.total_usd || 0).toFixed(2)}
+              </div>
               <div className="text-xs text-gray-500 mt-1">Pending collection</div>
             </div>
             
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-sm text-gray-400 mb-1">Collection Rate</div>
-              <div className="text-2xl font-bold text-blue-400">79.3%</div>
+              <div className="text-2xl font-bold text-blue-400">
+                {(revenueData?.revenue_summary?.collection_rate || 100).toFixed(1)}%
+              </div>
               <div className="text-xs text-gray-500 mt-1">Target: 95%+</div>
+            </div>
+          </div>
+          
+          {/* ✅ Show actual transaction count & avg value */}
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="text-sm text-gray-400">
+              Total Transactions: 
+              <span className="text-white font-medium ml-2">
+                {revenueData?.revenue_summary?.total_transactions || 0}
+              </span>
+            </div>
+            <div className="text-sm text-gray-400">
+              Avg Transaction: 
+              <span className="text-white font-medium ml-2">
+                ${(revenueData?.revenue_summary?.avg_transaction_value || 0).toFixed(2)}
+              </span>
             </div>
           </div>
           
