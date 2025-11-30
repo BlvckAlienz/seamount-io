@@ -49,20 +49,12 @@ export const AdminDashboard: React.FC = () => {
   // ============================================================================
   // ACCESS CONTROL (Frontend guard)
   // ============================================================================
+  // ✅ SIMPLIFIED: Minimal check (backend enforces security anyway)
   useEffect(() => {
-    console.log('🔍 ADMIN DEBUG:', {
-      userProfile,
-      is_admin: userProfile?.is_admin,
-      role: userProfile?.role,
-      email: userProfile?.email
-    });
-    
-    if (!userProfile?.is_admin) {
-      console.error('❌ Admin check failed - redirecting');
+    // Only redirect if we KNOW user is NOT admin (not null/loading)
+    if (userProfile && !userProfile.is_admin) {
       toast.error('Admin access required');
       navigate('/dashboard');
-    } else {
-      console.log('✅ Admin check passed!');
     }
   }, [userProfile, navigate]);
   

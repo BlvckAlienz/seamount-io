@@ -278,23 +278,16 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
-      
-      if (error) throw error;
-      
-      // ✅ CRITICAL: Verify session is persisted
-      console.log('✅ [Auth] Login successful:', {
-        hasSession: !!data.session,
-        hasToken: !!data.session?.access_token,
-        userId: data.session?.user?.id,
-        email: data.session?.user?.email,
-        expiresAt: data.session?.expires_at 
-          ? new Date(data.session.expires_at * 1000).toLocaleString() 
-          : 'N/A',
-      });
 
-      // Verify localStorage has the token
-      const storedSession = localStorage.getItem('seamount-auth');
-      console.log('✅ [Auth] Session in localStorage:', !!storedSession);
+      if (error) throw error;
+
+      // ✅ Simplified debug logging (development only)
+      if (import.meta.env.DEV) {
+        console.log('✅ [Auth] Login successful:', {
+          userId: data.session?.user?.id,
+          email: data.session?.user?.email,
+        });
+      }
 
       setState((prev) => ({ ...prev, session: data.session, loading: false }));
       return { success: true };

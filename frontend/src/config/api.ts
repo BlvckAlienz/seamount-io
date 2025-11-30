@@ -57,15 +57,15 @@ const API_ENDPOINTS = {
 };
 
 // Request interceptor
-apiClient.interceptors.request.use(
-  async (config) => {
-    const fullUrl = `${config.baseURL}${config.url}`;
-    console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
+apiClient.interceptors.request.use(async (config) => {
+  const fullUrl = `${config.baseURL}${config.url}`;
+  console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
+  
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
     
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      // ✅ DEBUG: Log full session state
+    // ✅ DEBUG: Log full session state (development only)
+    if (import.meta.env.DEV) {
       console.log('[API Auth] Session check:', {
         hasSession: !!session,
         hasToken: !!session?.access_token,
@@ -73,36 +73,37 @@ apiClient.interceptors.request.use(
         error: error?.message,
         url: config.url,
       });
-      
-      const token = session?.access_token;
-      
-      if (token) {
-        // 🔧 FIX: Ensure headers object exists
-        if (!config.headers) {
-          config.headers = {} as any;
-        }
-        
-        // 🔧 FIX: Force set Authorization header
-        config.headers['Authorization'] = `Bearer ${token}`;
-        
-        console.log(`[API Auth] ✅ Token attached (${token.substring(0, 20)}...) for ${config.url}`);
-      } else {
-        console.error(`[API Auth] ❌ NO TOKEN for ${config.url} - Session:`, session);
-      }
-    } catch (error) {
-      console.error('[API Auth Error] Failed to get session:', error);
     }
     
-    // 🔧 DEBUG: Log final headers
-    console.log('[API Headers]', config.headers);
+    const token = session?.access_token;
     
-    return config;
-  },
-  (error) => {
-    console.error('[API Request Error]:', error);
-    return Promise.reject(error);
+    if (token) {
+      if (!config.headers) {
+        config.headers = {} as any;
+      }
+      
+      config.headers['Authorization'] = `Bearer ${token}`;
+      
+      if (import.meta.env.DEV) {
+        console.log(`[API Auth] ✅ Token attached (${token.substring(0, 20)}...) for ${config.url}`);
+      }
+    } else {
+      console.error(`[API Auth] ❌ NO TOKEN for ${config.url} - Session:`, session);
+    }
+  } catch (error) {
+    console.error('[API Auth Error] Failed to get session:', error);
   }
-);
+  
+  // ✅ DEBUG: Log final headers (development only)
+  if (import.meta.env.DEV) {
+    console.log('[API Headers]', config.headers);
+  }
+  
+  return config;
+}, (error) => {
+  console.error('[API Request Error]:', error);
+  return Promise.reject(error);
+});
 
 // Response interceptor
 apiClient.interceptors.response.use(

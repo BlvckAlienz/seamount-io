@@ -407,6 +407,16 @@ const DashboardPage = () => {
               
               {/* Desktop Profile Menu */}
               <div className="hidden md:block relative">
+                {/* ✅ ADMIN BUTTON - Only visible to admins */}
+                {userProfile?.is_admin && (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="mr-3 flex items-center gap-2 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 px-4 py-2 rounded-lg text-white font-medium transition-all shadow-lg hover:shadow-yellow-500/50"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Admin Dashboard</span>
+                  </button>
+                )}
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)} 
                   className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
@@ -420,6 +430,16 @@ const DashboardPage = () => {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                     <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                      {/* ✅ ADMIN MENU ITEM - Only for admins */}
+                      {userProfile?.is_admin && (
+                        <button 
+                          onClick={() => navigate('/admin')} 
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
+                        >
+                          <Shield className="h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </button>
+                      )}
                       <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
                         <Key className="h-4 w-4" />
                         <span>Recovery Phrases</span>
@@ -507,6 +527,19 @@ const DashboardPage = () => {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                     <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                      {/* ✅ ADMIN MENU ITEM - Only for admins */}
+                      {userProfile?.is_admin && (
+                        <button 
+                          onClick={() => {
+                            setShowProfileMenu(false); // Close menu
+                            navigate('/admin');
+                          }} 
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
+                        >
+                          <Shield className="h-4 w-4" />
+                          <span>Admin Dashboard</span>
+                        </button>
+                      )}
                       <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
                         <Key className="h-4 w-4" />
                         <span>Recovery Phrases</span>
