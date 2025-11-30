@@ -509,14 +509,22 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // HYBRID WALLET DETECTION - Fast profile check + API fallback
   useEffect(() => {
-    const evaluateNavigation = async () => {
-      console.log('🚦 [Navigation] Evaluation started', {
-        isResettingPassword: state.isResettingPassword,
-        hasSession: !!state.session,
-        hasUser: !!state.user,
-        isLoading: state.loading,
-        currentPath: window.location.pathname
-      });
+  const evaluateNavigation = async () => {
+    const currentPath = window.location.pathname;
+    
+    console.log('🚦 [Navigation] Evaluation started', {
+      isResettingPassword: state.isResettingPassword,
+      hasSession: !!state.session,
+      hasUser: !!state.user,
+      isLoading: state.loading,
+      currentPath
+    });
+
+    // 🚨 CRITICAL: Don't interfere with admin or settings routes
+    if (currentPath.startsWith('/admin') || currentPath.startsWith('/settings')) {
+      console.log('🛡️ [Navigation] Protected route detected - skipping auto-navigation');
+      return; // ← EXIT EARLY
+    }
 
       // ⚠️ Don't navigate while user is resetting password
       // Check both ref (immediate) and state (for re-renders)
