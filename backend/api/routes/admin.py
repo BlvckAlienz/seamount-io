@@ -62,45 +62,69 @@ async def get_transactions_overview(
     - Total transaction count
     - Success/failure rates
     - Total volume (USD)
-    - Breakdown by type (onramp, offramp, transfer)
+    - Breakdown by type (onramp, offramp)
     """
     try:
         time_filter = datetime.utcnow() - timedelta(hours=hours)
         
-        # Query ALL transaction tables (onramp, offramp, transfers)
-        onramp_txs = db.supabase.table('onramp_transactions')\
-            .select('id, type, status, amount_fiat as amount, currency, created_at')\
-            .gte('created_at', time_filter.isoformat())\
-            .execute()
-
-        offramp_txs = db.supabase.table('offramp_transactions')\
-            .select('id, type, status, net_fiat_amount as amount, fiat_currency as currency, created_at')\
-            .gte('created_at', time_filter.isoformat())\
-            .execute()
-
-        # Combine results
+        # ✅ Query onramp_transactions (using CORRECT column names)
+        try:
+            onramp_txs = db.supabase.table('onramp_transactions')\
+                .select('id, type, status, fiat_amount, fiat_currency, created_at')\
+                .gte('created_at', time_filter.isoformat())\
+                .execute()
+            
+            logger.info(f"📊 Onramp transactions found: {len(onramp_txs.data or [])}")
+        except Exception as e:
+            logger.error(f"❌ Onramp query failed: {e}")
+            onramp_txs = type('obj', (object,), {'data': []})()
+        
+        # ✅ Query offramp_transactions (using CORRECT column names)
+        try:
+            offramp_txs = db.supabase.table('offramp_transactions')\
+                .select('id, type, status, net_fiat_amount, fiat_currency, created_at')\
+                .gte('created_at', time_filter.isoformat())\
+                .execute()
+            
+            logger.info(f"📊 Offramp transactions found: {len(offramp_txs.data or [])}")
+        except Exception as e:
+            logger.error(f"❌ Offramp query failed: {e}")
+            offramp_txs = type('obj', (object,), {'data': []})()
+        
+        # ✅ Combine and normalize data
         all_transactions = []
+        
+        # Add onramp transactions
         if onramp_txs.data:
             all_transactions.extend([{
-                **tx,
-                'transaction_type': 'onramp'
+                'id': tx['id'],
+                'transaction_type': 'onramp',
+                'status': tx['status'],
+                'amount': float(tx.get('fiat_amount', 0)),  # ✅ CORRECT column
+                'currency': tx.get('fiat_currency', 'USD'),  # ✅ CORRECT column
+                'created_at': tx['created_at']
             } for tx in onramp_txs.data])
-
+        
+        # Add offramp transactions
         if offramp_txs.data:
             all_transactions.extend([{
-                **tx,
-                'transaction_type': 'offramp'
+                'id': tx['id'],
+                'transaction_type': 'offramp',
+                'status': tx['status'],
+                'amount': float(tx.get('net_fiat_amount', 0)),  # ✅ CORRECT column
+                'currency': tx.get('fiat_currency', 'USD'),  # ✅ CORRECT column
+                'created_at': tx['created_at']
             } for tx in offramp_txs.data])
-
-        # Process combined results
+        
+        # ✅ Calculate metrics
         total_transactions = len(all_transactions)
         total_volume = Decimal('0')
         success_count = 0
         failed_count = 0
         processing_count = 0
-
+        
         type_breakdown = {}
-
+        
         for tx in all_transactions:
             status = tx.get('status', 'unknown')
             amount = Decimal(str(tx.get('amount', 0)))
@@ -158,51 +182,78 @@ async def get_failed_transactions(
 ):
     """
     🚨 FAILED TRANSACTION ANALYSIS
-    
-    Returns recent failed transactions with:
-    - User info (email, not sensitive data)
-    - Amount and asset
-    - Failure reason
-    - Timestamp
     """
     try:
-        # Query failed transactions across all tables
-        failed_txs = db.supabase.table('transactions')\
-            .select('id, user_id, transaction_type, amount, currency, status, created_at, metadata')\
+        # Query failed onramp transactions
+        failed_onramp = db.supabase.table('onramp_transactions')\
+            .select('id, user_id, type, fiat_amount, fiat_currency, status, created_at')\
             .in_('status', ['failed', 'cancelled', 'rejected'])\
             .order('created_at', desc=True)\
             .limit(limit)\
             .range(offset, offset + limit - 1)\
             .execute()
         
-        # Enrich with user emails (non-sensitive)
-        enriched = []
-        for tx in (failed_txs.data or []):
-            user_id = tx.get('user_id')
-            
-            # Get user email (admins can see this per RLS)
-            user_profile = db.supabase.table('user_profiles')\
-                .select('email, first_name')\
-                .eq('id', user_id)\
-                .maybe_single()\
-                .execute()
-            
-            enriched.append({
-                'transaction_id': tx['id'],
-                'user_email': user_profile.data.get('email') if user_profile.data else 'Unknown',
-                'user_name': user_profile.data.get('first_name') if user_profile.data else 'Unknown',
-                'type': tx['transaction_type'],
-                'amount': float(tx.get('amount', 0)),
-                'currency': tx.get('currency'),
-                'status': tx['status'],
-                'created_at': tx['created_at'],
-                'failure_reason': tx.get('metadata', {}).get('error') if tx.get('metadata') else 'Unknown'
-            })
+        # Query failed offramp transactions
+        failed_offramp = db.supabase.table('offramp_transactions')\
+            .select('id, user_id, type, net_fiat_amount, fiat_currency, status, created_at')\
+            .in_('status', ['failed', 'cancelled', 'rejected'])\
+            .order('created_at', desc=True)\
+            .limit(limit)\
+            .range(offset, offset + limit - 1)\
+            .execute()
+        
+        # Combine results
+        all_failed = []
+        
+        # Process onramp failures
+        if failed_onramp.data:
+            for tx in failed_onramp.data:
+                user = db.supabase.table('user_profiles')\
+                    .select('email, first_name')\
+                    .eq('id', tx['user_id'])\
+                    .maybe_single()\
+                    .execute()
+                
+                all_failed.append({
+                    'transaction_id': tx['id'],
+                    'user_email': user.data.get('email') if user.data else 'Unknown',
+                    'user_name': user.data.get('first_name') if user.data else 'Unknown',
+                    'type': 'onramp',
+                    'amount': float(tx.get('fiat_amount', 0)),
+                    'currency': tx.get('fiat_currency', 'USD'),
+                    'status': tx['status'],
+                    'created_at': tx['created_at'],
+                    'failure_reason': 'Payment provider error'  # Default reason
+                })
+        
+        # Process offramp failures
+        if failed_offramp.data:
+            for tx in failed_offramp.data:
+                user = db.supabase.table('user_profiles')\
+                    .select('email, first_name')\
+                    .eq('id', tx['user_id'])\
+                    .maybe_single()\
+                    .execute()
+                
+                all_failed.append({
+                    'transaction_id': tx['id'],
+                    'user_email': user.data.get('email') if user.data else 'Unknown',
+                    'user_name': user.data.get('first_name') if user.data else 'Unknown',
+                    'type': 'offramp',
+                    'amount': float(tx.get('net_fiat_amount', 0)),
+                    'currency': tx.get('fiat_currency', 'USD'),
+                    'status': tx['status'],
+                    'created_at': tx['created_at'],
+                    'failure_reason': 'Withdrawal failed'  # Default reason
+                })
+        
+        # Sort by date (newest first)
+        all_failed.sort(key=lambda x: x['created_at'], reverse=True)
         
         return {
             'success': True,
-            'failed_transactions': enriched,
-            'total_returned': len(enriched),
+            'failed_transactions': all_failed[:limit],
+            'total_returned': len(all_failed[:limit]),
             'offset': offset,
             'limit': limit
         }
@@ -220,47 +271,77 @@ async def get_live_transaction_feed(
 ):
     """
     💸 LIVE TRANSACTION FEED
-    
-    Most recent transactions across all types
-    Auto-refreshable for real-time monitoring
     """
     try:
-        recent_txs = db.supabase.table('transactions')\
-            .select('id, user_id, transaction_type, amount, currency, status, created_at')\
+        # Get recent onramp transactions
+        recent_onramp = db.supabase.table('onramp_transactions')\
+            .select('id, user_id, type, fiat_amount, fiat_currency, status, created_at')\
             .order('created_at', desc=True)\
             .limit(limit)\
             .execute()
         
+        # Get recent offramp transactions
+        recent_offramp = db.supabase.table('offramp_transactions')\
+            .select('id, user_id, type, net_fiat_amount, fiat_currency, status, created_at')\
+            .order('created_at', desc=True)\
+            .limit(limit)\
+            .execute()
+        
+        # Combine and format
         feed = []
-        for tx in (recent_txs.data or []):
-            # Get user email
-            user = db.supabase.table('user_profiles')\
-                .select('email')\
-                .eq('id', tx['user_id'])\
-                .maybe_single()\
-                .execute()
-            
-            feed.append({
-                'id': tx['id'],
-                'user_email': user.data.get('email') if user.data else 'Unknown',
-                'type': tx['transaction_type'],
-                'amount': float(tx.get('amount', 0)),
-                'currency': tx.get('currency'),
-                'status': tx['status'],
-                'timestamp': tx['created_at']
-            })
+        
+        # Add onramp transactions
+        if recent_onramp.data:
+            for tx in recent_onramp.data:
+                user = db.supabase.table('user_profiles')\
+                    .select('email')\
+                    .eq('id', tx['user_id'])\
+                    .maybe_single()\
+                    .execute()
+                
+                feed.append({
+                    'id': tx['id'],
+                    'user_email': user.data.get('email') if user.data else 'Unknown',
+                    'type': 'onramp',
+                    'amount': float(tx.get('fiat_amount', 0)),
+                    'currency': tx.get('fiat_currency', 'USD'),
+                    'status': tx['status'],
+                    'timestamp': tx['created_at']
+                })
+        
+        # Add offramp transactions
+        if recent_offramp.data:
+            for tx in recent_offramp.data:
+                user = db.supabase.table('user_profiles')\
+                    .select('email')\
+                    .eq('id', tx['user_id'])\
+                    .maybe_single()\
+                    .execute()
+                
+                feed.append({
+                    'id': tx['id'],
+                    'user_email': user.data.get('email') if user.data else 'Unknown',
+                    'type': 'offramp',
+                    'amount': float(tx.get('net_fiat_amount', 0)),
+                    'currency': tx.get('fiat_currency', 'USD'),
+                    'status': tx['status'],
+                    'timestamp': tx['created_at']
+                })
+        
+        # Sort by timestamp (newest first)
+        feed.sort(key=lambda x: x['timestamp'], reverse=True)
         
         return {
             'success': True,
-            'transactions': feed,
-            'count': len(feed),
+            'transactions': feed[:limit],
+            'count': len(feed[:limit]),
             'timestamp': datetime.utcnow().isoformat()
         }
         
     except Exception as e:
         logger.error(f"❌ Live feed failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 
 @router.get("/revenue/uncollected-fees")
 async def get_uncollected_fees(
