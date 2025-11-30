@@ -67,33 +67,52 @@ async def get_transactions_overview(
     try:
         time_filter = datetime.utcnow() - timedelta(hours=hours)
         
-        # ✅ DIRECT TABLE QUERY (no RPC needed)
-        transactions = db.supabase.table('transactions')\
-            .select('id, transaction_type, status, amount, currency')\
+        # Query ALL transaction tables (onramp, offramp, transfers)
+        onramp_txs = db.supabase.table('onramp_transactions')\
+            .select('id, type, status, amount_fiat as amount, currency, created_at')\
             .gte('created_at', time_filter.isoformat())\
             .execute()
-        
-        # Process results
-        total_transactions = len(transactions.data) if transactions.data else 0
+
+        offramp_txs = db.supabase.table('offramp_transactions')\
+            .select('id, type, status, net_fiat_amount as amount, fiat_currency as currency, created_at')\
+            .gte('created_at', time_filter.isoformat())\
+            .execute()
+
+        # Combine results
+        all_transactions = []
+        if onramp_txs.data:
+            all_transactions.extend([{
+                **tx,
+                'transaction_type': 'onramp'
+            } for tx in onramp_txs.data])
+
+        if offramp_txs.data:
+            all_transactions.extend([{
+                **tx,
+                'transaction_type': 'offramp'
+            } for tx in offramp_txs.data])
+
+        # Process combined results
+        total_transactions = len(all_transactions)
         total_volume = Decimal('0')
         success_count = 0
         failed_count = 0
         processing_count = 0
-        
+
         type_breakdown = {}
-        
-        for row in (transactions.data or []):
-            status = row.get('status', 'unknown')
-            amount = Decimal(str(row.get('amount', 0)))
-            tx_type = row.get('transaction_type', 'unknown')
+
+        for tx in all_transactions:
+            status = tx.get('status', 'unknown')
+            amount = Decimal(str(tx.get('amount', 0)))
+            tx_type = tx.get('transaction_type', 'unknown')
             
             # Count statuses
-            if status == 'completed':
+            if status in ['completed', 'success']:
                 success_count += 1
                 total_volume += amount
-            elif status == 'failed':
+            elif status in ['failed', 'cancelled', 'rejected']:
                 failed_count += 1
-            elif status == 'processing':
+            elif status in ['processing', 'pending', 'pending_payment']:
                 processing_count += 1
             
             # Group by type
@@ -101,7 +120,7 @@ async def get_transactions_overview(
                 type_breakdown[tx_type] = {'count': 0, 'volume': Decimal('0')}
             
             type_breakdown[tx_type]['count'] += 1
-            if status == 'completed':
+            if status in ['completed', 'success']:
                 type_breakdown[tx_type]['volume'] += amount
         
         success_rate = (success_count / total_transactions * 100) if total_transactions > 0 else 0

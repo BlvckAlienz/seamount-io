@@ -1,13 +1,8 @@
 // File: frontend/src/pages/AdminDashboard.tsx
-/**
- * Admin Transaction Dashboard
- * 🚨 Only accessible to verified admins (is_admin=true + role='tribe')
- */
-
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, AlertTriangle, DollarSign, Activity, 
-  Users, RefreshCw, Clock, CheckCircle, XCircle 
+  Users, RefreshCw, Clock, CheckCircle, XCircle, ArrowLeft
 } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
@@ -43,48 +38,51 @@ export const AdminDashboard: React.FC = () => {
   const [metrics, setMetrics] = useState<TransactionMetrics | null>(null);
   const [failedTxs, setFailedTxs] = useState<FailedTransaction[]>([]);
   const [liveFeed, setLiveFeed] = useState<any[]>([]);
-  const [timeRange, setTimeRange] = useState(24); // hours
+  const [timeRange, setTimeRange] = useState(24);
   const [autoRefresh, setAutoRefresh] = useState(true);
   
-  // ============================================================================
-  // ACCESS CONTROL (Frontend guard)
-  // ============================================================================
-  // ✅ SIMPLIFIED: Minimal check (backend enforces security anyway)
+  // Access control
   useEffect(() => {
-    // Only redirect if we KNOW user is NOT admin (not null/loading)
     if (userProfile && !userProfile.is_admin) {
       toast.error('Admin access required');
       navigate('/dashboard');
     }
   }, [userProfile, navigate]);
   
-  // ============================================================================
-  // DATA FETCHING
-  // ============================================================================
+  // Data fetching
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
+      console.log('🔍 [Admin] Fetching dashboard data for hours:', timeRange);
+      
       // Fetch overview metrics
       const overviewRes = await apiClient.get(`/api/v1/admin/transactions/overview?hours=${timeRange}`);
+      console.log('📊 [Admin] Overview response:', overviewRes.data);
+      
       if (overviewRes.data.success) {
         setMetrics(overviewRes.data.metrics);
+        console.log('✅ [Admin] Metrics set:', overviewRes.data.metrics);
       }
       
       // Fetch failed transactions
       const failedRes = await apiClient.get('/api/v1/admin/transactions/failed?limit=20');
+      console.log('🚨 [Admin] Failed txs response:', failedRes.data);
+      
       if (failedRes.data.success) {
         setFailedTxs(failedRes.data.failed_transactions);
       }
       
       // Fetch live feed
       const feedRes = await apiClient.get('/api/v1/admin/transactions/live-feed?limit=15');
+      console.log('📡 [Admin] Live feed response:', feedRes.data);
+      
       if (feedRes.data.success) {
         setLiveFeed(feedRes.data.transactions);
       }
       
     } catch (error: any) {
-      console.error('Admin dashboard error:', error);
+      console.error('❌ [Admin] Dashboard error:', error);
       if (error.response?.status === 403) {
         toast.error('Admin access denied');
         navigate('/dashboard');
@@ -111,9 +109,6 @@ export const AdminDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [autoRefresh, timeRange]);
   
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   if (loading && !metrics) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -129,11 +124,23 @@ export const AdminDashboard: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
         
-        {/* ========== HEADER ========== */}
+        {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-            <p className="text-gray-400">Transaction Monitoring & Analytics</p>
+          <div className="flex items-center gap-4">
+            {/* ✅ BACK BUTTON */}
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="hidden md:inline">Back</span>
+            </button>
+            
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
+              <p className="text-gray-400">Transaction Monitoring & Analytics</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-4">
@@ -156,6 +163,7 @@ export const AdminDashboard: React.FC = () => {
                   ? 'bg-green-600 hover:bg-green-700 text-white' 
                   : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
               }`}
+              title={autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
             >
               <RefreshCw className={`h-5 w-5 ${autoRefresh ? 'animate-spin' : ''}`} />
             </button>
@@ -170,10 +178,9 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
         
-        {/* ========== METRICS CARDS ========== */}
+        {/* METRICS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           
-          {/* Total Transactions */}
           <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <Activity className="h-8 w-8 text-blue-400" />
@@ -185,7 +192,6 @@ export const AdminDashboard: React.FC = () => {
             <div className="text-sm text-gray-400">Total Transactions</div>
           </div>
           
-          {/* Success Rate */}
           <div className="bg-gradient-to-br from-green-900/20 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <CheckCircle className="h-8 w-8 text-green-400" />
@@ -199,7 +205,6 @@ export const AdminDashboard: React.FC = () => {
             <div className="text-sm text-gray-400">Success Rate</div>
           </div>
           
-          {/* Total Volume */}
           <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <DollarSign className="h-8 w-8 text-purple-400" />
@@ -211,7 +216,6 @@ export const AdminDashboard: React.FC = () => {
             <div className="text-sm text-gray-400">Total Volume</div>
           </div>
           
-          {/* Failed Transactions */}
           <div className="bg-gradient-to-br from-red-900/20 to-red-800/20 border border-red-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <XCircle className="h-8 w-8 text-red-400" />
@@ -226,85 +230,98 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
         
-        {/* ========== FAILED TRANSACTIONS TABLE ========== */}
+        {/* FAILED TRANSACTIONS TABLE */}
         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-red-400" />
             Recent Failed Transactions
           </h2>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-gray-400 border-b border-gray-700">
-                  <th className="pb-3 px-4">User</th>
-                  <th className="pb-3 px-4">Type</th>
-                  <th className="pb-3 px-4">Amount</th>
-                  <th className="pb-3 px-4">Time</th>
-                  <th className="pb-3 px-4">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {failedTxs.map((tx) => (
-                  <tr key={tx.transaction_id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
-                    <td className="py-3 px-4">
-                      <div className="text-white font-medium">{tx.user_name}</div>
-                      <div className="text-sm text-gray-400">{tx.user_email}</div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 capitalize">
-                      {tx.type.replace('_', ' ')}
-                    </td>
-                    <td className="py-3 px-4 text-white font-mono">
-                      {tx.amount.toFixed(2)} {tx.currency}
-                    </td>
-                    <td className="py-3 px-4 text-gray-400 text-sm">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-red-400 text-sm">
-                      {tx.failure_reason || 'Unknown error'}
-                    </td>
+          {failedTxs.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              No failed transactions in the selected time range
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-gray-400 border-b border-gray-700">
+                    <th className="pb-3 px-4">User</th>
+                    <th className="pb-3 px-4">Type</th>
+                    <th className="pb-3 px-4">Amount</th>
+                    <th className="pb-3 px-4">Time</th>
+                    <th className="pb-3 px-4">Reason</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {failedTxs.map((tx) => (
+                    <tr key={tx.transaction_id} className="border-b border-gray-700/50 hover:bg-gray-700/30">
+                      <td className="py-3 px-4">
+                        <div className="text-white font-medium">{tx.user_name}</div>
+                        <div className="text-sm text-gray-400">{tx.user_email}</div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-300 capitalize">
+                        {tx.type.replace('_', ' ')}
+                      </td>
+                      <td className="py-3 px-4 text-white font-mono">
+                        {tx.amount.toFixed(2)} {tx.currency}
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 text-sm">
+                        {new Date(tx.created_at).toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-red-400 text-sm">
+                        {tx.failure_reason || 'Unknown error'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
         
-        {/* ========== LIVE FEED ========== */}
+        {/* LIVE FEED */}
         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Activity className="h-6 w-6 text-blue-400 animate-pulse" />
             Live Transaction Feed
           </h2>
           
-          <div className="space-y-3">
-            {liveFeed.map((tx) => (
-              <div 
-                key={tx.id} 
-                className="bg-gray-900/50 rounded-lg p-4 flex items-center justify-between hover:bg-gray-900/70 transition-colors"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className={`w-3 h-3 rounded-full ${
-                    tx.status === 'completed' ? 'bg-green-400 animate-pulse' :
-                    tx.status === 'failed' ? 'bg-red-400' :
-                    'bg-yellow-400 animate-pulse'
-                  }`}></div>
-                  
-                  <div className="flex-1">
-                    <div className="text-white font-medium">{tx.user_email}</div>
-                    <div className="text-sm text-gray-400">{tx.type}</div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <div className="text-white font-mono">{tx.amount.toFixed(2)} {tx.currency}</div>
-                    <div className="text-xs text-gray-400">
-                      {new Date(tx.timestamp).toLocaleTimeString()}
+          {liveFeed.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              No recent transactions
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {liveFeed.map((tx) => (
+                <div 
+                  key={tx.id} 
+                  className="bg-gray-900/50 rounded-lg p-4 flex items-center justify-between hover:bg-gray-900/70 transition-colors"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className={`w-3 h-3 rounded-full ${
+                      tx.status === 'completed' ? 'bg-green-400 animate-pulse' :
+                      tx.status === 'failed' ? 'bg-red-400' :
+                      'bg-yellow-400 animate-pulse'
+                    }`}></div>
+                    
+                    <div className="flex-1">
+                      <div className="text-white font-medium">{tx.user_email}</div>
+                      <div className="text-sm text-gray-400">{tx.type}</div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="text-white font-mono">{tx.amount.toFixed(2)} {tx.currency}</div>
+                      <div className="text-xs text-gray-400">
+                        {/* ✅ FIX 1: Show date AND time */}
+                        {new Date(tx.timestamp).toLocaleDateString()} {new Date(tx.timestamp).toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
         
       </div>
