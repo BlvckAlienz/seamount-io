@@ -106,6 +106,24 @@ async def get_transactions_overview(
                 'type': 'bridge',
                 'amount_fields': ['amount', 'value'],
                 'currency_fields': ['asset', 'currency']
+            },
+            {
+                'name': 'transactions',
+                'type': 'transaction',
+                'amount_fields': ['amount', 'value', 'transaction_amount'],
+                'currency_fields': ['currency', 'asset', 'symbol']
+            },
+            {
+                'name': 'daily_revenue_summary',
+                'type': 'revenue',
+                'amount_fields': ['total_revenue', 'net_revenue', 'gross_revenue', 'amount'],
+                'currency_fields': ['currency']
+            },
+            {
+                'name': 'fees_owed',
+                'type': 'fee',
+                'amount_fields': ['fee_amount', 'amount', 'owed_amount'],
+                'currency_fields': ['asset', 'currency', 'chain']
             }
         ]
         
@@ -427,7 +445,128 @@ async def get_live_transaction_feed(
         logger.error(f"❌ Live feed failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-
+@router.get("/revenue/summary")
+async def get_revenue_summary(
+    days: int = Query(30, ge=1, le=365),
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    💰 REVENUE SUMMARY - CORRECTED for actual schema
+    
+    Schema: revenue_date, total_revenue, transaction_count, avg_transaction_value
+    """
+    try:
+        time_filter = datetime.utcnow() - timedelta(days=days)
+        
+        # ========== QUERY DAILY REVENUE (using revenue_date) ==========
+        try:
+            daily_revenue = db.supabase.table('daily_revenue_summary')\
+                .select('*')\
+                .gte('revenue_date', time_filter.date().isoformat())\
+                .order('revenue_date', desc=True)\
+                .execute()
+            
+            total_revenue = sum(
+                float(row.get('total_revenue', 0)) 
+                for row in (daily_revenue.data or [])
+            )
+            
+            total_transactions = sum(
+                int(row.get('transaction_count', 0))
+                for row in (daily_revenue.data or [])
+            )
+            
+            avg_transaction = (
+                total_revenue / total_transactions 
+                if total_transactions > 0 else 0
+            )
+            
+            logger.info(f"💰 Daily revenue records: {len(daily_revenue.data or [])} | Total: ${total_revenue:.2f}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Daily revenue query failed: {e}")
+            daily_revenue = type('obj', (object,), {'data': []})()
+            total_revenue = 0
+            total_transactions = 0
+            avg_transaction = 0
+        
+        # ========== QUERY FEES OWED ==========
+        try:
+            fees_owed = db.supabase.table('fees_owed')\
+                .select('*')\
+                .eq('status', 'pending')\
+                .execute()
+            
+            total_owed = sum(
+                float(row.get('fee_amount', 0)) 
+                for row in (fees_owed.data or [])
+            )
+            
+            # Group by chain
+            owed_by_chain = {}
+            for row in (fees_owed.data or []):
+                chain = row.get('chain', 'unknown')
+                amount = float(row.get('fee_amount', 0))
+                
+                if chain not in owed_by_chain:
+                    owed_by_chain[chain] = 0
+                owed_by_chain[chain] += amount
+            
+            logger.info(f"💸 Uncollected fees: ${total_owed:.2f}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Fees owed query failed: {e}")
+            fees_owed = type('obj', (object,), {'data': []})()
+            total_owed = 0
+            owed_by_chain = {}
+        
+        # ========== REVENUE BY DATE ==========
+        revenue_by_date = {}
+        
+        if daily_revenue.data:
+            for row in daily_revenue.data:
+                date_str = str(row.get('revenue_date', 'unknown'))
+                revenue_by_date[date_str] = {
+                    'revenue': float(row.get('total_revenue', 0)),
+                    'transactions': int(row.get('transaction_count', 0)),
+                    'avg_value': float(row.get('avg_transaction_value', 0))
+                }
+        
+        # ========== COLLECTION RATE ==========
+        total_fees_generated = total_revenue + total_owed
+        collection_rate = (
+            (total_revenue / total_fees_generated * 100) 
+            if total_fees_generated > 0 else 100
+        )
+        
+        return {
+            'success': True,
+            'time_range_days': days,
+            'revenue_summary': {
+                'total_collected': round(total_revenue, 2),
+                'total_owed': round(total_owed, 2),
+                'collection_rate': round(collection_rate, 2),
+                'net_position': round(total_revenue - total_owed, 2),
+                'total_transactions': total_transactions,
+                'avg_transaction_value': round(avg_transaction, 2)
+            },
+            'uncollected_fees': {
+                'total_usd': round(total_owed, 2),
+                'count': len(fees_owed.data or []),
+                'by_chain': {k: round(v, 2) for k, v in owed_by_chain.items()}
+            },
+            'revenue_by_date': revenue_by_date,
+            'daily_records': len(daily_revenue.data or []),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Revenue summary failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.get("/revenue/uncollected-fees")
 async def get_uncollected_fees(
     admin: dict = Depends(require_admin),

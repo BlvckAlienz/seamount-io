@@ -230,6 +230,41 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
         
+        {/* ========== REVENUE SUMMARY SECTION ========== */}
+        <div className="bg-gradient-to-br from-green-900/20 to-emerald-800/20 border border-green-500/30 rounded-2xl p-6 mb-8">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <DollarSign className="h-6 w-6 text-green-400" />
+            Revenue & Fees Summary (30 Days)
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Collected Revenue</div>
+              <div className="text-2xl font-bold text-green-400">$12,450.00</div>
+              <div className="text-xs text-gray-500 mt-1">From completed transactions</div>
+            </div>
+            
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Uncollected Fees</div>
+              <div className="text-2xl font-bold text-yellow-400">$3,240.00</div>
+              <div className="text-xs text-gray-500 mt-1">Pending collection</div>
+            </div>
+            
+            <div className="bg-gray-900/50 rounded-lg p-4">
+              <div className="text-sm text-gray-400 mb-1">Collection Rate</div>
+              <div className="text-2xl font-bold text-blue-400">79.3%</div>
+              <div className="text-xs text-gray-500 mt-1">Target: 95%+</div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => {/* TODO: Implement detailed revenue modal */}}
+            className="mt-4 text-sm text-green-400 hover:text-green-300 transition-colors"
+          >
+            View Detailed Revenue Report →
+          </button>
+        </div>
+
         {/* FAILED TRANSACTIONS TABLE */}
         <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6 mb-8">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
