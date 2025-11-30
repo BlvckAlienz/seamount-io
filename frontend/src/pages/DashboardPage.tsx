@@ -420,16 +420,6 @@ const DashboardPage = () => {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                     <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                      {/* ✅ ADMIN MENU ITEM - Only for admins */}
-                      {userProfile?.is_admin && (
-                        <button 
-                          onClick={() => navigate('/admin')} 
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
-                        >
-                          <Shield className="h-4 w-4" />
-                          <span>Admin Dashboard</span>
-                        </button>
-                      )}
                       <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
                         <Key className="h-4 w-4" />
                         <span>Recovery Phrases</span>
