@@ -407,16 +407,6 @@ const DashboardPage = () => {
               
               {/* Desktop Profile Menu */}
               <div className="hidden md:block relative">
-                {/* ✅ ADMIN BUTTON - Only visible to admins */}
-                {userProfile?.is_admin && (
-                  <button
-                    onClick={() => navigate('/admin')}
-                    className="mr-3 flex items-center gap-2 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 px-4 py-2 rounded-lg text-white font-medium transition-all shadow-lg hover:shadow-yellow-500/50"
-                  >
-                    <Shield className="h-4 w-4" />
-                    <span>Admin Dashboard</span>
-                  </button>
-                )}
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)} 
                   className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
