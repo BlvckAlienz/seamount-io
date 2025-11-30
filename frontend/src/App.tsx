@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { api } from '@/lib/api'; // 🎯 Use our fixed API client
+import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 // --- Core Components & Pages ---
@@ -38,14 +38,14 @@ const AppContent: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState<boolean>(false);
 
-  // ✅ Auto-logout hook (only runs for authenticated users)
+  // ✅ Auto-logout hook
   useAutoLogout();
 
-  // ✅ Call hook unconditionally at top level
+  // ✅ Auth hook
   const auth = useAuth();
   const authSession = auth?.session || null;
 
-  // ✅ Initialize consent from localStorage after mount
+  // ✅ Initialize consent from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('seamount_consent_given');
@@ -57,28 +57,23 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
+  // ✅ Initialize anonymous session
   useEffect(() => {
-    // Initialize anonymous session for unauthenticated users without consent
     const initializeAnonymousSession = async () => {
       try {
         const response = await api.post('/api/v1/session/initialize');
-        console.log('🔄 Session initialize response:', response);
+        console.log('📄 Session initialize response:', response);
         
-        // 🎯 Handle different response structures
         if (response && response.data) {
-          // If response has data property
           setSessionId(response.data.session_id || response.data.id);
         } else if (response && response.session_id) {
-          // If response is the data itself
           setSessionId(response.session_id);
         } else {
           console.warn('⚠️ Unexpected session response structure:', response);
-          // Generate a fallback session ID
           setSessionId(`anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
         }
       } catch (error) {
         console.error("Failed to initialize anonymous session:", error);
-        // Generate fallback session ID on error
         setSessionId(`anon_error_${Date.now()}`);
       }
     };
@@ -106,14 +101,28 @@ const AppContent: React.FC = () => {
     <>
       <Routes>
         {/* Public Routes */}
-         path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
+        <Route path="/" element={<LandingPage onOpenAuth={handleOpenAuth} />} />
         <Route path="/contact" element={<InvestorContact />} />
         <Route path="/debug-auth" element={<AuthDebugPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         {/* Protected Routes */}
-        <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route 
+          path="/onboarding" 
+          element={
+            <ProtectedRoute>
+              <OnboardingPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/admin" 
           element={
@@ -122,15 +131,64 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           } 
         />
-        <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        <Route path="/trading" element={<ProtectedRoute><TradingPage /></ProtectedRoute>} />
-        <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
-        <Route path="/portfolio" element={<ProtectedRoute><portfolioPage /></ProtectedRoute>} />
-        <Route path="/wallet-recovery" element={<ProtectedRoute><WalletRecovery /></ProtectedRoute>} />
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <UserProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/trading" 
+          element={
+            <ProtectedRoute>
+              <TradingPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/payments" 
+          element={
+            <ProtectedRoute>
+              <PaymentsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/portfolio" 
+          element={
+            <ProtectedRoute>
+              <portfolioPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/wallet-recovery" 
+          element={
+            <ProtectedRoute>
+              <WalletRecovery />
+            </ProtectedRoute>
+          } 
+        />
         
-        {/* Admin Route */}
-        <Route path="/admin/compliance" element={<ProtectedRoute adminRequired={true}><ComplianceDashboard /></ProtectedRoute>} />
+        {/* Admin Compliance Route */}
+        <Route 
+          path="/admin/compliance" 
+          element={
+            <ProtectedRoute adminRequired={true}>
+              <ComplianceDashboard />
+            </ProtectedRoute>
+          } 
+        />
 
         {/* Fallback Route */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -143,7 +201,10 @@ const AppContent: React.FC = () => {
       />
 
       {!authSession && !consentGiven && sessionId && (
-        <CookieConsentBanner sessionId={sessionId} onConsentGiven={handleConsentGiven} />
+        <CookieConsentBanner 
+          sessionId={sessionId} 
+          onConsentGiven={handleConsentGiven} 
+        />
       )}
     </>
   );
