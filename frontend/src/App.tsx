@@ -114,11 +114,14 @@ const AppContent: React.FC = () => {
         {/* Protected Routes */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/admin" element={
-          <ProtectedRoute adminRequired={true}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute adminRequired={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/trading" element={<ProtectedRoute><TradingPage /></ProtectedRoute>} />
