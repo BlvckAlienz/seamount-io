@@ -187,15 +187,26 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">🌍</span> African Forex Rates
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {marketData?.forex && ['NGN/USD', 'KES/USD', 'ZAR/USD', 'GHS/USD', 'ETB/USD', 'EGP/USD'].map((pair) => (
-            <div key={pair} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm font-semibold">{pair}</div>
-              <div className="text-2xl font-bold mt-1">
-                {marketData.forex[pair].toFixed(6)}
+          {marketData?.forex && ['NGN/USD', 'KES/USD', 'ZAR/USD', 'GHS/USD', 'ETB/USD', 'EGP/USD'].map((pair) => {
+            // 🚨 FLIPPED: Show USD/NGN as primary
+            const inversePair = pair.split('/').reverse().join('/');  // USD/NGN
+            const inverseRate = marketData.forex[inversePair];        // 1445.09
+            const secondaryPair = pair;                               // NGN/USD
+            const secondaryRate = marketData.forex[pair];             // 0.000692
+            
+            return (
+              <div key={pair} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="text-gray-400 text-sm font-semibold">{inversePair}</div>  {/* 🚨 USD/NGN */}
+                <div className="text-2xl font-bold mt-1">
+                  {inverseRate.toFixed(2)}  {/* 🚨 1445.09 (BIG) */}
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  {secondaryPair}: {secondaryRate.toFixed(6)}  {/* 🚨 NGN/USD: 0.000692 (small) */}
+                </div>
+                <div className="text-green-400 text-sm mt-1">● Live</div>
               </div>
-              <div className="text-green-400 text-sm mt-1">● Live</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

@@ -247,24 +247,26 @@ const MarketTerminalModal: React.FC<MarketTerminalModalProps> = ({ isOpen, onClo
               {activeTab === 'forex' && marketData && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {['NGN/USD', 'KES/USD', 'ZAR/USD', 'GHS/USD', 'ETB/USD', 'EGP/USD'].map(pair => {
-                    const rate = marketData.forex[pair];
-                    const inversePair = pair.split('/').reverse().join('/');
-                    const inverseRate = marketData.forex[inversePair];
+                    // 🚨 FLIPPED: Show USD/NGN as primary (big), NGN/USD as secondary (small)
+                    const inversePair = pair.split('/').reverse().join('/');  // USD/NGN
+                    const inverseRate = marketData.forex[inversePair];        // 1445.09
+                    const secondaryPair = pair;                               // NGN/USD
+                    const secondaryRate = marketData.forex[pair];             // 0.000692
                     
                     return (
                       <div key={pair} className="bg-gray-800 rounded-xl p-4 border border-gray-700 hover:border-green-500/50 hover:shadow-lg transition-all">
                         <div className="flex items-center justify-between mb-2">
-                          <div className="text-gray-300 font-bold">{pair}</div>
+                          <div className="text-gray-300 font-bold">{inversePair}</div>  {/* 🚨 NOW SHOWS USD/NGN */}
                           <div className="flex items-center gap-1 text-green-400 text-xs">
                             <Activity className="h-3 w-3" />
                             Live
                           </div>
                         </div>
                         <div className="text-2xl font-bold text-white mb-1">
-                          {rate.toFixed(6)}
+                          {inverseRate.toFixed(2)}  {/* 🚨 NOW SHOWS 1445.09 (BIG) */}
                         </div>
                         <div className="text-sm text-gray-400 mt-2">
-                          {inversePair}: {inverseRate.toFixed(2)}
+                          {secondaryPair}: {secondaryRate.toFixed(6)}  {/* 🚨 NOW SHOWS NGN/USD: 0.000692 (small) */}
                         </div>
                       </div>
                     );
