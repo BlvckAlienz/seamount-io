@@ -115,22 +115,33 @@ class PriceLoggerService:
                 for symbol in config['assets']:
                     try:
                         # 🚨 CRITICAL: Force Yahoo Finance tier (skip metals_dev)
-                        # This preserves metals_dev quota for user-facing terminal requests
                         price, metadata = await self.oracle.get_commodity_price(symbol)
                         
-                        # Only log if NOT from metals_dev (background should never use it)
-                        if metadata.get('source') != 'metals_dev':
-                            logger.debug(f"📊 Precious: {symbol} = ${price} ({metadata['source']})")
-                        else:
-                            logger.warning(f"⚠️ Background task accidentally used metals_dev for {symbol}")
+                        # ✅ FIX: Create PriceData object and store it
+                        from backend.services.oracle_service import PriceData
+                        from datetime import datetime
+                        
+                        price_data = PriceData(
+                            currency_pair=f"{symbol}/USD",
+                            rate=price,
+                            source=metadata.get('source', 'unknown'),
+                            timestamp=datetime.utcnow(),
+                            confidence=metadata.get('confidence', 0.8),
+                            volume_24h=None
+                        )
+                        
+                        # 🚨 CRITICAL: Actually store the data
+                        await self.oracle.store_price_data([price_data])
+                        
+                        logger.debug(f"📊 Precious: {symbol} = ${price} ({metadata['source']})")
                         
                     except Exception as e:
-                        logger.error(f"Failed to log {symbol}: {e}")
+                        logger.error(f"Failed to log {symbol}: {e}", exc_info=True)
                 
                 await asyncio.sleep(config['interval_seconds'])
                 
             except Exception as e:
-                logger.error(f"Precious metals logging error: {e}")
+                logger.error(f"Precious metals logging error: {e}", exc_info=True)
                 await asyncio.sleep(300)
     
     async def _log_industrial_metals(self):
@@ -142,14 +153,30 @@ class PriceLoggerService:
                 for symbol in config['assets']:
                     try:
                         price, metadata = await self.oracle.get_commodity_price(symbol)
+                        
+                        # ✅ FIX: Create and store PriceData
+                        from backend.services.oracle_service import PriceData
+                        from datetime import datetime
+                        
+                        price_data = PriceData(
+                            currency_pair=f"{symbol}/USD",
+                            rate=price,
+                            source=metadata.get('source', 'unknown'),
+                            timestamp=datetime.utcnow(),
+                            confidence=metadata.get('confidence', 0.8),
+                            volume_24h=None
+                        )
+                        
+                        await self.oracle.store_price_data([price_data])
                         logger.debug(f"📊 Industrial: {symbol} = ${price} ({metadata['source']})")
+                        
                     except Exception as e:
-                        logger.error(f"Failed to log {symbol}: {e}")
+                        logger.error(f"Failed to log {symbol}: {e}", exc_info=True)
                 
                 await asyncio.sleep(config['interval_seconds'])
                 
             except Exception as e:
-                logger.error(f"Industrial metals logging error: {e}")
+                logger.error(f"Industrial metals logging error: {e}", exc_info=True)
                 await asyncio.sleep(900)
     
     async def _log_critical_minerals(self):
@@ -161,14 +188,30 @@ class PriceLoggerService:
                 for symbol in config['assets']:
                     try:
                         price, metadata = await self.oracle.get_commodity_price(symbol)
+                        
+                        # ✅ FIX: Create and store PriceData
+                        from backend.services.oracle_service import PriceData
+                        from datetime import datetime
+                        
+                        price_data = PriceData(
+                            currency_pair=f"{symbol}/USD",
+                            rate=price,
+                            source=metadata.get('source', 'unknown'),
+                            timestamp=datetime.utcnow(),
+                            confidence=metadata.get('confidence', 0.8),
+                            volume_24h=None
+                        )
+                        
+                        await self.oracle.store_price_data([price_data])
                         logger.debug(f"📊 Critical: {symbol} = ${price} ({metadata['source']})")
+                        
                     except Exception as e:
-                        logger.error(f"Failed to log {symbol}: {e}")
+                        logger.error(f"Failed to log {symbol}: {e}", exc_info=True)
                 
                 await asyncio.sleep(config['interval_seconds'])
                 
             except Exception as e:
-                logger.error(f"Critical minerals logging error: {e}")
+                logger.error(f"Critical minerals logging error: {e}", exc_info=True)
                 await asyncio.sleep(3600)
     
     async def _log_forex_rates(self):
@@ -180,14 +223,30 @@ class PriceLoggerService:
                 for from_curr, to_curr in config['pairs']:
                     try:
                         rate, metadata = await self.oracle.get_forex_rate(from_curr, to_curr)
+                        
+                        # ✅ FIX: Create and store PriceData
+                        from backend.services.oracle_service import PriceData
+                        from datetime import datetime
+                        
+                        price_data = PriceData(
+                            currency_pair=f"{from_curr}/{to_curr}",
+                            rate=rate,
+                            source=metadata.get('source', 'unknown'),
+                            timestamp=datetime.utcnow(),
+                            confidence=metadata.get('confidence', 0.8),
+                            volume_24h=None
+                        )
+                        
+                        await self.oracle.store_price_data([price_data])
                         logger.debug(f"📊 Forex: {from_curr}/{to_curr} = {rate} ({metadata['source']})")
+                        
                     except Exception as e:
-                        logger.error(f"Failed to log {from_curr}/{to_curr}: {e}")
+                        logger.error(f"Failed to log {from_curr}/{to_curr}: {e}", exc_info=True)
                 
                 await asyncio.sleep(config['interval_seconds'])
                 
             except Exception as e:
-                logger.error(f"Forex logging error: {e}")
+                logger.error(f"Forex logging error: {e}", exc_info=True)
                 await asyncio.sleep(600)
     
     async def _monitor_quota_health(self):
