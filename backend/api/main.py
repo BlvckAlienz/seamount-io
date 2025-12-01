@@ -678,8 +678,14 @@ if routers_available.get('yield'):
     logger.info("✅ Yield router registered at /api/v1")
 
 if routers_available.get('market'):
-    app.include_router(routers_available['market'].router, prefix="/api/v1", tags=["Market Terminal"])
+    # Register main market router (/api/v1/market/...)
+    app.include_router(routers_available['market'].router, prefix="/api/v1")
     logger.info("✅ Market terminal router registered at /api/v1/market")
+    
+    # Register quota router (/api/v1/quota/...)
+    if hasattr(routers_available['market'], 'quota_router'):
+        app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
+        logger.info("✅ Quota health router registered at /api/v1/quota")
 
 # ===== ADMIN ROUTES =====
 try:
