@@ -44,6 +44,10 @@ class EnhancedOracleService:
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
         self.rate_cache: Dict[str, Dict[str, Any]] = {}
+
+        # ✅ ADD: Configuration attributes
+        self.request_timeout = aiohttp.ClientTimeout(total=10)  # 10 second timeout
+        self.cache_ttl = 300  # 5 minutes cache
         
         # ✅ ADD: Quota management
         from backend.services.quota_service import QuotaService

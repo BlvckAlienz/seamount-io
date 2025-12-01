@@ -1,5 +1,5 @@
 # File: backend/services/quota_service.py
-# Smart API Quota Management - Production Grade
+# Smart API Quota Management - FIXED for DatabaseService.query()
 
 import logging
 from typing import Optional, Dict, Any
@@ -73,45 +73,56 @@ class QuotaService:
             success: Whether the call succeeded
         """
         try:
-            # Increment counter
-            query = """
-                UPDATE api_quota_tracking
-                SET 
-                    calls_used_this_month = calls_used_this_month + 1,
-                    last_call_timestamp = NOW(),
-                    status = CASE 
-                        WHEN calls_used_this_month + 1 >= monthly_limit THEN 'exhausted'
-                        WHEN calls_used_this_month + 1 >= monthly_limit * 0.9 THEN 'degraded'
-                        ELSE 'active'
-                    END
-                WHERE service_name = $1
-                RETURNING calls_used_this_month, monthly_limit, status
-            """
+            # Get current quota data
+            quota_data = await self._get_quota_data(service_name)
             
-            result = await self.db_service.execute_query(query, service_name)
+            if not quota_data:
+                logger.warning(f"No quota data found for {service_name}, skipping record")
+                return
             
-            if result and len(result) > 0:
-                row = result[0]
-                calls_used = row['calls_used_this_month']
-                limit = row['monthly_limit']
-                status = row['status']
-                
+            # Calculate new values
+            new_calls_used = quota_data['calls_used_this_month'] + 1
+            monthly_limit = quota_data['monthly_limit']
+            
+            # Determine new status
+            if new_calls_used >= monthly_limit:
+                new_status = 'exhausted'
+            elif new_calls_used >= monthly_limit * 0.9:
+                new_status = 'degraded'
+            else:
+                new_status = 'active'
+            
+            # Update using DatabaseService.update()
+            update_success = await self.db_service.update(
+                table='api_quota_tracking',
+                data={
+                    'calls_used_this_month': new_calls_used,
+                    'last_call_timestamp': datetime.utcnow().isoformat(),
+                    'status': new_status,
+                    'updated_at': datetime.utcnow().isoformat()
+                },
+                filters={'service_name': service_name}
+            )
+            
+            if update_success:
                 # Log warnings at key thresholds
-                usage_percent = (calls_used / limit) * 100
+                usage_percent = (new_calls_used / monthly_limit) * 100
                 
                 if usage_percent >= 90:
                     logger.warning(
-                        f"🚨 {service_name} CRITICAL: {calls_used}/{limit} "
-                        f"({usage_percent:.1f}%) - Status: {status}"
+                        f"🚨 {service_name} CRITICAL: {new_calls_used}/{monthly_limit} "
+                        f"({usage_percent:.1f}%) - Status: {new_status}"
                     )
                 elif usage_percent >= 75:
                     logger.warning(
-                        f"⚠️ {service_name} HIGH: {calls_used}/{limit} "
+                        f"⚠️ {service_name} HIGH: {new_calls_used}/{monthly_limit} "
                         f"({usage_percent:.1f}%)"
                     )
                 
                 # Clear cache to force refresh
                 self._quota_cache.pop(service_name, None)
+            else:
+                logger.error(f"Failed to update quota for {service_name}")
             
         except Exception as e:
             logger.error(f"Failed to record API call for {service_name}: {e}")
@@ -149,8 +160,11 @@ class QuotaService:
     async def get_all_quotas(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all tracked services"""
         try:
-            query = "SELECT * FROM api_quota_tracking ORDER BY service_name"
-            results = await self.db_service.execute_query(query)
+            # Use DatabaseService.query()
+            results = await self.db_service.query(
+                table='api_quota_tracking',
+                order_by={'service_name': 'asc'}
+            )
             
             quotas = {}
             for row in results:
@@ -166,15 +180,24 @@ class QuotaService:
     async def reset_monthly_quotas(self):
         """Manually trigger monthly quota reset"""
         try:
-            query = """
-                UPDATE api_quota_tracking
-                SET 
-                    calls_used_this_month = 0,
-                    last_reset_date = NOW(),
-                    status = 'active'
-            """
+            # Get all services
+            all_services = await self.db_service.query(
+                table='api_quota_tracking'
+            )
             
-            await self.db_service.execute_query(query)
+            # Reset each one
+            for service_row in all_services:
+                await self.db_service.update(
+                    table='api_quota_tracking',
+                    data={
+                        'calls_used_this_month': 0,
+                        'last_reset_date': datetime.utcnow().isoformat(),
+                        'status': 'active',
+                        'updated_at': datetime.utcnow().isoformat()
+                    },
+                    filters={'service_name': service_row['service_name']}
+                )
+            
             logger.info("✅ Monthly quotas reset successfully")
             
             # Clear cache
@@ -194,13 +217,11 @@ class QuotaService:
                 if datetime.now() - cached['cached_at'] < timedelta(minutes=5):
                     return cached['data']
             
-            # Fetch from database
-            query = """
-                SELECT * FROM api_quota_tracking 
-                WHERE service_name = $1
-            """
-            
-            result = await self.db_service.execute_query(query, service_name)
+            # Fetch from database using DatabaseService.query()
+            result = await self.db_service.query(
+                table='api_quota_tracking',
+                filters={'service_name': service_name}
+            )
             
             if result and len(result) > 0:
                 data = dict(result[0])
