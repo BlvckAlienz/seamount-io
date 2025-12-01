@@ -1,11 +1,11 @@
 # File: backend/api/routes/market.py
-# Bloomberg-Style Live Market Terminal API - PRODUCTION READY
+# Bloomberg-Style Live Market Terminal API - PRODUCTION READY (FIXED)
 
 from fastapi import APIRouter, HTTPException, Depends
 from backend.services.oracle_service import EnhancedOracleService
 from backend.services.database_service import DatabaseService
 from backend.dependencies import get_db_service, get_oracle_service
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,8 @@ async def get_commodity_price(
         )
 
 
-@router.get("/market/commodity/{symbol}/history")
+# 🚨 FIXED: Removed double /market prefix
+@router.get("/commodity/{symbol}/history")  # ✅ WAS: /market/commodity/{symbol}/history
 async def get_commodity_history(
     symbol: str,
     hours: int = 24,
@@ -148,10 +149,10 @@ async def get_commodity_history(
     
     Returns historical prices for the last 24 hours (default)
     Includes price change % and hourly data for sparkline charts
+    
+    🚨 FIX: Corrected route path from /market/commodity to /commodity
     """
     try:
-        from datetime import timezone  # ✅ Add this import
-        
         # 🚨 FIX: Construct proper currency pair
         currency_pair = f"{symbol.upper()}/USD"
         
