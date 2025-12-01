@@ -1,24 +1,30 @@
 # File: backend/api/routes/market.py
-# Bloomberg-Style Live Market Terminal API
+# Bloomberg-Style Live Market Terminal API - PRODUCTION READY
 
 from fastapi import APIRouter, HTTPException, Depends
 from backend.services.oracle_service import EnhancedOracleService
 from backend.services.database_service import DatabaseService
 from backend.dependencies import get_db_service, get_oracle_service
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
 
-@router.get("/market/snapshot")
-async def get_market_snapshot():
+# ✅ Router with /market prefix - all routes will be /api/v1/market/...
+router = APIRouter(prefix="/market", tags=["Market Terminal"])
+
+
+@router.get("/snapshot")
+async def get_market_snapshot(
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+):
     """
-    ðŸ"Š GET COMPLETE MARKET SNAPSHOT
+    📊 GET COMPLETE MARKET SNAPSHOT
     
     Returns Bloomberg-style terminal data:
     - Crypto prices (BTC, ETH, ALGO, TRX)
     - Forex rates (NGN, KES, ZAR, GHS, ETB, EGP vs USD)
-    - Commodities (Gold, Silver, Copper, Nickel, Lithium, Cobalt)
+    - Commodities (Gold, Silver, Platinum, Palladium, Copper, Nickel, Lithium, Cobalt)
     - Cross-rates (BTC/NGN, ETH/ZAR, etc.)
     
     Response:
@@ -34,7 +40,6 @@ async def get_market_snapshot():
     }
     """
     try:
-        oracle_service = get_oracle_service()
         snapshot = await oracle_service.get_market_snapshot()
         
         return {
@@ -49,12 +54,17 @@ async def get_market_snapshot():
             detail=f"Could not fetch market data: {str(e)}"
         )
 
-@router.get("/market/forex/{from_currency}/{to_currency}")
-async def get_forex_rate(from_currency: str, to_currency: str):
+
+@router.get("/forex/{from_currency}/{to_currency}")
+async def get_forex_rate(
+    from_currency: str,
+    to_currency: str,
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+):
     """
     💱 GET FOREX EXCHANGE RATE
     
-    Example: GET /market/forex/NGN/USD
+    Example: GET /api/v1/market/forex/NGN/USD
     
     Response:
     {
@@ -65,8 +75,10 @@ async def get_forex_rate(from_currency: str, to_currency: str):
     }
     """
     try:
-        oracle_service = get_oracle_service()
-        rate, metadata = await oracle_service.get_forex_rate(from_currency.upper(), to_currency.upper())
+        rate, metadata = await oracle_service.get_forex_rate(
+            from_currency.upper(),
+            to_currency.upper()
+        )
         
         return {
             "success": True,
@@ -81,15 +93,21 @@ async def get_forex_rate(from_currency: str, to_currency: str):
             detail=f"Could not fetch forex rate: {str(e)}"
         )
 
-@router.get("/market/commodity/{symbol}")
-async def get_commodity_price(symbol: str):
+
+@router.get("/commodity/{symbol}")
+async def get_commodity_price(
+    symbol: str,
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+):
     """
     🏆 GET COMMODITY PRICE
     
-    Supported: XAU (Gold), XAG (Silver), COPP (Copper), NICK (Nickel), 
-               LITH (Lithium), COBT (Cobalt), MANG (Manganese), GRPH (Graphite)
+    Supported: XAU (Gold), XAG (Silver), XPT (Platinum), XPD (Palladium),
+               COPP (Copper), NICK (Nickel), ALUM (Aluminum), ZINC (Zinc),
+               LITH (Lithium), COBT (Cobalt), MANG (Manganese), GRPH (Graphite),
+               TANT (Tantalum)
     
-    Example: GET /market/commodity/XAU
+    Example: GET /api/v1/market/commodity/XAU
     
     Response:
     {
@@ -101,7 +119,6 @@ async def get_commodity_price(symbol: str):
     }
     """
     try:
-        oracle_service = get_oracle_service()
         price, metadata = await oracle_service.get_commodity_price(symbol.upper())
         
         return {
@@ -118,70 +135,57 @@ async def get_commodity_price(symbol: str):
             detail=f"Could not fetch commodity price: {str(e)}"
         )
 
-@router.get("/market/cross-rate/{asset}/{currency}")
-async def get_cross_rate(asset: str, currency: str):
-    """
-    🌍 GET CROSS-RATE (Asset in Local Currency)
-    
-    Example: GET /market/cross-rate/bitcoin/NGN
-    
-    Response:
-    {
-        "success": true,
-        "rate": 95250000,
-        "pair": "BTC/NGN",
-        "metadata": {...}
-    }
-    """
-    try:
-        oracle_service = get_oracle_service()
-        rate, metadata = await oracle_service.get_cross_rate(asset.lower(), currency.upper())
-        
-        return {
-            "success": True,
-            "rate": float(rate),
-            "pair": f"{asset.upper()}/{currency.upper()}",
-            "metadata": metadata
-        }
-    except Exception as e:
-        logger.error(f"Cross-rate fetch failed for {asset}/{currency}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not fetch cross-rate: {str(e)}"
-        )
 
 @router.get("/commodity/{symbol}/history")
 async def get_commodity_history(
     symbol: str,
     hours: int = 24,
-    db_service: DatabaseService = Depends(get_db_service)
+    db_service: DatabaseService = Depends(get_db_service),
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
 ):
     """
-    Get historical prices for commodity (last 24 hours)
-    Returns price change % and hourly data for sparkline
+    📈 GET COMMODITY PRICE HISTORY
+    
+    Returns historical prices for the last 24 hours (default)
+    Includes price change % and hourly data for sparkline charts
+    
+    Example: GET /api/v1/market/commodity/XAU/history?hours=24
+    
+    Response:
+    {
+        "success": true,
+        "symbol": "XAU",
+        "prices": [2650.00, 2651.50, ...],
+        "timestamps": ["2024-12-01T10:00:00Z", ...],
+        "current_price": 2665.00,
+        "change_24h": 15.00,
+        "change_percent": 0.57,
+        "mock_data": false
+    }
     """
     try:
-        # Query price_history table
-        query = f"""
-            SELECT 
-                rate as price,
-                timestamp
-            FROM price_history
-            WHERE currency_pair LIKE '%{symbol}%'
-                AND timestamp >= NOW() - INTERVAL '{hours} hours'
-            ORDER BY timestamp ASC
-        """
+        # 🚨 FIX: Construct proper currency pair
+        currency_pair = f"{symbol.upper()}/USD"
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
         
-        result = await db_service.execute_query(query)
+        # 🚨 FIX: Use db_service.query() instead of execute_query()
+        result = await db_service.query(
+            table="price_history",
+            filters={"currency_pair": currency_pair},
+            order_by={"timestamp": "asc"}
+        )
+        
+        # Filter by time (since query() doesn't support WHERE timestamp >)
+        result = [
+            row for row in result 
+            if datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00')) > cutoff_time
+        ]
         
         if not result or len(result) == 0:
             # 🚨 FALLBACK: Generate mock data if no history exists yet
             logger.warning(f"No historical data for {symbol}, generating mock trend")
             
-            # Create realistic price trend (slight variation around current price)
-            from backend.services.oracle_service import EnhancedOracleService
-            oracle = get_oracle_service()
-            current_price, _ = await oracle.get_commodity_price(symbol)
+            current_price, _ = await oracle_service.get_commodity_price(symbol)
             
             # Generate 24 hourly points with ±2% variation
             import random
@@ -203,7 +207,7 @@ async def get_commodity_history(
                 "mock_data": True
             }
         
-        prices = [float(row['price']) for row in result]
+        prices = [float(row['rate']) for row in result]
         timestamps = [row['timestamp'] for row in result]
         
         # Calculate 24h change
@@ -224,24 +228,85 @@ async def get_commodity_history(
         }
         
     except Exception as e:
-        logger.error(f"History fetch failed for {symbol}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"History fetch failed for {symbol}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not fetch price history: {str(e)}"
+        )
+
+
+@router.get("/cross-rate/{asset}/{currency}")
+async def get_cross_rate(
+    asset: str,
+    currency: str,
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+):
+    """
+    🌍 GET CROSS-RATE (Asset in Local Currency)
     
-@router.get("/quota/health")
-async def get_quota_health():
+    Example: GET /api/v1/market/cross-rate/bitcoin/NGN
+    
+    Response:
+    {
+        "success": true,
+        "rate": 95250000,
+        "pair": "BTC/NGN",
+        "metadata": {...}
+    }
+    """
+    try:
+        rate, metadata = await oracle_service.get_cross_rate(
+            asset.lower(),
+            currency.upper()
+        )
+        
+        return {
+            "success": True,
+            "rate": float(rate),
+            "pair": f"{asset.upper()}/{currency.upper()}",
+            "metadata": metadata
+        }
+    except Exception as e:
+        logger.error(f"Cross-rate fetch failed for {asset}/{currency}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not fetch cross-rate: {str(e)}"
+        )
+
+
+# ✅ SEPARATE ROUTER FOR QUOTA (not under /market)
+quota_router = APIRouter(prefix="/quota", tags=["API Quota"])
+
+
+@quota_router.get("/health")
+async def get_quota_health(
+    db_service: DatabaseService = Depends(get_db_service)
+):
     """
     📊 GET API QUOTA HEALTH STATUS
     
     Returns real-time quota usage for all external APIs
     Useful for monitoring and alerts
+    
+    Example: GET /api/v1/quota/health
+    
+    Response:
+    {
+        "success": true,
+        "overall_status": "healthy",
+        "summary": {
+            "critical": 0,
+            "warning": 1,
+            "healthy": 5
+        },
+        "services": {...},
+        "timestamp": "2024-12-01T12:00:00Z"
+    }
     """
     try:
-        from backend.dependencies import get_db_service
         from backend.services.quota_service import QuotaService
         
-        db_service = get_db_service()
         quota_service = QuotaService(db_service)
-        
         all_quotas = await quota_service.get_all_quotas()
         
         # Calculate overall health
@@ -276,9 +341,12 @@ async def get_quota_health():
             "services": all_quotas,
             "critical_services": critical_services,
             "warning_services": warning_services,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.utcnow().isoformat()
         }
         
     except Exception as e:
         logger.error(f"Quota health check failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not fetch quota status: {str(e)}"
+        )
