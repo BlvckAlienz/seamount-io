@@ -136,7 +136,7 @@ async def get_commodity_price(
         )
 
 
-@router.get("/commodity/{symbol}/history")
+@router.get("/market/commodity/{symbol}/history")
 async def get_commodity_history(
     symbol: str,
     hours: int = 24,
@@ -148,25 +148,15 @@ async def get_commodity_history(
     
     Returns historical prices for the last 24 hours (default)
     Includes price change % and hourly data for sparkline charts
-    
-    Example: GET /api/v1/market/commodity/XAU/history?hours=24
-    
-    Response:
-    {
-        "success": true,
-        "symbol": "XAU",
-        "prices": [2650.00, 2651.50, ...],
-        "timestamps": ["2024-12-01T10:00:00Z", ...],
-        "current_price": 2665.00,
-        "change_24h": 15.00,
-        "change_percent": 0.57,
-        "mock_data": false
-    }
     """
     try:
+        from datetime import timezone  # ✅ Add this import
+        
         # 🚨 FIX: Construct proper currency pair
         currency_pair = f"{symbol.upper()}/USD"
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        
+        # ✅ FIX: Make cutoff_time timezone-aware
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
         
         # 🚨 FIX: Use db_service.query() instead of execute_query()
         result = await db_service.query(
