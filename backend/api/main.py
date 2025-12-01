@@ -248,6 +248,14 @@ except ImportError as e:
     logger.error(f"❌ Yield router import error: {e}")
     routers_available['yield'] = None
 
+try:
+    from backend.api.routes import market
+    routers_available['market'] = market
+    logger.info("✅ Market terminal router imported")
+except ImportError as e:
+    logger.error(f"❌ Market terminal router import error: {e}")
+    routers_available['market'] = None
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}
@@ -359,19 +367,30 @@ async def lifespan(app: FastAPI):
                             logger.info("✅ Oracle service initialized")
                         except Exception as e:
                             logger.error(f"❌ Oracle service initialization failed: {e}")
-                            logger.info("Creating mock oracle service for graceful degradation...")
 
-                    # ✅ ADD THIS FALLBACK (if oracle is still None):
-                    if oracle_service is None:
-                        logger.warning("⚠️ Using mock oracle service")
-                        # Create mock oracle class inline
-                        class MockOracleService:
-                            async def get_asset_price(self, asset_name: str):
-                                """Mock price: always returns $1.00"""
-                                return Decimal('1.0'), {'source': 'mock', 'asset': asset_name}
-                        
-                        oracle_service = MockOracleService()
-                        logger.info("✅ Mock oracle service created")
+                    # ✅ REPLACE OLD BACKGROUND TASK WITH SMART PRICE LOGGER
+                    if oracle_service:
+                        try:
+                            from backend.services.price_logger_service import PriceLoggerService
+                            from backend.services.quota_service import QuotaService
+                            
+                            # Initialize quota service
+                            quota_service = QuotaService(db_service)
+                            
+                            # Initialize intelligent price logger
+                            price_logger = PriceLoggerService(oracle_service, quota_service)
+                            
+                            # Start logging
+                            await price_logger.start()
+                            
+                            # Store reference for cleanup
+                            app.state.price_logger = price_logger
+                            
+                            logger.info("✅ Intelligent price logger started with tiered refresh rates:")
+                            logger.info("   📊 Crypto: 30s | Precious: 5min | Industrial: 15min | Critical: 1hr | Forex: 10min")
+                            
+                        except Exception as e:
+                            logger.error(f"❌ Price logger failed to start: {e}")
 
                     # Initialize Multi-Chain Wallet Service (UNIFIED NAME)
                     multi_chain_wallet_service = MultiChainWalletService(
@@ -489,7 +508,22 @@ async def lifespan(app: FastAPI):
     except Exception as sched_err:
         logger.error(f"❌ Failed to stop scheduler: {sched_err}")
         
+    # Store services for cleanup
+    app.state.quota_service = quota_service if 'quota_service' in locals() else None
+
     yield
+
+    # ============================================================================
+    # SHUTDOWN
+    # ============================================================================
+
+    # Stop price logger
+    if hasattr(app.state, 'price_logger'):
+        try:
+            await app.state.price_logger.stop()
+            logger.info("✅ Price logger stopped")
+        except Exception as e:
+            logger.error(f"❌ Failed to stop price logger: {e}")
     
     logger.info("--- Seamount API Shutting Down ---")
 
@@ -642,6 +676,10 @@ if routers_available.get('swap'):
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("✅ Yield router registered at /api/v1")
+
+if routers_available.get('market'):
+    app.include_router(routers_available['market'].router, prefix="/api/v1", tags=["Market Terminal"])
+    logger.info("✅ Market terminal router registered at /api/v1/market")
 
 # ===== ADMIN ROUTES =====
 try:

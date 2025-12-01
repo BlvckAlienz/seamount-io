@@ -24,6 +24,8 @@ import { WalletProvider } from '@/contexts/WalletContext';
 import { SendForm } from '@/components/payments/SendForm.tsx';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
+import MarketTerminalModal from '@/components/market/MarketTerminalModal';
+import LiveMarketPreview from '@/components/market/LiveMarketPreview';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -157,6 +159,7 @@ const DashboardPage = () => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showEarnModal, setShowEarnModal] = useState(false);
+  const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
 
@@ -540,6 +543,30 @@ const DashboardPage = () => {
           </div>
 
           <NigerianUserBanner />
+
+          {/* 📍 BLOOMBERG-GRADE MARKET TERMINAL PREVIEW */}
+          <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-blue-400" />
+                  Live Market Terminal
+                </h2>
+                <p className="text-gray-400 text-sm">Bloomberg-Grade Real-Time Market Data</p>
+              </div>
+              <button
+                onClick={() => setShowMarketTerminal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 animate-pulse"
+              >
+                <Activity className="h-5 w-5" />
+                <span className="hidden sm:inline">Open Terminal</span>
+                <span className="sm:hidden">View</span>
+              </button>
+            </div>
+
+            {/* Live Price Preview (Top 4 Assets) */}
+            <LiveMarketPreview onOpenTerminal={() => setShowMarketTerminal(true)} />
+          </div>
           
           {walletCreationStatus && !walletCreationStatus.overall_complete && (
             <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
@@ -667,6 +694,10 @@ const DashboardPage = () => {
         <EarnModal 
           open={showEarnModal} 
           onOpenChange={setShowEarnModal} 
+        />
+        <MarketTerminalModal 
+          isOpen={showMarketTerminal} 
+          onClose={() => setShowMarketTerminal(false)} 
         />
       </div>
     </WalletProvider>

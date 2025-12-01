@@ -830,6 +830,12 @@ class Settings(BaseSettings):
     CASHRAMP_WEBHOOK_SECRET: Optional[SecretStr] = None
     FLUTTERWAVE_SECRET_KEY: Optional[SecretStr] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
+    # Commodity & Forex API Keys (Optional - improves rate limits)
+    ALPHA_VANTAGE_API_KEY: Optional[SecretStr] = None  # Free: 500 req/day
+    TWELVE_DATA_API_KEY: Optional[SecretStr] = None     # Free: 800 req/day
+    FMP_API_KEY: Optional[SecretStr] = None             # Free: 250 req/day
+    # Metals & Commodities APIs (FREE tier, high reliability)
+    METALS_DEV_API_KEY: Optional[SecretStr] = None       # Free: 100 req/month
     
     # ============================================================================
     # PRETIUM AFRICA CONFIGURATION (Tron USDT Exclusive)
