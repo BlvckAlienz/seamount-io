@@ -577,6 +577,14 @@ if routers_available.get('wallet_creation'):
 # ===== REGISTER ROUTERS =====
 app.include_router(seed_routes.router)
 
+# 📍 Prediction Markets Routes
+try:
+    from backend.api.routes.predictions import router as predictions_router
+    app.include_router(predictions_router, prefix="/api/v1", tags=["Prediction Markets"])
+    logger.info("✅ Prediction Markets router registered at /api/v1/predictions")
+except ImportError as e:
+    logger.error(f"❌ Prediction Markets router import error: {e}")
+
 # Wallet backup tracking
 try:
     from backend.api.routes.wallet_backup_routes import router as wallet_backup_router
