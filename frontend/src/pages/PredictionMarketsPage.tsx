@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info } from 'lucide-react';
 
 import { apiClient } from '@/config/api';
-import { supabase } from '@/lib/supabase'; // Ã¢Å“â€¦ Add this import
+import { supabase } from '@/lib/supabase'; 
 import toast from 'react-hot-toast';
 
 interface Market {
@@ -31,6 +31,7 @@ interface Bet {
   resolved: boolean;
   won?: boolean;
   payout?: number;
+  tx_hash?: string;  // ✅ BONUS: Also useful for tracking
 }
 
 interface PortfolioBet extends Bet {
@@ -54,7 +55,7 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // ðŸ” WALLET STATE FOR ON-CHAIN TRANSACTIONS
+  // WALLET STATE FOR ON-CHAIN TRANSACTIONS
   const [walletConnected, setWalletConnected] = useState(false);
   const [userAddress, setUserAddress] = useState<string>('');
   const [signingTransaction, setSigningTransaction] = useState(false);
@@ -77,12 +78,12 @@ const PredictionMarketsPage: React.FC = () => {
         if (wallet?.address) {
             setUserAddress(wallet.address);
             setWalletConnected(true);
-            console.log('âœ… Wallet connected:', wallet.address);
+            console.log('Wallet connected:', wallet.address);
         } else {
-            console.warn('âš ï¸ No Ethereum wallet found');
+            console.warn('No Ethereum wallet found');
         }
         } catch (error) {
-        console.error('âŒ Wallet check failed:', error);
+        console.error('Wallet check failed:', error);
         }
     };
 
@@ -103,7 +104,7 @@ const PredictionMarketsPage: React.FC = () => {
 
     const fetchMyBets = async () => {
         try {
-            // Ã°Å¸"' Get valid session token
+            // Get valid session token
             const { data: { session } } = await supabase.auth.getSession();
             
             if (!session?.access_token) {
@@ -113,13 +114,24 @@ const PredictionMarketsPage: React.FC = () => {
             
             const response = await fetch('/api/v1/predictions/my-bets', {
                 headers: {
-                    'Authorization': `Bearer ${session.access_token}` // Ã¢Å“â€¦ CORRECT TOKEN
+                    'Authorization': `Bearer ${session.access_token}`
                 }
             });
             
             const data = await response.json();
             if (data.success) {
-                setMyBets(data.bets);
+                // ✅ ONLY SHOW CONFIRMED/WON/LOST BETS (not pending/failed)
+                const confirmedBets = data.bets.filter((bet: any) => 
+                    bet.status === 'confirmed' || bet.won !== undefined
+                );
+                
+                setMyBets(confirmedBets);
+                
+                // 🚨 LOG PENDING BETS FOR DEBUGGING
+                const pendingBets = data.bets.filter((bet: any) => bet.status === 'pending');
+                if (pendingBets.length > 0) {
+                    console.warn(`⏳ ${pendingBets.length} pending bets (not showing in UI):`, pendingBets);
+                }
             }
         } catch (error) {
             console.error('Failed to fetch my bets:', error);
@@ -324,7 +336,7 @@ const handlePlaceBet = async () => {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
-            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS â€¢ $0 VOLUME</span>
+            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
@@ -497,7 +509,7 @@ const handlePlaceBet = async () => {
                   <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
                     <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
-                      ${myBets.reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)}
+                        ${myBets.filter(b => b.status === 'confirmed').reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)}
                     </div>
                   </div>
                   

@@ -1064,13 +1064,9 @@ async def approve_usdc_spending(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    ðŸ” APPROVE USDC SPENDING FOR PREDICTION MARKETS
+    🔐 APPROVE USDC SPENDING FOR PREDICTION MARKETS
     
-    This endpoint signs an USDC approval transaction on behalf of the user
-    (using their encrypted wallet seed) to allow the prediction market contract
-    to spend USDC.
-    
-    âœ… Security: Seed never leaves backend, encrypted at rest
+    FIXED: Proper gas estimation + error handling
     """
     try:
         bet_id = request.get('bet_id')
@@ -1081,12 +1077,12 @@ async def approve_usdc_spending(
         
         user_id = current_user.get("id")
         
-        # 1ï¸âƒ£ GET USER'S ENCRYPTED ETHEREUM WALLET SEED
+        # 1️⃣ GET USER'S ENCRYPTED ETHEREUM WALLET SEED
         from backend.services.database_service import DatabaseService
         db = DatabaseService()
         
         wallet_result = db.supabase.table('multi_chain_addresses')\
-            .select('encrypted_seed')\
+            .select('encrypted_seed, address')\
             .eq('user_id', user_id)\
             .eq('blockchain', 'ethereum')\
             .execute()
@@ -1094,20 +1090,32 @@ async def approve_usdc_spending(
         if not wallet_result.data or len(wallet_result.data) == 0:
             raise HTTPException(status_code=404, detail="No Ethereum wallet found")
         
+        wallet_address = wallet_result.data[0]['address']
         encrypted_seed = wallet_result.data[0]['encrypted_seed']
         
-        # 2ï¸âƒ£ DECRYPT SEED (server-side only)
+        # ✅ VERIFY WALLET HAS ETH FOR GAS
+        balance_wei = w3.eth.get_balance(wallet_address)
+        balance_eth = balance_wei / 1e18
+        
+        logger.info(f"💰 Wallet {wallet_address} has {balance_eth:.4f} ETH")
+        
+        if balance_wei < 10000000000000000:  # Less than 0.01 ETH
+            raise HTTPException(
+                status_code=400,
+                detail=f"❌ INSUFFICIENT ETH FOR GAS\n\n"
+                       f"Current balance: {balance_eth:.4f} ETH\n"
+                       f"Minimum required: 0.01 ETH\n\n"
+                       f"Get testnet ETH from: https://faucet.campnetwork.xyz/"
+            )
+        
+        # 2️⃣ DECRYPT SEED (server-side only)
         from backend.services.seed_encryption_service import SeedEncryptionService
         encryption_service = SeedEncryptionService()
         plaintext_seed = encryption_service.decrypt_seed(encrypted_seed)
         
-        # 3ï¸âƒ£ PREPARE USDC APPROVAL TRANSACTION
+        # 3️⃣ DERIVE PRIVATE KEY
         from web3 import Web3
         from eth_account import Account
-        
-        w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
-        
-        # Derive private key from seed (using BIP39/BIP44 standard)
         from hdwallet import HDWallet
         from hdwallet.symbols import ETH
         
@@ -1118,7 +1126,7 @@ async def approve_usdc_spending(
         private_key = hdwallet.private_key()
         account = Account.from_key(private_key)
         
-        # USDC Contract ABI (approve function)
+        # 4️⃣ PREPARE USDC APPROVAL TRANSACTION (FIXED GAS ESTIMATION)
         usdc_abi = [
             {
                 "constant": False,
@@ -1129,6 +1137,13 @@ async def approve_usdc_spending(
                 "name": "approve",
                 "outputs": [{"name": "", "type": "bool"}],
                 "type": "function"
+            },
+            {
+                "constant": True,
+                "inputs": [{"name": "_owner", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "balance", "type": "uint256"}],
+                "type": "function"
             }
         ]
         
@@ -1137,42 +1152,94 @@ async def approve_usdc_spending(
             abi=usdc_abi
         )
         
+        # ✅ CHECK USDC BALANCE
+        usdc_balance = usdc_contract.functions.balanceOf(wallet_address).call()
+        usdc_balance_human = usdc_balance / 1_000_000  # 6 decimals
+        
+        logger.info(f"💵 Wallet has {usdc_balance_human:.2f} USDC")
+        
+        if usdc_balance == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"❌ NO USDC IN WALLET\n\n"
+                       f"You need USDC to place bets!\n"
+                       f"Get testnet USDC from a faucet or bridge."
+            )
+        
         # Convert amount to 6 decimals (USDC precision)
         amount_wei = int(amount * 1_000_000)
         
-        # Build transaction
-        approve_tx = usdc_contract.functions.approve(
-            Web3.to_checksum_address(CONTRACT_ADDRESS),
-            amount_wei * 2  # Approve 2x for gas buffer
-        ).build_transaction({
-            'from': account.address,
-            'nonce': w3.eth.get_transaction_count(account.address),
-            'gas': 100000,
-            'gasPrice': w3.eth.gas_price
-        })
+        if usdc_balance < amount_wei:
+            raise HTTPException(
+                status_code=400,
+                detail=f"❌ INSUFFICIENT USDC\n\n"
+                       f"Available: {usdc_balance_human:.2f} USDC\n"
+                       f"Required: {float(amount):.2f} USDC"
+            )
         
-        # 4ï¸âƒ£ SIGN AND SEND TRANSACTION
-        signed_tx = account.sign_transaction(approve_tx)
-        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        # 5️⃣ BUILD APPROVAL TRANSACTION WITH PROPER GAS
+        try:
+            # Get current nonce
+            nonce = w3.eth.get_transaction_count(account.address, 'pending')
+            
+            # Get current gas price
+            gas_price = w3.eth.gas_price
+            
+            # Build transaction
+            approve_tx = usdc_contract.functions.approve(
+                Web3.to_checksum_address(CONTRACT_ADDRESS),
+                amount_wei * 2  # Approve 2x for buffer
+            ).build_transaction({
+                'from': account.address,
+                'nonce': nonce,
+                'gas': 100000,  # Fixed gas limit for approval
+                'gasPrice': gas_price,
+                'chainId': 325000  # Camp testnet chain ID
+            })
+            
+            logger.info(f"📝 Built approval tx: nonce={nonce}, gasPrice={gas_price}, gas=100000")
+            
+        except Exception as build_err:
+            logger.error(f"❌ Failed to build transaction: {build_err}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Transaction build failed: {str(build_err)}"
+            )
         
-        # Wait for confirmation (up to 30 seconds)
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
-        
-        if receipt['status'] != 1:
-            raise Exception("USDC approval transaction failed on-chain")
-        
-        logger.info(f"âœ… USDC approved: {tx_hash.hex()} for bet {bet_id}")
-        
-        return {
-            "success": True,
-            "tx_hash": tx_hash.hex(),
-            "message": "USDC spending approved"
-        }
+        # 6️⃣ SIGN AND SEND TRANSACTION
+        try:
+            signed_tx = account.sign_transaction(approve_tx)
+            tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+            
+            logger.info(f"📤 Approval tx sent: {tx_hash.hex()}")
+            
+            # Wait for confirmation (up to 60 seconds)
+            receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+            
+            if receipt['status'] != 1:
+                logger.error(f"❌ Approval tx reverted: {tx_hash.hex()}")
+                raise Exception("USDC approval transaction failed on-chain")
+            
+            logger.info(f"✅ USDC approved successfully: {tx_hash.hex()}")
+            
+            return {
+                "success": True,
+                "tx_hash": tx_hash.hex(),
+                "message": "USDC spending approved",
+                "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash.hex()}"
+            }
+            
+        except Exception as send_err:
+            logger.error(f"❌ Failed to send/confirm transaction: {send_err}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Approval transaction failed: {str(send_err)}"
+            )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"âŒ USDC approval failed: {e}")
+        logger.error(f"❌ USDC approval failed: {e}")
         raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
 
 
