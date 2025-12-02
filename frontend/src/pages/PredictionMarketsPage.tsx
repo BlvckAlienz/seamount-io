@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info } from 'lucide-react';
 
+import { apiClient } from '@/config/api';
+
 interface Market {
   id: number;
   question: string;
@@ -49,6 +51,11 @@ const PredictionMarketsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
+
+  // 🔐 WALLET STATE FOR ON-CHAIN TRANSACTIONS
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [userAddress, setUserAddress] = useState<string>('');
+  const [signingTransaction, setSigningTransaction] = useState(false);
 
   useEffect(() => {
     fetchMarkets();
@@ -131,6 +138,7 @@ const PredictionMarketsPage: React.FC = () => {
     setLoading(true);
     
     try {
+        // 1️⃣ RECORD BET IN DATABASE (existing logic)
         const response = await fetch('/api/v1/predictions/bet', {
         method: 'POST',
         headers: {
@@ -146,24 +154,74 @@ const PredictionMarketsPage: React.FC = () => {
         
         const data = await response.json();
         
-        if (data.success) {
-        // Show success toast (install react-hot-toast if not already)
-        alert(`✅ Bet recorded! Bet ID: ${data.bet_id}\n\nNext: Approve USDC and call placeBet() on-chain`);
+        if (!data.success) {
+        alert(`❌ Bet failed: ${data.detail || 'Unknown error'}`);
+        return;
+        }
         
-        // Refresh markets and close modal
+        const betId = data.bet_id;
+        const instructions = data.on_chain_instructions;
+        
+        // ✅ DATABASE BET RECORDED
+        console.log('✅ Step 1: Database bet recorded', betId);
+        
+        // 2️⃣ GET USER'S WALLET ADDRESS (from multi-chain wallets)
+        const walletResponse = await apiClient.get('/api/v1/wallet/multi-chain-status');
+        
+        if (!walletResponse.data.success || !walletResponse.data.wallets.ethereum?.address) {
+        alert('❌ No Ethereum wallet found. Create one in Dashboard first.');
+        return;
+        }
+        
+        const userWalletAddress = walletResponse.data.wallets.ethereum.address;
+        console.log('✅ Step 2: User wallet found', userWalletAddress);
+        
+        // 3️⃣ APPROVE USDC SPENDING (via backend proxy to avoid exposing private keys)
+        setSigningTransaction(true);
+        
+        const approveResponse = await apiClient.post('/api/v1/predictions/approve-usdc', {
+        bet_id: betId,
+        amount: parseFloat(betAmount)
+        });
+        
+        if (!approveResponse.data.success) {
+        alert(`❌ USDC approval failed: ${approveResponse.data.error}`);
+        return;
+        }
+        
+        console.log('✅ Step 3: USDC approved', approveResponse.data.tx_hash);
+        
+        // 4️⃣ CALL placeBet() ON SMART CONTRACT (via backend)
+        const placeBetResponse = await apiClient.post('/api/v1/predictions/execute-bet', {
+        bet_id: betId,
+        market_id: selectedMarket.id,
+        prediction: betPrediction,
+        amount: parseFloat(betAmount)
+        });
+        
+        if (!placeBetResponse.data.success) {
+        alert(`❌ On-chain bet failed: ${placeBetResponse.data.error}`);
+        return;
+        }
+        
+        console.log('✅ Step 4: On-chain bet placed', placeBetResponse.data.tx_hash);
+        
+        // 5️⃣ SUCCESS - UPDATE UI
+        alert(`🎉 BET PLACED SUCCESSFULLY!\n\nTransaction: ${placeBetResponse.data.tx_hash}\nView on Explorer: https://camp.cloud.blockscout.com/tx/${placeBetResponse.data.tx_hash}`);
+        
+        // Refresh data
         await fetchMarkets();
         await fetchMyBets();
         setShowBetModal(false);
         setBetAmount('10');
-        } else {
-        alert(`❌ Bet failed: ${data.detail || 'Unknown error'}`);
-        }
+        setSigningTransaction(false);
         
-    } catch (error) {
-        console.error('Bet placement error:', error);
-        alert('❌ Failed to place bet. Check console for details.');
+    } catch (error: any) {
+        console.error('❌ Bet placement error:', error);
+        alert(`❌ Transaction failed: ${error.message || 'Unknown error'}`);
     } finally {
         setLoading(false);
+        setSigningTransaction(false);
     }
     };
 
@@ -212,7 +270,7 @@ const PredictionMarketsPage: React.FC = () => {
           </h1>
           
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Bet on Nigerian sports, crypto, FX, and politics with <span className="text-green-400 font-semibold">USDC</span> on Camp Network
+            Bet on sports, crypto, FX, and politics with <span className="text-green-400 font-semibold">USDC</span> on Camp Network
           </p>
         </div>
 
@@ -588,10 +646,19 @@ const PredictionMarketsPage: React.FC = () => {
                   </button>
                   <button
                     onClick={handlePlaceBet}
-                    disabled={loading || !betAmount || parseFloat(betAmount) < 1}
+                    disabled={loading || signingTransaction || !betAmount || parseFloat(betAmount) < 1}
                     className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? 'Processing...' : `Place ${betAmount ? `$${betAmount}` : ''} Bet`}
+                    {signingTransaction ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                        <span>Signing Transaction...</span>
+                      </div>
+                    ) : loading ? (
+                      'Recording Bet...'
+                    ) : (
+                      `Place ${betAmount ? `$${betAmount}` : ''} Bet`
+                    )}
                   </button>
                 </div>
               </div>
