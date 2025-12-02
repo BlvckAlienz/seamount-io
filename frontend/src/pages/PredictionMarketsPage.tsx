@@ -88,40 +88,48 @@ const PredictionMarketsPage: React.FC = () => {
   const [signingTransaction, setSigningTransaction] = useState(false);
   const CAMP_CHAIN_ID = 325000; // Camp Network Testnet V2
 
-  // Check for existing wallet connection on mount
-  useEffect(() => {
-    const checkExistingConnection = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
+// Check for existing wallet connection on mount (ONCE ONLY)
+useEffect(() => {
+  let isMounted = true; // Prevent state updates after unmount
+  
+  const checkExistingConnection = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || !isMounted) return;
 
-        const response = await fetch('/api/v1/wallet/external-wallets', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.wallets && data.wallets.length > 0) {
-            const wallet = data.wallets[0];
-            setExternalWallet({
-              connected: true,
-              address: wallet.address,
-              chainName: wallet.chain_name,
-              walletSource: wallet.wallet_source,
-              verified: wallet.verified
-            });
-            console.log('✅ Existing wallet connection found:', wallet.address);
-          }
+      const response = await fetch('/api/v1/wallet/external-wallets', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
         }
-      } catch (error) {
+      });
+
+      if (response.ok && isMounted) {
+        const data = await response.json();
+        if (data.wallets && data.wallets.length > 0) {
+          const wallet = data.wallets[0];
+          setExternalWallet({
+            connected: true,
+            address: wallet.address,
+            chainName: wallet.chain_name,
+            walletSource: wallet.wallet_source,
+            verified: wallet.verified
+          });
+          console.log('✅ Existing wallet connection found:', wallet.address);
+        }
+      }
+    } catch (error) {
+      if (isMounted) {
         console.error('Failed to check existing wallet:', error);
       }
-    };
+    }
+  };
 
-    checkExistingConnection();
-  }, []);
+  checkExistingConnection();
+  
+  return () => {
+    isMounted = false; // Cleanup
+  };
+}, []); // ✅ EMPTY DEPS ARRAY - ONLY RUN ONCE
 
   // Handle successful wallet connection from modal
   const handleWalletConnected = (wallet: ConnectedWallet) => {
@@ -270,6 +278,12 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
   const handlePlaceBet = async () => {
+    console.log('🎯 handlePlaceBet called');
+    console.log('📊 Selected market:', selectedMarket?.id);
+    console.log('💰 Bet amount:', betAmount);
+    console.log('🔌 Wallet connected:', externalWallet.connected);
+    console.log('🌐 Chain check:', checkWalletChain());
+    
     if (!selectedMarket || !betAmount) return;
 
     // ⚠️ CHECK WALLET CONNECTION (UPDATED)

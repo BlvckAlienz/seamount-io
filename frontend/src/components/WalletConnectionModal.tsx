@@ -200,11 +200,14 @@ export const WalletConnectionModal: React.FC<WalletConnectionModalProps> = ({
 
       // 3️⃣ GENERATE NONCE FROM BACKEND
       setStep('signing');
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('Please sign in first');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        console.error('❌ Session error:', sessionError);
+        throw new Error('Please sign in to Seamount first');
       }
+
+      console.log('🔑 Generating nonce for:', address);
 
       const nonceResponse = await fetch('/api/v1/wallet/generate-nonce', {
         method: 'POST',
@@ -212,12 +215,16 @@ export const WalletConnectionModal: React.FC<WalletConnectionModalProps> = ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ address })
+        body: JSON.stringify({ address }),
+        credentials: 'include' // ✅ ADD THIS for CORS
       });
 
+      console.log('📡 Nonce response status:', nonceResponse.status);
+
       if (!nonceResponse.ok) {
-        const errorData = await nonceResponse.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Failed to generate verification nonce');
+        const errorText = await nonceResponse.text();
+        console.error('❌ Nonce generation failed:', errorText);
+        throw new Error(`Failed to generate nonce: ${nonceResponse.status} ${errorText}`);
       }
 
       const { nonce, message } = await nonceResponse.json();
