@@ -45,3 +45,4 @@ web3==6.15.0
 mnemonic==0.21  # ✅ BIP39 seed phrase generation
 algokit-utils==3.0.0
 eth-account==0.10.0
+hdwallet==2.2.1

@@ -1105,10 +1105,9 @@ async def approve_usdc_spending(
         from web3 import Web3
         from eth_account import Account
         
-        w3 = Web3(Web3.HTTPProvider("https://rpc-campnetwork.xyz"))
+        w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
         
         # Derive private key from seed (using BIP39/BIP44 standard)
-        # NOTE: This requires hdwallet library
         from hdwallet import HDWallet
         from hdwallet.symbols import ETH
         
@@ -1176,6 +1175,7 @@ async def approve_usdc_spending(
         logger.error(f"❌ USDC approval failed: {e}")
         raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
 
+
 @router.post("/execute-bet")
 async def execute_on_chain_bet(
     request: Dict[str, Any],
@@ -1225,7 +1225,7 @@ async def execute_on_chain_bet(
         from hdwallet import HDWallet
         from hdwallet.symbols import ETH
         
-        w3 = Web3(Web3.HTTPProvider("https://rpc-campnetwork.xyz"))
+        w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
         
         hdwallet = HDWallet(symbol=ETH)
         hdwallet.from_mnemonic(plaintext_seed)

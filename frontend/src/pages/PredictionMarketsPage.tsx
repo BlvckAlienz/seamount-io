@@ -59,6 +59,36 @@ const PredictionMarketsPage: React.FC = () => {
   const [userAddress, setUserAddress] = useState<string>('');
   const [signingTransaction, setSigningTransaction] = useState(false);
 
+  // Check if user has Ethereum wallet on Camp Network
+  useEffect(() => {
+    const checkWallet = async () => {
+        try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+
+        // Fetch user's Ethereum wallet from database
+        const { data: wallet } = await supabase
+            .from('multi_chain_addresses')
+            .select('address')
+            .eq('user_id', session.user.id)
+            .eq('blockchain', 'ethereum')
+            .single();
+
+        if (wallet?.address) {
+            setUserAddress(wallet.address);
+            setWalletConnected(true);
+            console.log('✅ Wallet connected:', wallet.address);
+        } else {
+            console.warn('⚠️ No Ethereum wallet found');
+        }
+        } catch (error) {
+        console.error('❌ Wallet check failed:', error);
+        }
+    };
+
+    checkWallet();
+  }, []);
+
   useEffect(() => {
     fetchMarkets();
     const interval = setInterval(fetchMarkets, 10000); // Poll every 10s
@@ -144,64 +174,117 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
 const handlePlaceBet = async () => {
-    if (!selectedMarket || !betAmount) return;
+  if (!selectedMarket || !betAmount) return;
+  
+  setLoading(true);
+  
+  try {
+    // 🔐 STEP 1: GET VALID SUPABASE SESSION TOKEN
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    setLoading(true);
-    
-    try {
-        // ðŸ"' STEP 1: GET VALID SUPABASE SESSION TOKEN
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session?.access_token) {
-            toast.error('âŒ Please sign in to place bets');
-            console.error('[Bet] No valid session:', sessionError);
-            return;
-        }
-        
-        console.log('âœ… [Bet] Valid session token retrieved');
-        
-        // 1ï¸âƒ£ RECORD BET IN DATABASE
-        const response = await fetch('/api/v1/predictions/bet', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}` // âœ… CORRECT TOKEN
-            },
-            body: JSON.stringify({
-                market_id: selectedMarket.id,
-                prediction: betPrediction,
-                amount: parseFloat(betAmount)
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.detail || `HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        if (!data.success) {
-            throw new Error(data.detail || 'Bet recording failed');
-        }
-        
-        const betId = data.bet_id;
-        console.log('âœ… [Bet] Step 1: Database bet recorded', betId);
-        
-        // 2ï¸âƒ£ SUCCESS - SHOW CONFIRMATION (on-chain steps coming in Feature #1)
-        toast.success(`ðŸŽ‰ Bet placed! $${betAmount} on ${betPrediction ? 'YES' : 'NO'}`);
-        
-        // Refresh data
-        await fetchMarkets();
-        await fetchMyBets();
-        setShowBetModal(false);
-        setBetAmount('10');
-        
-    } catch (error: any) {
-        console.error('âŒ [Bet] Placement error:', error);
-        toast.error(error.message || 'Bet placement failed');
-    } finally {
-        setLoading(false);
+    if (sessionError || !session?.access_token) {
+      toast.error('❌ Please sign in to place bets');
+      console.error('[Bet] No valid session:', sessionError);
+      return;
     }
+    
+    console.log('✅ [Bet] Valid session token retrieved');
+    
+    // 1️⃣ RECORD BET IN DATABASE
+    const response = await fetch('/api/v1/predictions/bet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        market_id: selectedMarket.id,
+        prediction: betPrediction,
+        amount: parseFloat(betAmount)
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    if (!data.success) {
+      throw new Error(data.detail || 'Bet recording failed');
+    }
+    
+    const betId = data.bet_id;
+    console.log('✅ [Bet] Step 1: Database bet recorded', betId);
+    
+    // 2️⃣ APPROVE USDC SPENDING (if not already approved)
+    setSigningTransaction(true);
+    toast.loading('Step 1/3: Approving USDC...', { id: 'bet-process' });
+    
+    const approvalResponse = await fetch('/api/v1/predictions/approve-usdc', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        bet_id: betId,
+        amount: parseFloat(betAmount)
+      })
+    });
+    
+    const approvalData = await approvalResponse.json();
+    
+    if (!approvalData.success) {
+      throw new Error('USDC approval failed: ' + approvalData.error);
+    }
+    
+    console.log('✅ [Bet] Step 2: USDC approved', approvalData.tx_hash);
+    
+    // 3️⃣ EXECUTE ON-CHAIN BET
+    toast.loading('Step 2/3: Placing bet on-chain...', { id: 'bet-process' });
+    
+    const executeResponse = await fetch('/api/v1/predictions/execute-bet', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        bet_id: betId,
+        market_id: selectedMarket.id,
+        prediction: betPrediction,
+        amount: parseFloat(betAmount)
+      })
+    });
+    
+    const executeData = await executeResponse.json();
+    
+    if (!executeData.success) {
+      throw new Error('On-chain bet failed: ' + executeData.error);
+    }
+    
+    console.log('✅ [Bet] Step 3: On-chain bet executed', executeData.tx_hash);
+    
+    // 4️⃣ SUCCESS - SHOW CONFIRMATION
+    toast.success(
+      `Bet placed! View on block explorer: ${executeData.explorer_url}`,
+      { id: 'bet-process', duration: 5000 }
+    );
+    
+    // Refresh data
+    await fetchMarkets();
+    await fetchMyBets();
+    setShowBetModal(false);
+    setBetAmount('10');
+    
+  } catch (error: any) {
+    console.error('❌ [Bet] Placement error:', error);
+    toast.error(error.message || 'Bet placement failed', { id: 'bet-process' });
+  } finally {
+    setLoading(false);
+    setSigningTransaction(false);
+  }
 };
 
   const getCategoryFromQuestion = (question: string) => {
