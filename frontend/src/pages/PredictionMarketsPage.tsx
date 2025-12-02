@@ -5,6 +5,7 @@ import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCirc
 import { apiClient } from '@/config/api';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import { WalletConnectionModal } from '@/components/WalletConnectionModal'; // 🆕 ADD THIS IMPORT
 
 declare global {
   interface Window {
@@ -69,58 +70,66 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-// 🔧 SIMPLIFIED WALLET STATE - NO AUTO-REFRESH
-const [externalWallet, setExternalWallet] = useState<{
-  connected: boolean;
-  address: string;
-  chainName: string;
-  walletSource: string;
-  verified: boolean;
-}>(() => {
-  // Try to load from localStorage on component mount (ONCE)
-  const saved = localStorage.getItem('seamount_wallet');
-  return saved ? JSON.parse(saved) : {
+  // 🔌 WALLET CONNECTION STATE (UPDATED)
+  const [externalWallet, setExternalWallet] = useState<{
+    connected: boolean;
+    address: string;
+    chainName: string;
+    walletSource: string;
+    verified: boolean;
+  }>({
     connected: false,
     address: '',
     chainName: '',
     walletSource: '',
     verified: false
-  };
-});
+  });
+  const [showWalletModal, setShowWalletModal] = useState(false); // 🆕 NEW STATE
+  const [signingTransaction, setSigningTransaction] = useState(false);
+  const CAMP_CHAIN_ID = 325000; // Camp Network Testnet V2
 
-// 🔧 SIMPLIFIED: Check existing wallet ONCE on mount
+// Check for existing wallet connection on mount (ONCE ONLY)
 useEffect(() => {
-  const checkOnce = async () => {
+  let isMounted = true; // Prevent state updates after unmount
+  
+  const checkExistingConnection = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      
+      if (!session?.access_token || !isMounted) return;
+
       const response = await fetch('/api/v1/wallet/external-wallets', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
-      
-      if (response.ok) {
+
+      if (response.ok && isMounted) {
         const data = await response.json();
         if (data.wallets && data.wallets.length > 0) {
           const wallet = data.wallets[0];
-          const walletState = {
+          setExternalWallet({
             connected: true,
             address: wallet.address,
             chainName: wallet.chain_name,
             walletSource: wallet.wallet_source,
             verified: wallet.verified
-          };
-          setExternalWallet(walletState);
-          localStorage.setItem('seamount_wallet', JSON.stringify(walletState));
+          });
+          console.log('✅ Existing wallet connection found:', wallet.address);
         }
       }
     } catch (error) {
-      console.log('No existing wallet found (normal for first-time users)');
+      if (isMounted) {
+        console.error('Failed to check existing wallet:', error);
+      }
     }
   };
+
+  checkExistingConnection();
   
-  checkOnce();
-}, []); // ✅ EMPTY DEPS - RUNS ONCE
+  return () => {
+    isMounted = false; // Cleanup
+  };
+}, []); // ✅ EMPTY DEPS ARRAY - ONLY RUN ONCE
 
   // Handle successful wallet connection from modal
   const handleWalletConnected = (wallet: ConnectedWallet) => {
@@ -267,88 +276,6 @@ useEffect(() => {
     const grossPayout = (amount / winningPool) * totalPool;
     return grossPayout * 0.982;
   };
-
-    // 🆕 SIMPLIFIED: Direct MetaMask connection without modal
-    const quickConnectMetaMask = async () => {
-    if (typeof window.ethereum === 'undefined') {
-        toast.error('Please install MetaMask');
-        return false;
-    }
-    
-    try {
-        // 1. Request account access
-        const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-        });
-        const address = accounts[0];
-        
-        // 2. Switch to Camp Network (silently)
-        try {
-        await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${CAMP_CHAIN_ID.toString(16)}` }]
-        });
-        } catch (switchError: any) {
-        if (switchError.code === 4902) {
-            await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-                chainId: `0x${CAMP_CHAIN_ID.toString(16)}`,
-                chainName: 'Camp Network Testnet V2',
-                rpcUrls: ['https://rpc.camp-network-testnet.gelato.digital'],
-                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                blockExplorerUrls: ['https://camp.cloud.blockscout.com']
-            }]
-            });
-        }
-        }
-        
-        // 3. Save to backend WITHOUT signature verification
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
-        toast.error('Please sign in first');
-        return false;
-        }
-        
-        const response = await fetch('/api/v1/wallet/connect-external', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-            address,
-            chain: 'ethereum',
-            wallet_source: 'metamask'
-            // 🔥 NO SIGNATURE - SIMPLIFIED FOR SPEED
-        })
-        });
-        
-        if (response.ok) {
-        const walletState = {
-            connected: true,
-            address,
-            chainName: 'Camp Network',
-            walletSource: 'metamask',
-            verified: false // Will verify later
-        };
-        setExternalWallet(walletState);
-        localStorage.setItem('seamount_wallet', JSON.stringify(walletState));
-        toast.success('MetaMask connected!');
-        return true;
-        }
-        
-        return false;
-    } catch (error: any) {
-        console.error('Quick connect failed:', error);
-        if (error.code === 4001) {
-        toast.error('Connection rejected');
-        } else {
-        toast.error('Connection failed');
-        }
-        return false;
-    }
-    };
 
   const handlePlaceBet = async () => {
     console.log('🎯 handlePlaceBet called');
@@ -616,50 +543,55 @@ useEffect(() => {
           ))}
         </div>
         
-        {/* 🆕 SIMPLIFIED WALLET BANNER */}
+        {/* 🆕 UPDATED WALLET CONNECTION BANNERS */}
         {!externalWallet.connected ? (
-        <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-2xl p-4 mb-6">
+          <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between">
-            <div>
-                <h3 className="text-lg font-bold text-white mb-1">🔐 Connect MetaMask</h3>
-                <p className="text-gray-300 text-sm">Quick connect to start betting</p>
-            </div>
-            <button
-                onClick={quickConnectMetaMask}
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">🔐 Connect Your Wallet</h3>
+                <p className="text-gray-300">Connect your Web3 wallet to start betting on prediction markets</p>
+              </div>
+              <button
+                onClick={() => setShowWalletModal(true)}
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50"
-            >
-                {loading ? 'Connecting...' : 'Connect MetaMask'}
-            </button>
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50"
+              >
+                {loading ? 'Connecting...' : 'Connect Wallet'}
+              </button>
             </div>
-        </div>
+          </div>
         ) : !checkWalletChain() ? (
-        <div className="bg-gradient-to-r from-yellow-900/50 to-orange-900/50 border border-yellow-500/30 rounded-2xl p-4 mb-6">
+          <div className="bg-gradient-to-r from-yellow-900/50 to-orange-900/50 border border-yellow-500/30 rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between">
-            <div>
-                <h3 className="text-lg font-bold text-white mb-1">⚠️ Switch Network</h3>
-                <p className="text-gray-300 text-sm">Please switch to Camp Network</p>
-            </div>
-            <button
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">⚠️ Wrong Network</h3>
+                <p className="text-gray-300">Please switch to Camp Network Testnet V2 (Chain ID: {CAMP_CHAIN_ID})</p>
+              </div>
+              <button
                 onClick={switchToCampNetwork}
-                className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 transition-all"
-            >
+                className="px-8 py-4 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 transition-all"
+              >
                 Switch Network
-            </button>
+              </button>
             </div>
-        </div>
+          </div>
         ) : (
-        <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-2xl p-3 mb-6">
+          <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-2xl p-4 mb-6">
             <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-white font-semibold text-sm">
-                MetaMask: {externalWallet.address.slice(0, 6)}...{externalWallet.address.slice(-4)}
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                <div>
+                  <span className="text-white font-semibold">
+                    {externalWallet.walletSource} Connected: {externalWallet.address.slice(0, 6)}...{externalWallet.address.slice(-4)}
+                  </span>
+                  <div className="text-xs text-gray-400">
+                    {externalWallet.verified ? '✓ Verified' : '⚠️ Needs verification'}
+                  </div>
+                </div>
+              </div>
+              <span className="text-green-400 text-sm">{externalWallet.chainName} ✓</span>
             </div>
-            <span className="text-green-400 text-xs">Camp Network ✓</span>
-            </div>
-        </div>
+          </div>
         )}
         
         {/* Tabs */}
@@ -1035,6 +967,13 @@ useEffect(() => {
             </div>
           </div>
         )}
+
+        {/* 🆕 WALLET CONNECTION MODAL */}
+        <WalletConnectionModal
+          isOpen={showWalletModal}
+          onClose={() => setShowWalletModal(false)}
+          onSuccess={handleWalletConnected}
+        />
       </div>
     </div>
   );
