@@ -844,7 +844,7 @@ class PlaceBetRequest(BaseModel):
 @router.get("/markets")
 async def get_active_markets():
     """
-    ðŸ"Š GET ACTIVE PREDICTION MARKETS
+    Ã°Å¸"Å  GET ACTIVE PREDICTION MARKETS
     Open to ALL users (no authentication required for viewing)
     """
     try:
@@ -919,7 +919,7 @@ async def get_active_markets():
 @router.get("/markets/{market_id}")
 async def get_market_details(market_id: int):
     """
-    ðŸ" GET SPECIFIC MARKET DETAILS
+    Ã°Å¸" GET SPECIFIC MARKET DETAILS
     """
     try:
         if not CONTRACT_ADDRESS:
@@ -964,69 +964,58 @@ async def get_market_details(market_id: int):
 
 @router.post("/bet")
 async def place_bet(
-    request: dict,  # Changed to accept wallet_address
+    request: PlaceBetRequest,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    💰 RECORD BET (No signing - client does that)
-    ✅ Validates market exists
-    ✅ Records bet in database
-    ✅ Returns bet ID for client to attach tx_hash
+    ðŸ’° PLACE BET ON PREDICTION MARKET
+    âœ… Authenticated users only
+    âœ… Records bet in database
+    âœ… Returns transaction instructions
     """
     try:
-        market_id = request.get('market_id')
-        prediction = request.get('prediction')
-        amount = Decimal(str(request.get('amount', 0)))
-        wallet_address = request.get('wallet_address')  # External wallet
-        
-        if market_id is None or prediction is None or amount <= 0:
-            raise HTTPException(status_code=400, detail="Invalid bet parameters")
-        
-        if not wallet_address:
-            raise HTTPException(status_code=400, detail="Wallet address required")
-        
-        user_id = current_user.get("id")
-        
-        # 1️⃣ VALIDATE MARKET EXISTS
         if not CONTRACT_ADDRESS:
             raise HTTPException(status_code=503, detail="Prediction markets not configured")
         
+        user_id = current_user.get("id")
+        
+        # 1ï¸âƒ£ VALIDATE MARKET EXISTS & IS ACTIVE
         contract = w3.eth.contract(
             address=Web3.to_checksum_address(CONTRACT_ADDRESS),
             abi=MARKET_ABI
         )
         
         market_count = contract.functions.marketCount().call()
-        if market_id >= market_count:
-            raise HTTPException(status_code=404, detail=f"Market {market_id} does not exist")
+        if request.market_id >= market_count:
+            raise HTTPException(status_code=404, detail=f"Market {request.market_id} does not exist")
         
-        market_details = contract.functions.getMarketDetails(market_id).call()
+        # Get market details
+        market_details = contract.functions.getMarketDetails(request.market_id).call()
         
         # Check market is still open
-        if market_details[9] <= 0:
+        if market_details[9] <= 0:  # timeRemaining
             raise HTTPException(status_code=400, detail="Market has already ended")
         
-        if market_details[3]:
+        if market_details[3]:  # resolved
             raise HTTPException(status_code=400, detail="Market already resolved")
         
-        # 2️⃣ VALIDATE BET AMOUNT
+        # 2ï¸âƒ£ VALIDATE BET AMOUNT
         min_bet = Decimal("1.0")
         max_bet = Decimal("10000.0")
         
-        if amount < min_bet:
+        if request.amount < min_bet:
             raise HTTPException(status_code=400, detail=f"Minimum bet is ${min_bet}")
-        if amount > max_bet:
+        if request.amount > max_bet:
             raise HTTPException(status_code=400, detail=f"Maximum bet is ${max_bet}")
         
-        # 3️⃣ RECORD BET IN DATABASE
+        # 3ï¸âƒ£ RECORD BET IN DATABASE
         supabase = get_supabase_client()
         
         bet_data = {
             "user_id": user_id,
-            "market_id": market_id,
-            "prediction": prediction,
-            "amount": float(amount),
-            "wallet_address": wallet_address,  # Store external wallet
+            "market_id": request.market_id,
+            "prediction": request.prediction,
+            "amount": float(request.amount),
             "status": "pending",
             "tx_hash": None,
             "created_at": datetime.utcnow().isoformat()
@@ -1039,82 +1028,271 @@ async def place_bet(
         
         bet_record = db_result.data[0]
         
-        logger.info(f"✅ Bet recorded: User {user_id} placed ${amount} on market {market_id}")
+        logger.info(f"âœ… Bet recorded: User {user_id} placed ${request.amount} ({request.prediction}) on market {request.market_id}")
         
-        # 4️⃣ CALCULATE POTENTIAL PAYOUT
-        odds = market_details[7] if prediction else market_details[8]
-        potential_payout = float(amount) * (10000 / odds) * 0.982
+        # 4ï¸âƒ£ CALCULATE POTENTIAL PAYOUT
+        odds = market_details[7] if request.prediction else market_details[8]
+        potential_payout = float(request.amount) * (10000 / odds) * 0.982  # After 1.8% fee
         
         return {
             "success": True,
-            "message": "Bet recorded. Complete transaction in your wallet.",
+            "message": "Bet recorded successfully! Complete on-chain transaction to finalize.",
             "bet_id": bet_record["id"],
-            "potential_payout": round(potential_payout, 2)
+            "bet": {
+                **bet_record,
+                "potential_payout": round(potential_payout, 2),
+                "market_question": market_details[0]
+            },
+            "on_chain_instructions": {
+                "step_1": "Approve USDC spending",
+                "step_2": "Call placeBet() on contract",
+                "contract_address": CONTRACT_ADDRESS,
+                "usdc_address": USDC_ADDRESS,
+                "amount_wei": int(request.amount * 1_000_000)  # Convert to 6 decimals
+            }
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Bet recording failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        logger.error(f"âŒ Bet placement failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Bet placement failed: {str(e)}")
 
-@router.patch("/update-bet")
-async def update_bet_tx_hash(
-    request: dict,
+@router.post("/approve-usdc")
+async def approve_usdc_spending(
+    request: Dict[str, Any],
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    ✅ UPDATE BET WITH TX HASH (after client signs)
-    Called after user completes on-chain transaction
+    ðŸ” APPROVE USDC SPENDING FOR PREDICTION MARKETS
+    
+    This endpoint signs an USDC approval transaction on behalf of the user
+    (using their encrypted wallet seed) to allow the prediction market contract
+    to spend USDC.
+    
+    âœ… Security: Seed never leaves backend, encrypted at rest
     """
     try:
         bet_id = request.get('bet_id')
-        tx_hash = request.get('tx_hash')
-        status = request.get('status', 'confirmed')
+        amount = Decimal(str(request.get('amount', 0)))
         
-        if not bet_id or not tx_hash:
-            raise HTTPException(status_code=400, detail="bet_id and tx_hash required")
+        if not bet_id or amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid bet_id or amount")
         
         user_id = current_user.get("id")
-        supabase = get_supabase_client()
         
-        # Verify bet belongs to user
-        bet_check = supabase.table('prediction_bets').select('user_id').eq('id', bet_id).execute()
+        # 1ï¸âƒ£ GET USER'S ENCRYPTED ETHEREUM WALLET SEED
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
         
-        if not bet_check.data:
-            raise HTTPException(status_code=404, detail="Bet not found")
+        wallet_result = db.supabase.table('multi_chain_addresses')\
+            .select('encrypted_seed')\
+            .eq('user_id', user_id)\
+            .eq('blockchain', 'ethereum')\
+            .execute()
         
-        if bet_check.data[0]['user_id'] != user_id:
-            raise HTTPException(status_code=403, detail="Not your bet")
+        if not wallet_result.data or len(wallet_result.data) == 0:
+            raise HTTPException(status_code=404, detail="No Ethereum wallet found")
         
-        # Update with tx hash
-        update_result = supabase.table('prediction_bets').update({
-            'tx_hash': tx_hash,
-            'status': status,
-            'updated_at': datetime.utcnow().isoformat()
-        }).eq('id', bet_id).execute()
+        encrypted_seed = wallet_result.data[0]['encrypted_seed']
         
-        logger.info(f"✅ Bet {bet_id} updated with tx {tx_hash}")
+        # 2ï¸âƒ£ DECRYPT SEED (server-side only)
+        from backend.services.seed_encryption_service import SeedEncryptionService
+        encryption_service = SeedEncryptionService()
+        plaintext_seed = encryption_service.decrypt_seed(encrypted_seed)
+        
+        # 3ï¸âƒ£ PREPARE USDC APPROVAL TRANSACTION
+        from web3 import Web3
+        from eth_account import Account
+        
+        w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
+        
+        # Derive private key from seed (using BIP39/BIP44 standard)
+        from hdwallet import HDWallet
+        from hdwallet.symbols import ETH
+        
+        hdwallet = HDWallet(symbol=ETH)
+        hdwallet.from_mnemonic(plaintext_seed)
+        hdwallet.from_path("m/44'/60'/0'/0/0")  # Standard Ethereum derivation path
+        
+        private_key = hdwallet.private_key()
+        account = Account.from_key(private_key)
+        
+        # USDC Contract ABI (approve function)
+        usdc_abi = [
+            {
+                "constant": False,
+                "inputs": [
+                    {"name": "_spender", "type": "address"},
+                    {"name": "_value", "type": "uint256"}
+                ],
+                "name": "approve",
+                "outputs": [{"name": "", "type": "bool"}],
+                "type": "function"
+            }
+        ]
+        
+        usdc_contract = w3.eth.contract(
+            address=Web3.to_checksum_address(USDC_ADDRESS),
+            abi=usdc_abi
+        )
+        
+        # Convert amount to 6 decimals (USDC precision)
+        amount_wei = int(amount * 1_000_000)
+        
+        # Build transaction
+        approve_tx = usdc_contract.functions.approve(
+            Web3.to_checksum_address(CONTRACT_ADDRESS),
+            amount_wei * 2  # Approve 2x for gas buffer
+        ).build_transaction({
+            'from': account.address,
+            'nonce': w3.eth.get_transaction_count(account.address),
+            'gas': 100000,
+            'gasPrice': w3.eth.gas_price
+        })
+        
+        # 4ï¸âƒ£ SIGN AND SEND TRANSACTION
+        signed_tx = account.sign_transaction(approve_tx)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        
+        # Wait for confirmation (up to 30 seconds)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+        
+        if receipt['status'] != 1:
+            raise Exception("USDC approval transaction failed on-chain")
+        
+        logger.info(f"âœ… USDC approved: {tx_hash.hex()} for bet {bet_id}")
         
         return {
             "success": True,
-            "message": "Bet confirmed on-chain",
-            "tx_hash": tx_hash
+            "tx_hash": tx_hash.hex(),
+            "message": "USDC spending approved"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Bet update failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-          
+        logger.error(f"âŒ USDC approval failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
+
+
+@router.post("/execute-bet")
+async def execute_on_chain_bet(
+    request: Dict[str, Any],
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    âš¡ EXECUTE ON-CHAIN BET (Call placeBet() on smart contract)
+    
+    Prerequisites:
+    - USDC must be approved first (via /approve-usdc)
+    - Bet must exist in database
+    """
+    try:
+        bet_id = request.get('bet_id')
+        market_id = request.get('market_id')
+        prediction = request.get('prediction')
+        amount = Decimal(str(request.get('amount', 0)))
+        
+        if bet_id is None or market_id is None or prediction is None or amount <= 0:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        user_id = current_user.get("id")
+        
+        # 1ï¸âƒ£ GET USER'S WALLET
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        wallet_result = db.supabase.table('multi_chain_addresses')\
+            .select('encrypted_seed')\
+            .eq('user_id', user_id)\
+            .eq('blockchain', 'ethereum')\
+            .execute()
+        
+        if not wallet_result.data:
+            raise HTTPException(status_code=404, detail="No Ethereum wallet")
+        
+        encrypted_seed = wallet_result.data[0]['encrypted_seed']
+        
+        # 2ï¸âƒ£ DECRYPT SEED
+        from backend.services.seed_encryption_service import SeedEncryptionService
+        encryption_service = SeedEncryptionService()
+        plaintext_seed = encryption_service.decrypt_seed(encrypted_seed)
+        
+        # 3ï¸âƒ£ DERIVE PRIVATE KEY
+        from web3 import Web3
+        from eth_account import Account
+        from hdwallet import HDWallet
+        from hdwallet.symbols import ETH
+        
+        w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
+        
+        hdwallet = HDWallet(symbol=ETH)
+        hdwallet.from_mnemonic(plaintext_seed)
+        hdwallet.from_path("m/44'/60'/0'/0/0")
+        
+        private_key = hdwallet.private_key()
+        account = Account.from_key(private_key)
+        
+        # 4ï¸âƒ£ CALL placeBet() ON SMART CONTRACT
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(CONTRACT_ADDRESS),
+            abi=MARKET_ABI
+        )
+        
+        amount_wei = int(amount * 1_000_000)  # 6 decimals for USDC
+        
+        place_bet_tx = contract.functions.placeBet(
+            market_id,
+            prediction,
+            amount_wei
+        ).build_transaction({
+            'from': account.address,
+            'nonce': w3.eth.get_transaction_count(account.address),
+            'gas': 300000,
+            'gasPrice': w3.eth.gas_price
+        })
+        
+        # 5ï¸âƒ£ SIGN AND SEND
+        signed_tx = account.sign_transaction(place_bet_tx)
+        tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+        
+        # Wait for confirmation
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+        
+        if receipt['status'] != 1:
+            raise Exception("Bet transaction failed on-chain")
+        
+        # 6ï¸âƒ£ UPDATE DATABASE BET RECORD
+        supabase = get_supabase_client()
+        
+        update_result = supabase.table('prediction_bets').update({
+            'tx_hash': tx_hash.hex(),
+            'status': 'confirmed',
+            'updated_at': datetime.utcnow().isoformat()
+        }).eq('id', bet_id).execute()
+        
+        logger.info(f"âœ… On-chain bet placed: {tx_hash.hex()} for bet {bet_id}")
+        
+        return {
+            "success": True,
+            "tx_hash": tx_hash.hex(),
+            "message": "Bet placed on-chain successfully",
+            "explorer_url": f"https://camp.cloud.blockscout.com/tx/{tx_hash.hex()}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"âŒ On-chain bet execution failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
+        
 @router.get("/my-bets")
 async def get_my_bets(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    📊 GET USER'S BET HISTORY
+    ðŸ“Š GET USER'S BET HISTORY
     Returns all bets with enriched market data
     """
     try:
@@ -1218,7 +1396,7 @@ async def get_my_bets(
 @router.get("/health")
 async def predictions_health():
     """
-    âœ… HEALTH CHECK FOR PREDICTION MARKETS
+    Ã¢Å“â€¦ HEALTH CHECK FOR PREDICTION MARKETS
     """
     try:
         if not CONTRACT_ADDRESS:

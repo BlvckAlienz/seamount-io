@@ -36,7 +36,7 @@ dependencies_available = False
 oracle_service_available = False
 routers_available = {}
 
-logger.info("🚀 Starting Seamount API initialization...")
+logger.info("ðŸš€ Starting Seamount API initialization...")
 
 # ===== IMPORT DEPENDENCIES =====
 try:
@@ -52,9 +52,9 @@ try:
         get_oracle_service
     )
     dependencies_available = True
-    logger.info("✅ Dependencies imported successfully")
+    logger.info("âœ… Dependencies imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Critical dependency import error: {e}")
+    logger.error(f"âŒ Critical dependency import error: {e}")
     dependencies_available = False
     
     # Create mock functions for graceful degradation
@@ -84,9 +84,9 @@ from backend.models import UserRole
 # Import services individually with fallbacks
 try:
     from backend.services.multi_chain_wallet_service import MultiChainWalletService
-    logger.info("✅ MultiChainWalletService imported")
+    logger.info("âœ… MultiChainWalletService imported")
 except ImportError as e:
-    logger.error(f"❌ MultiChainWalletService import failed: {e}")
+    logger.error(f"âŒ MultiChainWalletService import failed: {e}")
     MultiChainWalletService = None
 
 try:
@@ -96,18 +96,18 @@ try:
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService
     services_available = True
-    logger.info("✅ Core services imported")
+    logger.info("âœ… Core services imported")
 except ImportError as e:
-    logger.error(f"❌ Core services import error: {e}")
+    logger.error(f"âŒ Core services import error: {e}")
     services_available = False
 
 # ===== IMPORT ORACLE SERVICE =====
 try:
     from backend.services.oracle_service import OracleService
     oracle_service_available = True
-    logger.info("✅ Oracle service imported successfully")
+    logger.info("âœ… Oracle service imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Oracle service import error: {e}")
+    logger.error(f"âŒ Oracle service import error: {e}")
     oracle_service_available = False
 
 from backend.api.routes import seed_routes
@@ -118,57 +118,57 @@ from backend.api.routes import onramp, offramp, bank_verification
 try:
     from backend.api.routes import bank_verification
     routers_available['bank_verification'] = bank_verification
-    logger.info("✅ Bank verification router imported")
+    logger.info("âœ… Bank verification router imported")
 except ImportError as e:
-    logger.error(f"❌ Bank verification router import error: {e}")
+    logger.error(f"âŒ Bank verification router import error: {e}")
     routers_available['bank_verification'] = None
 
 try:
     from backend.api.routes.users import router as users_router
     routers_available['users'] = users_router
-    logger.info("✅ Users router imported")
+    logger.info("âœ… Users router imported")
 except ImportError as e:
-    logger.error(f"❌ Users router import error: {e}")
+    logger.error(f"âŒ Users router import error: {e}")
     routers_available['users'] = None
 
 try:
     from backend.api.routes.kyc import router as kyc_router
     routers_available['kyc'] = kyc_router
-    logger.info("✅ KYC router imported")
+    logger.info("âœ… KYC router imported")
 except ImportError as e:
-    logger.error(f"❌ KYC router import error: {e}")
+    logger.error(f"âŒ KYC router import error: {e}")
     routers_available['kyc'] = None
 
 try:
     from backend.api.routes.session import router as session_router
     routers_available['session'] = session_router
-    logger.info("✅ Session router imported")
+    logger.info("âœ… Session router imported")
 except ImportError as e:
-    logger.error(f"❌ Session router import error: {e}")
+    logger.error(f"âŒ Session router import error: {e}")
     routers_available['session'] = None
 
 try:
     from backend.api.routes import wallet
     routers_available['wallet'] = wallet
-    logger.info("✅ Wallet router imported")
+    logger.info("âœ… Wallet router imported")
 except ImportError as e:
-    logger.error(f"❌ Wallet router import error: {e}")
+    logger.error(f"âŒ Wallet router import error: {e}")
     routers_available['wallet'] = None
 
 try:
     from backend.api.routes import oracle
     routers_available['oracle'] = oracle
-    logger.info("✅ Oracle router imported")
+    logger.info("âœ… Oracle router imported")
 except ImportError as e:
-    logger.error(f"❌ Oracle router import error: {e}")
+    logger.error(f"âŒ Oracle router import error: {e}")
     routers_available['oracle'] = None
 
 try:
     from backend.api.routes.licensing import router as licensing_router
     routers_available['licensing'] = licensing_router
-    logger.info("✅ Licensing router imported")
+    logger.info("âœ… Licensing router imported")
 except ImportError as e:
-    logger.error(f"❌ Licensing router import error: {e}")
+    logger.error(f"âŒ Licensing router import error: {e}")
     routers_available['licensing'] = None
 
 try:
@@ -177,9 +177,9 @@ try:
     routers_available['portfolio'] = portfolio
     routers_available['investor'] = investor
     routers_available['consent'] = consent
-    logger.info("✅ Additional routers imported (webhooks, portfolio, investor, consent)")
+    logger.info("âœ… Additional routers imported (webhooks, portfolio, investor, consent)")
 except ImportError as e:
-    logger.error(f"❌ Additional routers import error: {e}")
+    logger.error(f"âŒ Additional routers import error: {e}")
     routers_available.update({
         'webhooks': None,
         'portfolio': None,
@@ -190,9 +190,9 @@ except ImportError as e:
 try:
     from backend.api.routes.payments import router as payments_router
     routers_available['payments'] = payments_router
-    logger.info("✅ Payments router imported")
+    logger.info("âœ… Payments router imported")
 except ImportError as payment_e:
-    logger.error(f"❌ Payments router import error: {payment_e}")
+    logger.error(f"âŒ Payments router import error: {payment_e}")
     from fastapi import APIRouter
     payments_router = APIRouter()
     @payments_router.get("/health")
@@ -203,57 +203,57 @@ except ImportError as payment_e:
 try:
     from backend.api.routes.transactions import router as transactions_router
     routers_available['transactions'] = transactions_router
-    logger.info("✅ Transactions router imported")
+    logger.info("âœ… Transactions router imported")
 except ImportError as e:
-    logger.error(f"❌ Transactions router import error: {e}")
+    logger.error(f"âŒ Transactions router import error: {e}")
     routers_available['transactions'] = None
 
 try:
     from backend.api.routes.onramp import router as onramp_router
     routers_available['onramp'] = onramp_router
-    logger.info("✅ On-ramp router imported")
+    logger.info("âœ… On-ramp router imported")
 except ImportError as e:
-    logger.error(f"❌ On-ramp router import error: {e}")
+    logger.error(f"âŒ On-ramp router import error: {e}")
     routers_available['onramp'] = None
 
 try:
     from backend.api.routes.offramp import router as offramp_router
     routers_available['offramp'] = offramp_router
-    logger.info("✅ Off-ramp router imported")
+    logger.info("âœ… Off-ramp router imported")
 except ImportError as e:
-    logger.error(f"❌ Off-ramp router import error: {e}")
+    logger.error(f"âŒ Off-ramp router import error: {e}")
     routers_available['offramp'] = None
 
 try:
     from backend.api.routes.wallet_connect import router as wallet_connect_router
     routers_available['wallet_connect'] = wallet_connect_router
-    logger.info("✅ Wallet connect router imported")
+    logger.info("âœ… Wallet connect router imported")
 except ImportError as e:
-    logger.error(f"❌ Wallet connect router import error: {e}")
+    logger.error(f"âŒ Wallet connect router import error: {e}")
     routers_available['wallet_connect'] = None
 
 try:
     from backend.api.routes.swap_routes import router as swap_router
     routers_available['swap'] = swap_router
-    logger.info("âœ… Swap router imported")
+    logger.info("Ã¢Å“â€¦ Swap router imported")
 except ImportError as e:
-    logger.error(f"âŒ Swap router import error: {e}")
+    logger.error(f"Ã¢Å’ Swap router import error: {e}")
     routers_available['swap'] = None
 
 try:
     from backend.api.routes.yield_routes import router as yield_router
     routers_available['yield'] = yield_router
-    logger.info("✅ Yield router imported")
+    logger.info("âœ… Yield router imported")
 except ImportError as e:
-    logger.error(f"❌ Yield router import error: {e}")
+    logger.error(f"âŒ Yield router import error: {e}")
     routers_available['yield'] = None
 
 try:
     from backend.api.routes import market
     routers_available['market'] = market
-    logger.info("✅ Market terminal router imported")
+    logger.info("âœ… Market terminal router imported")
 except ImportError as e:
-    logger.error(f"❌ Market terminal router import error: {e}")
+    logger.error(f"âŒ Market terminal router import error: {e}")
     routers_available['market'] = None
 
 # ===== SECURITY COMPONENTS =====
@@ -328,7 +328,7 @@ async def lifespan(app: FastAPI):
     
     try:
         if services_available and dependencies_available:
-            logger.info("✅ Core services available - proceeding with initialization")
+            logger.info("âœ… Core services available - proceeding with initialization")
             settings = get_settings()
             
             # Validate Supabase credentials
@@ -338,7 +338,7 @@ async def lifespan(app: FastAPI):
                         settings.SUPABASE_URL,
                         settings.SUPABASE_SERVICE_KEY.get_secret_value()
                     )
-                    logger.info("✅ Supabase client created successfully")
+                    logger.info("âœ… Supabase client created successfully")
                     
                     # Validate WDK configuration
                     settings.validate_wdk_configuration()
@@ -352,23 +352,23 @@ async def lifespan(app: FastAPI):
                     # Initialize Algorand service
                     from backend.services.algorand_service import AlgorandService
                     algorand_service = AlgorandService(settings)
-                    logger.info("✅ Algorand service initialized")
+                    logger.info("âœ… Algorand service initialized")
                     
                     # Initialize Fee Calculator
                     from backend.services.fee_calculator import FeeCalculatorService
                     fee_calculator = FeeCalculatorService(db_service)
-                    logger.info("✅ Fee calculator initialized")
+                    logger.info("âœ… Fee calculator initialized")
 
                     # Initialize Oracle service
                     oracle_service = None
                     if oracle_service_available:
                         try:
                             oracle_service = OracleService(db_service)
-                            logger.info("✅ Oracle service initialized")
+                            logger.info("âœ… Oracle service initialized")
                         except Exception as e:
-                            logger.error(f"❌ Oracle service initialization failed: {e}")
+                            logger.error(f"âŒ Oracle service initialization failed: {e}")
 
-                    # ✅ REPLACE OLD BACKGROUND TASK WITH SMART PRICE LOGGER
+                    # âœ… REPLACE OLD BACKGROUND TASK WITH SMART PRICE LOGGER
                     if oracle_service:
                         try:
                             from backend.services.price_logger_service import PriceLoggerService
@@ -386,11 +386,11 @@ async def lifespan(app: FastAPI):
                             # Store reference for cleanup
                             app.state.price_logger = price_logger
                             
-                            logger.info("✅ Intelligent price logger started with tiered refresh rates:")
-                            logger.info("   📊 Crypto: 30s | Precious: 5min | Industrial: 15min | Critical: 1hr | Forex: 10min")
+                            logger.info("âœ… Intelligent price logger started with tiered refresh rates:")
+                            logger.info("   ðŸ“Š Crypto: 30s | Precious: 5min | Industrial: 15min | Critical: 1hr | Forex: 10min")
                             
                         except Exception as e:
-                            logger.error(f"❌ Price logger failed to start: {e}")
+                            logger.error(f"âŒ Price logger failed to start: {e}")
 
                     # Initialize Multi-Chain Wallet Service (UNIFIED NAME)
                     multi_chain_wallet_service = MultiChainWalletService(
@@ -399,7 +399,7 @@ async def lifespan(app: FastAPI):
                         fee_calculator=fee_calculator,
                         oracle_service=oracle_service
                     )
-                    logger.info("✅ Multi-Chain Wallet Service initialized")
+                    logger.info("âœ… Multi-Chain Wallet Service initialized")
                     
                     # Initialize WalletCreationService
                     try:
@@ -409,9 +409,9 @@ async def lifespan(app: FastAPI):
                             algorand_service=algorand_service,
                             wdk_client=multi_chain_wallet_service.wdk  # Use actual WDK client
                         )
-                        logger.info("✅ WalletCreationService initialized")
+                        logger.info("âœ… WalletCreationService initialized")
                     except Exception as e:
-                        logger.warning(f"⚠️ WalletCreationService unavailable: {e}")
+                        logger.warning(f"âš ï¸ WalletCreationService unavailable: {e}")
                         wallet_creation_service = None
 
                     # Initialize KYC service
@@ -425,9 +425,9 @@ async def lifespan(app: FastAPI):
                     # Test KYC service health
                     try:
                         kyc_health = await kyc_service.health_check()
-                        logger.info(f"✅ KYC Service health: {kyc_health}")
+                        logger.info(f"âœ… KYC Service health: {kyc_health}")
                     except Exception as e:
-                        logger.error(f"❌ KYC Service health check failed: {e}")
+                        logger.error(f"âŒ KYC Service health check failed: {e}")
                     
                     # Register all services with dependency injection
                     initialize_dependencies(
@@ -440,7 +440,7 @@ async def lifespan(app: FastAPI):
                         algorand_service,
                         oracle_service
                     )
-                    logger.info("✅ All dependencies initialized successfully")
+                    logger.info("âœ… All dependencies initialized successfully")
                     
                     # ============================================================================
                     # START FEE COLLECTION SCHEDULER (Background Task)
@@ -451,13 +451,13 @@ async def lifespan(app: FastAPI):
                         scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
                         await scheduler.start()
                         
-                        logger.info("✅ Fee collection scheduler started (runs daily at 3:00 AM)")
+                        logger.info("âœ… Fee collection scheduler started (runs daily at 3:00 AM)")
                         
                         # Store reference for cleanup
                         app.state.fee_scheduler = scheduler
                         
                     except Exception as sched_err:
-                        logger.error(f"❌ Fee collection scheduler failed to start: {sched_err}")
+                        logger.error(f"âŒ Fee collection scheduler failed to start: {sched_err}")
 
                     # Test business model calculations
                     try:
@@ -468,23 +468,23 @@ async def lifespan(app: FastAPI):
                             from_country="nigeria",
                             to_country="kenya"
                         )
-                        logger.info(f"💰 Business model initialized. Test $1000 cross-border: Fee=${test_calc['total_fee']}, Revenue=${test_calc['net_revenue']}")
+                        logger.info(f"ðŸ’° Business model initialized. Test $1000 cross-border: Fee=${test_calc['total_fee']}, Revenue=${test_calc['net_revenue']}")
                     except Exception as e:
-                        logger.warning(f"⚠️ Business model validation failed: {e}")
+                        logger.warning(f"âš ï¸ Business model validation failed: {e}")
                     
                 except Exception as e:
-                    logger.error(f"❌ Supabase client creation failed: {e}")
+                    logger.error(f"âŒ Supabase client creation failed: {e}")
                     supabase_client = None
             else:
-                logger.warning("❌ Supabase credentials validation failed - operating without database")
+                logger.warning("âŒ Supabase credentials validation failed - operating without database")
         else:
-            logger.warning("❌ Core services not available - operating in limited mode")
+            logger.warning("âŒ Core services not available - operating in limited mode")
     
     except Exception as e:
-        logger.critical(f"💥 FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-        logger.info("🚨 Continuing with degraded functionality")
+        logger.critical(f"ðŸ’¥ FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+        logger.info("ðŸš¨ Continuing with degraded functionality")
 
-        # ✅ START WDK DEPOSIT MONITOR (background task)
+        # âœ… START WDK DEPOSIT MONITOR (background task)
         if services_available:
             try:
                 from backend.services.wdk_deposit_monitor import WDKDepositMonitor
@@ -494,9 +494,9 @@ async def lifespan(app: FastAPI):
                 # Run in background (non-blocking)
                 asyncio.create_task(monitor.monitor_deposits())
                 
-                logger.info("✅ WDK Deposit Monitor started (polling every 30s)")
+                logger.info("âœ… WDK Deposit Monitor started (polling every 30s)")
             except Exception as e:
-                logger.warning(f"⚠️ WDK Deposit Monitor failed to start: {e}")
+                logger.warning(f"âš ï¸ WDK Deposit Monitor failed to start: {e}")
                 
     # ============================================================================
     # STOP FEE COLLECTION SCHEDULER
@@ -504,9 +504,9 @@ async def lifespan(app: FastAPI):
     try:
         if hasattr(app.state, 'fee_scheduler'):
             await app.state.fee_scheduler.stop()
-            logger.info("✅ Fee collection scheduler stopped")
+            logger.info("âœ… Fee collection scheduler stopped")
     except Exception as sched_err:
-        logger.error(f"❌ Failed to stop scheduler: {sched_err}")
+        logger.error(f"âŒ Failed to stop scheduler: {sched_err}")
         
     # Store services for cleanup
     app.state.quota_service = quota_service if 'quota_service' in locals() else None
@@ -521,9 +521,9 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, 'price_logger'):
         try:
             await app.state.price_logger.stop()
-            logger.info("✅ Price logger stopped")
+            logger.info("âœ… Price logger stopped")
         except Exception as e:
-            logger.error(f"❌ Failed to stop price logger: {e}")
+            logger.error(f"âŒ Failed to stop price logger: {e}")
     
     logger.info("--- Seamount API Shutting Down ---")
 
@@ -561,29 +561,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔐 Seed Retrieval Routes - ADD HERE
+# ðŸ” Seed Retrieval Routes - ADD HERE
 try:
     from backend.api.routes.seed_routes import router as seed_routes_router
     app.include_router(seed_routes_router)
-    logger.info("✅ Seed retrieval routes registered at /api/v1/seeds")
+    logger.info("âœ… Seed retrieval routes registered at /api/v1/seeds")
 except ImportError as e:
-    logger.error(f"❌ Seed routes import error: {e}")
+    logger.error(f"âŒ Seed routes import error: {e}")
 
-# ✅ ADD this clean registration (only once)
+# âœ… ADD this clean registration (only once)
 if routers_available.get('wallet_creation'):
     app.include_router(routers_available['wallet_creation'], prefix="/api/v1", tags=["Wallet Creation"])
-    logger.info("✅ Wallet creation routes registered at /api/v1/wallet-creation")
+    logger.info("âœ… Wallet creation routes registered at /api/v1/wallet-creation")
 
 # ===== REGISTER ROUTERS =====
 app.include_router(seed_routes.router)
 
-# 📍 Prediction Markets Routes
+# ðŸ“ Prediction Markets Routes
 try:
     from backend.api.routes.predictions import router as predictions_router
     app.include_router(predictions_router, prefix="/api/v1", tags=["Prediction Markets"])
-    logger.info("✅ Prediction Markets router registered at /api/v1/predictions")
+    logger.info("âœ… Prediction Markets router registered at /api/v1/predictions")
 except ImportError as e:
-    logger.error(f"❌ Prediction Markets router import error: {e}")
+    logger.error(f"âŒ Prediction Markets router import error: {e}")
 
 # Wallet backup tracking
 try:
@@ -596,112 +596,112 @@ try:
         tags=["wallet-backup"]
     )
     
-    logger.info("✅ Wallet backup routes registered at /api/v1/wallet-backup")
+    logger.info("âœ… Wallet backup routes registered at /api/v1/wallet-backup")
     
     # Log registered endpoints
     for route in wallet_backup_router.routes:
         full_path = f"/api/v1/wallet-backup{route.path}"
-        logger.info(f"   → {route.methods} {full_path}")
+        logger.info(f"   â†’ {route.methods} {full_path}")
 except ImportError as e:
-    logger.error(f"❌ Wallet backup routes import error: {e}")
+    logger.error(f"âŒ Wallet backup routes import error: {e}")
 
 if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
-    logger.info("✅ Users router registered at /api/v1/user")
+    logger.info("âœ… Users router registered at /api/v1/user")
 
 # Register wallet creation routes
 try:
     from backend.api.routes.wallet_creation_routes import router as wallet_creation_router
     app.include_router(wallet_creation_router)
-    logger.info("✅ Wallet creation routes registered at /api/v1/wallet-creation")
+    logger.info("âœ… Wallet creation routes registered at /api/v1/wallet-creation")
 except ImportError as e:
-    logger.error(f"❌ Failed to import wallet creation routes: {e}")
+    logger.error(f"âŒ Failed to import wallet creation routes: {e}")
 
 if routers_available.get('kyc'):
     app.include_router(routers_available['kyc'], prefix="/api/v1/kyc", tags=["KYC"])
-    logger.info("✅ KYC router registered at /api/v1/kyc")
+    logger.info("âœ… KYC router registered at /api/v1/kyc")
 
 if routers_available.get('session'):
     app.include_router(routers_available['session'], prefix="/api/v1/session", tags=["Session"])
-    logger.info("✅ Session router registered at /api/v1/session")
+    logger.info("âœ… Session router registered at /api/v1/session")
 
 if routers_available.get('wallet'):
     app.include_router(routers_available['wallet'].router, prefix="/api/v1", tags=["Multi-Chain Wallet"])
-    logger.info("✅ Multi-chain wallet router registered at /api/v1/wallet")
+    logger.info("âœ… Multi-chain wallet router registered at /api/v1/wallet")
 
 if routers_available.get('oracle'):
     app.include_router(routers_available['oracle'].router, prefix="/api", tags=["Oracle"])
-    logger.info("✅ Oracle router registered at /api/oracle")
+    logger.info("âœ… Oracle router registered at /api/oracle")
 
 if routers_available.get('licensing'):
     app.include_router(routers_available['licensing'], prefix="/api/v1", tags=["Licensing"])
-    logger.info("✅ Licensing router registered at /api/v1")
+    logger.info("âœ… Licensing router registered at /api/v1")
 
 if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
     app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
-    logger.info("✅ Webhooks router registered at /webhooks")
+    logger.info("âœ… Webhooks router registered at /webhooks")
 
 if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
     app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["portfolio"])
-    logger.info("✅ portfolio router registered at /api/v1")
+    logger.info("âœ… portfolio router registered at /api/v1")
 
 if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
     app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])
-    logger.info("✅ Investor router registered at /api/v1")
+    logger.info("âœ… Investor router registered at /api/v1")
 
 if routers_available.get('consent') and hasattr(routers_available['consent'], 'router'):
     app.include_router(routers_available['consent'].router, prefix="/api/v1", tags=["Consent"])
-    logger.info("✅ Consent router registered at /api/v1")
+    logger.info("âœ… Consent router registered at /api/v1")
 
 if routers_available.get('payments'):
     app.include_router(routers_available['payments'], prefix="/api/payments", tags=["Payments"])
-    logger.info("✅ Payments router registered at /api/payments")
+    logger.info("âœ… Payments router registered at /api/payments")
 
 if routers_available.get('transactions'):
     app.include_router(routers_available['transactions'], prefix="/api/v1", tags=["Transactions"])
-    logger.info("✅ Transactions router registered at /api/v1")
+    logger.info("âœ… Transactions router registered at /api/v1")
 
 if routers_available.get('onramp'):
     app.include_router(routers_available['onramp'], prefix="/api/v1", tags=["On-Ramp"])
-    logger.info("✅ On-ramp router registered at /api/v1")
+    logger.info("âœ… On-ramp router registered at /api/v1")
 
 if routers_available.get('offramp'):
     app.include_router(routers_available['offramp'], prefix="/api/v1", tags=["Off-Ramp"])
-    logger.info("✅ Off-ramp router registered at /api/v1")
+    logger.info("âœ… Off-ramp router registered at /api/v1")
 
 if routers_available.get('bank_verification'):
     app.include_router(routers_available['bank_verification'].router, prefix="/api/v1", tags=["Bank Verification"])
-    logger.info("✅ Bank verification router registered at /api/v1/bank")
+    logger.info("âœ… Bank verification router registered at /api/v1/bank")
     
 if routers_available.get('wallet_connect'):
     app.include_router(routers_available['wallet_connect'], prefix="/api/v1", tags=["Wallet Connect"])
-    logger.info("✅ Wallet connect router registered at /api/v1")
+    logger.info("âœ… Wallet connect router registered at /api/v1")
 
 if routers_available.get('swap'):
     app.include_router(routers_available['swap'], prefix="/api/v1", tags=["Swap"])
-    logger.info("âœ… Swap router registered at /api/v1/swap")
+    logger.info("Ã¢Å“â€¦ Swap router registered at /api/v1/swap")
     
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
-    logger.info("✅ Yield router registered at /api/v1")
+    logger.info("âœ… Yield router registered at /api/v1")
 
 if routers_available.get('market'):
     # Register main market router (/api/v1/market/...)
     app.include_router(routers_available['market'].router, prefix="/api/v1")
-    logger.info("✅ Market terminal router registered at /api/v1/market")
+    logger.info("âœ… Market terminal router registered at /api/v1/market")
     
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
-        logger.info("✅ Quota health router registered at /api/v1/quota")
+        logger.info("âœ… Quota health router registered at /api/v1/quota")
 
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router
     app.include_router(admin_router, prefix="/api/v1", tags=["Admin"])
-    logger.info("✅ Admin routes registered at /api/v1/admin")
+    logger.info("âœ… Admin routes registered at /api/v1/admin")
 except ImportError as e:
-    logger.error(f"❌ Admin routes import error: {e}")
+    logger.error(f"âŒ Admin routes import error: {e}")
 
 # ===== CORE API ENDPOINTS =====
 
@@ -838,22 +838,22 @@ async def business_contact(
     background_tasks: BackgroundTasks
 ):
     """
-    📧 Submit business lead inquiry
-    ✅ Saves to database
-    ✅ Sends email to business@seamount.io (non-blocking)
-    ✅ Returns toast-ready response
+    ðŸ“§ Submit business lead inquiry
+    âœ… Saves to database
+    âœ… Sends email to business@seamount.io (non-blocking)
+    âœ… Returns toast-ready response
     """
     try:
         supabase = get_supabase_client()
         
-        # 1️⃣ VALIDATE INPUT
+        # 1ï¸âƒ£ VALIDATE INPUT
         if not payload.name or not payload.email:
             raise HTTPException(
                 status_code=400,
                 detail="Name and email are required"
             )
         
-        # 2️⃣ SAVE TO DATABASE
+        # 2ï¸âƒ£ SAVE TO DATABASE
         lead_data = {
             "name": payload.name,
             "email": payload.email,
@@ -862,28 +862,28 @@ async def business_contact(
             # created_at and updated_at are handled by database defaults
         }
         
-        logger.info(f"[Business Lead] 💾 Attempting to save: {payload.name} <{payload.email}>")
+        logger.info(f"[Business Lead] ðŸ’¾ Attempting to save: {payload.name} <{payload.email}>")
         
         db_result = supabase.table('business_leads').insert(lead_data).execute()
         
         if not db_result.data:
-            logger.error("[Business Lead] ❌ Database insert failed - no data returned")
+            logger.error("[Business Lead] âŒ Database insert failed - no data returned")
             raise HTTPException(
                 status_code=500, 
                 detail="Failed to save your inquiry. Please try again."
             )
         
         saved_lead = db_result.data[0]
-        logger.info(f"[Business Lead] ✅ Saved successfully - ID: {saved_lead['id']}")
+        logger.info(f"[Business Lead] âœ… Saved successfully - ID: {saved_lead['id']}")
         
-        # 3️⃣ SEND EMAIL IN BACKGROUND (Non-blocking)
+        # 3ï¸âƒ£ SEND EMAIL IN BACKGROUND (Non-blocking)
         async def send_lead_notification():
             """Background task to send email notification"""
             try:
                 from backend.services.email_service import EmailService
                 email_service = EmailService(get_settings_cached())
                 
-                subject = f"🚀 New Business Lead: {payload.business_name or payload.name}"
+                subject = f"ðŸš€ New Business Lead: {payload.business_name or payload.name}"
                 
                 # Build professional HTML email
                 html_body = f"""
@@ -978,36 +978,36 @@ async def business_contact(
                 <body>
                     <div class="container">
                         <div class="header">
-                            <h1>📧 New Business Inquiry</h1>
+                            <h1>ðŸ“§ New Business Inquiry</h1>
                             <p>Seamount.io Lead Management</p>
                         </div>
                         <div class="content">
                             <table>
                                 <tr>
-                                    <td class="label">👤 Name:</td>
+                                    <td class="label">ðŸ‘¤ Name:</td>
                                     <td class="value">{payload.name}</td>
                                 </tr>
                                 <tr>
-                                    <td class="label">✉️ Email:</td>
+                                    <td class="label">âœ‰ï¸ Email:</td>
                                     <td class="value">
                                         <a href="mailto:{payload.email}">{payload.email}</a>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="label">🏢 Company:</td>
+                                    <td class="label">ðŸ¢ Company:</td>
                                     <td class="value">{payload.business_name or '<em>Not provided</em>'}</td>
                                 </tr>
                                 <tr>
-                                    <td class="label">💬 Message:</td>
+                                    <td class="label">ðŸ’¬ Message:</td>
                                     <td class="value">{payload.message or '<em>No message provided</em>'}</td>
                                 </tr>
                                 <tr>
-                                    <td class="label">🕐 Received:</td>
+                                    <td class="label">ðŸ• Received:</td>
                                     <td class="value">{datetime.utcnow().strftime('%B %d, %Y at %H:%M UTC')}</td>
                                 </tr>
                             </table>
                             <div class="action-box">
-                                <strong>⚡ Action Required:</strong><br>
+                                <strong>âš¡ Action Required:</strong><br>
                                 Please respond within 24 hours to maintain our service commitment.
                             </div>
                         </div>
@@ -1028,19 +1028,19 @@ async def business_contact(
                 )
                 
                 if email_sent:
-                    logger.info(f"[Business Lead] ✅ Email sent to business@seamount.io")
+                    logger.info(f"[Business Lead] âœ… Email sent to business@seamount.io")
                 else:
-                    logger.warning(f"[Business Lead] ⚠️ Email send returned False (check email service)")
+                    logger.warning(f"[Business Lead] âš ï¸ Email send returned False (check email service)")
                 
             except Exception as email_error:
                 # Non-critical: Don't fail the user's request if email fails
-                logger.error(f"[Business Lead] ⚠️ Email notification failed (non-critical): {email_error}")
+                logger.error(f"[Business Lead] âš ï¸ Email notification failed (non-critical): {email_error}")
                 logger.error(f"[Business Lead] Stack trace: {traceback.format_exc()}")
         
         # Queue email to send in background (won't block response)
         background_tasks.add_task(send_lead_notification)
         
-        # 4️⃣ RETURN SUCCESS RESPONSE (User sees this immediately)
+        # 4ï¸âƒ£ RETURN SUCCESS RESPONSE (User sees this immediately)
         return {
             "success": True,
             "message": "Thank you for your interest! A member of our team will be in touch within 24 hours.",
@@ -1051,7 +1051,7 @@ async def business_contact(
         raise
     except Exception as e:
         error_id = str(uuid4())[:8]
-        logger.error(f"[Business Lead] ❌ Unexpected error [{error_id}]: {str(e)}")
+        logger.error(f"[Business Lead] âŒ Unexpected error [{error_id}]: {str(e)}")
         logger.error(f"[Business Lead] Stack trace: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500, 
