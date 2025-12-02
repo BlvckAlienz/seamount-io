@@ -6,7 +6,7 @@ import {
   TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine
+  Wallet, ArrowDownToLine, Target
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -26,6 +26,7 @@ import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '@/components/market/LiveMarketPreview';
+import PredictionMarketsPage from './PredictionMarketsPage';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -162,6 +163,7 @@ const DashboardPage = () => {
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
+  const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -568,6 +570,51 @@ const DashboardPage = () => {
             <LiveMarketPreview onOpenTerminal={() => setShowMarketTerminal(true)} />
           </div>
           
+          {/* 🎯 PREDICTION MARKETS CARD */}
+          <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-green-500/10 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Target className="h-6 w-6 text-green-400" />
+                  Prediction Markets
+                </h2>
+                <p className="text-gray-400 text-sm">Bet on Nigerian sports, crypto, FX & politics with USDC</p>
+              </div>
+              <button
+                onClick={() => setShowPredictionMarkets(true)}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
+              >
+                <TrendingUp className="h-5 w-5" />
+                <span className="hidden sm:inline">View Markets</span>
+                <span className="sm:hidden">Bet</span>
+              </button>
+            </div>
+
+            {/* Live Markets Preview (Top 3) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { title: 'Super Eagles AFCON 2025', yes: 67, no: 33, volume: '$0' },
+                { title: 'Bitcoin $150K by Q1 2026', yes: 52, no: 48, volume: '$0' },
+                { title: 'NGN/USD hits ₦1,400 Q1 2026', yes: 71, no: 29, volume: '$0' }
+              ].map((market, idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-sm font-semibold text-white mb-3 line-clamp-2">{market.title}</h4>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-green-400 font-bold">YES</div>
+                      <div className="text-lg font-black text-white">{market.yes}%</div>
+                    </div>
+                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-red-400 font-bold">NO</div>
+                      <div className="text-lg font-black text-white">{market.no}%</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">{market.volume} volume</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {walletCreationStatus && !walletCreationStatus.overall_complete && (
             <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
           )}
@@ -700,6 +747,23 @@ const DashboardPage = () => {
           onClose={() => setShowMarketTerminal(false)} 
         />
       </div>
+      {/* Prediction Markets Modal */}
+      {showPredictionMarkets && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="min-h-screen">
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
+            <div className="relative">
+              <button
+                 onClick={() => setShowPredictionMarkets(false)}
+                 className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
+               >
+                 <X className="h-6 w-6" />
+               </button>
+               <PredictionMarketsPage />
+            </div>
+           </div>
+         </div>
+       )}      
     </WalletProvider>
   );
 };
