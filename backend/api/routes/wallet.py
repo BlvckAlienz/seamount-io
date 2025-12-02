@@ -591,6 +591,95 @@ async def get_supported_chains():
         logger.error(f"Chains endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch chain information")
 
+@router.post("/connect-simple")
+async def connect_wallet_simple(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🚀 SIMPLIFIED WALLET CONNECTION (NO SIGNATURE REQUIRED)
+    For emergency deadline - just saves the wallet without verification
+    """
+    try:
+        user_id = current_user["id"]
+        wallet_address = request.get("address", "").strip()
+        chain = request.get("chain", "ethereum").lower()
+        wallet_source = request.get("wallet_source", "metamask").lower()
+        
+        # 1️⃣ BASIC VALIDATION
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Wallet address required")
+        
+        if chain not in SUPPORTED_CHAINS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported chain: {chain}"
+            )
+        
+        # 2️⃣ CHECK FOR EXISTING CONNECTION
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        existing = db.supabase.table("multi_chain_addresses") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .eq("address", wallet_address) \
+            .eq("blockchain", chain) \
+            .eq("is_external", True) \
+            .execute()
+        
+        if existing.data:
+            return {
+                "success": True,
+                "message": "Wallet already connected",
+                "wallet": {
+                    "address": wallet_address,
+                    "chain": chain,
+                    "verified": False,
+                    "connection_type": "simple"
+                }
+            }
+        
+        # 3️⃣ SAVE WITHOUT VERIFICATION
+        wallet_data = {
+            "user_id": user_id,
+            "blockchain": chain,
+            "address": wallet_address,
+            "wallet_source": wallet_source,
+            "is_external": True,
+            "connected_at": datetime.utcnow().isoformat(),
+            "connection_metadata": {
+                "verified": False,
+                "connection_type": "simple_no_signature",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        insert_result = db.supabase.table("multi_chain_addresses").insert(wallet_data).execute()
+        
+        if not insert_result.data:
+            raise HTTPException(status_code=500, detail="Failed to save wallet")
+        
+        logger.info(f"✅ Simple wallet connection for user {user_id}: {wallet_address[:8]}...")
+        
+        return {
+            "success": True,
+            "message": "Wallet connected successfully!",
+            "wallet": {
+                "address": wallet_address,
+                "chain": chain,
+                "verified": False,
+                "connection_type": "simple"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Simple wallet connection failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to connect wallet")
+    
 @router.post("/connect-external")
 async def connect_external_wallet(
     request: dict,
