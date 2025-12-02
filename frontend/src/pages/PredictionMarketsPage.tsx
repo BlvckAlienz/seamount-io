@@ -1,16 +1,17 @@
-// Add to top of file
+// 📂 FILE: frontend/src/components/pages/PredictionMarketsPage.tsx
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info } from 'lucide-react';
+
+import { apiClient } from '@/config/api';
+import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
+import { WalletConnectionModal } from '@/components/WalletConnectionModal'; // 🆕 ADD THIS IMPORT
+
 declare global {
   interface Window {
     ethereum?: any;
   }
 }
-
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info } from 'lucide-react';
-
-import { apiClient } from '@/config/api';
-import { supabase } from '@/lib/supabase'; // âœ… Add this import
-import toast from 'react-hot-toast';
 
 interface Market {
   id: number;
@@ -47,8 +48,16 @@ interface PortfolioBet extends Bet {
     yes: number;
     no: number;
   };
-  roi: number; // Return on Investment %
+  roi: number;
   status: 'pending' | 'won' | 'lost' | 'claimable';
+}
+
+interface ConnectedWallet {
+  address: string;
+  chain: string;
+  chainName: string;
+  walletSource: string;
+  verified: boolean;
 }
 
 const PredictionMarketsPage: React.FC = () => {
@@ -61,116 +70,80 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-// 🔐 EXTERNAL WALLET STATE (MetaMask, Coinbase, etc.)
+  // 🔌 WALLET CONNECTION STATE (UPDATED)
   const [externalWallet, setExternalWallet] = useState<{
     connected: boolean;
     address: string;
-    provider: any;
-    chainId: number | null;
+    chainName: string;
+    walletSource: string;
+    verified: boolean;
   }>({
     connected: false,
     address: '',
-    provider: null,
-    chainId: null
+    chainName: '',
+    walletSource: '',
+    verified: false
   });
+  const [showWalletModal, setShowWalletModal] = useState(false); // 🆕 NEW STATE
   const [signingTransaction, setSigningTransaction] = useState(false);
   const CAMP_CHAIN_ID = 325000; // Camp Network Testnet V2
 
-  // Check for Web3 wallet (auto-detect MetaMask, Coinbase, etc.)
+  // Check for existing wallet connection on mount
   useEffect(() => {
-    const checkExternalWallet = async () => {
-      if (typeof window.ethereum === 'undefined') {
-        console.warn('⚠️ No Web3 wallet detected');
-        return;
-      }
-
+    const checkExistingConnection = async () => {
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        
-        if (accounts.length > 0) {
-          const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-          
-          setExternalWallet({
-            connected: true,
-            address: accounts[0],
-            provider: window.ethereum,
-            chainId: parseInt(chainId, 16)
-          });
-          
-          console.log('✅ External wallet connected:', accounts[0]);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        const response = await fetch('/api/v1/wallet/external-wallets', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.wallets && data.wallets.length > 0) {
+            const wallet = data.wallets[0];
+            setExternalWallet({
+              connected: true,
+              address: wallet.address,
+              chainName: wallet.chain_name,
+              walletSource: wallet.wallet_source,
+              verified: wallet.verified
+            });
+            console.log('✅ Existing wallet connection found:', wallet.address);
+          }
         }
       } catch (error) {
-        console.error('❌ Wallet check failed:', error);
+        console.error('Failed to check existing wallet:', error);
       }
     };
 
-    checkExternalWallet();
-
-    // Listen for account/chain changes
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', (accounts: string[]) => {
-        if (accounts.length === 0) {
-          setExternalWallet({ connected: false, address: '', provider: null, chainId: null });
-        } else {
-          setExternalWallet(prev => ({ ...prev, address: accounts[0] }));
-        }
-      });
-
-      window.ethereum.on('chainChanged', (chainId: string) => {
-        setExternalWallet(prev => ({ ...prev, chainId: parseInt(chainId, 16) }));
-      });
-    }
-
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeAllListeners('accountsChanged');
-        window.ethereum.removeAllListeners('chainChanged');
-      }
-    };
+    checkExistingConnection();
   }, []);
 
-  // 🔌 CONNECT EXTERNAL WALLET
-  const connectExternalWallet = async () => {
+  // Handle successful wallet connection from modal
+  const handleWalletConnected = (wallet: ConnectedWallet) => {
+    setExternalWallet({
+      connected: true,
+      address: wallet.address,
+      chainName: wallet.chainName,
+      walletSource: wallet.walletSource,
+      verified: wallet.verified
+    });
+    setShowWalletModal(false);
+    console.log('✅ Wallet connected:', wallet);
+  };
+
+  // 🔄 SWITCH TO CAMP NETWORK (Updated to work with any wallet provider)
+  const switchToCampNetwork = async () => {
     if (typeof window.ethereum === 'undefined') {
-      toast.error('Please install MetaMask, Coinbase Wallet, or another Web3 wallet');
+      toast.error('No wallet detected. Please connect a wallet first.');
+      setShowWalletModal(true);
       return;
     }
 
-    try {
-      setLoading(true);
-      
-      // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      const chainIdDec = parseInt(chainId, 16);
-      
-      setExternalWallet({
-        connected: true,
-        address: accounts[0],
-        provider: window.ethereum,
-        chainId: chainIdDec
-      });
-      
-      // Check if on Camp Network
-      if (chainIdDec !== CAMP_CHAIN_ID) {
-        toast.error(
-          `⚠️ Wrong network! Please switch to Camp Network Testnet V2 (Chain ID: ${CAMP_CHAIN_ID})`,
-          { duration: 5000 }
-        );
-      } else {
-        toast.success(`✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
-      }
-      
-    } catch (error: any) {
-      console.error('Wallet connection failed:', error);
-      toast.error('Failed to connect wallet: ' + (error.message || 'Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🔄 SWITCH TO CAMP NETWORK
-  const switchToCampNetwork = async () => {
     try {
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
@@ -205,42 +178,49 @@ const PredictionMarketsPage: React.FC = () => {
     }
   };
 
+  // Check wallet chain (Updated for new wallet structure)
+  const checkWalletChain = () => {
+    if (externalWallet.chainName !== 'Camp Network') {
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 10000); // Poll every 10s
+    const interval = setInterval(fetchMarkets, 10000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (activeTab === 'mybets') {
-        fetchMyBets();
+      fetchMyBets();
     }
-    }, [activeTab]);
+  }, [activeTab]);
 
-    const fetchMyBets = async () => {
-        try {
-            // ðŸ"' Get valid session token
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (!session?.access_token) {
-                console.warn('[MyBets] No valid session');
-                return;
-            }
-            
-            const response = await fetch('/api/v1/predictions/my-bets', {
-                headers: {
-                    'Authorization': `Bearer ${session.access_token}` // âœ… CORRECT TOKEN
-                }
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                setMyBets(data.bets);
-            }
-        } catch (error) {
-            console.error('Failed to fetch my bets:', error);
+  const fetchMyBets = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        console.warn('[MyBets] No valid session');
+        return;
+      }
+      
+      const response = await fetch('/api/v1/predictions/my-bets', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
         }
-    };
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        setMyBets(data.bets);
+      }
+    } catch (error) {
+      console.error('Failed to fetch my bets:', error);
+    }
+  };
 
   const fetchMarkets = async () => {
     try {
@@ -268,7 +248,7 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
   const formatVolume = (volume: string) => {
-    const num = parseFloat(volume) / 1000000; // Convert from 6 decimals
+    const num = parseFloat(volume) / 1000000;
     if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
     return `$${num.toFixed(0)}`;
@@ -283,163 +263,167 @@ const PredictionMarketsPage: React.FC = () => {
       ? (selectedMarket.yesPercent * parseFloat(selectedMarket.totalVolume) / 100000000) + amount
       : (selectedMarket.noPercent * parseFloat(selectedMarket.totalVolume) / 100000000) + amount;
     
-    if (winningPool === 0) return amount * 1.96; // 2x minus 1.8% fee
+    if (winningPool === 0) return amount * 1.96;
     
     const grossPayout = (amount / winningPool) * totalPool;
-    return grossPayout * 0.982; // After 1.8% fee
+    return grossPayout * 0.982;
   };
 
-const handlePlaceBet = async () => {
-  if (!selectedMarket || !betAmount) return;
+  const handlePlaceBet = async () => {
+    if (!selectedMarket || !betAmount) return;
 
-  // ⚠️ CHECK WALLET CONNECTION
-  if (!externalWallet.connected) {
-    toast.error('Please connect your wallet first');
-    await connectExternalWallet();
-    return;
-  }
-
-  // ⚠️ CHECK CORRECT NETWORK
-  if (externalWallet.chainId !== CAMP_CHAIN_ID) {
-    toast.error(`Wrong network! Switch to Camp Network (Chain ID: ${CAMP_CHAIN_ID})`);
-    await switchToCampNetwork();
-    return;
-  }
-  
-  setLoading(true);
-  setSigningTransaction(true);
-  
-  try {
-    // 1️⃣ RECORD BET IN DATABASE (no backend signing)
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.access_token) {
-      toast.error('Please sign in to place bets');
+    // ⚠️ CHECK WALLET CONNECTION (UPDATED)
+    if (!externalWallet.connected) {
+      toast.error('Please connect your wallet first');
+      setShowWalletModal(true);
       return;
     }
 
-    toast.loading('Recording bet...', { id: 'bet-process' });
-    
-    const response = await fetch('/api/v1/predictions/bet', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        market_id: selectedMarket.id,
-        prediction: betPrediction,
-        amount: parseFloat(betAmount),
-        wallet_address: externalWallet.address // Pass wallet address
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.detail || 'Failed to record bet');
+    // ⚠️ CHECK CORRECT NETWORK (UPDATED)
+    if (!checkWalletChain()) {
+      toast.error(`Wrong network! Switch to Camp Network (Chain ID: ${CAMP_CHAIN_ID})`);
+      await switchToCampNetwork();
+      return;
     }
     
-    const betId = data.bet_id;
-    console.log('✅ Bet recorded:', betId);
-
-    // 2️⃣ APPROVE USDC (Client-side signing)
-    toast.loading('Step 1/2: Approving USDC...', { id: 'bet-process' });
+    setLoading(true);
+    setSigningTransaction(true);
     
-    const Web3 = (await import('web3')).default;
-    const web3 = new Web3(externalWallet.provider);
-    
-    const USDC_ADDRESS = '0x977fdEF62CE095Ae8750Fd3496730F24F60dea7a';
-    const CONTRACT_ADDRESS = '0xc54a1b1ac9890191aB56849B45bA5C0604293A75';
-    
-    const usdcAbi = [
-      {
-        "constant": false,
-        "inputs": [
-          {"name": "_spender", "type": "address"},
-          {"name": "_value", "type": "uint256"}
-        ],
-        "name": "approve",
-        "outputs": [{"name": "", "type": "bool"}],
-        "type": "function"
+    try {
+      // 1️⃣ RECORD BET IN DATABASE
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Please sign in to place bets');
+        return;
       }
-    ];
-    
-    const usdcContract = new web3.eth.Contract(usdcAbi, USDC_ADDRESS);
-    const amountWei = web3.utils.toWei(betAmount, 'mwei'); // USDC has 6 decimals
-    
-    const approveTx = await usdcContract.methods
-      .approve(CONTRACT_ADDRESS, amountWei)
-      .send({ from: externalWallet.address });
-    
-    console.log('✅ USDC approved:', approveTx.transactionHash);
 
-    // 3️⃣ PLACE BET ON SMART CONTRACT
-    toast.loading('Step 2/2: Placing bet on-chain...', { id: 'bet-process' });
-    
-    const marketAbi = [
-      {
-        "inputs": [
-          {"name": "marketId", "type": "uint256"},
-          {"name": "prediction", "type": "bool"},
-          {"name": "amount", "type": "uint256"}
-        ],
-        "name": "placeBet",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
+      toast.loading('Recording bet...', { id: 'bet-process' });
+      
+      const response = await fetch('/api/v1/predictions/bet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          market_id: selectedMarket.id,
+          prediction: betPrediction,
+          amount: parseFloat(betAmount),
+          wallet_address: externalWallet.address
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.detail || 'Failed to record bet');
       }
-    ];
-    
-    const marketContract = new web3.eth.Contract(marketAbi, CONTRACT_ADDRESS);
-    
-    const betTx = await marketContract.methods
-      .placeBet(selectedMarket.id, betPrediction, amountWei)
-      .send({ from: externalWallet.address });
-    
-    console.log('✅ Bet placed:', betTx.transactionHash);
+      
+      const betId = data.bet_id;
+      console.log('✅ Bet recorded:', betId);
 
-    // 4️⃣ UPDATE DATABASE WITH TX HASH
-    await fetch('/api/v1/predictions/update-bet', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        bet_id: betId,
-        tx_hash: betTx.transactionHash,
-        status: 'confirmed'
-      })
-    });
+      // 2️⃣ APPROVE USDC (Client-side signing)
+      if (typeof window.ethereum === 'undefined') {
+        throw new Error('Wallet not available');
+      }
 
-    toast.success(
-      `🎉 Bet placed! View on explorer: https://camp.cloud.blockscout.com/tx/${betTx.transactionHash}`,
-      { id: 'bet-process', duration: 7000 }
-    );
-    
-    // Refresh data
-    await fetchMarkets();
-    await fetchMyBets();
-    setShowBetModal(false);
-    setBetAmount('10');
-    
-  } catch (error: any) {
-    console.error('❌ Bet placement failed:', error);
-    
-    let errorMsg = 'Bet placement failed';
-    if (error.message?.includes('User denied')) {
-      errorMsg = 'Transaction rejected by user';
-    } else if (error.message?.includes('insufficient funds')) {
-      errorMsg = 'Insufficient USDC or ETH for gas';
+      toast.loading('Step 1/2: Approving USDC...', { id: 'bet-process' });
+      
+      const Web3 = (await import('web3')).default;
+      const web3 = new Web3(window.ethereum);
+      
+      const USDC_ADDRESS = '0x977fdEF62CE095Ae8750Fd3496730F24F60dea7a';
+      const CONTRACT_ADDRESS = '0xc54a1b1ac9890191aB56849B45bA5C0604293A75';
+      
+      const usdcAbi = [
+        {
+          "constant": false,
+          "inputs": [
+            {"name": "_spender", "type": "address"},
+            {"name": "_value", "type": "uint256"}
+          ],
+          "name": "approve",
+          "outputs": [{"name": "", "type": "bool"}],
+          "type": "function"
+        }
+      ];
+      
+      const usdcContract = new web3.eth.Contract(usdcAbi, USDC_ADDRESS);
+      const amountWei = web3.utils.toWei(betAmount, 'mwei');
+      
+      const approveTx = await usdcContract.methods
+        .approve(CONTRACT_ADDRESS, amountWei)
+        .send({ from: externalWallet.address });
+      
+      console.log('✅ USDC approved:', approveTx.transactionHash);
+
+      // 3️⃣ PLACE BET ON SMART CONTRACT
+      toast.loading('Step 2/2: Placing bet on-chain...', { id: 'bet-process' });
+      
+      const marketAbi = [
+        {
+          "inputs": [
+            {"name": "marketId", "type": "uint256"},
+            {"name": "prediction", "type": "bool"},
+            {"name": "amount", "type": "uint256"}
+          ],
+          "name": "placeBet",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        }
+      ];
+      
+      const marketContract = new web3.eth.Contract(marketAbi, CONTRACT_ADDRESS);
+      
+      const betTx = await marketContract.methods
+        .placeBet(selectedMarket.id, betPrediction, amountWei)
+        .send({ from: externalWallet.address });
+      
+      console.log('✅ Bet placed:', betTx.transactionHash);
+
+      // 4️⃣ UPDATE DATABASE WITH TX HASH
+      await fetch('/api/v1/predictions/update-bet', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          bet_id: betId,
+          tx_hash: betTx.transactionHash,
+          status: 'confirmed'
+        })
+      });
+
+      toast.success(
+        `🎉 Bet placed! View on explorer: https://camp.cloud.blockscout.com/tx/${betTx.transactionHash}`,
+        { id: 'bet-process', duration: 7000 }
+      );
+      
+      // Refresh data
+      await fetchMarkets();
+      await fetchMyBets();
+      setShowBetModal(false);
+      setBetAmount('10');
+      
+    } catch (error: any) {
+      console.error('❌ Bet placement failed:', error);
+      
+      let errorMsg = 'Bet placement failed';
+      if (error.message?.includes('User denied')) {
+        errorMsg = 'Transaction rejected by user';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMsg = 'Insufficient USDC or ETH for gas';
+      }
+      
+      toast.error(errorMsg, { id: 'bet-process' });
+    } finally {
+      setLoading(false);
+      setSigningTransaction(false);
     }
-    
-    toast.error(errorMsg, { id: 'bet-process' });
-  } finally {
-    setLoading(false);
-    setSigningTransaction(false);
-  }
-};
+  };
 
   const getCategoryFromQuestion = (question: string) => {
     if (question.toLowerCase().includes('bitcoin') || question.toLowerCase().includes('btc')) return 'crypto';
@@ -508,16 +492,16 @@ const handlePlaceBet = async () => {
           ))}
         </div>
         
-        {/* Wallet Connection Banner */}
+        {/* 🆕 UPDATED WALLET CONNECTION BANNERS */}
         {!externalWallet.connected ? (
           <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold text-white mb-2">🔐 Connect Your Wallet</h3>
-                <p className="text-gray-300">Connect MetaMask, Coinbase, or any Web3 wallet to start betting</p>
+                <p className="text-gray-300">Connect your Web3 wallet to start betting on prediction markets</p>
               </div>
               <button
-                onClick={connectExternalWallet}
+                onClick={() => setShowWalletModal(true)}
                 disabled={loading}
                 className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50"
               >
@@ -525,7 +509,7 @@ const handlePlaceBet = async () => {
               </button>
             </div>
           </div>
-        ) : externalWallet.chainId !== CAMP_CHAIN_ID ? (
+        ) : !checkWalletChain() ? (
           <div className="bg-gradient-to-r from-yellow-900/50 to-orange-900/50 border border-yellow-500/30 rounded-2xl p-6 mb-6">
             <div className="flex items-center justify-between">
               <div>
@@ -545,11 +529,16 @@ const handlePlaceBet = async () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-white font-semibold">
-                  Wallet Connected: {externalWallet.address.slice(0, 6)}...{externalWallet.address.slice(-4)}
-                </span>
+                <div>
+                  <span className="text-white font-semibold">
+                    {externalWallet.walletSource} Connected: {externalWallet.address.slice(0, 6)}...{externalWallet.address.slice(-4)}
+                  </span>
+                  <div className="text-xs text-gray-400">
+                    {externalWallet.verified ? '✓ Verified' : '⚠️ Needs verification'}
+                  </div>
+                </div>
               </div>
-              <span className="text-green-400 text-sm">Camp Network ✓</span>
+              <span className="text-green-400 text-sm">{externalWallet.chainName} ✓</span>
             </div>
           </div>
         )}
@@ -908,7 +897,7 @@ const handlePlaceBet = async () => {
                   </button>
                   <button
                     onClick={handlePlaceBet}
-                    disabled={loading || signingTransaction || !betAmount || parseFloat(betAmount) < 1}
+                    disabled={loading || signingTransaction || !betAmount || parseFloat(betAmount) < 1 || !externalWallet.connected}
                     className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {signingTransaction ? (
@@ -927,6 +916,13 @@ const handlePlaceBet = async () => {
             </div>
           </div>
         )}
+
+        {/* 🆕 WALLET CONNECTION MODAL */}
+        <WalletConnectionModal
+          isOpen={showWalletModal}
+          onClose={() => setShowWalletModal(false)}
+          onSuccess={handleWalletConnected}
+        />
       </div>
     </div>
   );

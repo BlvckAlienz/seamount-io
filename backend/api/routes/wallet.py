@@ -11,6 +11,10 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 import logging
 import re
+import secrets
+import hashlib
+from eth_account.messages import encode_defunct
+from web3.auto import w3 as web3_instance
 
 # ========== REQUEST/RESPONSE MODELS ==========
 
@@ -586,6 +590,352 @@ async def get_supported_chains():
         logger.error(f"Chains endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch chain information")
 
+@router.post("/connect-external")
+async def connect_external_wallet(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🔌 CONNECT EXTERNAL WALLET TO USER ACCOUNT
+    
+    Payload:
+    {
+        "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+        "chain": "ethereum",
+        "wallet_source": "metamask",
+        "signature": "0x123...",  // Optional for verification
+        "message": "Sign this message to connect your wallet..."
+    }
+    
+    Returns:
+    {
+        "success": true,
+        "wallet": {
+            "address": "0x...",
+            "chain": "ethereum",
+            "wallet_source": "metamask",
+            "status": "connected"
+        }
+    }
+    """
+    try:
+        user_id = current_user["id"]
+        wallet_address = request.get("address", "").strip()
+        chain = request.get("chain", "ethereum").lower()
+        wallet_source = request.get("wallet_source", "external").lower()
+        signature = request.get("signature")  # Optional
+        message = request.get("message")  # Optional
+        
+        # 1️⃣ VALIDATE INPUTS
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Wallet address required")
+        
+        if chain not in SUPPORTED_CHAINS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported chain: {chain}. Supported: {list(SUPPORTED_CHAINS.keys())}"
+            )
+        
+        # 2️⃣ VALIDATE ADDRESS FORMAT
+        chain_config = SUPPORTED_CHAINS[chain]
+        pattern = chain_config.get("address_pattern")
+        
+        if pattern and not re.match(pattern, wallet_address):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid {chain_config['name']} address format"
+            )
+        
+        # 3️⃣ OPTIONAL: VERIFY SIGNATURE (if provided)
+        if signature and message:
+            try:
+                # Verify the signature matches the wallet address
+                message_hash = encode_defunct(text=message)
+                recovered_address = web3_instance.eth.account.recover_message(
+                    message_hash, 
+                    signature=signature
+                )
+                
+                if recovered_address.lower() != wallet_address.lower():
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Signature verification failed. Wallet address mismatch."
+                    )
+                
+                logger.info(f"✅ Signature verified for wallet {wallet_address}")
+                
+            except Exception as sig_err:
+                logger.error(f"Signature verification failed: {sig_err}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid signature"
+                )
+        
+        # 4️⃣ CHECK IF WALLET ALREADY CONNECTED
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        # Check if THIS USER already has THIS WALLET connected
+        existing_user_wallet = db.supabase.table("multi_chain_addresses") \
+            .select("id, user_id, wallet_source, connected_at") \
+            .eq("user_id", user_id) \
+            .eq("blockchain", chain) \
+            .eq("address", wallet_address) \
+            .eq("is_external", True) \
+            .execute()
+        
+        if existing_user_wallet.data:
+            logger.info(f"Wallet {wallet_address} already connected to user {user_id}")
+            return {
+                "success": True,
+                "message": "Wallet already connected",
+                "wallet": {
+                    "address": wallet_address,
+                    "chain": chain,
+                    "chain_name": chain_config["name"],
+                    "wallet_source": existing_user_wallet.data[0]["wallet_source"],
+                    "connected_at": existing_user_wallet.data[0]["connected_at"],
+                    "status": "already_connected"
+                }
+            }
+        
+        # 🚨 SECURITY: Check if wallet is connected to ANOTHER user
+        existing_other_user = db.supabase.table("multi_chain_addresses") \
+            .select("user_id") \
+            .eq("blockchain", chain) \
+            .eq("address", wallet_address) \
+            .eq("is_external", True) \
+            .neq("user_id", user_id) \
+            .execute()
+        
+        if existing_other_user.data:
+            logger.warning(f"🚨 Wallet {wallet_address} already connected to another user")
+            raise HTTPException(
+                status_code=409,
+                detail="This wallet is already connected to another account"
+            )
+        
+        # 5️⃣ DETECT WALLET TYPE (if not provided)
+        if wallet_source == "external":
+            # Try to detect from metadata
+            wallet_source = "metamask"  # Default fallback
+        
+        # 6️⃣ SAVE WALLET TO DATABASE
+        connection_metadata = {
+            "user_agent": request.get("user_agent"),
+            "ip_address": request.get("ip_address"),
+            "verified": bool(signature),
+            "chain_id": chain_config.get("chain_id")
+        }
+        
+        wallet_data = {
+            "user_id": user_id,
+            "blockchain": chain,
+            "address": wallet_address,
+            "wallet_source": wallet_source,
+            "is_external": True,
+            "connected_at": datetime.utcnow().isoformat(),
+            "last_used_at": datetime.utcnow().isoformat(),
+            "connection_metadata": connection_metadata,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        insert_result = db.supabase.table("multi_chain_addresses").insert(wallet_data).execute()
+        
+        if not insert_result.data:
+            raise HTTPException(status_code=500, detail="Failed to save wallet")
+        
+        logger.info(f"✅ External {chain} wallet connected for user {user_id}: {wallet_address[:8]}...")
+        
+        # 7️⃣ RETURN SUCCESS
+        return {
+            "success": True,
+            "message": f"{chain_config['name']} wallet connected successfully!",
+            "wallet": {
+                "address": wallet_address,
+                "chain": chain,
+                "chain_name": chain_config["name"],
+                "native_asset": chain_config["native_asset"],
+                "wallet_source": wallet_source,
+                "connected_at": wallet_data["connected_at"],
+                "verified": bool(signature),
+                "status": "connected"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to connect external wallet: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect wallet: {str(e)}")
+
+
+@router.post("/generate-nonce")
+async def generate_wallet_nonce(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🔐 GENERATE NONCE FOR WALLET SIGNATURE VERIFICATION
+    
+    Payload:
+    {
+        "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    }
+    
+    Returns:
+    {
+        "nonce": "Sign this message to verify wallet ownership: abc123...",
+        "expires_at": "2024-12-04T12:00:00Z"
+    }
+    """
+    try:
+        wallet_address = request.get("address", "").strip().lower()
+        
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Wallet address required")
+        
+        # Generate cryptographically secure nonce
+        nonce_value = secrets.token_hex(16)
+        expires_at = datetime.utcnow() + timedelta(minutes=5)  # 5-minute expiry
+        
+        # Store nonce in database
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        nonce_data = {
+            "wallet_address": wallet_address,
+            "nonce": nonce_value,
+            "expires_at": expires_at.isoformat(),
+            "used": False
+        }
+        
+        db.supabase.table("wallet_nonces").insert(nonce_data).execute()
+        
+        # Create human-readable message
+        message = f"Sign this message to verify wallet ownership:\n\nNonce: {nonce_value}\nExpires: {expires_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        
+        logger.info(f"✅ Generated nonce for wallet {wallet_address[:8]}...")
+        
+        return {
+            "success": True,
+            "nonce": nonce_value,
+            "message": message,
+            "expires_at": expires_at.isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Nonce generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate nonce")
+
+
+@router.get("/external-wallets")
+async def get_external_wallets(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    📋 GET ALL EXTERNAL WALLETS CONNECTED TO USER ACCOUNT
+    
+    Returns:
+    {
+        "wallets": [
+            {
+                "address": "0x...",
+                "chain": "ethereum",
+                "wallet_source": "metamask",
+                "connected_at": "2024-12-01T10:00:00Z"
+            }
+        ],
+        "total": 2
+    }
+    """
+    try:
+        user_id = current_user["id"]
+        
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        wallets_result = db.supabase.table("multi_chain_addresses") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .eq("is_external", True) \
+            .order("connected_at", desc=True) \
+            .execute()
+        
+        wallets = []
+        for wallet in wallets_result.data:
+            chain_config = SUPPORTED_CHAINS.get(wallet["blockchain"], {})
+            wallets.append({
+                "address": wallet["address"],
+                "chain": wallet["blockchain"],
+                "chain_name": chain_config.get("name", wallet["blockchain"]),
+                "wallet_source": wallet["wallet_source"],
+                "connected_at": wallet["connected_at"],
+                "last_used_at": wallet.get("last_used_at"),
+                "verified": wallet.get("connection_metadata", {}).get("verified", False)
+            })
+        
+        return {
+            "success": True,
+            "wallets": wallets,
+            "total": len(wallets)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch external wallets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch wallets")
+
+
+@router.delete("/disconnect-wallet")
+async def disconnect_external_wallet(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    🔌 DISCONNECT EXTERNAL WALLET FROM USER ACCOUNT
+    
+    Payload:
+    {
+        "address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+        "chain": "ethereum"
+    }
+    """
+    try:
+        user_id = current_user["id"]
+        wallet_address = request.get("address", "").strip()
+        chain = request.get("chain", "ethereum").lower()
+        
+        if not wallet_address:
+            raise HTTPException(status_code=400, detail="Wallet address required")
+        
+        from backend.services.database_service import DatabaseService
+        db = DatabaseService()
+        
+        # Delete wallet connection
+        delete_result = db.supabase.table("multi_chain_addresses") \
+            .delete() \
+            .eq("user_id", user_id) \
+            .eq("address", wallet_address) \
+            .eq("blockchain", chain) \
+            .eq("is_external", True) \
+            .execute()
+        
+        if not delete_result.data:
+            raise HTTPException(status_code=404, detail="Wallet connection not found")
+        
+        logger.info(f"✅ Disconnected wallet {wallet_address[:8]}... from user {user_id}")
+        
+        return {
+            "success": True,
+            "message": "Wallet disconnected successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to disconnect wallet: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to disconnect wallet")
+    
 @router.get("/health")
 async def wallet_health_check(
     wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
