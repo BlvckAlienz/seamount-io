@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Clock, AlertCircle, ExternalLink, Loader, Zap } from 'lucide-react';
 
-// ✅ ADD THIS IMPORT
-import { supabase } from '@/lib/supabase';
-
 interface TransactionMonitorProps {
   betId: string;
   txHash: string;
@@ -21,61 +18,53 @@ export const TransactionMonitor: React.FC<TransactionMonitorProps> = ({
   const [explorerUrl, setExplorerUrl] = useState('');
   const [elapsed, setElapsed] = useState(0);
 
-useEffect(() => {
-  let pollInterval: NodeJS.Timeout;
-  let timeInterval: NodeJS.Timeout;
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    let timeInterval: NodeJS.Timeout;
 
-  const pollStatus = async () => {
-    try {
-      const response = await fetch(`/api/v1/predictions/bet/${betId}/status`, {
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+    // Poll transaction status every 2 seconds
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/v1/predictions/bet/${betId}/status`, {
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setStatus(data.status);
+          setConfirmations(data.confirmations || 0);
+          setBlockNumber(data.block_number || null);
+          setExplorerUrl(data.explorer_url || '');
+
+          if (data.status === 'confirmed') {
+            clearInterval(pollInterval);
+            onConfirmed();
+          } else if (data.status === 'failed') {
+            clearInterval(pollInterval);
+          }
         }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setStatus(data.status);
-        setConfirmations(data.confirmations || 0);
-        setBlockNumber(data.block_number || null);
-        setExplorerUrl(data.explorer_url || '');
-
-        if (data.status === 'confirmed') {
-          clearInterval(pollInterval);
-          clearInterval(timeInterval);
-          
-          // ✅ TRIGGER IMMEDIATE REFRESH
-          onConfirmed();
-          
-          // ✅ FORCE PARENT TO RE-FETCH DATA
-          setTimeout(() => {
-            window.location.reload(); // Nuclear option but guarantees sync
-          }, 2000);
-        } else if (data.status === 'failed') {
-          clearInterval(pollInterval);
-          clearInterval(timeInterval);
-        }
+      } catch (error) {
+        console.error('Status poll failed:', error);
       }
-    } catch (error) {
-      console.error('Status poll failed:', error);
-    }
-  };
+    };
 
-  // Poll every 2 seconds
-  pollInterval = setInterval(pollStatus, 2000);
-  pollStatus(); // Initial poll
+    // Start polling
+    pollInterval = setInterval(pollStatus, 2000);
+    pollStatus(); // Initial poll
 
-  // Track elapsed time
-  timeInterval = setInterval(() => {
-    setElapsed(prev => prev + 1);
-  }, 1000);
+    // Track elapsed time
+    timeInterval = setInterval(() => {
+      setElapsed(prev => prev + 1);
+    }, 1000);
 
-  return () => {
-    clearInterval(pollInterval);
-    clearInterval(timeInterval);
-  };
-}, [betId, onConfirmed]);
+    return () => {
+      clearInterval(pollInterval);
+      clearInterval(timeInterval);
+    };
+  }, [betId, onConfirmed]);
 
   const getStatusConfig = () => {
     switch (status) {
@@ -127,7 +116,7 @@ useEffect(() => {
         {/* TX Hash */}
         <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3">
           <span className="text-xs text-gray-400">Transaction</span>
-          <a
+          
             href={explorerUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -138,7 +127,7 @@ useEffect(() => {
           </a>
         </div>
 
-        {/* Time Elapsed */}
+        {/* Confirmations */}
         {status === 'pending' && (
           <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3">
             <span className="text-xs text-gray-400">Time Elapsed</span>
