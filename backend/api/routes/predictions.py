@@ -1333,3 +1333,78 @@ async def get_market_stats():
     except Exception as e:
         logger.error(f"Failed to fetch market stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/dashboard-stats")
+async def get_dashboard_stats():
+    """
+    📊 GET LIVE DASHBOARD STATISTICS
+    - Total Volume: Sum of confirmed bets
+    - Active Markets: From smart contract
+    - Total Traders: Unique wallet addresses
+    - Hot Market: Market with most volume
+    - Total Transactions: Count of confirmed bets
+    """
+    try:
+        supabase = get_supabase_client()
+        
+        # 1️⃣ GET TOTAL VOLUME (Sum of confirmed bet amounts)
+        volume_result = supabase.rpc(
+            'get_total_volume'
+        ).execute()
+        
+        total_volume = float(volume_result.data[0]['total']) if volume_result.data else 0.0
+        
+        # 2️⃣ GET TOTAL TRADERS (Unique wallet addresses)
+        traders_result = supabase.rpc(
+            'get_unique_traders'
+        ).execute()
+        
+        total_traders = traders_result.data[0]['count'] if traders_result.data else 0
+        
+        # 3️⃣ GET TOTAL TRANSACTIONS (Count of confirmed bets)
+        tx_result = supabase.table('prediction_bets')\
+            .select('id', count='exact')\
+            .eq('status', 'confirmed')\
+            .execute()
+        
+        total_transactions = tx_result.count if tx_result.count else 0
+        
+        # 4️⃣ GET HOT MARKET (Market with highest volume)
+        hot_market_result = supabase.rpc(
+            'get_hot_market'
+        ).execute()
+        
+        hot_market = None
+        if hot_market_result.data and len(hot_market_result.data) > 0:
+            hot_market = {
+                "market_id": hot_market_result.data[0]['market_id'],
+                "total_volume": float(hot_market_result.data[0]['total_volume']),
+                "bet_count": hot_market_result.data[0]['bet_count']
+            }
+        
+        # 5️⃣ GET ACTIVE MARKETS FROM SMART CONTRACT
+        active_markets = 0
+        if CONTRACT_ADDRESS:
+            try:
+                contract = w3.eth.contract(
+                    address=Web3.to_checksum_address(CONTRACT_ADDRESS),
+                    abi=MARKET_ABI
+                )
+                active_markets = contract.functions.marketCount().call()
+            except Exception as contract_error:
+                logger.error(f"Failed to fetch market count: {contract_error}")
+        
+        return {
+            "success": True,
+            "stats": {
+                "total_volume": round(total_volume, 2),
+                "active_markets": active_markets,
+                "total_traders": total_traders,
+                "hot_market": hot_market,
+                "total_transactions": total_transactions
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch dashboard stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -109,6 +109,15 @@ const PredictionMarketsPage: React.FC = () => {
   win_rate: 0
 });
 
+  // 🚨 NEW: Dashboard stats from predictions_table
+const [dashboardStats, setDashboardStats] = useState({
+  total_volume: 0,
+  active_markets: 0,
+  total_traders: 0,
+  hot_market: null as { market_id: number; total_volume: number; bet_count: number } | null,
+  total_transactions: 0
+});
+
   // ✅ CHECK METAMASK PERSISTENCE
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
@@ -149,6 +158,28 @@ const PredictionMarketsPage: React.FC = () => {
     const interval = setInterval(fetchMarkets, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // 🚨 NEW: Fetch dashboard stats
+const fetchDashboardStats = async () => {
+  try {
+    const response = await fetch('/api/v1/predictions/dashboard-stats');
+    const data = await response.json();
+    
+    if (data.success) {
+      setDashboardStats(data.stats);
+      console.log('📊 Dashboard stats updated:', data.stats);
+    }
+  } catch (error) {
+    console.error('Failed to fetch dashboard stats:', error);
+  }
+};
+
+// Poll every 5 seconds
+useEffect(() => {
+  fetchDashboardStats();
+  const interval = setInterval(fetchDashboardStats, 5000);
+  return () => clearInterval(interval);
+}, []);
 
   useEffect(() => {
     if (activeTab === 'mybets') {
@@ -556,31 +587,39 @@ const PredictionMarketsPage: React.FC = () => {
 
   // 🔥 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
   const statsData = [
-    { 
-      label: 'Total Volume', 
-      value: `${calculateMarketStats().totalVolume.toFixed(1)} CAMP`, 
-      icon: DollarSign, 
-      color: 'text-green-400' 
-    },
-    { 
-      label: 'Active Markets', 
-      value: markets.length, 
-      icon: TrendingUp, 
-      color: 'text-blue-400' 
-    },
-    { 
-      label: 'Total Traders', 
-      value: calculateMarketStats().totalTraders, 
-      icon: Users, 
-      color: 'text-purple-400' 
-    },
-    { 
-      label: 'Profit (Loss)', 
-      value: `${myBets.filter(b => b.won).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(1)} CAMP`, 
-      icon: Trophy, 
-      color: 'text-yellow-400' 
-    }
-  ];
+  { 
+    label: 'Total Volume', 
+    value: `${dashboardStats.total_volume.toFixed(2)} CAMP`, 
+    icon: DollarSign, 
+    color: 'text-green-400' 
+  },
+  { 
+    label: 'Active Markets', 
+    value: dashboardStats.active_markets, 
+    icon: TrendingUp, 
+    color: 'text-blue-400' 
+  },
+  { 
+    label: 'Total Traders', 
+    value: dashboardStats.total_traders, 
+    icon: Users, 
+    color: 'text-purple-400' 
+  },
+  { 
+    label: 'Hot Market', 
+    value: dashboardStats.hot_market 
+      ? `#${dashboardStats.hot_market.market_id} (${dashboardStats.hot_market.total_volume.toFixed(1)} CAMP)` 
+      : 'N/A', 
+    icon: Zap, 
+    color: 'text-orange-400' 
+  },
+  { 
+    label: 'Total Transactions', 
+    value: dashboardStats.total_transactions, 
+    icon: Target, 
+    color: 'text-cyan-400' 
+  }
+];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
@@ -617,7 +656,9 @@ const PredictionMarketsPage: React.FC = () => {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
-            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
+            <span className="text-green-400 font-semibold text-sm">
+                {dashboardStats.active_markets} LIVE MARKETS • {dashboardStats.total_volume.toFixed(0)} CAMP VOLUME
+            </span>
           </div>
 
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
