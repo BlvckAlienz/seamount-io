@@ -859,15 +859,15 @@ const PredictionMarketsPage: React.FC = () => {
                       {/* ✅ BLOCKCHAIN EXPLORER LINK */}
                       {bet.tx_hash && (
                         <a
-                          href={`https://camp-network-testnet.blockscout.com/tx/${bet.tx_hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
+                            href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          View on Blockchain Explorer
+                            <ExternalLink className="w-3 h-3" />
+                            View on Blockchain Explorer
                         </a>
-                      )}
+                        )}
                       
                       {bet.won && !bet.resolved && (
                         <button
@@ -966,7 +966,7 @@ const PredictionMarketsPage: React.FC = () => {
                     <div className="mb-6">
                       <label className="block text-sm font-semibold text-gray-400 mb-2">Bet Amount (CAMP)</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">CAMP</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500"></span>
                         <input
                           type="number"
                           value={betAmount}

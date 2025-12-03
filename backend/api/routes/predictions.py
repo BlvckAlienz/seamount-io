@@ -1113,6 +1113,7 @@ async def get_my_bets(
         bets_result = supabase.table('prediction_bets')\
             .select('*')\
             .eq('user_id', user_id)\
+            .eq('status', 'confirmed')\
             .order('created_at', desc=True)\
             .execute()
         
