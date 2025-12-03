@@ -943,6 +943,13 @@ async def place_bet(
         odds = market_details[7] if request.prediction else market_details[8]
         potential_payout = float(request.amount) * (10000 / odds) * 0.982
         
+        # Calculate potential payout
+        odds = market_details[7] if request.prediction else market_details[8]
+        potential_payout = float(request.amount) * (10000 / odds) * 0.982
+
+        # ✅ Convert Decimal to int for wei calculation
+        amount_in_wei = int(float(request.amount) * 1e18)
+
         return {
             "success": True,
             "message": "Bet intent recorded. Execute via MetaMask.",
@@ -951,7 +958,7 @@ async def place_bet(
             "contract_function": {
                 "name": "placeBet",
                 "params": [request.market_id, request.prediction],
-                "value_in_wei": int(request.amount * 1e18)  # Convert CAMP to wei
+                "value_in_wei": amount_in_wei  # ✅ FIXED
             },
             "potential_payout": round(potential_payout, 4)
         }
