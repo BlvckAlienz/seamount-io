@@ -446,7 +446,7 @@ const handlePlaceBet = async () => {
             <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
                 </span>
             </div>
             <button
