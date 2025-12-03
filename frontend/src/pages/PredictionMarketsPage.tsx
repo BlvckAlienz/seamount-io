@@ -438,41 +438,13 @@ const handlePlaceBet = async () => {
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
             <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
           </div>
-          
-        {/* 🔥 WALLET CONNECTION STATUS */}
-        <div className="flex justify-end mb-4">
-        {walletConnected ? (
-            <div className="flex items-center gap-3">
-            <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-green-400 font-mono text-sm">
-                {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
-                </span>
-            </div>
-            <button
-                onClick={disconnectWallet}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
-            >
-                Disconnect
-            </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowWalletModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
-            >
-              <Wallet className="w-5 h-5" />
-              Connect Wallet
-            </button>
-          )}
-        </div>
 
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
             Seamount Predictions
           </h1>
           
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Bet on sports, crypto, FX, and politics with <span className="text-green-400 font-semibold">USDC</span> on Camp Network
+            Bet on sports, crypto, FX, and politics powered by <span className="text-green-400 font-semibold">CAMP</span> Network
           </p>
         </div>
 
@@ -681,7 +653,7 @@ const handlePlaceBet = async () => {
                             </span>
                             {bet.resolved && bet.won && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
-                                WON ðŸŽ‰
+                                WON
                               </span>
                             )}
                             {bet.resolved && !bet.won && (
