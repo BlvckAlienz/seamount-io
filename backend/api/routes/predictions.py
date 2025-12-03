@@ -33,21 +33,10 @@ w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
 # Full ABI from your contract
 MARKET_ABI = [
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "prediction",
-				"type": "bool"
-			}
-		],
-		"name": "bet",
+		"inputs": [],
+		"name": "acceptOwnership",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -61,7 +50,7 @@ MARKET_ABI = [
 			{
 				"indexed": True,
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
 			},
 			{
@@ -81,6 +70,18 @@ MARKET_ABI = [
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "newYesOdds",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "newNoOdds",
+				"type": "uint256"
 			}
 		],
 		"name": "BetPlaced",
@@ -90,108 +91,25 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
 			}
 		],
-		"name": "bootstrapMarket",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "yes",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "no",
-				"type": "uint256"
-			}
-		],
-		"name": "Bootstrapped",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			}
-		],
-		"name": "claim",
+		"name": "claimWinnings",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"anonymous": False,
 		"inputs": [
 			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "Claimed",
-		"type": "event"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
 				"internalType": "string",
 				"name": "question",
 				"type": "string"
 			},
 			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			}
-		],
-		"name": "Created",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "string",
-				"name": "question",
+				"name": "description",
 				"type": "string"
 			},
 			{
@@ -212,11 +130,117 @@ MARKET_ABI = [
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "emergencyWithdraw",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "oldCollector",
+				"type": "address"
+			},
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "newCollector",
+				"type": "address"
+			}
+		],
+		"name": "FeeCollectorUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "marketId",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "string",
+				"name": "question",
+				"type": "string"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "endTime",
+				"type": "uint256"
+			}
+		],
+		"name": "MarketCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "marketId",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "bool",
+				"name": "outcome",
+				"type": "bool"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "lockedYesPool",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "lockedNoPool",
+				"type": "uint256"
+			}
+		],
+		"name": "MarketResolved",
+		"type": "event"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "currentOwner",
+				"type": "address"
+			},
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferInitiated",
+		"type": "event"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
 	},
 	{
 		"inputs": [],
@@ -229,20 +253,25 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "prediction",
+				"type": "bool"
 			}
 		],
-		"name": "recover",
+		"name": "placeBet",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
 			},
 			{
@@ -251,39 +280,20 @@ MARKET_ABI = [
 				"type": "bool"
 			}
 		],
-		"name": "resolve",
+		"name": "resolveMarket",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "bool",
-				"name": "outcome",
-				"type": "bool"
-			}
-		],
-		"name": "Resolved",
-		"type": "event"
 	},
 	{
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "a",
+				"name": "newOwner",
 				"type": "address"
 			}
 		],
-		"name": "setFeeCollector",
+		"name": "transferOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -298,30 +308,56 @@ MARKET_ABI = [
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
 				"internalType": "address",
-				"name": "",
+				"name": "newCollector",
 				"type": "address"
 			}
 		],
-		"name": "claimed",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
+		"name": "updateFeeCollector",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "marketId",
+				"type": "uint256"
+			},
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "grossPayout",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "fee",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "netPayout",
+				"type": "uint256"
+			}
+		],
+		"name": "WinningsClaimed",
+		"type": "event"
+	},
+	{
 		"inputs": [],
-		"name": "DEADLINE",
+		"name": "CLAIM_DEADLINE_DAYS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -346,34 +382,157 @@ MARKET_ABI = [
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "getActiveMarketIds",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
 				"type": "uint256"
 			}
 		],
-		"name": "getMarket",
+		"name": "getActiveMarketsPaginated",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getContractStatus",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "paused",
+				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "collector",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalMarkets",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalFees",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "contractBalance",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "activeMarketsCount",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getCurrentBlockTimestamp",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "marketId",
+				"type": "uint256"
+			}
+		],
+		"name": "getMarketDetails",
 		"outputs": [
 			{
 				"internalType": "string",
-				"name": "",
+				"name": "question",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "description",
 				"type": "string"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "endTime",
 				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "resolved",
 				"type": "bool"
 			},
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "outcome",
 				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalVolume",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "participantCount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "yesOdds",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "noOdds",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timeRemaining",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -383,25 +542,30 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
 			}
 		],
-		"name": "getPools",
+		"name": "getMarketOdds",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "yesOdds",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "noOdds",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "yesPercentage",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "noPercentage",
 				"type": "uint256"
 			}
 		],
@@ -412,7 +576,7 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "id",
+				"name": "marketId",
 				"type": "uint256"
 			},
 			{
@@ -425,30 +589,22 @@ MARKET_ABI = [
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "yesBet",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "noBet",
 				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "hasClaimed",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "HIGH_FEE",
-		"outputs": [
+			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "potentialPayout",
 				"type": "uint256"
 			}
 		],
@@ -457,7 +613,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "LOW_FEE",
+		"name": "LIQUIDITY_MULTIPLIER",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -497,6 +653,11 @@ MARKET_ABI = [
 				"type": "string"
 			},
 			{
+				"internalType": "string",
+				"name": "description",
+				"type": "string"
+			},
+			{
 				"internalType": "uint256",
 				"name": "endTime",
 				"type": "uint256"
@@ -517,38 +678,33 @@ MARKET_ABI = [
 				"type": "bool"
 			},
 			{
-				"internalType": "bool",
-				"name": "bootstrapped",
-				"type": "bool"
-			},
-			{
 				"internalType": "uint256",
-				"name": "lockedYes",
+				"name": "lockedYesPool",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lockedNo",
+				"name": "lockedNoPool",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lockedTotal",
+				"name": "lockedTotalPool",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "currentYes",
+				"name": "currentYesBets",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "currentNo",
+				"name": "currentNoBets",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "participants",
+				"name": "participantCount",
 				"type": "uint256"
 			}
 		],
@@ -557,7 +713,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MAX_ODDS",
+		"name": "MAX_BET",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -570,7 +726,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MED_FEE",
+		"name": "MAX_MARKETS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -596,7 +752,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MIN_BOOT",
+		"name": "ONE_DAY",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -609,7 +765,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MIN_ODDS",
+		"name": "PLATFORM_FEE_RATE",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -622,116 +778,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MULTIPLIER",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "noBets",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			}
-		],
-		"name": "odds",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "yes",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "no",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "participated",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalFees",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "yesBets",
+		"name": "totalFeesCollected",
 		"outputs": [
 			{
 				"internalType": "uint256",
