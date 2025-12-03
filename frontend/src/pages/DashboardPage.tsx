@@ -748,24 +748,7 @@ const DashboardPage = () => {
           isOpen={showMarketTerminal} 
           onClose={() => setShowMarketTerminal(false)} 
         />
-      </div>
-      {/* Prediction Markets Modal */}
-      {showPredictionMarkets && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="min-h-screen">
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-            <div className="relative">
-              <button
-                 onClick={() => setShowPredictionMarkets(false)}
-                 className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-               >
-                 <X className="h-6 w-6" />
-               </button>
-               <PredictionMarketsPage />
-            </div>
-           </div>
-         </div>
-       )}      
+      </div>     
     </WalletProvider>
   );
 };
