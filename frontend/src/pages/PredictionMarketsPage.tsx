@@ -307,7 +307,6 @@ const PredictionMarketsPage: React.FC = () => {
     return `${num.toFixed(1)} CAMP`;
   };
 
-  // 🔥 IMPROVED MARKET STATS CALCULATION WITH UNIQUE TRADERS
   const calculateMarketStats = () => {
     if (markets.length === 0) return { totalVolume: 0, totalTraders: 0 };
     
@@ -318,61 +317,11 @@ const PredictionMarketsPage: React.FC = () => {
       totalVolume += marketVolume;
     });
     
-    // Note: This is a simplified calculation. For accurate unique trader count,
-    // we would need backend support to aggregate unique wallet addresses across all markets
     const uniqueTraders = markets.reduce((sum, m) => sum + m.participantCount, 0);
     
     return {
       totalVolume,
       totalTraders: uniqueTraders
-    };
-  };
-
-  // 🔥 USER BET STATISTICS CALCULATION FUNCTIONS
-  const getConfirmedBets = () => {
-    return myBets.filter(bet => bet.status === 'confirmed');
-  };
-
-  const getActiveBets = () => {
-    return getConfirmedBets().filter(bet => !bet.resolved);
-  };
-
-  const getResolvedWonBets = () => {
-    return getConfirmedBets().filter(bet => bet.resolved && bet.won === true);
-  };
-
-  const getResolvedLostBets = () => {
-    return getConfirmedBets().filter(bet => bet.resolved && bet.won === false);
-  };
-
-  // 🔥 CALCULATE USER STATISTICS
-  const calculateUserStats = () => {
-    const confirmedBets = getConfirmedBets();
-    const activeBets = getActiveBets();
-    const wonBets = getResolvedWonBets();
-    
-    const totalStaked = confirmedBets.reduce((sum, bet) => sum + bet.amount, 0);
-    const totalWon = wonBets.reduce((sum, bet) => sum + (bet.payout || 0), 0);
-    const activeBetCount = activeBets.length;
-    
-    // Potential winnings only for active bets (we need to calculate potential payout)
-    // For now, we'll use a simplified calculation based on odds
-    const totalPotentialWinnings = activeBets.reduce((sum, bet) => {
-      // This would require market odds data for each active bet
-      // For now, we'll just show the staked amount for active bets
-      return sum + bet.amount;
-    }, 0);
-    
-    const netProfit = (totalWon + totalPotentialWinnings) - totalStaked;
-    
-    return {
-      totalStaked,
-      totalWon,
-      totalPotentialWinnings,
-      activeBetCount,
-      netProfit,
-      confirmedBetCount: confirmedBets.length,
-      wonBetCount: wonBets.length
     };
   };
 
@@ -589,14 +538,11 @@ const PredictionMarketsPage: React.FC = () => {
     };
   }, []);
 
-  // 🔥 UPDATED STATS DATA ARRAY WITH ACCURATE USER PROFIT CALCULATION
-  const userStats = calculateUserStats();
-  const marketStats = calculateMarketStats();
-  
+  // 🔥 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
   const statsData = [
     { 
       label: 'Total Volume', 
-      value: `${marketStats.totalVolume.toFixed(1)} CAMP`, 
+      value: `${calculateMarketStats().totalVolume.toFixed(1)} CAMP`, 
       icon: DollarSign, 
       color: 'text-green-400' 
     },
@@ -608,15 +554,15 @@ const PredictionMarketsPage: React.FC = () => {
     },
     { 
       label: 'Total Traders', 
-      value: marketStats.totalTraders, 
+      value: calculateMarketStats().totalTraders, 
       icon: Users, 
       color: 'text-purple-400' 
     },
     { 
-      label: 'Your Profit', 
-      value: `${userStats.netProfit.toFixed(1)} CAMP`, 
+      label: 'Profit (Loss)', 
+      value: `${myBets.filter(b => b.won).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(1)} CAMP`, 
       icon: Trophy, 
-      color: userStats.netProfit >= 0 ? 'text-yellow-400' : 'text-red-400'
+      color: 'text-yellow-400' 
     }
   ];
 
@@ -703,7 +649,7 @@ const PredictionMarketsPage: React.FC = () => {
             }`}
           >
             <Trophy className="inline h-5 w-5 mr-2" />
-            My Bets ({myBets.filter(b => b.status === 'confirmed').length})
+            My Bets ({myBets.length})
           </button>
         </div>
 
@@ -818,35 +764,26 @@ const PredictionMarketsPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Portfolio Summary Card - UPDATED WITH ACCURATE STATS */}
+                {/* Portfolio Summary Card */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Total Staked (Confirmed)</div>
+                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
-                      {userStats.totalStaked.toFixed(2)} CAMP
-                    </div>
-                    <div className="text-xs text-green-300 mt-1">
-                      {userStats.confirmedBetCount} successful bet{userStats.confirmedBetCount !== 1 ? 's' : ''}
+                      {myBets.filter(b => b.status === 'confirmed').reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)} CAMP
                     </div>
                   </div>
                   
                   <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
                     <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
                     <div className="text-3xl font-black text-white">
-                      {userStats.totalPotentialWinnings.toFixed(2)} CAMP
-                    </div>
-                    <div className="text-xs text-blue-300 mt-1">
-                      {userStats.activeBetCount} active bet{userStats.activeBetCount !== 1 ? 's' : ''}
+                      {myBets.filter(b => !b.resolved).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(2)} CAMP
                     </div>
                   </div>
                   
                   <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Net Profit/Loss</div>
-                    <div className={`text-3xl font-black ${userStats.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {userStats.netProfit >= 0 ? '+' : ''}{userStats.netProfit.toFixed(2)} CAMP
-                    </div>
-                    <div className="text-xs text-purple-300 mt-1">
-                      {userStats.wonBetCount} win{userStats.wonBetCount !== 1 ? 's' : ''}
+                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Active Bets</div>
+                    <div className="text-3xl font-black text-white">
+                      {myBets.filter(b => !b.resolved).length}
                     </div>
                   </div>
                 </div>
@@ -859,7 +796,7 @@ const PredictionMarketsPage: React.FC = () => {
                       className={`bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border transition-all hover:scale-[1.01] ${
                         bet.won 
                           ? 'border-green-500/50 hover:border-green-500' 
-                          : bet.resolved && bet.won === false
+                          : bet.resolved 
                           ? 'border-red-500/30 opacity-60' 
                           : 'border-slate-700/50 hover:border-slate-600'
                       }`}
@@ -888,18 +825,12 @@ const PredictionMarketsPage: React.FC = () => {
                                 Confirmed
                               </span>
                             )}
-                            {bet.status === 'failed' && (
-                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
-                                <XCircle className="w-3 h-3" />
-                                Failed
-                              </span>
-                            )}
                             {bet.resolved && bet.won && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
                                 WON
                               </span>
                             )}
-                            {bet.resolved && bet.won === false && (
+                            {bet.resolved && !bet.won && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-500/20 text-gray-400 border border-gray-500/30">
                                 LOST
                               </span>
@@ -925,18 +856,18 @@ const PredictionMarketsPage: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* ✅ CORRECTED BLOCKCHAIN EXPLORER LINK */}
-                      {bet.tx_hash && bet.status === 'confirmed' && (
+                      {/* ✅ BLOCKCHAIN EXPLORER LINK */}
+                      {bet.tx_hash && (
                         <a
-                          href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
+                            href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          View on Blockchain Explorer
+                            <ExternalLink className="w-3 h-3" />
+                            View on Blockchain Explorer
                         </a>
-                      )}
+                        )}
                       
                       {bet.won && !bet.resolved && (
                         <button
@@ -1035,7 +966,7 @@ const PredictionMarketsPage: React.FC = () => {
                     <div className="mb-6">
                       <label className="block text-sm font-semibold text-gray-400 mb-2">Bet Amount (CAMP)</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">CAMP</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500"></span>
                         <input
                           type="number"
                           value={betAmount}
