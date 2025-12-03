@@ -59,7 +59,7 @@ interface PortfolioBet extends Bet {
 
 // ✅ CORRECT BASECAMP TESTNET CONFIG
 const BASECAMP_CONFIG = {
-  chainId: '0x75bcd15',        // 123420001114 in hex
+  chainId: '0x1cbc67c35a',        // 7777777770 in hex (MetaMask's existing chain)
   chainName: 'Basecamp',
   nativeCurrency: {
     name: 'CAMP',
@@ -67,8 +67,7 @@ const BASECAMP_CONFIG = {
     decimals: 18
   },
   rpcUrls: [
-    'https://rpc.basecamp.t.raas.gelato.cloud',
-    'https://rpc-campnetwork.xyz'
+    'https://rpc.basecamp.t.raas.gelato.cloud'
   ],
   blockExplorerUrls: ['https://basecamp.cloud.blockscout.com']
 };
@@ -427,15 +426,15 @@ const handlePlaceBet = async () => {
   };
 
   const getCategoryEmoji = (category: string) => {
-    const emojis: Record<string, string> = {
-      sports: 'âš½',
-      crypto: 'â‚¿',
-      forex: 'ðŸ’±',
-      politics: 'ðŸ—³ï¸',
-      other: 'ðŸ“Š'
-    };
-    return emojis[category] || 'ðŸ“Š';
+  const emojis: Record<string, string> = {
+    sports: '⚽',
+    crypto: '₿',
+    forex: '💱',
+    politics: '🏛️',
+    other: '📊'
   };
+  return emojis[category] || '📊';
+};
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
