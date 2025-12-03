@@ -24,7 +24,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = BACKEND_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
-CAMP_RPC = os.getenv("CAMP_TESTNET_RPC", "https://rpc.camp-network-testnet.gelato.digital")
+CAMP_RPC = os.getenv("CAMP_TESTNET_RPC", "https://rpc.basecamp.t.raas.gelato.cloud/")
 CONTRACT_ADDRESS = os.getenv("PREDICTIONS_CONTRACT_ADDRESS")
 
 # Web3 setup
