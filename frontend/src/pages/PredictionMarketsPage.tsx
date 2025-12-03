@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info, Wallet, X, Loader } from 'lucide-react';
 
 import { apiClient } from '@/config/api';
 import { supabase } from '@/lib/supabase'; 
 import toast from 'react-hot-toast';
+
+// 🔥 TYPE DECLARATION FOR METAMASK
+declare global {
+  interface Window {
+    ethereum?: {
+      isMetaMask?: boolean;
+      request: (args: { method: string; params?: any[] }) => Promise<any>;
+      on?: (event: string, handler: (...args: any[]) => void) => void;
+      removeListener?: (event: string, handler: (...args: any[]) => void) => void;
+    };
+  }
+}
 
 interface Market {
   id: number;
@@ -45,6 +57,22 @@ interface PortfolioBet extends Bet {
   status: 'pending' | 'won' | 'lost' | 'claimable';
 }
 
+// ✅ CORRECT BASECAMP TESTNET CONFIG
+const BASECAMP_CONFIG = {
+  chainId: '0x75bcd15',        // 123420001114 in hex
+  chainName: 'BaseCAMP Testnet',
+  nativeCurrency: {
+    name: 'CAMP',
+    symbol: 'CAMP',
+    decimals: 18
+  },
+  rpcUrls: [
+    'https://rpc.basecamp.t.raas.gelato.cloud',
+    'https://rpc-campnetwork.xyz'
+  ],
+  blockExplorerUrls: ['https://basecamp.cloud.blockscout.com']
+};
+
 const PredictionMarketsPage: React.FC = () => {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [myBets, setMyBets] = useState<Bet[]>([]);
@@ -54,6 +82,10 @@ const PredictionMarketsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
+
+  // 🔥 IN-APP WALLET CONNECTION
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   // WALLET STATE FOR ON-CHAIN TRANSACTIONS
   const [walletConnected, setWalletConnected] = useState(false);
@@ -138,6 +170,64 @@ const PredictionMarketsPage: React.FC = () => {
         }
     };
 
+// 🔥 IN-APP WALLET CONNECTION
+const connectWallet = async () => {
+  setConnecting(true);
+  
+  try {
+    if (!window.ethereum) {
+      const shouldInstall = window.confirm(
+        '⚠️ MetaMask not detected.\n\nInstall MetaMask to place bets?'
+      );
+      
+      if (shouldInstall) {
+        window.open('https://metamask.io/download/', '_blank');
+      }
+      setConnecting(false);
+      return;
+    }
+
+    // Request account access
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_requestAccounts' 
+    }) as string[];
+
+    // Switch to BaseCAMP (or add if missing)
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: BASECAMP_CONFIG.chainId }]
+      });
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [BASECAMP_CONFIG]
+        });
+      } else {
+        throw switchError;
+      }
+    }
+
+    setUserAddress(accounts[0]); // ✅ Use existing state
+    setWalletConnected(true);
+    setShowWalletModal(false);
+    toast.success(`✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
+    
+  } catch (error: any) {
+    console.error('Wallet connection failed:', error);
+    toast.error(error.message || 'Failed to connect wallet');
+  } finally {
+    setConnecting(false);
+  }
+};
+
+const disconnectWallet = () => {
+  setWalletConnected(false);
+  setUserAddress('');
+  toast.success('Wallet disconnected');
+};
+
   const fetchMarkets = async () => {
     try {
       setLoading(true);
@@ -186,52 +276,25 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
 const handlePlaceBet = async () => {
+  // 🚨 WALLET CHECK - Opens modal IN-APP if not connected
+  if (!walletConnected) {
+    setShowWalletModal(true);
+    return;
+  }
+  
   if (!selectedMarket || !betAmount) return;
   
   setLoading(true);
   
   try {
-    // ✅ STEP 1: GET VALID SESSION TOKEN
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError || !session?.access_token) {
-      toast.error('❌ Please sign in to place bets');
+      toast.error('⚠️ Please sign in to place bets');
       return;
     }
     
-    // ✅ STEP 2: CHECK IF METAMASK IS INSTALLED
-    if (!window.ethereum) {
-      toast.error('❌ MetaMask not detected! Install it to bet.');
-      window.open('https://metamask.io/download/', '_blank');
-      return;
-    }
-    
-    // ✅ STEP 3: REQUEST METAMASK CONNECTION
-    const accounts = await window.ethereum.request({ 
-      method: 'eth_requestAccounts' 
-    });
-    
-    const userWallet = accounts[0];
-    toast.success(`✅ Wallet connected: ${userWallet.slice(0, 6)}...${userWallet.slice(-4)}`);
-    
-    // ✅ STEP 4: CHECK CAMP BALANCE
-    const balance = await window.ethereum.request({
-      method: 'eth_getBalance',
-      params: [userWallet, 'latest']
-    });
-    
-    const balanceInCAMP = parseInt(balance, 16) / 1e18;
-    const required = parseFloat(betAmount) + 0.01; // bet + gas
-    
-    if (balanceInCAMP < required) {
-      toast.error(
-        `❌ Insufficient CAMP\n\nBalance: ${balanceInCAMP.toFixed(4)} CAMP\nRequired: ${required.toFixed(4)} CAMP\n\nGet testnet CAMP: https://faucet.campnetwork.xyz/`,
-        { duration: 8000 }
-      );
-      return;
-    }
-    
-    // ✅ STEP 5: RECORD BET INTENT IN DATABASE
+    // ✅ User already connected - proceed with bet
     const response = await fetch('/api/v1/predictions/bet', {
       method: 'POST',
       headers: {
@@ -242,7 +305,7 @@ const handlePlaceBet = async () => {
         market_id: selectedMarket.id,
         prediction: betPrediction,
         amount: parseFloat(betAmount),
-        user_wallet: userWallet
+        user_wallet: userAddress
       })
     });
     
@@ -252,56 +315,23 @@ const handlePlaceBet = async () => {
       throw new Error(data.detail || 'Bet recording failed');
     }
     
-    const { contract_address, contract_function } = data;
-    
-    // ✅ STEP 6: EXECUTE ON-CHAIN BET VIA METAMASK
+    // Execute on-chain transaction via MetaMask
     setSigningTransaction(true);
     toast.loading('📝 Sign the transaction in MetaMask...', { id: 'bet-tx' });
     
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
-        from: userWallet,
-        to: contract_address,
-        value: `0x${contract_function.value_in_wei.toString(16)}`,
-        data: web3.eth.abi.encodeFunctionCall({
-          name: 'placeBet',
-          type: 'function',
-          inputs: [
-            { type: 'uint256', name: 'marketId' },
-            { type: 'bool', name: 'prediction' }
-          ]
-        }, [contract_function.params[0], contract_function.params[1]])
+        from: userAddress,
+        to: data.contract_address,
+        value: `0x${data.contract_function.value_in_wei.toString(16)}`,
+        data: data.contract_function.encoded_data
       }]
     });
     
-    toast.loading('⏳ Waiting for confirmation...', { id: 'bet-tx' });
+    toast.loading('⏳ Confirming transaction...', { id: 'bet-tx' });
     
-    // ✅ STEP 7: WAIT FOR TRANSACTION CONFIRMATION
-    let receipt = null;
-    for (let i = 0; i < 30; i++) {
-      const result = await window.ethereum.request({
-        method: 'eth_getTransactionReceipt',
-        params: [txHash]
-      });
-      
-      if (result) {
-        receipt = result;
-        break;
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    
-    if (!receipt) {
-      throw new Error('Transaction timeout - check block explorer');
-    }
-    
-    if (receipt.status !== '0x1') {
-      throw new Error('Transaction failed on-chain');
-    }
-    
-    // ✅ STEP 8: CONFIRM BET IN DATABASE
+    // Confirm bet in database
     const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
       method: 'POST',
       headers: {
@@ -312,7 +342,7 @@ const handlePlaceBet = async () => {
         market_id: selectedMarket.id,
         prediction: betPrediction,
         amount: parseFloat(betAmount),
-        user_wallet: userWallet,
+        user_wallet: walletAddress,
         tx_hash: txHash
       })
     });
@@ -320,23 +350,21 @@ const handlePlaceBet = async () => {
     const confirmData = await confirmResponse.json();
     
     if (!confirmData.success) {
-      throw new Error('Failed to confirm bet in database');
+      throw new Error('Failed to confirm bet');
     }
     
-    // ✅ SUCCESS
     toast.success(
-      `🎉 Bet placed! View on explorer: ${confirmData.explorer_url}`,
-      { id: 'bet-tx', duration: 6000 }
+      `🎉 Bet placed successfully!`,
+      { id: 'bet-tx', duration: 5000 }
     );
     
-    // Refresh data
     await fetchMarkets();
     await fetchMyBets();
     setShowBetModal(false);
     setBetAmount('10');
     
   } catch (error: any) {
-    console.error('❌ Bet placement error:', error);
+    console.error('Bet placement error:', error);
     toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
   } finally {
     setLoading(false);
@@ -377,6 +405,33 @@ const handlePlaceBet = async () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        {/* 🔥 WALLET CONNECTION HEADER */}
+        <div className="flex justify-end mb-4">
+        {walletConnected ? (
+            <div className="flex items-center gap-3">
+            <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 font-mono text-sm">
+                {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
+                </span>
+            </div>
+            <button
+                onClick={disconnectWallet}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
+            >
+                Disconnect
+            </button>
+            </div>
+        ) : (
+            <button
+            onClick={() => setShowWalletModal(true)}
+            className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
+            >
+            <Wallet className="w-5 h-5" />
+            Connect Wallet
+            </button>
+        )}
+        </div>
         {/* Hero Header */}
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
@@ -384,6 +439,34 @@ const handlePlaceBet = async () => {
             <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
           </div>
           
+        {/* 🔥 WALLET CONNECTION STATUS */}
+        <div className="flex justify-end mb-4">
+        {walletConnected ? (
+            <div className="flex items-center gap-3">
+            <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 font-mono text-sm">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </span>
+            </div>
+            <button
+                onClick={disconnectWallet}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
+            >
+                Disconnect
+            </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowWalletModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
+            >
+              <Wallet className="w-5 h-5" />
+              Connect Wallet
+            </button>
+          )}
+        </div>
+
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
             Seamount Predictions
           </h1>
@@ -783,6 +866,84 @@ const handlePlaceBet = async () => {
               </div>
             </div>
           </div>
+        )}
+        {/* 🔥 IN-APP WALLET CONNECTION MODAL */}
+        {showWalletModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-md w-full p-6 relative">
+            <button
+                onClick={() => setShowWalletModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+                <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
+                <p className="text-gray-400 text-sm">
+                Connect to place bets on prediction markets
+                </p>
+            </div>
+
+            <div className="space-y-3">
+                <button
+                onClick={connectWallet}
+                disabled={connecting}
+                className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-green-500/50 rounded-xl transition flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">🦊</span>
+                    </div>
+                    <div className="text-left">
+                    <div className="text-white font-semibold">MetaMask</div>
+                    <div className="text-gray-400 text-xs">Most popular wallet</div>
+                    </div>
+                </div>
+                {connecting ? (
+                    <Loader className="w-5 h-5 text-green-400 animate-spin" />
+                ) : (
+                    <CheckCircle className="w-5 h-5 text-gray-600 group-hover:text-green-400 transition" />
+                )}
+                </button>
+
+                <div className="text-center text-xs text-gray-500 pt-2">
+                Don't have a wallet?{' '}
+                <a 
+                    href="https://metamask.io/download/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-green-400 hover:underline"
+                >
+                    Download MetaMask
+                </a>
+                </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <div className="flex gap-2">
+                <span className="text-yellow-400 text-sm">💡</span>
+                <div>
+                    <p className="text-yellow-200 text-sm font-semibold mb-1">New to BaseCAMP?</p>
+                    <p className="text-yellow-200/80 text-xs">
+                    Get free testnet CAMP tokens at{' '}
+                    <a 
+                        href="https://faucet.campnetwork.xyz/" 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-yellow-100"
+                    >
+                        faucet.campnetwork.xyz
+                    </a>
+                    </p>
+                </div>
+                </div>
+            </div>
+            </div>
+        </div>
         )}
       </div>
     </div>
