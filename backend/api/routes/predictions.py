@@ -767,7 +767,7 @@ class RecordBetRequest(BaseModel):
 @router.get("/markets")
 async def get_active_markets():
     """
-    📊 GET ACTIVE PREDICTION MARKETS
+    ðŸ“Š GET ACTIVE PREDICTION MARKETS
     """
     try:
         if not CONTRACT_ADDRESS:
@@ -795,13 +795,13 @@ async def get_active_markets():
         markets = []
         for i in range(market_count):
             try:
-                # ✅ NEW: Call getMarket() - returns (question, endTime, resolved, outcome)
+                # âœ… NEW: Call getMarket() - returns (question, endTime, resolved, outcome)
                 market_info = contract.functions.getMarket(i).call()
                 
-                # ✅ NEW: Call getPools() - returns (currentYes, currentNo, participants)
+                # âœ… NEW: Call getPools() - returns (currentYes, currentNo, participants)
                 pools = contract.functions.getPools(i).call()
                 
-                # ✅ NEW: Call odds() - returns (yes, no)
+                # âœ… NEW: Call odds() - returns (yes, no)
                 market_odds = contract.functions.odds(i).call()
                 
                 # Calculate time remaining
@@ -851,7 +851,7 @@ async def place_bet(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    💰 RECORD BET INTENT (Frontend will execute via MetaMask)
+    ðŸ’° RECORD BET INTENT (Frontend will execute via MetaMask)
     """
     try:
         if not CONTRACT_ADDRESS:
@@ -869,7 +869,7 @@ async def place_bet(
         if request.market_id >= market_count:
             raise HTTPException(status_code=404, detail=f"Market {request.market_id} does not exist")
         
-        # ✅ NEW: Get market info from getMarket()
+        # âœ… NEW: Get market info from getMarket()
         market_info = contract.functions.getMarket(request.market_id).call()
 
         # Validate market is open
@@ -909,17 +909,17 @@ async def place_bet(
         
         bet_record = db_result.data[0]
         
-        logger.info(f"✅ Bet intent recorded: {user_id} - {request.amount} CAMP on market {request.market_id}")
+        logger.info(f"âœ… Bet intent recorded: {user_id} - {request.amount} CAMP on market {request.market_id}")
         
-        # ✅ NEW: Get odds separately
+        # âœ… NEW: Get odds separately
         market_odds = contract.functions.odds(request.market_id).call()
         odds = market_odds[0] if request.prediction else market_odds[1]
         potential_payout = float(request.amount) * (10000 / odds) * 0.982
 
-        # ✅ Convert Decimal to int for wei calculation
+        # âœ… Convert Decimal to int for wei calculation
         amount_in_wei = int(float(request.amount) * 1e18)
 
-        # ✅ ENCODE THE CONTRACT FUNCTION CALL
+        # âœ… ENCODE THE CONTRACT FUNCTION CALL
         from eth_abi import encode
 
         # Encode bet(uint256 id, bool prediction) - NEW function name
@@ -935,7 +935,7 @@ async def place_bet(
         # Combine selector + params
         encoded_data = f"0x{function_selector[2:]}{encoded_params}"
 
-        logger.info(f"📝 Encoded transaction data: {encoded_data}")
+        logger.info(f"ðŸ“ Encoded transaction data: {encoded_data}")
 
         return {
             "success": True,
@@ -943,10 +943,10 @@ async def place_bet(
             "bet_id": bet_record["id"],
             "contract_address": CONTRACT_ADDRESS,
             "contract_function": {
-                "name": "bet", # ✅ CHANGED from "placeBet"
+                "name": "bet", # âœ… CHANGED from "placeBet"
                 "params": [request.market_id, request.prediction],
                 "value_in_wei": amount_in_wei,
-                "encoded_data": encoded_data  # ✅ NOW ACTUALLY ENCODED
+                "encoded_data": encoded_data  # âœ… NOW ACTUALLY ENCODED
             },
             "potential_payout": round(potential_payout, 4)
         }
@@ -954,7 +954,7 @@ async def place_bet(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Bet placement failed: {e}")
+        logger.error(f"âŒ Bet placement failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/confirm-bet")
@@ -963,7 +963,7 @@ async def confirm_bet(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    ✅ CONFIRM BET AFTER ON-CHAIN EXECUTION
+    âœ… CONFIRM BET AFTER ON-CHAIN EXECUTION
     Frontend calls this after MetaMask transaction succeeds
     """
     try:
@@ -992,7 +992,7 @@ async def confirm_bet(
             'updated_at': datetime.utcnow().isoformat()
         }).eq('id', bet_id).execute()
         
-        logger.info(f"✅ Bet confirmed: {bet_id} - TX: {request.tx_hash}")
+        logger.info(f"âœ… Bet confirmed: {bet_id} - TX: {request.tx_hash}")
         
         return {
             "success": True,
@@ -1005,7 +1005,7 @@ async def confirm_bet(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Bet confirmation failed: {e}")
+        logger.error(f"âŒ Bet confirmation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bet/{bet_id}/status")
@@ -1014,14 +1014,14 @@ async def get_bet_status(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    🔍 POLL TRANSACTION STATUS
+    ðŸ” POLL TRANSACTION STATUS
     Returns: pending | confirmed | failed | not_found
     """
     try:
         user_id = current_user.get("id")
         supabase = get_supabase_client()
         
-        # 1️⃣ Fetch bet from database
+        # 1ï¸âƒ£ Fetch bet from database
         bet_result = supabase.table('prediction_bets')\
             .select('*')\
             .eq('id', bet_id)\
@@ -1042,7 +1042,7 @@ async def get_bet_status(
                 "message": "Waiting for transaction signature"
             }
         
-        # 2️⃣ Check transaction on blockchain
+        # 2ï¸âƒ£ Check transaction on blockchain
         try:
             tx_receipt = w3.eth.get_transaction_receipt(tx_hash)
             
@@ -1052,7 +1052,7 @@ async def get_bet_status(
                 block_number = tx_receipt['blockNumber']
                 gas_used = tx_receipt['gasUsed']
                 
-                # 3️⃣ Update database if newly confirmed
+                # 3ï¸âƒ£ Update database if newly confirmed
                 if bet['status'] != confirmation_status:
                     supabase.table('prediction_bets').update({
                         'status': confirmation_status,
@@ -1069,7 +1069,7 @@ async def get_bet_status(
                     "gas_used": gas_used,
                     "confirmations": w3.eth.block_number - block_number,
                     "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}",
-                    "message": "✅ Transaction confirmed!" if confirmation_status == "confirmed" else "❌ Transaction failed"
+                    "message": "âœ… Transaction confirmed!" if confirmation_status == "confirmed" else "âŒ Transaction failed"
                 }
             else:
                 # Transaction still pending in mempool
@@ -1077,7 +1077,7 @@ async def get_bet_status(
                     "success": True,
                     "status": "pending",
                     "tx_hash": tx_hash,
-                    "message": "⏳ Waiting for blockchain confirmation...",
+                    "message": "â³ Waiting for blockchain confirmation...",
                     "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}"
                 }
                 
@@ -1088,7 +1088,7 @@ async def get_bet_status(
                 "success": True,
                 "status": "pending",
                 "tx_hash": tx_hash,
-                "message": "⏳ Broadcasting to network...",
+                "message": "â³ Broadcasting to network...",
                 "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}"
             }
         
@@ -1103,7 +1103,7 @@ async def get_my_bets(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    📊 GET USER'S BET HISTORY (ONLY CONFIRMED BETS)
+    ðŸ“Š GET USER'S BET HISTORY (ONLY CONFIRMED BETS)
     """
     try:
         user_id = current_user.get("id")
@@ -1148,7 +1148,7 @@ async def get_my_bets(
         enriched_bets = []
         for bet in bets_result.data:
             try:
-                # ✅ Get market info from smart contract
+                # âœ… Get market info from smart contract
                 market_info = contract.functions.getMarket(bet['market_id']).call()
                 market_odds = contract.functions.odds(bet['market_id']).call()
                 
@@ -1165,7 +1165,7 @@ async def get_my_bets(
                     "outcome": market_outcome
                 }
                 
-                # 🚨 SYNC RESOLUTION STATUS TO DATABASE
+                # ðŸš¨ SYNC RESOLUTION STATUS TO DATABASE
                 if market_resolved and not bet.get('resolved'):
                     # Market just resolved, calculate winnings and update DB
                     won_bet = (bet['prediction'] == market_outcome)
@@ -1190,7 +1190,7 @@ async def get_my_bets(
                         bet_enriched['won'] = won_bet
                         bet_enriched['payout'] = payout_amount
                         
-                        logger.info(f"✅ Synced resolution for bet {bet['id']}: won={won_bet}, payout={payout_amount}")
+                        logger.info(f"âœ… Synced resolution for bet {bet['id']}: won={won_bet}, payout={payout_amount}")
                     except Exception as sync_error:
                         logger.error(f"Failed to sync resolution for bet {bet['id']}: {sync_error}")
                 
@@ -1217,7 +1217,7 @@ async def get_my_bets(
                 logger.error(f"Failed to enrich bet {bet['id']}: {market_error}")
                 continue
         
-        # 🧮 CALCULATE PORTFOLIO STATS (CONFIRMED BETS ONLY)
+        # ðŸ§® CALCULATE PORTFOLIO STATS (CONFIRMED BETS ONLY)
         total_staked = sum(float(bet['amount']) for bet in enriched_bets)
         
         # Active bets = confirmed but not resolved
@@ -1259,7 +1259,7 @@ async def get_my_bets(
 @router.get("/health")
 async def predictions_health():
     """
-    ✅ HEALTH CHECK
+    âœ… HEALTH CHECK
     """
     try:
         if not CONTRACT_ADDRESS:
@@ -1294,7 +1294,7 @@ async def predictions_health():
 @router.get("/market-stats")
 async def get_market_stats():
     """
-    📊 GET MARKET STATISTICS (Total Volume, Unique Traders)
+    ðŸ“Š GET MARKET STATISTICS (Total Volume, Unique Traders)
     """
     try:
         if not CONTRACT_ADDRESS:
@@ -1332,79 +1332,4 @@ async def get_market_stats():
         
     except Exception as e:
         logger.error(f"Failed to fetch market stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@router.get("/dashboard-stats")
-async def get_dashboard_stats():
-    """
-    📊 GET LIVE DASHBOARD STATISTICS
-    - Total Volume: Sum of confirmed bets
-    - Active Markets: From smart contract
-    - Total Traders: Unique wallet addresses
-    - Hot Market: Market with most volume
-    - Total Transactions: Count of confirmed bets
-    """
-    try:
-        supabase = get_supabase_client()
-        
-        # 1️⃣ GET TOTAL VOLUME (Sum of confirmed bet amounts)
-        volume_result = supabase.rpc(
-            'get_total_volume'
-        ).execute()
-        
-        total_volume = float(volume_result.data[0]['total']) if volume_result.data else 0.0
-        
-        # 2️⃣ GET TOTAL TRADERS (Unique wallet addresses)
-        traders_result = supabase.rpc(
-            'get_unique_traders'
-        ).execute()
-        
-        total_traders = traders_result.data[0]['count'] if traders_result.data else 0
-        
-        # 3️⃣ GET TOTAL TRANSACTIONS (Count of confirmed bets)
-        tx_result = supabase.table('prediction_bets')\
-            .select('id', count='exact')\
-            .eq('status', 'confirmed')\
-            .execute()
-        
-        total_transactions = tx_result.count if tx_result.count else 0
-        
-        # 4️⃣ GET HOT MARKET (Market with highest volume)
-        hot_market_result = supabase.rpc(
-            'get_hot_market'
-        ).execute()
-        
-        hot_market = None
-        if hot_market_result.data and len(hot_market_result.data) > 0:
-            hot_market = {
-                "market_id": hot_market_result.data[0]['market_id'],
-                "total_volume": float(hot_market_result.data[0]['total_volume']),
-                "bet_count": hot_market_result.data[0]['bet_count']
-            }
-        
-        # 5️⃣ GET ACTIVE MARKETS FROM SMART CONTRACT
-        active_markets = 0
-        if CONTRACT_ADDRESS:
-            try:
-                contract = w3.eth.contract(
-                    address=Web3.to_checksum_address(CONTRACT_ADDRESS),
-                    abi=MARKET_ABI
-                )
-                active_markets = contract.functions.marketCount().call()
-            except Exception as contract_error:
-                logger.error(f"Failed to fetch market count: {contract_error}")
-        
-        return {
-            "success": True,
-            "stats": {
-                "total_volume": round(total_volume, 2),
-                "active_markets": active_markets,
-                "total_traders": total_traders,
-                "hot_market": hot_market,
-                "total_transactions": total_transactions
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to fetch dashboard stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))

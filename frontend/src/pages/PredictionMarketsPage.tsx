@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
 
-// 🔥 ENHANCED METAMASK TYPE DECLARATION
+// ðŸ”¥ ENHANCED METAMASK TYPE DECLARATION
 declare global {
   interface Window {
     ethereum?: {
@@ -60,7 +60,7 @@ interface PortfolioBet extends Bet {
   status: 'pending' | 'won' | 'lost' | 'claimable';
 }
 
-// ✅ CORRECT BASECAMP TESTNET CONFIG
+// âœ… CORRECT BASECAMP TESTNET CONFIG
 const BASECAMP_CONFIG = {
   chainId: '0x1cbc67c35a',
   chainName: 'Basecamp',
@@ -85,7 +85,7 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // 🔥 IN-APP WALLET CONNECTION
+  // ðŸ”¥ IN-APP WALLET CONNECTION
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
@@ -94,7 +94,7 @@ const PredictionMarketsPage: React.FC = () => {
   const [userAddress, setUserAddress] = useState<string>('');
   const [signingTransaction, setSigningTransaction] = useState(false);
 
-  // ✅ TRANSACTION MONITOR STATE
+  // âœ… TRANSACTION MONITOR STATE
   const [activeTransaction, setActiveTransaction] = useState<{
     betId: string;
     txHash: string;
@@ -109,16 +109,7 @@ const PredictionMarketsPage: React.FC = () => {
   win_rate: 0
 });
 
-  // 🚨 NEW: Dashboard stats from predictions_table
-const [dashboardStats, setDashboardStats] = useState({
-  total_volume: 0,
-  active_markets: 0,
-  total_traders: 0,
-  hot_market: null as { market_id: number; total_volume: number; bet_count: number } | null,
-  total_transactions: 0
-});
-
-  // ✅ CHECK METAMASK PERSISTENCE
+  // âœ… CHECK METAMASK PERSISTENCE
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
       try {
@@ -136,9 +127,9 @@ const [dashboardStats, setDashboardStats] = useState({
           if (chainId === BASECAMP_CONFIG.chainId) {
             setUserAddress(accounts[0]);
             setWalletConnected(true);
-            console.log('✅ MetaMask reconnected:', accounts[0]);
+            console.log('âœ… MetaMask reconnected:', accounts[0]);
           } else {
-            console.warn('⚠️ Wrong network, please switch to BaseCAMP');
+            console.warn('âš ï¸ Wrong network, please switch to BaseCAMP');
           }
         } else {
           setTimeout(() => {
@@ -158,28 +149,6 @@ const [dashboardStats, setDashboardStats] = useState({
     const interval = setInterval(fetchMarkets, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // 🚨 NEW: Fetch dashboard stats
-const fetchDashboardStats = async () => {
-  try {
-    const response = await fetch('/api/v1/predictions/dashboard-stats');
-    const data = await response.json();
-    
-    if (data.success) {
-      setDashboardStats(data.stats);
-      console.log('📊 Dashboard stats updated:', data.stats);
-    }
-  } catch (error) {
-    console.error('Failed to fetch dashboard stats:', error);
-  }
-};
-
-// Poll every 5 seconds
-useEffect(() => {
-  fetchDashboardStats();
-  const interval = setInterval(fetchDashboardStats, 5000);
-  return () => clearInterval(interval);
-}, []);
 
   useEffect(() => {
     if (activeTab === 'mybets') {
@@ -207,17 +176,17 @@ useEffect(() => {
       if (data.success) {
         setMyBets(data.bets);
         
-        // 🚨 UPDATE PORTFOLIO STATS FROM BACKEND
+        // ðŸš¨ UPDATE PORTFOLIO STATS FROM BACKEND
         if (data.stats) {
           setPortfolioStats(data.stats);
-          console.log('📊 Stats updated:', data.stats);
+          console.log('ðŸ“Š Stats updated:', data.stats);
         }
         
-        console.log(`✅ Loaded ${data.bets.length} confirmed bets`);
+        console.log(`âœ… Loaded ${data.bets.length} confirmed bets`);
         
         const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
         if (pendingCount > 0) {
-          console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
+          console.log(`â³ ${pendingCount} pending bets - will auto-refresh`);
           setTimeout(fetchMyBets, 5000);
         }
       }
@@ -226,14 +195,14 @@ useEffect(() => {
     }
   };
 
-  // 🔥 IN-APP WALLET CONNECTION
+  // ðŸ”¥ IN-APP WALLET CONNECTION
   const connectWallet = async () => {
     setConnecting(true);
     
     try {
       if (!window.ethereum) {
         const shouldInstall = window.confirm(
-          '⚠️ MetaMask not detected.\n\nInstall MetaMask to place bets?'
+          'âš ï¸ MetaMask not detected.\n\nInstall MetaMask to place bets?'
         );
         
         if (shouldInstall) {
@@ -253,22 +222,22 @@ useEffect(() => {
           params: [{ chainId: BASECAMP_CONFIG.chainId }]
         });
         
-        console.log('✅ Switched to existing BaseCAMP network');
+        console.log('âœ… Switched to existing BaseCAMP network');
         
       } catch (switchError: any) {
         if (switchError.code === 4902) {
-          console.log('⚠️ BaseCAMP not found in MetaMask, adding now...');
+          console.log('âš ï¸ BaseCAMP not found in MetaMask, adding now...');
           
           try {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [BASECAMP_CONFIG]
             });
-            console.log('✅ BaseCAMP network added successfully');
+            console.log('âœ… BaseCAMP network added successfully');
           } catch (addError: any) {
             if (addError.code === -32603 && addError.message.includes('same RPC endpoint')) {
               toast.error(
-                '⚠️ BaseCAMP network already exists in MetaMask.\n\n' +
+                'âš ï¸ BaseCAMP network already exists in MetaMask.\n\n' +
                 'Please manually switch to "Basecamp" network in MetaMask.',
                 { duration: 6000 }
               );
@@ -287,7 +256,7 @@ useEffect(() => {
       });
       
       if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('⚠️ Please switch to BaseCAMP network in MetaMask');
+        toast.error('âš ï¸ Please switch to BaseCAMP network in MetaMask');
         setConnecting(false);
         return;
       }
@@ -297,12 +266,12 @@ useEffect(() => {
       setShowWalletModal(false);
       
       toast.success(
-        `✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
+        `âœ… Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
         { duration: 3000 }
       );
       
     } catch (error: any) {
-      console.error('❌ Wallet connection failed:', error);
+      console.error('âŒ Wallet connection failed:', error);
       
       if (error.code === 4001) {
         toast.error('Connection cancelled by user');
@@ -372,7 +341,7 @@ useEffect(() => {
     };
   };
 
-  // 🔥 TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
+  // ðŸ”¥ TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
   const calculateFeeRate = (totalVolume: number): number => {
     // Convert from wei to CAMP and use same thresholds as smart contract
     const totalCAMP = totalVolume / 1e18;
@@ -424,7 +393,7 @@ useEffect(() => {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
-        toast.error('⚠️ Please sign in to place bets');
+        toast.error('âš ï¸ Please sign in to place bets');
         return;
       }
       
@@ -450,10 +419,10 @@ useEffect(() => {
       
       if (!data.contract_function.encoded_data || 
           !data.contract_function.encoded_data.startsWith('0x')) {
-        throw new Error('🚨 Invalid contract data from backend');
+        throw new Error('ðŸš¨ Invalid contract data from backend');
       }
 
-      console.log('📝 Sending transaction:', {
+      console.log('ðŸ“ Sending transaction:', {
         to: data.contract_address,
         value: `0x${data.contract_function.value_in_wei.toString(16)}`,
         data: data.contract_function.encoded_data,
@@ -471,7 +440,7 @@ useEffect(() => {
         }]
       }) as string;
 
-      console.log('✅ Transaction submitted:', txHash);
+      console.log('âœ… Transaction submitted:', txHash);
       
       const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
         method: 'POST',
@@ -494,14 +463,14 @@ useEffect(() => {
         throw new Error('Failed to confirm bet');
       }
 
-      // ✅ SHOW TRANSACTION MONITOR
+      // âœ… SHOW TRANSACTION MONITOR
       setActiveTransaction({
         betId: confirmData.bet_id,
         txHash: txHash
       });
 
       toast.success(
-        `📡 Transaction submitted! Monitoring status...`,
+        `ðŸ“¡ Transaction submitted! Monitoring status...`,
         { id: 'bet-tx', duration: 10000 }
       );
       
@@ -528,13 +497,13 @@ useEffect(() => {
 
   const getCategoryEmoji = (category: string) => {
     const emojis: Record<string, string> = {
-      sports: '⚽',
-      crypto: '₿',
-      forex: '💱',
-      politics: '🏛️',
-      other: '📊'
+      sports: 'âš½',
+      crypto: 'â‚¿',
+      forex: 'ðŸ’±',
+      politics: 'ðŸ›ï¸',
+      other: 'ðŸ“Š'
     };
-    return emojis[category] || '📊';
+    return emojis[category] || 'ðŸ“Š';
   };
 
   const getCategoryColor = (category: string) => {
@@ -548,7 +517,7 @@ useEffect(() => {
     return colors[category] || 'from-gray-500 to-slate-500';
   };
 
-  // ✅ PERSIST METAMASK CONNECTION
+  // âœ… PERSIST METAMASK CONNECTION
   useEffect(() => {
     if (!window.ethereum) return;
 
@@ -565,10 +534,10 @@ useEffect(() => {
 
     const handleChainChanged = (chainId: string) => {
       if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('⚠️ Please switch back to BaseCAMP network');
+        toast.error('âš ï¸ Please switch back to BaseCAMP network');
         setWalletConnected(false);
       } else {
-        toast.success('✅ Connected to BaseCAMP');
+        toast.success('âœ… Connected to BaseCAMP');
         window.location.reload();
       }
     };
@@ -585,46 +554,38 @@ useEffect(() => {
     };
   }, []);
 
-  // 🔥 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
+  // ðŸ”¥ UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
   const statsData = [
-  { 
-    label: 'Total Volume', 
-    value: `${dashboardStats.total_volume.toFixed(2)} CAMP`, 
-    icon: DollarSign, 
-    color: 'text-green-400' 
-  },
-  { 
-    label: 'Active Markets', 
-    value: dashboardStats.active_markets, 
-    icon: TrendingUp, 
-    color: 'text-blue-400' 
-  },
-  { 
-    label: 'Total Traders', 
-    value: dashboardStats.total_traders, 
-    icon: Users, 
-    color: 'text-purple-400' 
-  },
-  { 
-    label: 'Hot Market', 
-    value: dashboardStats.hot_market 
-      ? `#${dashboardStats.hot_market.market_id} (${dashboardStats.hot_market.total_volume.toFixed(1)} CAMP)` 
-      : 'N/A', 
-    icon: Zap, 
-    color: 'text-orange-400' 
-  },
-  { 
-    label: 'Total Transactions', 
-    value: dashboardStats.total_transactions, 
-    icon: Target, 
-    color: 'text-cyan-400' 
-  }
-];
+    { 
+      label: 'Total Volume', 
+      value: `${calculateMarketStats().totalVolume.toFixed(1)} CAMP`, 
+      icon: DollarSign, 
+      color: 'text-green-400' 
+    },
+    { 
+      label: 'Active Markets', 
+      value: markets.length, 
+      icon: TrendingUp, 
+      color: 'text-blue-400' 
+    },
+    { 
+      label: 'Total Traders', 
+      value: calculateMarketStats().totalTraders, 
+      icon: Users, 
+      color: 'text-purple-400' 
+    },
+    { 
+      label: 'Payouts', 
+      value: `${myBets.filter(b => b.won).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(1)} CAMP`, 
+      icon: Trophy, 
+      color: 'text-yellow-400' 
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* 🔥 WALLET CONNECTION HEADER */}
+        {/* ðŸ”¥ WALLET CONNECTION HEADER */}
         <div className="flex justify-end mb-4">
           {walletConnected ? (
             <div className="flex items-center gap-3">
@@ -656,9 +617,7 @@ useEffect(() => {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
-            <span className="text-green-400 font-semibold text-sm">
-                {dashboardStats.active_markets} LIVE MARKETS • {dashboardStats.total_volume.toFixed(0)} CAMP VOLUME
-            </span>
+            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
           </div>
 
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
@@ -907,7 +866,7 @@ useEffect(() => {
                               {bet.prediction ? 'YES' : 'NO'}
                             </span>
 
-                            {/* ✅ LIVE STATUS BADGE */}
+                            {/* âœ… LIVE STATUS BADGE */}
                             {bet.status === 'pending' && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
@@ -951,7 +910,7 @@ useEffect(() => {
                         </div>
                       </div>
                       
-                      {/* ✅ BLOCKCHAIN EXPLORER LINK */}
+                      {/* âœ… BLOCKCHAIN EXPLORER LINK */}
                       {bet.tx_hash && (
                         <a
                             href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
@@ -1018,7 +977,7 @@ useEffect(() => {
                       onConfirmed={() => {
                         fetchMarkets();
                         fetchMyBets();
-                        toast.success('🎉 Bet confirmed on-chain!', { duration: 9000 });
+                        toast.success('ðŸŽ‰ Bet confirmed on-chain!', { duration: 9000 });
                         setTimeout(() => {
                           setActiveTransaction(null);
                           setShowBetModal(false);
@@ -1165,7 +1124,7 @@ useEffect(() => {
           </div>
         )}
 
-        {/* 🔥 IN-APP WALLET CONNECTION MODAL */}
+        {/* ðŸ”¥ IN-APP WALLET CONNECTION MODAL */}
         {showWalletModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-md w-full p-6 relative">
@@ -1180,13 +1139,13 @@ useEffect(() => {
                 <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Wallet className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">🎯 Connect to Place Bets</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Connect to Place Bets</h2>
                 <p className="text-gray-400 text-sm mb-4">
                   Tiered fees: 1.0% under 1K CAMP, 0.7% for 1K-10K CAMP, 0.5% for 10K+ CAMP
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                   <p className="text-blue-300 text-xs">
-                    ℹ️ <strong>Judges:</strong> Use your MetaMask BaseCAMP testnet wallet. 
+                    â„¹ï¸ <strong>Judges:</strong> Use your MetaMask BaseCAMP testnet wallet. 
                     Get free CAMP at <a 
                       href="https://faucet.campnetwork.xyz/" 
                       target="_blank"
@@ -1207,7 +1166,7 @@ useEffect(() => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">🦊</span>
+                      <span className="text-white font-bold text-sm">ðŸ¦Š</span>
                     </div>
                     <div className="text-left">
                       <div className="text-white font-semibold">MetaMask</div>
@@ -1236,7 +1195,7 @@ useEffect(() => {
 
               <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <div className="flex gap-2">
-                  <span className="text-yellow-400 text-sm">💡</span>
+                  <span className="text-yellow-400 text-sm">ðŸ’¡</span>
                   <div>
                     <p className="text-yellow-200 text-sm font-semibold mb-1">New to BaseCAMP?</p>
                     <p className="text-yellow-200/80 text-xs">
