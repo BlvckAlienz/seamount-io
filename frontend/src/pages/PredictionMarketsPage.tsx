@@ -60,7 +60,7 @@ interface PortfolioBet extends Bet {
 // ✅ CORRECT BASECAMP TESTNET CONFIG
 const BASECAMP_CONFIG = {
   chainId: '0x75bcd15',        // 123420001114 in hex
-  chainName: 'BaseCAMP Testnet',
+  chainName: 'Basecamp',
   nativeCurrency: {
     name: 'CAMP',
     symbol: 'CAMP',
@@ -187,36 +187,82 @@ const connectWallet = async () => {
       return;
     }
 
-    // Request account access
+    // ✅ STEP 1: Request account access FIRST
     const accounts = await window.ethereum.request({ 
       method: 'eth_requestAccounts' 
     }) as string[];
 
-    // Switch to BaseCAMP (or add if missing)
+    // ✅ STEP 2: Try to switch to existing BaseCAMP network
     try {
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: BASECAMP_CONFIG.chainId }]
       });
+      
+      console.log('✅ Switched to existing BaseCAMP network');
+      
     } catch (switchError: any) {
+      // ✅ STEP 3: If network doesn't exist (error 4902), add it
       if (switchError.code === 4902) {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [BASECAMP_CONFIG]
-        });
+        console.log('⚠️ BaseCAMP not found in MetaMask, adding now...');
+        
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [BASECAMP_CONFIG]
+          });
+          console.log('✅ BaseCAMP network added successfully');
+        } catch (addError: any) {
+          // 🚨 If add fails due to duplicate RPC, show helpful message
+          if (addError.code === -32603 && addError.message.includes('same RPC endpoint')) {
+            toast.error(
+              '⚠️ BaseCAMP network already exists in MetaMask.\n\n' +
+              'Please manually switch to "Basecamp" network in MetaMask.',
+              { duration: 6000 }
+            );
+            setConnecting(false);
+            return;
+          }
+          throw addError;
+        }
       } else {
+        // Other switch errors (user rejected, etc.)
         throw switchError;
       }
     }
 
-    setUserAddress(accounts[0]); // ✅ Use existing state
+    // ✅ STEP 4: Verify we're on the correct chain
+    const chainId = await window.ethereum.request({ 
+      method: 'eth_chainId' 
+    });
+    
+    if (chainId !== BASECAMP_CONFIG.chainId) {
+      toast.error('⚠️ Please switch to BaseCAMP network in MetaMask');
+      setConnecting(false);
+      return;
+    }
+
+    // ✅ STEP 5: Success!
+    setUserAddress(accounts[0]);
     setWalletConnected(true);
     setShowWalletModal(false);
-    toast.success(`✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
+    
+    toast.success(
+      `✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
+      { duration: 3000 }
+    );
     
   } catch (error: any) {
-    console.error('Wallet connection failed:', error);
-    toast.error(error.message || 'Failed to connect wallet');
+    console.error('❌ Wallet connection failed:', error);
+    
+    // User-friendly error messages
+    if (error.code === 4001) {
+      toast.error('Connection cancelled by user');
+    } else if (error.message?.includes('already processing')) {
+      toast.error('Please check MetaMask popup');
+    } else {
+      toast.error(error.message || 'Failed to connect wallet');
+    }
   } finally {
     setConnecting(false);
   }
