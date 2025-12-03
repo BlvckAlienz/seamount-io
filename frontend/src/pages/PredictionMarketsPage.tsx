@@ -147,44 +147,44 @@ const PredictionMarketsPage: React.FC = () => {
     }
   }, [activeTab]);
 
-  const fetchMyBets = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        console.warn('[MyBets] No valid session');
-        return;
-      }
-      
-      const response = await fetch('/api/v1/predictions/my-bets', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        // ✅ SHOW ALL BETS (including pending with tx_hash)
-        const displayableBets = data.bets.filter((bet: any) => 
-          bet.tx_hash && (bet.status === 'confirmed' || bet.status === 'pending')
-        );
-        
-        setMyBets(displayableBets);
-        
-        console.log(`✅ Loaded ${displayableBets.length} bets`);
-        
-        // Auto-refresh pending bets every 5 seconds
-        const pendingCount = displayableBets.filter((b: any) => b.status === 'pending').length;
-        if (pendingCount > 0) {
-          console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
-          setTimeout(fetchMyBets, 5000);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch my bets:', error);
+const fetchMyBets = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      console.warn('[MyBets] No valid session');
+      return;
     }
-  };
+    
+    const response = await fetch('/api/v1/predictions/my-bets', {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // ✅ SHOW ALL BETS (including pending with tx_hash)
+      const displayableBets = data.bets.filter((bet: any) => 
+        bet.tx_hash && (bet.status === 'confirmed' || bet.status === 'pending')
+      );
+      
+      setMyBets(displayableBets);
+      
+      console.log(`✅ Loaded ${displayableBets.length} bets`);
+      
+      // ✅ AUTO-REFRESH if pending bets exist
+      const pendingCount = displayableBets.filter((b: any) => b.status === 'pending').length;
+      if (pendingCount > 0) {
+        console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
+        setTimeout(fetchMyBets, 5000); // Poll every 5 seconds
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch my bets:', error);
+  }
+};
 
   // 🔥 IN-APP WALLET CONNECTION
   const connectWallet = async () => {
