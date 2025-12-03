@@ -191,18 +191,47 @@ const handlePlaceBet = async () => {
   setLoading(true);
   
   try {
-    // ðŸ” STEP 1: GET VALID SUPABASE SESSION TOKEN
+    // ✅ STEP 1: GET VALID SESSION TOKEN
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError || !session?.access_token) {
-      toast.error('âŒ Please sign in to place bets');
-      console.error('[Bet] No valid session:', sessionError);
+      toast.error('❌ Please sign in to place bets');
       return;
     }
     
-    console.log('âœ… [Bet] Valid session token retrieved');
+    // ✅ STEP 2: CHECK IF METAMASK IS INSTALLED
+    if (!window.ethereum) {
+      toast.error('❌ MetaMask not detected! Install it to bet.');
+      window.open('https://metamask.io/download/', '_blank');
+      return;
+    }
     
-    // 1ï¸âƒ£ RECORD BET IN DATABASE
+    // ✅ STEP 3: REQUEST METAMASK CONNECTION
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_requestAccounts' 
+    });
+    
+    const userWallet = accounts[0];
+    toast.success(`✅ Wallet connected: ${userWallet.slice(0, 6)}...${userWallet.slice(-4)}`);
+    
+    // ✅ STEP 4: CHECK CAMP BALANCE
+    const balance = await window.ethereum.request({
+      method: 'eth_getBalance',
+      params: [userWallet, 'latest']
+    });
+    
+    const balanceInCAMP = parseInt(balance, 16) / 1e18;
+    const required = parseFloat(betAmount) + 0.01; // bet + gas
+    
+    if (balanceInCAMP < required) {
+      toast.error(
+        `❌ Insufficient CAMP\n\nBalance: ${balanceInCAMP.toFixed(4)} CAMP\nRequired: ${required.toFixed(4)} CAMP\n\nGet testnet CAMP: https://faucet.campnetwork.xyz/`,
+        { duration: 8000 }
+      );
+      return;
+    }
+    
+    // ✅ STEP 5: RECORD BET INTENT IN DATABASE
     const response = await fetch('/api/v1/predictions/bet', {
       method: 'POST',
       headers: {
@@ -212,76 +241,92 @@ const handlePlaceBet = async () => {
       body: JSON.stringify({
         market_id: selectedMarket.id,
         prediction: betPrediction,
-        amount: parseFloat(betAmount)
+        amount: parseFloat(betAmount),
+        user_wallet: userWallet
       })
     });
     
     const data = await response.json();
     
-    if (!response.ok) {
-      throw new Error(data.detail || `HTTP ${response.status}: ${response.statusText}`);
-    }
-    
     if (!data.success) {
       throw new Error(data.detail || 'Bet recording failed');
     }
     
-    const betId = data.bet_id;
-    console.log('âœ… [Bet] Step 1: Database bet recorded', betId);
+    const { contract_address, contract_function } = data;
     
-    // 2ï¸âƒ£ APPROVE USDC SPENDING (if not already approved)
+    // ✅ STEP 6: EXECUTE ON-CHAIN BET VIA METAMASK
     setSigningTransaction(true);
-    toast.loading('Step 1/3: Approving USDC...', { id: 'bet-process' });
+    toast.loading('📝 Sign the transaction in MetaMask...', { id: 'bet-tx' });
     
-    const approvalResponse = await fetch('/api/v1/predictions/approve-usdc', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        bet_id: betId,
-        amount: parseFloat(betAmount)
-      })
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: userWallet,
+        to: contract_address,
+        value: `0x${contract_function.value_in_wei.toString(16)}`,
+        data: web3.eth.abi.encodeFunctionCall({
+          name: 'placeBet',
+          type: 'function',
+          inputs: [
+            { type: 'uint256', name: 'marketId' },
+            { type: 'bool', name: 'prediction' }
+          ]
+        }, [contract_function.params[0], contract_function.params[1]])
+      }]
     });
     
-    const approvalData = await approvalResponse.json();
+    toast.loading('⏳ Waiting for confirmation...', { id: 'bet-tx' });
     
-    if (!approvalData.success) {
-      throw new Error('USDC approval failed: ' + approvalData.error);
+    // ✅ STEP 7: WAIT FOR TRANSACTION CONFIRMATION
+    let receipt = null;
+    for (let i = 0; i < 30; i++) {
+      const result = await window.ethereum.request({
+        method: 'eth_getTransactionReceipt',
+        params: [txHash]
+      });
+      
+      if (result) {
+        receipt = result;
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
-    console.log('âœ… [Bet] Step 2: USDC approved', approvalData.tx_hash);
+    if (!receipt) {
+      throw new Error('Transaction timeout - check block explorer');
+    }
     
-    // 3ï¸âƒ£ EXECUTE ON-CHAIN BET
-    toast.loading('Step 2/3: Placing bet on-chain...', { id: 'bet-process' });
+    if (receipt.status !== '0x1') {
+      throw new Error('Transaction failed on-chain');
+    }
     
-    const executeResponse = await fetch('/api/v1/predictions/execute-bet', {
+    // ✅ STEP 8: CONFIRM BET IN DATABASE
+    const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
-        bet_id: betId,
         market_id: selectedMarket.id,
         prediction: betPrediction,
-        amount: parseFloat(betAmount)
+        amount: parseFloat(betAmount),
+        user_wallet: userWallet,
+        tx_hash: txHash
       })
     });
     
-    const executeData = await executeResponse.json();
+    const confirmData = await confirmResponse.json();
     
-    if (!executeData.success) {
-      throw new Error('On-chain bet failed: ' + executeData.error);
+    if (!confirmData.success) {
+      throw new Error('Failed to confirm bet in database');
     }
     
-    console.log('âœ… [Bet] Step 3: On-chain bet executed', executeData.tx_hash);
-    
-    // 4ï¸âƒ£ SUCCESS - SHOW CONFIRMATION
+    // ✅ SUCCESS
     toast.success(
-      `Bet placed! View on block explorer: ${executeData.explorer_url}`,
-      { id: 'bet-process', duration: 5000 }
+      `🎉 Bet placed! View on explorer: ${confirmData.explorer_url}`,
+      { id: 'bet-tx', duration: 6000 }
     );
     
     // Refresh data
@@ -291,8 +336,8 @@ const handlePlaceBet = async () => {
     setBetAmount('10');
     
   } catch (error: any) {
-    console.error('âŒ [Bet] Placement error:', error);
-    toast.error(error.message || 'Bet placement failed', { id: 'bet-process' });
+    console.error('❌ Bet placement error:', error);
+    toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
   } finally {
     setLoading(false);
     setSigningTransaction(false);
