@@ -1121,7 +1121,15 @@ async def get_my_bets(
             return {
                 "success": True,
                 "bets": [],
-                "total": 0
+                "total": 0,
+                "stats": {
+                    "total_staked": 0,
+                    "potential_winnings": 0,
+                    "realized_winnings": 0,
+                    "active_bets": 0,
+                    "profit_loss": 0,
+                    "win_rate": 0
+                }
             }
         
         # Enrich with market details
@@ -1140,43 +1148,108 @@ async def get_my_bets(
         enriched_bets = []
         for bet in bets_result.data:
             try:
-                # ✅ NEW: Get market info
+                # ✅ Get market info from smart contract
                 market_info = contract.functions.getMarket(bet['market_id']).call()
                 market_odds = contract.functions.odds(bet['market_id']).call()
                 
+                # Check if market is resolved on-chain
+                market_resolved = market_info[2]
+                market_outcome = market_info[3]
+                
+                # Start with bet data
                 bet_enriched = {
                     **bet,
-                    "question": market_info[0],      # string
-                    "market_end_time": market_info[1],  # uint256
-                    "resolved": market_info[2],      # bool
-                    "outcome": market_info[3]        # bool
+                    "question": market_info[0],
+                    "market_end_time": market_info[1],
+                    "resolved": market_resolved,
+                    "outcome": market_outcome
                 }
                 
-                # Calculate payout
-                if not market_info[2]:  # Not resolved
+                # 🚨 SYNC RESOLUTION STATUS TO DATABASE
+                if market_resolved and not bet.get('resolved'):
+                    # Market just resolved, calculate winnings and update DB
+                    won_bet = (bet['prediction'] == market_outcome)
                     odds = market_odds[0] if bet['prediction'] else market_odds[1]
-                    bet_enriched['payout'] = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
-                    bet_enriched['status'] = 'active'
-                else:
-                    bet_enriched['won'] = (bet['prediction'] == market_info[3])
-                    if bet_enriched['won']:
-                        odds = market_odds[0] if bet['prediction'] else market_odds[1]
-                        bet_enriched['payout'] = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
-                        bet_enriched['status'] = 'claimable'
+                    
+                    if won_bet:
+                        payout_amount = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
                     else:
-                        bet_enriched['payout'] = 0
-                        bet_enriched['status'] = 'lost'
+                        payout_amount = 0
+                    
+                    try:
+                        supabase.table('prediction_bets').update({
+                            'resolved': True,
+                            'won': won_bet,
+                            'outcome': market_outcome,
+                            'payout': payout_amount,
+                            'updated_at': datetime.utcnow().isoformat()
+                        }).eq('id', bet['id']).execute()
+                        
+                        # Update enriched bet with fresh data
+                        bet_enriched['resolved'] = True
+                        bet_enriched['won'] = won_bet
+                        bet_enriched['payout'] = payout_amount
+                        
+                        logger.info(f"✅ Synced resolution for bet {bet['id']}: won={won_bet}, payout={payout_amount}")
+                    except Exception as sync_error:
+                        logger.error(f"Failed to sync resolution for bet {bet['id']}: {sync_error}")
+                
+                # Calculate status and payout for display
+                if not market_resolved:
+                    # Active bet - calculate potential payout
+                    odds = market_odds[0] if bet['prediction'] else market_odds[1]
+                    if not bet_enriched.get('payout'):
+                        bet_enriched['payout'] = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
+                    bet_enriched['status_display'] = 'active'
+                else:
+                    # Resolved bet - use DB payout if available
+                    bet_enriched['won'] = bet.get('won', bet['prediction'] == market_outcome)
+                    if bet_enriched['won']:
+                        bet_enriched['status_display'] = 'claimable' if not bet.get('claimed') else 'claimed'
+                    else:
+                        bet_enriched['status_display'] = 'lost'
+                        if not bet_enriched.get('payout'):
+                            bet_enriched['payout'] = 0
                 
                 enriched_bets.append(bet_enriched)
                 
-            except Exception as market_err:
-                logger.error(f"Failed to enrich bet {bet['id']}: {market_err}")
+            except Exception as market_error:
+                logger.error(f"Failed to enrich bet {bet['id']}: {market_error}")
                 continue
+        
+        # 🧮 CALCULATE PORTFOLIO STATS (CONFIRMED BETS ONLY)
+        total_staked = sum(float(bet['amount']) for bet in enriched_bets)
+        
+        # Active bets = confirmed but not resolved
+        active_bets = [bet for bet in enriched_bets if not bet.get('resolved', False)]
+        active_bet_count = len(active_bets)
+        
+        # Potential winnings = sum of active bet payouts
+        potential_winnings = sum(float(bet.get('payout', 0)) for bet in active_bets)
+        
+        # Realized winnings from won bets (resolved)
+        resolved_bets = [bet for bet in enriched_bets if bet.get('resolved', False)]
+        won_bets = [bet for bet in resolved_bets if bet.get('won', False)]
+        realized_winnings = sum(float(bet.get('payout', 0)) for bet in won_bets)
+        
+        # Profit/Loss = (potential + realized) - total staked
+        profit_loss = (potential_winnings + realized_winnings) - total_staked
+        
+        # Win rate calculation
+        win_rate = (len(won_bets) / len(resolved_bets) * 100) if resolved_bets else 0
         
         return {
             "success": True,
             "bets": enriched_bets,
-            "total": len(enriched_bets)
+            "total": len(enriched_bets),
+            "stats": {
+                "total_staked": round(total_staked, 2),
+                "potential_winnings": round(potential_winnings, 2),
+                "realized_winnings": round(realized_winnings, 2),
+                "active_bets": active_bet_count,
+                "profit_loss": round(profit_loss, 2),
+                "win_rate": round(win_rate, 1)
+            }
         }
         
     except Exception as e:

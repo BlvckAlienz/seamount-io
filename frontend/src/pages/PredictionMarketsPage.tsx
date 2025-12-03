@@ -100,6 +100,15 @@ const PredictionMarketsPage: React.FC = () => {
     txHash: string;
   } | null>(null);
 
+  const [portfolioStats, setPortfolioStats] = useState({
+  total_staked: 0,
+  potential_winnings: 0,
+  realized_winnings: 0,
+  active_bets: 0,
+  profit_loss: 0,
+  win_rate: 0
+});
+
   // ✅ CHECK METAMASK PERSISTENCE
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
@@ -166,7 +175,14 @@ const PredictionMarketsPage: React.FC = () => {
       
       if (data.success) {
         setMyBets(data.bets);
-        console.log(`✅ Loaded ${data.bets.length} bets`);
+        
+        // 🚨 UPDATE PORTFOLIO STATS FROM BACKEND
+        if (data.stats) {
+          setPortfolioStats(data.stats);
+          console.log('📊 Stats updated:', data.stats);
+        }
+        
+        console.log(`✅ Loaded ${data.bets.length} confirmed bets`);
         
         const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
         if (pendingCount > 0) {
@@ -765,27 +781,65 @@ const PredictionMarketsPage: React.FC = () => {
             ) : (
               <div className="space-y-6">
                 {/* Portfolio Summary Card */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Total Staked</div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {/* Card 1: Total Staked */}
+                <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
+                    <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
-                      {myBets.filter(b => b.status === 'confirmed').reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)} CAMP
+                    {portfolioStats.total_staked.toFixed(2)} CAMP
                     </div>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
+                    <div className="text-xs text-blue-300/70 mt-1">Confirmed bets</div>
+                </div>
+                
+                {/* Card 2: Potential Winnings */}
+                <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
+                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
                     <div className="text-3xl font-black text-white">
-                      {myBets.filter(b => !b.resolved).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(2)} CAMP
+                    {portfolioStats.potential_winnings.toFixed(2)} CAMP
                     </div>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Active Bets</div>
+                    <div className="text-xs text-purple-300/70 mt-1">If all active win</div>
+                </div>
+                
+                {/* Card 3: Realized Winnings */}
+                <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
+                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Realized Winnings</div>
                     <div className="text-3xl font-black text-white">
-                      {myBets.filter(b => !b.resolved).length}
+                    {portfolioStats.realized_winnings.toFixed(2)} CAMP
                     </div>
-                  </div>
+                    <div className="text-xs text-green-300/70 mt-1">From won bets</div>
+                </div>
+                
+                {/* Card 4: Active Bets */}
+                <div className="bg-gradient-to-br from-slate-800/30 to-slate-700/20 border border-slate-500/30 rounded-2xl p-6">
+                    <div className="text-sm text-slate-400 mb-1 uppercase tracking-wide">Active Bets</div>
+                    <div className="text-3xl font-black text-white">
+                    {portfolioStats.active_bets}
+                    </div>
+                    <div className="text-xs text-slate-300/70 mt-1">Unresolved</div>
+                </div>
+                
+                {/* Card 5: Your Profit (Dynamic Color) */}
+                <div className={`bg-gradient-to-br rounded-2xl p-6 ${
+                    portfolioStats.profit_loss >= 0 
+                    ? 'from-yellow-900/30 to-yellow-800/20 border border-yellow-500/30' 
+                    : 'from-red-900/30 to-red-800/20 border border-red-500/30'
+                }`}>
+                    <div className={`text-sm mb-1 uppercase tracking-wide ${
+                    portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                    Your Profit
+                    </div>
+                    <div className={`text-3xl font-black ${
+                    portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                    {portfolioStats.profit_loss >= 0 ? '+' : ''}{portfolioStats.profit_loss.toFixed(2)} CAMP
+                    </div>
+                    <div className={`text-xs mt-1 ${
+                    portfolioStats.profit_loss >= 0 ? 'text-yellow-300/70' : 'text-red-300/70'
+                    }`}>
+                    Win rate: {portfolioStats.win_rate.toFixed(1)}%
+                    </div>
+                </div>
                 </div>
 
                 {/* Bets List */}
