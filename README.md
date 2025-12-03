@@ -417,7 +417,7 @@ MIT License - see [LICENSE](./LICENSE) for details.
 
 - [Live App](https://seamount.io)
 - [API Docs](https://api.seamount.io/docs)
-- [Contract Explorer](https://testnet.basescan.org/address/0x...)
-- [Pitch Deck](./docs/Seamount-Pitch-Deck.pdf)
+- [Contract Explorer](https://basecamp.cloud.blockscout.com/tx/0x319e35a60374195a04b443b712bbb1eca16aac8af6f326fe4de5051d82d74ab3)
+- [Pitch Deck](https://bit.ly/Seamount-Deck)
 
 **Last updated:** December 2025 | **Status:** Active Development 🚀

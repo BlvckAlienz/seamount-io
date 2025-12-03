@@ -237,7 +237,7 @@ const PredictionMarketsPage: React.FC = () => {
           } catch (addError: any) {
             if (addError.code === -32603 && addError.message.includes('same RPC endpoint')) {
               toast.error(
-                'âš ï¸ BaseCAMP network already exists in MetaMask.\n\n' +
+                'BaseCAMP network already exists in MetaMask.\n\n' +
                 'Please manually switch to "Basecamp" network in MetaMask.',
                 { duration: 6000 }
               );
@@ -256,7 +256,7 @@ const PredictionMarketsPage: React.FC = () => {
       });
       
       if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('âš ï¸ Please switch to BaseCAMP network in MetaMask');
+        toast.error('Please switch to BaseCAMP network in MetaMask');
         setConnecting(false);
         return;
       }
@@ -271,7 +271,7 @@ const PredictionMarketsPage: React.FC = () => {
       );
       
     } catch (error: any) {
-      console.error('âŒ Wallet connection failed:', error);
+      console.error('Wallet connection failed:', error);
       
       if (error.code === 4001) {
         toast.error('Connection cancelled by user');
@@ -393,7 +393,7 @@ const PredictionMarketsPage: React.FC = () => {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session?.access_token) {
-        toast.error('âš ï¸ Please sign in to place bets');
+        toast.error('Please sign in to place bets');
         return;
       }
       
@@ -470,7 +470,7 @@ const PredictionMarketsPage: React.FC = () => {
       });
 
       toast.success(
-        `ðŸ“¡ Transaction submitted! Monitoring status...`,
+        `Transaction submitted! Monitoring status...`,
         { id: 'bet-tx', duration: 10000 }
       );
       
@@ -537,7 +537,7 @@ const PredictionMarketsPage: React.FC = () => {
         toast.error('âš ï¸ Please switch back to BaseCAMP network');
         setWalletConnected(false);
       } else {
-        toast.success('âœ… Connected to BaseCAMP');
+        toast.success('Connected to BaseCAMP');
         window.location.reload();
       }
     };
@@ -977,7 +977,7 @@ const PredictionMarketsPage: React.FC = () => {
                       onConfirmed={() => {
                         fetchMarkets();
                         fetchMyBets();
-                        toast.success('ðŸŽ‰ Bet confirmed on-chain!', { duration: 9000 });
+                        toast.success('Bet confirmed on-chain!', { duration: 9000 });
                         setTimeout(() => {
                           setActiveTransaction(null);
                           setShowBetModal(false);
