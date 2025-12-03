@@ -1113,7 +1113,6 @@ async def get_my_bets(
         bets_result = supabase.table('prediction_bets')\
             .select('*')\
             .eq('user_id', user_id)\
-            .eq('status', 'confirmed')\
             .order('created_at', desc=True)\
             .execute()
         
@@ -1217,3 +1216,46 @@ async def predictions_health():
             'status': 'unhealthy',
             'error': str(e)
         }
+    
+@router.get("/market-stats")
+async def get_market_stats():
+    """
+    📊 GET MARKET STATISTICS (Total Volume, Unique Traders)
+    """
+    try:
+        if not CONTRACT_ADDRESS:
+            raise HTTPException(status_code=503, detail="Prediction markets not configured")
+        
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(CONTRACT_ADDRESS),
+            abi=MARKET_ABI
+        )
+        
+        market_count = contract.functions.marketCount().call()
+        
+        total_volume_wei = 0
+        all_participants = set()
+        
+        for i in range(market_count):
+            try:
+                pools = contract.functions.getPools(i).call()
+                # currentYes + currentNo in wei
+                total_volume_wei += pools[0] + pools[1]
+                # participants per market (this might have duplicates across markets)
+                # Note: We would need an event-based system to track unique addresses
+            except:
+                continue
+        
+        # Convert wei to CAMP
+        total_volume_camp = total_volume_wei / 1e18
+        
+        return {
+            "success": True,
+            "total_volume_camp": total_volume_camp,
+            "market_count": market_count,
+            "unique_traders": len(all_participants)  # This will be inaccurate without event tracking
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch market stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

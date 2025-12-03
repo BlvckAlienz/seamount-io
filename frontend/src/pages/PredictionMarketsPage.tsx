@@ -165,17 +165,10 @@ const PredictionMarketsPage: React.FC = () => {
       const data = await response.json();
       
       if (data.success) {
-        // ✅ SHOW ALL BETS (including pending with tx_hash)
-        const displayableBets = data.bets.filter((bet: any) => 
-          bet.tx_hash && (bet.status === 'confirmed' || bet.status === 'pending')
-        );
+        setMyBets(data.bets);
+        console.log(`✅ Loaded ${data.bets.length} bets`);
         
-        setMyBets(displayableBets);
-        
-        console.log(`✅ Loaded ${displayableBets.length} bets`);
-        
-        // Auto-refresh pending bets every 5 seconds
-        const pendingCount = displayableBets.filter((b: any) => b.status === 'pending').length;
+        const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
         if (pendingCount > 0) {
           console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
           setTimeout(fetchMyBets, 5000);
@@ -308,25 +301,66 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
   const formatVolume = (volume: string) => {
-    const num = parseFloat(volume) / 1000000;
-    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
-    return `$${num.toFixed(0)}`;
+    const num = parseFloat(volume) / 1e18; // Convert from wei to CAMP
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M CAMP`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K CAMP`;
+    return `${num.toFixed(1)} CAMP`;
+  };
+
+  const calculateMarketStats = () => {
+    if (markets.length === 0) return { totalVolume: 0, totalTraders: 0 };
+    
+    let totalVolume = 0;
+    
+    markets.forEach(market => {
+      const marketVolume = parseFloat(market.totalVolume) / 1e18;
+      totalVolume += marketVolume;
+    });
+    
+    const uniqueTraders = markets.reduce((sum, m) => sum + m.participantCount, 0);
+    
+    return {
+      totalVolume,
+      totalTraders: uniqueTraders
+    };
+  };
+
+  // 🔥 TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
+  const calculateFeeRate = (totalVolume: number): number => {
+    // Convert from wei to CAMP and use same thresholds as smart contract
+    const totalCAMP = totalVolume / 1e18;
+    
+    if (totalCAMP < 1000) return 10;    // 1.0% (10/1000) - LOW_FEE
+    if (totalCAMP < 10000) return 7;    // 0.7% (7/1000) - MED_FEE
+    return 5;                           // 0.5% (5/1000) - HIGH_FEE
+  };
+
+  const getFeePercentage = (totalVolume: number): string => {
+    const rate = calculateFeeRate(totalVolume);
+    // Convert to percentage: 10 = 1.0%, 7 = 0.7%, 5 = 0.5%
+    return (rate / 10).toFixed(1);
   };
 
   const calculatePotentialPayout = () => {
     if (!selectedMarket || !betAmount) return 0;
     
     const amount = parseFloat(betAmount);
-    const totalPool = parseFloat(selectedMarket.totalVolume) / 1000000 + amount;
+    const totalVolume = parseFloat(selectedMarket.totalVolume || '0');
+    const totalPool = (totalVolume / 1e18) + amount;
     const winningPool = betPrediction 
-      ? (selectedMarket.yesPercent * parseFloat(selectedMarket.totalVolume) / 100000000) + amount
-      : (selectedMarket.noPercent * parseFloat(selectedMarket.totalVolume) / 100000000) + amount;
+      ? ((selectedMarket.yesPercent / 100) * (totalVolume / 1e18)) + amount
+      : ((selectedMarket.noPercent / 100) * (totalVolume / 1e18)) + amount;
     
-    if (winningPool === 0) return amount * 1.96;
+    if (winningPool === 0) return amount * 1.98; // 2x minus minimum fee approximation
     
     const grossPayout = (amount / winningPool) * totalPool;
-    return grossPayout * 0.982;
+    
+    // Use the same tiered fee logic as the smart contract
+    const feeRate = calculateFeeRate(totalVolume);
+    const fee = (grossPayout * feeRate) / 1000;
+    const netPayout = grossPayout - fee;
+    
+    return netPayout;
   };
 
   const handlePlaceBet = async () => {
@@ -421,7 +455,7 @@ const PredictionMarketsPage: React.FC = () => {
 
       toast.success(
         `📡 Transaction submitted! Monitoring status...`,
-        { id: 'bet-tx', duration: 3000 }
+        { id: 'bet-tx', duration: 10000 }
       );
       
       await fetchMarkets();
@@ -504,6 +538,34 @@ const PredictionMarketsPage: React.FC = () => {
     };
   }, []);
 
+  // 🔥 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
+  const statsData = [
+    { 
+      label: 'Total Volume', 
+      value: `${calculateMarketStats().totalVolume.toFixed(1)} CAMP`, 
+      icon: DollarSign, 
+      color: 'text-green-400' 
+    },
+    { 
+      label: 'Active Markets', 
+      value: markets.length, 
+      icon: TrendingUp, 
+      color: 'text-blue-400' 
+    },
+    { 
+      label: 'Total Traders', 
+      value: calculateMarketStats().totalTraders, 
+      icon: Users, 
+      color: 'text-purple-400' 
+    },
+    { 
+      label: 'Your Profit', 
+      value: `${myBets.filter(b => b.won).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(1)} CAMP`, 
+      icon: Trophy, 
+      color: 'text-yellow-400' 
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -553,12 +615,7 @@ const PredictionMarketsPage: React.FC = () => {
 
         {/* Stats Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Total Volume', value: '$0', icon: DollarSign, color: 'text-green-400' },
-            { label: 'Active Markets', value: markets.length, icon: TrendingUp, color: 'text-blue-400' },
-            { label: 'Total Traders', value: '0', icon: Users, color: 'text-purple-400' },
-            { label: 'Your Profit', value: '$0.00', icon: Trophy, color: 'text-yellow-400' }
-          ].map((stat, idx) => (
+          {statsData.map((stat, idx) => (
             <div key={idx} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 hover:border-slate-600 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <stat.icon className={`h-4 w-4 ${stat.color}`} />
@@ -712,14 +769,14 @@ const PredictionMarketsPage: React.FC = () => {
                   <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
                     <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
-                      ${myBets.filter(b => b.status === 'confirmed').reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)}
+                      {myBets.filter(b => b.status === 'confirmed').reduce((sum, bet) => sum + bet.amount, 0).toFixed(2)} CAMP
                     </div>
                   </div>
                   
                   <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
                     <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
                     <div className="text-3xl font-black text-white">
-                      ${myBets.filter(b => !b.resolved).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(2)}
+                      {myBets.filter(b => !b.resolved).reduce((sum, bet) => sum + (bet.payout || 0), 0).toFixed(2)} CAMP
                     </div>
                   </div>
                   
@@ -785,15 +842,15 @@ const PredictionMarketsPage: React.FC = () => {
                         
                         <div className="text-right">
                           <div className="text-sm text-gray-400 mb-1">Staked</div>
-                          <div className="text-xl font-bold text-white">${bet.amount.toFixed(2)}</div>
+                          <div className="text-xl font-bold text-white">{bet.amount.toFixed(2)} CAMP</div>
                           {bet.payout && !bet.resolved && (
                             <div className="text-xs text-green-400 mt-1">
-                              Potential: ${bet.payout.toFixed(2)}
+                              Potential: {bet.payout.toFixed(2)} CAMP
                             </div>
                           )}
                           {bet.won && bet.payout && (
                             <div className="text-lg font-bold text-green-400 mt-1">
-                              +${bet.payout.toFixed(2)}
+                              +{bet.payout.toFixed(2)} CAMP
                             </div>
                           )}
                         </div>
@@ -818,7 +875,7 @@ const PredictionMarketsPage: React.FC = () => {
                           className="w-full mt-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all flex items-center justify-center gap-2"
                         >
                           <Trophy className="h-5 w-5" />
-                          Claim ${bet.payout?.toFixed(2)}
+                          Claim {bet.payout?.toFixed(2)} CAMP
                         </button>
                       )}
                     </div>
@@ -866,11 +923,11 @@ const PredictionMarketsPage: React.FC = () => {
                       onConfirmed={() => {
                         fetchMarkets();
                         fetchMyBets();
-                        toast.success('🎉 Bet confirmed on-chain!', { duration: 5000 });
+                        toast.success('🎉 Bet confirmed on-chain!', { duration: 9000 });
                         setTimeout(() => {
                           setActiveTransaction(null);
                           setShowBetModal(false);
-                        }, 3000);
+                        }, 6000);
                       }}
                     />
                   </div>
@@ -907,9 +964,9 @@ const PredictionMarketsPage: React.FC = () => {
 
                     {/* Amount Input */}
                     <div className="mb-6">
-                      <label className="block text-sm font-semibold text-gray-400 mb-2">Bet Amount (USDC)</label>
+                      <label className="block text-sm font-semibold text-gray-400 mb-2">Bet Amount (CAMP)</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">$</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500">CAMP</span>
                         <input
                           type="number"
                           value={betAmount}
@@ -922,43 +979,62 @@ const PredictionMarketsPage: React.FC = () => {
                       
                       {/* Quick Amounts */}
                       <div className="grid grid-cols-4 gap-2 mt-3">
-                        {[10, 50, 100, 500].map(amount => (
+                        {[1, 5, 10, 50].map(amount => (
                           <button
                             key={amount}
                             onClick={() => setBetAmount(amount.toString())}
                             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-green-500 rounded-lg text-sm font-semibold text-gray-300 hover:text-white transition-all"
                           >
-                            ${amount}
+                            {amount} CAMP
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Payout Breakdown */}
+                    {/* Payout Breakdown - TIERED FEE CALCULATION */}
                     <div className="bg-slate-800/50 rounded-xl p-5 mb-6 border border-slate-700">
                       <div className="flex justify-between mb-3">
                         <span className="text-gray-400">Your Bet</span>
-                        <span className="text-white font-semibold">${betAmount || '0'}</span>
+                        <span className="text-white font-semibold">{betAmount || '0'} CAMP</span>
                       </div>
-                      <div className="flex justify-between mb-3">
-                        <span className="text-gray-400">Potential Return</span>
-                        <span className="text-green-400 font-semibold">${calculatePotentialPayout().toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between mb-3">
-                        <span className="text-gray-400">Platform Fee (1.8%)</span>
-                        <span className="text-gray-500 font-semibold">-${(calculatePotentialPayout() * 0.018).toFixed(2)}</span>
-                      </div>
-                      <div className="pt-3 border-t border-slate-700 flex justify-between">
-                        <span className="text-white font-bold">Net Payout</span>
-                        <span className="text-2xl text-green-400 font-black">${(calculatePotentialPayout() * 0.982).toFixed(2)}</span>
-                      </div>
+                      {(() => {
+                        const amount = parseFloat(betAmount || '0');
+                        const totalVolume = parseFloat(selectedMarket.totalVolume || '0');
+                        const totalPool = (totalVolume / 1e18) + amount;
+                        const winningPool = betPrediction 
+                          ? ((selectedMarket.yesPercent / 100) * (totalVolume / 1e18)) + amount
+                          : ((selectedMarket.noPercent / 100) * (totalVolume / 1e18)) + amount;
+                        
+                        const grossPayout = winningPool === 0 ? amount * 2 : (amount / winningPool) * totalPool;
+                        const feeRate = calculateFeeRate(totalVolume);
+                        const feePercentage = getFeePercentage(totalVolume);
+                        const fee = (grossPayout * feeRate) / 1000;
+                        const netPayout = grossPayout - fee;
+                        
+                        return (
+                          <>
+                            <div className="flex justify-between mb-3">
+                              <span className="text-gray-400">Potential Return</span>
+                              <span className="text-green-400 font-semibold">{grossPayout.toFixed(2)} CAMP</span>
+                            </div>
+                            <div className="flex justify-between mb-3">
+                              <span className="text-gray-400">Platform Fee ({feePercentage}%)</span>
+                              <span className="text-gray-500 font-semibold">-{fee.toFixed(2)} CAMP</span>
+                            </div>
+                            <div className="pt-3 border-t border-slate-700 flex justify-between">
+                              <span className="text-white font-bold">Net Payout</span>
+                              <span className="text-2xl text-green-400 font-black">{netPayout.toFixed(2)} CAMP</span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
-                    {/* Warning */}
+                    {/* Warning - UPDATED FEE INFORMATION */}
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex gap-3">
                       <Info className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-200">
-                        Betting is implemented on Camp testnet. Check back soon for the real deal!
+                        Fees are tiered: 1.0% for pools under 1K CAMP, 0.7% for 1K-10K CAMP, 0.5% for 10K+ CAMP
                       </p>
                     </div>
 
@@ -983,7 +1059,7 @@ const PredictionMarketsPage: React.FC = () => {
                         ) : loading ? (
                           'Recording Bet...'
                         ) : (
-                          `Place ${betAmount ? `$${betAmount}` : ''} Bet`
+                          `Place ${betAmount ? `${betAmount} CAMP` : ''} Bet`
                         )}
                       </button>
                     </div>
@@ -1011,7 +1087,7 @@ const PredictionMarketsPage: React.FC = () => {
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">🎯 Connect to Place Bets</h2>
                 <p className="text-gray-400 text-sm mb-4">
-                  You need a MetaMask wallet with <span className="text-green-400 font-semibold">CAMP tokens</span> to participate
+                  Tiered fees: 1.0% under 1K CAMP, 0.7% for 1K-10K CAMP, 0.5% for 10K+ CAMP
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                   <p className="text-blue-300 text-xs">
