@@ -5,7 +5,7 @@ import { apiClient } from '@/config/api';
 import { supabase } from '@/lib/supabase'; 
 import toast from 'react-hot-toast';
 
-// 🔥 TYPE DECLARATION FOR METAMASK
+// 🔥 ENHANCED METAMASK TYPE DECLARATION
 declare global {
   interface Window {
     ethereum?: {
@@ -91,35 +91,43 @@ const PredictionMarketsPage: React.FC = () => {
   const [userAddress, setUserAddress] = useState<string>('');
   const [signingTransaction, setSigningTransaction] = useState(false);
 
-  // Check if user has Ethereum wallet on Camp Network
+  // ✅ CHECK METAMASK PERSISTENCE (Don't auto-connect Seamount wallet)
   useEffect(() => {
-    const checkWallet = async () => {
+    const checkMetaMaskConnection = async () => {
         try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user?.id) return;
+        if (!window.ethereum) return;
 
-        // Fetch user's Ethereum wallet from database
-        const { data: wallet } = await supabase
-            .from('multi_chain_addresses')
-            .select('address')
-            .eq('user_id', session.user.id)
-            .eq('blockchain', 'ethereum')
-            .single();
+        // Check if MetaMask was previously connected
+        const accounts = await window.ethereum.request({ 
+            method: 'eth_accounts' 
+        }) as string[];
 
-        if (wallet?.address) {
-            setUserAddress(wallet.address);
+        if (accounts.length > 0) {
+            // User previously connected MetaMask - reconnect silently
+            const chainId = await window.ethereum.request({ 
+            method: 'eth_chainId' 
+            });
+
+            if (chainId === BASECAMP_CONFIG.chainId) {
+            setUserAddress(accounts[0]);
             setWalletConnected(true);
-            console.log('Wallet connected:', wallet.address);
+            console.log('✅ MetaMask reconnected:', accounts[0]);
+            } else {
+            console.warn('⚠️ Wrong network, please switch to BaseCAMP');
+            }
         } else {
-            console.warn('No Ethereum wallet found');
+            // No MetaMask connection - show modal after 1 second
+            setTimeout(() => {
+            setShowWalletModal(true);
+            }, 1000);
         }
         } catch (error) {
-        console.error('Wallet check failed:', error);
+        console.error('MetaMask check failed:', error);
         }
     };
 
-    checkWallet();
-  }, []);
+    checkMetaMaskConnection();
+    }, []);
 
   useEffect(() => {
     fetchMarkets();
@@ -360,21 +368,31 @@ const handlePlaceBet = async () => {
       throw new Error(data.detail || 'Bet recording failed');
     }
     
-    // Execute on-chain transaction via MetaMask
-    setSigningTransaction(true);
-    toast.loading('📝 Sign the transaction in MetaMask...', { id: 'bet-tx' });
-    
-    const txHash = await window.ethereum.request({
-      method: 'eth_sendTransaction',
-      params: [{
-        from: userAddress,
+    // ✅ VALIDATE TRANSACTION DATA FIRST
+    if (!data.contract_function.encoded_data || 
+        !data.contract_function.encoded_data.startsWith('0x')) {
+    throw new Error('🚨 Invalid contract data from backend');
+    }
+
+    console.log('📝 Sending transaction:', {
         to: data.contract_address,
         value: `0x${data.contract_function.value_in_wei.toString(16)}`,
-        data: data.contract_function.encoded_data
-      }]
+        data: data.contract_function.encoded_data,
+        from: userAddress
     });
-    
-    toast.loading('⏳ Confirming transaction...', { id: 'bet-tx' });
+
+    const txHash = await window.ethereum!.request({
+        method: 'eth_sendTransaction',
+        params: [{
+            from: userAddress,
+            to: data.contract_address,
+            value: `0x${data.contract_function.value_in_wei.toString(16)}`,
+            data: data.contract_function.encoded_data,
+            gas: '0x30D40' // ✅ ADD EXPLICIT GAS LIMIT (200,000)
+        }]
+    }) as string;
+
+    console.log('✅ Transaction submitted:', txHash);
     
     // Confirm bet in database
     const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
@@ -446,6 +464,48 @@ const handlePlaceBet = async () => {
     };
     return colors[category] || 'from-gray-500 to-slate-500';
   };
+
+  // ✅ PERSIST METAMASK CONNECTION (Listen for account/network changes)
+useEffect(() => {
+  if (!window.ethereum) return;
+
+  const handleAccountsChanged = (accounts: string[]) => {
+    if (accounts.length === 0) {
+      // User disconnected in MetaMask
+      setWalletConnected(false);
+      setUserAddress('');
+      toast.error('Wallet disconnected');
+    } else {
+      // User switched accounts
+      setUserAddress(accounts[0]);
+      toast.success(`Switched to ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
+    }
+  };
+
+  const handleChainChanged = (chainId: string) => {
+    if (chainId !== BASECAMP_CONFIG.chainId) {
+      toast.error('⚠️ Please switch back to BaseCAMP network');
+      setWalletConnected(false);
+    } else {
+      toast.success('✅ Connected to BaseCAMP');
+      // Reload to refresh state
+      window.location.reload();
+    }
+  };
+
+  // ✅ Type-safe event listener setup
+const ethereum = window.ethereum as any;  // Cast to 'any' to bypass TypeScript
+ethereum.on('accountsChanged', handleAccountsChanged);
+ethereum.on('chainChanged', handleChainChanged);
+
+// Cleanup listeners on unmount
+return () => {
+  if (ethereum.removeListener) {
+    ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    ethereum.removeListener('chainChanged', handleChainChanged);
+  }
+};
+}, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
@@ -899,10 +959,23 @@ const handlePlaceBet = async () => {
                 <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Wallet className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
-                <p className="text-gray-400 text-sm">
-                Connect to place bets on prediction markets
+                <h2 className="text-2xl font-bold text-white mb-2">🎯 Connect to Place Bets</h2>
+                <p className="text-gray-400 text-sm mb-4">
+                  You need a MetaMask wallet with <span className="text-green-400 font-semibold">CAMP tokens</span> to participate
                 </p>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+                  <p className="text-blue-300 text-xs">
+                    ℹ️ <strong>Judges:</strong> Use your MetaMask BaseCAMP testnet wallet. 
+                    Get free CAMP at <a 
+                      href="https://faucet.campnetwork.xyz/" 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-blue-200"
+                    >
+                      faucet.campnetwork.xyz
+                    </a>
+                  </p>
+                </div>
             </div>
 
             <div className="space-y-3">

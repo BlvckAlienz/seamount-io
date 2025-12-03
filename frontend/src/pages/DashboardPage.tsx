@@ -581,12 +581,14 @@ const DashboardPage = () => {
                 <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with USDC on Camp Net</p>
               </div>
               <button
-                onClick={() => setShowPredictionMarkets(true)}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
+                onClick={() => navigate('/predictions')}
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all flex items-center gap-2 group"
+                title="Connect MetaMask to place bets"
               >
-                <TrendingUp className="h-5 w-5" />
-                <span className="hidden sm:inline">View Markets</span>
-                <span className="sm:hidden">Bet</span>
+                <span>View Markets</span>
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </button>
             </div>
 

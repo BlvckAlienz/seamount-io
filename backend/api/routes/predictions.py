@@ -950,6 +950,24 @@ async def place_bet(
         # ✅ Convert Decimal to int for wei calculation
         amount_in_wei = int(float(request.amount) * 1e18)
 
+        # ✅ ENCODE THE CONTRACT FUNCTION CALL
+        from eth_abi import encode
+
+        # Encode placeBet(uint256 marketId, bool prediction)
+        function_signature = "placeBet(uint256,bool)"
+        function_selector = w3.keccak(text=function_signature)[:4].hex()
+
+        # Encode parameters
+        encoded_params = encode(
+            ['uint256', 'bool'],
+            [request.market_id, request.prediction]
+        ).hex()
+
+        # Combine selector + params
+        encoded_data = f"0x{function_selector[2:]}{encoded_params}"
+
+        logger.info(f"📝 Encoded transaction data: {encoded_data}")
+
         return {
             "success": True,
             "message": "Bet intent recorded. Execute via MetaMask.",
@@ -958,7 +976,8 @@ async def place_bet(
             "contract_function": {
                 "name": "placeBet",
                 "params": [request.market_id, request.prediction],
-                "value_in_wei": amount_in_wei  # ✅ FIXED
+                "value_in_wei": amount_in_wei,
+                "encoded_data": encoded_data  # ✅ NOW ACTUALLY ENCODED
             },
             "potential_payout": round(potential_payout, 4)
         }
