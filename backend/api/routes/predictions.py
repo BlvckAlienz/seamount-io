@@ -1039,6 +1039,96 @@ async def confirm_bet(
         logger.error(f"❌ Bet confirmation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/bet/{bet_id}/status")
+async def get_bet_status(
+    bet_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    🔍 POLL TRANSACTION STATUS
+    Returns: pending | confirmed | failed | not_found
+    """
+    try:
+        user_id = current_user.get("id")
+        supabase = get_supabase_client()
+        
+        # 1️⃣ Fetch bet from database
+        bet_result = supabase.table('prediction_bets')\
+            .select('*')\
+            .eq('id', bet_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+        
+        if not bet_result.data:
+            raise HTTPException(status_code=404, detail="Bet not found")
+        
+        bet = bet_result.data
+        tx_hash = bet.get('tx_hash')
+        
+        if not tx_hash:
+            return {
+                "success": True,
+                "status": "pending",
+                "message": "Waiting for transaction signature"
+            }
+        
+        # 2️⃣ Check transaction on blockchain
+        try:
+            tx_receipt = w3.eth.get_transaction_receipt(tx_hash)
+            
+            if tx_receipt:
+                # Transaction is mined!
+                confirmation_status = "confirmed" if tx_receipt['status'] == 1 else "failed"
+                block_number = tx_receipt['blockNumber']
+                gas_used = tx_receipt['gasUsed']
+                
+                # 3️⃣ Update database if newly confirmed
+                if bet['status'] != confirmation_status:
+                    supabase.table('prediction_bets').update({
+                        'status': confirmation_status,
+                        'block_number': block_number,
+                        'gas_used': gas_used,
+                        'updated_at': datetime.utcnow().isoformat()
+                    }).eq('id', bet_id).execute()
+                
+                return {
+                    "success": True,
+                    "status": confirmation_status,
+                    "tx_hash": tx_hash,
+                    "block_number": block_number,
+                    "gas_used": gas_used,
+                    "confirmations": w3.eth.block_number - block_number,
+                    "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}",
+                    "message": "✅ Transaction confirmed!" if confirmation_status == "confirmed" else "❌ Transaction failed"
+                }
+            else:
+                # Transaction still pending in mempool
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "tx_hash": tx_hash,
+                    "message": "⏳ Waiting for blockchain confirmation...",
+                    "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}"
+                }
+                
+        except Exception as chain_error:
+            # Transaction not found on chain yet
+            logger.warning(f"Transaction {tx_hash} not found on chain: {chain_error}")
+            return {
+                "success": True,
+                "status": "pending",
+                "tx_hash": tx_hash,
+                "message": "⏳ Broadcasting to network...",
+                "explorer_url": f"https://camp-network-testnet.blockscout.com/tx/{tx_hash}"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bet status check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.get("/my-bets")
 async def get_my_bets(
     current_user: Dict[str, Any] = Depends(get_current_user)
