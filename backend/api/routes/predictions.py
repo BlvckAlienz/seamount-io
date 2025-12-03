@@ -33,10 +33,21 @@ w3 = Web3(Web3.HTTPProvider(CAMP_RPC))
 # Full ABI from your contract
 MARKET_ABI = [
 	{
-		"inputs": [],
-		"name": "acceptOwnership",
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "prediction",
+				"type": "bool"
+			}
+		],
+		"name": "bet",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -50,7 +61,7 @@ MARKET_ABI = [
 			{
 				"indexed": True,
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
 			},
 			{
@@ -70,18 +81,6 @@ MARKET_ABI = [
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "newYesOdds",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "newNoOdds",
-				"type": "uint256"
 			}
 		],
 		"name": "BetPlaced",
@@ -91,25 +90,108 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
 			}
 		],
-		"name": "claimWinnings",
+		"name": "bootstrapMarket",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "yes",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "no",
+				"type": "uint256"
+			}
+		],
+		"name": "Bootstrapped",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "claim",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": True,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "Claimed",
+		"type": "event"
+	},
+	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "string",
+				"name": "question",
+				"type": "string"
+			},
+			{
+				"indexed": False,
+				"internalType": "uint256",
+				"name": "endTime",
+				"type": "uint256"
+			}
+		],
+		"name": "Created",
+		"type": "event"
 	},
 	{
 		"inputs": [
 			{
 				"internalType": "string",
 				"name": "question",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "description",
 				"type": "string"
 			},
 			{
@@ -130,117 +212,11 @@ MARKET_ABI = [
 		"type": "function"
 	},
 	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "oldCollector",
-				"type": "address"
-			},
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "newCollector",
-				"type": "address"
-			}
-		],
-		"name": "FeeCollectorUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "marketId",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "string",
-				"name": "question",
-				"type": "string"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			}
-		],
-		"name": "MarketCreated",
-		"type": "event"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "marketId",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "bool",
-				"name": "outcome",
-				"type": "bool"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "lockedYesPool",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "lockedNoPool",
-				"type": "uint256"
-			}
-		],
-		"name": "MarketResolved",
-		"type": "event"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "currentOwner",
-				"type": "address"
-			},
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "OwnershipTransferInitiated",
-		"type": "event"
-	},
-	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "previousOwner",
-				"type": "address"
-			},
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "OwnershipTransferred",
-		"type": "event"
+		"inputs": [],
+		"name": "emergencyWithdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -253,25 +229,20 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "prediction",
-				"type": "bool"
 			}
 		],
-		"name": "placeBet",
+		"name": "recover",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
 			},
 			{
@@ -280,20 +251,39 @@ MARKET_ABI = [
 				"type": "bool"
 			}
 		],
-		"name": "resolveMarket",
+		"name": "resolve",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
+		"anonymous": False,
+		"inputs": [
+			{
+				"indexed": True,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": False,
+				"internalType": "bool",
+				"name": "outcome",
+				"type": "bool"
+			}
+		],
+		"name": "Resolved",
+		"type": "event"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "newOwner",
+				"name": "a",
 				"type": "address"
 			}
 		],
-		"name": "transferOwnership",
+		"name": "setFeeCollector",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -308,56 +298,30 @@ MARKET_ABI = [
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
-				"name": "newCollector",
+				"name": "",
 				"type": "address"
 			}
 		],
-		"name": "updateFeeCollector",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "claimed",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"anonymous": False,
-		"inputs": [
-			{
-				"indexed": True,
-				"internalType": "uint256",
-				"name": "marketId",
-				"type": "uint256"
-			},
-			{
-				"indexed": True,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "grossPayout",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "fee",
-				"type": "uint256"
-			},
-			{
-				"indexed": False,
-				"internalType": "uint256",
-				"name": "netPayout",
-				"type": "uint256"
-			}
-		],
-		"name": "WinningsClaimed",
-		"type": "event"
-	},
-	{
 		"inputs": [],
-		"name": "CLAIM_DEADLINE_DAYS",
+		"name": "DEADLINE",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -382,157 +346,34 @@ MARKET_ABI = [
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getActiveMarketIds",
-		"outputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "",
-				"type": "uint256[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "offset",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "limit",
+				"name": "id",
 				"type": "uint256"
 			}
 		],
-		"name": "getActiveMarketsPaginated",
-		"outputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "",
-				"type": "uint256[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getContractStatus",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "paused",
-				"type": "bool"
-			},
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "collector",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalMarkets",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalFees",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "contractBalance",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "activeMarketsCount",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getCurrentBlockTimestamp",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "marketId",
-				"type": "uint256"
-			}
-		],
-		"name": "getMarketDetails",
+		"name": "getMarket",
 		"outputs": [
 			{
 				"internalType": "string",
-				"name": "question",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "description",
+				"name": "",
 				"type": "string"
 			},
 			{
 				"internalType": "uint256",
-				"name": "endTime",
+				"name": "",
 				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
-				"name": "resolved",
+				"name": "",
 				"type": "bool"
 			},
 			{
 				"internalType": "bool",
-				"name": "outcome",
+				"name": "",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalVolume",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "participantCount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "yesOdds",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "noOdds",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "timeRemaining",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -542,30 +383,25 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
 			}
 		],
-		"name": "getMarketOdds",
+		"name": "getPools",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "yesOdds",
+				"name": "",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "noOdds",
+				"name": "",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "yesPercentage",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "noPercentage",
+				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -576,7 +412,7 @@ MARKET_ABI = [
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "marketId",
+				"name": "id",
 				"type": "uint256"
 			},
 			{
@@ -589,22 +425,30 @@ MARKET_ABI = [
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "yesBet",
+				"name": "",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "noBet",
+				"name": "",
 				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
-				"name": "hasClaimed",
+				"name": "",
 				"type": "bool"
-			},
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "HIGH_FEE",
+		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "potentialPayout",
+				"name": "",
 				"type": "uint256"
 			}
 		],
@@ -613,7 +457,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "LIQUIDITY_MULTIPLIER",
+		"name": "LOW_FEE",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -653,11 +497,6 @@ MARKET_ABI = [
 				"type": "string"
 			},
 			{
-				"internalType": "string",
-				"name": "description",
-				"type": "string"
-			},
-			{
 				"internalType": "uint256",
 				"name": "endTime",
 				"type": "uint256"
@@ -678,33 +517,38 @@ MARKET_ABI = [
 				"type": "bool"
 			},
 			{
+				"internalType": "bool",
+				"name": "bootstrapped",
+				"type": "bool"
+			},
+			{
 				"internalType": "uint256",
-				"name": "lockedYesPool",
+				"name": "lockedYes",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lockedNoPool",
+				"name": "lockedNo",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lockedTotalPool",
+				"name": "lockedTotal",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "currentYesBets",
+				"name": "currentYes",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "currentNoBets",
+				"name": "currentNo",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "participantCount",
+				"name": "participants",
 				"type": "uint256"
 			}
 		],
@@ -713,7 +557,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MAX_BET",
+		"name": "MAX_ODDS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -726,7 +570,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "MAX_MARKETS",
+		"name": "MED_FEE",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -752,7 +596,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "ONE_DAY",
+		"name": "MIN_BOOT",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -765,7 +609,7 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "PLATFORM_FEE_RATE",
+		"name": "MIN_ODDS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -778,7 +622,116 @@ MARKET_ABI = [
 	},
 	{
 		"inputs": [],
-		"name": "totalFeesCollected",
+		"name": "MULTIPLIER",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "noBets",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "odds",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "yes",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "no",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "participated",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "totalFees",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "yesBets",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -842,29 +795,43 @@ async def get_active_markets():
         markets = []
         for i in range(market_count):
             try:
-                details = contract.functions.getMarketDetails(i).call()
+                # ✅ NEW: Call getMarket() - returns (question, endTime, resolved, outcome)
+                market_info = contract.functions.getMarket(i).call()
+                
+                # ✅ NEW: Call getPools() - returns (currentYes, currentNo, participants)
+                pools = contract.functions.getPools(i).call()
+                
+                # ✅ NEW: Call odds() - returns (yes, no)
+                market_odds = contract.functions.odds(i).call()
+                
+                # Calculate time remaining
+                current_time = int(datetime.utcnow().timestamp())
+                time_remaining = max(0, market_info[1] - current_time)
+                
+                # Calculate total volume (in wei, convert to CAMP)
+                total_volume = pools[0] + pools[1]
                 
                 market_data = {
                     'id': i,
-                    'question': details[0],
-                    'description': details[1],
-                    'endTime': details[2],
-                    'resolved': details[3],
-                    'outcome': details[4],
-                    'totalVolume': str(details[5]),
-                    'participantCount': details[6],
-                    'yesOdds': details[7],
-                    'noOdds': details[8],
-                    'timeRemaining': details[9],
-                    'yesPercent': round(details[7] / 100, 2),
-                    'noPercent': round(details[8] / 100, 2)
+                    'question': market_info[0],           # string
+                    'description': '',                     # V3 contract doesn't store description
+                    'endTime': market_info[1],            # uint256
+                    'resolved': market_info[2],           # bool
+                    'outcome': market_info[3],            # bool
+                    'totalVolume': str(total_volume),     # uint256 (yes + no pools)
+                    'participantCount': pools[2],         # uint256
+                    'yesOdds': market_odds[0],            # uint256 (scaled by 10000)
+                    'noOdds': market_odds[1],             # uint256 (scaled by 10000)
+                    'timeRemaining': time_remaining,      # calculated
+                    'yesPercent': round(market_odds[0] / 100, 2),  # Convert 5000 -> 50.00%
+                    'noPercent': round(market_odds[1] / 100, 2)    # Convert 5000 -> 50.00%
                 }
                 
                 markets.append(market_data)
-                
-            except Exception as market_error:
-                logger.error(f"Error fetching market {i}: {market_error}")
-                continue
+        
+    except Exception as market_error:
+        logger.error(f"Error fetching market {i}: {market_error}")
+        continue
         
         return {
             'success': True,
@@ -902,14 +869,19 @@ async def place_bet(
         if request.market_id >= market_count:
             raise HTTPException(status_code=404, detail=f"Market {request.market_id} does not exist")
         
-        # Get market details
-        market_details = contract.functions.getMarketDetails(request.market_id).call()
-        
-        if market_details[9] <= 0:  # timeRemaining
-            raise HTTPException(status_code=400, detail="Market has already ended")
-        
-        if market_details[3]:  # resolved
+        # ✅ NEW: Get market info from getMarket()
+        market_info = contract.functions.getMarket(request.market_id).call()
+
+        # Validate market is open
+        if market_info[2]:  # resolved = True
             raise HTTPException(status_code=400, detail="Market already resolved")
+
+        # Calculate time remaining
+        current_time = int(datetime.utcnow().timestamp())
+        time_remaining = max(0, market_info[1] - current_time)
+
+        if time_remaining <= 0:
+            raise HTTPException(status_code=400, detail="Market has already ended")
         
         # Validate bet amount
         min_bet = Decimal("0.01")
@@ -939,12 +911,9 @@ async def place_bet(
         
         logger.info(f"✅ Bet intent recorded: {user_id} - {request.amount} CAMP on market {request.market_id}")
         
-        # Calculate potential payout
-        odds = market_details[7] if request.prediction else market_details[8]
-        potential_payout = float(request.amount) * (10000 / odds) * 0.982
-        
-        # Calculate potential payout
-        odds = market_details[7] if request.prediction else market_details[8]
+        # ✅ NEW: Get odds separately
+        market_odds = contract.functions.odds(request.market_id).call()
+        odds = market_odds[0] if request.prediction else market_odds[1]
         potential_payout = float(request.amount) * (10000 / odds) * 0.982
 
         # ✅ Convert Decimal to int for wei calculation
@@ -953,8 +922,8 @@ async def place_bet(
         # ✅ ENCODE THE CONTRACT FUNCTION CALL
         from eth_abi import encode
 
-        # Encode placeBet(uint256 marketId, bool prediction)
-        function_signature = "placeBet(uint256,bool)"
+        # Encode bet(uint256 id, bool prediction) - NEW function name
+        function_signature = "bet(uint256,bool)"
         function_selector = w3.keccak(text=function_signature)[:4].hex()
 
         # Encode parameters
@@ -974,7 +943,7 @@ async def place_bet(
             "bet_id": bet_record["id"],
             "contract_address": CONTRACT_ADDRESS,
             "contract_function": {
-                "name": "placeBet",
+                "name": "bet", # ✅ CHANGED from "placeBet"
                 "params": [request.market_id, request.prediction],
                 "value_in_wei": amount_in_wei,
                 "encoded_data": encoded_data  # ✅ NOW ACTUALLY ENCODED
@@ -1171,25 +1140,28 @@ async def get_my_bets(
         enriched_bets = []
         for bet in bets_result.data:
             try:
-                market_details = contract.functions.getMarketDetails(bet['market_id']).call()
+                # ✅ NEW: Get market info
+                market_info = contract.functions.getMarket(bet['market_id']).call()
+                market_odds = contract.functions.odds(bet['market_id']).call()
                 
                 bet_enriched = {
                     **bet,
-                    "question": market_details[0],
-                    "market_end_time": market_details[2],
-                    "resolved": market_details[3],
-                    "outcome": market_details[4]
+                    "question": market_info[0],      # string
+                    "market_end_time": market_info[1],  # uint256
+                    "resolved": market_info[2],      # bool
+                    "outcome": market_info[3]        # bool
                 }
                 
                 # Calculate payout
-                if not market_details[3]:  # Not resolved
-                    odds = market_details[7] if bet['prediction'] else market_details[8]
+                # Calculate payout
+                if not market_info[2]:  # Not resolved
+                    odds = market_odds[0] if bet['prediction'] else market_odds[1]
                     bet_enriched['payout'] = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
                     bet_enriched['status'] = 'active'
                 else:
-                    bet_enriched['won'] = (bet['prediction'] == market_details[4])
+                    bet_enriched['won'] = (bet['prediction'] == market_info[3])
                     if bet_enriched['won']:
-                        odds = market_details[7] if bet['prediction'] else market_details[8]
+                        odds = market_odds[0] if bet['prediction'] else market_odds[1]
                         bet_enriched['payout'] = round(float(bet['amount']) * (10000 / odds) * 0.982, 4)
                         bet_enriched['status'] = 'claimable'
                     else:
