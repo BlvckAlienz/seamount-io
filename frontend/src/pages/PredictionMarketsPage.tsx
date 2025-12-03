@@ -342,7 +342,7 @@ const handlePlaceBet = async () => {
         market_id: selectedMarket.id,
         prediction: betPrediction,
         amount: parseFloat(betAmount),
-        user_wallet: walletAddress,
+        user_wallet: userAddress,
         tx_hash: txHash
       })
     });
