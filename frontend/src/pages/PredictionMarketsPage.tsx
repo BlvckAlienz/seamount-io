@@ -1145,8 +1145,8 @@ const PredictionMarketsPage: React.FC = () => {
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                   <p className="text-blue-300 text-xs">
-                    ℹ️ <strong>Use your MetaMask BaseCAMP testnet wallet.</strong> 
-                    \nGet free CAMP at <a 
+                    ℹ️ <strong>Use your MetaMask BaseCAMP testnet wallet.</strong>  
+                    Get free CAMP at <a 
                       href="https://faucet.campnetwork.xyz/" 
                       target="_blank"
                       rel="noopener noreferrer"
