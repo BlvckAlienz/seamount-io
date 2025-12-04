@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
 
-// ðŸ”¥ ENHANCED METAMASK TYPE DECLARATION
+// 🦊 ENHANCED METAMASK TYPE DECLARATION
 declare global {
   interface Window {
     ethereum?: {
@@ -60,7 +60,7 @@ interface PortfolioBet extends Bet {
   status: 'pending' | 'won' | 'lost' | 'claimable';
 }
 
-// âœ… CORRECT BASECAMP TESTNET CONFIG
+// ✅ CORRECT BASECAMP TESTNET CONFIG
 const BASECAMP_CONFIG = {
   chainId: '0x1cbc67c35a',
   chainName: 'Basecamp',
@@ -85,7 +85,7 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // ðŸ”¥ IN-APP WALLET CONNECTION
+  // 🦊 IN-APP WALLET CONNECTION
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
@@ -94,7 +94,7 @@ const PredictionMarketsPage: React.FC = () => {
   const [userAddress, setUserAddress] = useState<string>('');
   const [signingTransaction, setSigningTransaction] = useState(false);
 
-  // âœ… TRANSACTION MONITOR STATE
+  // ✅ TRANSACTION MONITOR STATE
   const [activeTransaction, setActiveTransaction] = useState<{
     betId: string;
     txHash: string;
@@ -109,7 +109,7 @@ const PredictionMarketsPage: React.FC = () => {
   win_rate: 0
 });
 
-  // âœ… CHECK METAMASK PERSISTENCE
+  // ✅ CHECK METAMASK PERSISTENCE
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
       try {
@@ -127,9 +127,9 @@ const PredictionMarketsPage: React.FC = () => {
           if (chainId === BASECAMP_CONFIG.chainId) {
             setUserAddress(accounts[0]);
             setWalletConnected(true);
-            console.log('âœ… MetaMask reconnected:', accounts[0]);
+            console.log('✅ MetaMask reconnected:', accounts[0]);
           } else {
-            console.warn('âš ï¸ Wrong network, please switch to BaseCAMP');
+            console.warn('⚠️ Wrong network, please switch to BaseCAMP');
           }
         } else {
           setTimeout(() => {
@@ -176,17 +176,17 @@ const PredictionMarketsPage: React.FC = () => {
       if (data.success) {
         setMyBets(data.bets);
         
-        // ðŸš¨ UPDATE PORTFOLIO STATS FROM BACKEND
+        // 💨 UPDATE PORTFOLIO STATS FROM BACKEND
         if (data.stats) {
           setPortfolioStats(data.stats);
-          console.log('ðŸ“Š Stats updated:', data.stats);
+          console.log('📊 Stats updated:', data.stats);
         }
         
-        console.log(`âœ… Loaded ${data.bets.length} confirmed bets`);
+        console.log(`✅ Loaded ${data.bets.length} confirmed bets`);
         
         const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
         if (pendingCount > 0) {
-          console.log(`â³ ${pendingCount} pending bets - will auto-refresh`);
+          console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
           setTimeout(fetchMyBets, 5000);
         }
       }
@@ -195,14 +195,14 @@ const PredictionMarketsPage: React.FC = () => {
     }
   };
 
-  // ðŸ”¥ IN-APP WALLET CONNECTION
+  // 🦊 IN-APP WALLET CONNECTION
   const connectWallet = async () => {
     setConnecting(true);
     
     try {
       if (!window.ethereum) {
         const shouldInstall = window.confirm(
-          'âš ï¸ MetaMask not detected.\n\nInstall MetaMask to place bets?'
+          '⚠️ MetaMask not detected.\n\nInstall MetaMask to place bets?'
         );
         
         if (shouldInstall) {
@@ -222,18 +222,18 @@ const PredictionMarketsPage: React.FC = () => {
           params: [{ chainId: BASECAMP_CONFIG.chainId }]
         });
         
-        console.log('âœ… Switched to existing BaseCAMP network');
+        console.log('✅ Switched to existing BaseCAMP network');
         
       } catch (switchError: any) {
         if (switchError.code === 4902) {
-          console.log('âš ï¸ BaseCAMP not found in MetaMask, adding now...');
+          console.log('⚠️ BaseCAMP not found in MetaMask, adding now...');
           
           try {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [BASECAMP_CONFIG]
             });
-            console.log('âœ… BaseCAMP network added successfully');
+            console.log('✅ BaseCAMP network added successfully');
           } catch (addError: any) {
             if (addError.code === -32603 && addError.message.includes('same RPC endpoint')) {
               toast.error(
@@ -266,7 +266,7 @@ const PredictionMarketsPage: React.FC = () => {
       setShowWalletModal(false);
       
       toast.success(
-        `âœ… Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
+        `✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
         { duration: 3000 }
       );
       
@@ -341,7 +341,7 @@ const PredictionMarketsPage: React.FC = () => {
     };
   };
 
-  // ðŸ”¥ TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
+  // 🦊 TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
   const calculateFeeRate = (totalVolume: number): number => {
     // Convert from wei to CAMP and use same thresholds as smart contract
     const totalCAMP = totalVolume / 1e18;
@@ -419,10 +419,10 @@ const PredictionMarketsPage: React.FC = () => {
       
       if (!data.contract_function.encoded_data || 
           !data.contract_function.encoded_data.startsWith('0x')) {
-        throw new Error('ðŸš¨ Invalid contract data from backend');
+        throw new Error('💨 Invalid contract data from backend');
       }
 
-      console.log('ðŸ“ Sending transaction:', {
+      console.log('📤 Sending transaction:', {
         to: data.contract_address,
         value: `0x${data.contract_function.value_in_wei.toString(16)}`,
         data: data.contract_function.encoded_data,
@@ -440,7 +440,7 @@ const PredictionMarketsPage: React.FC = () => {
         }]
       }) as string;
 
-      console.log('âœ… Transaction submitted:', txHash);
+      console.log('✅ Transaction submitted:', txHash);
       
       const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
         method: 'POST',
@@ -463,7 +463,7 @@ const PredictionMarketsPage: React.FC = () => {
         throw new Error('Failed to confirm bet');
       }
 
-      // âœ… SHOW TRANSACTION MONITOR
+      // ✅ SHOW TRANSACTION MONITOR
       setActiveTransaction({
         betId: confirmData.bet_id,
         txHash: txHash
@@ -497,13 +497,13 @@ const PredictionMarketsPage: React.FC = () => {
 
   const getCategoryEmoji = (category: string) => {
     const emojis: Record<string, string> = {
-      sports: 'âš½',
-      crypto: 'â‚¿',
-      forex: 'ðŸ’±',
-      politics: 'ðŸ›ï¸',
-      other: 'ðŸ“Š'
+      sports: '⚽',
+      crypto: '₿',
+      forex: '💱',
+      politics: '🗳️',
+      other: '📊'
     };
-    return emojis[category] || 'ðŸ“Š';
+    return emojis[category] || '📊';
   };
 
   const getCategoryColor = (category: string) => {
@@ -517,7 +517,7 @@ const PredictionMarketsPage: React.FC = () => {
     return colors[category] || 'from-gray-500 to-slate-500';
   };
 
-  // âœ… PERSIST METAMASK CONNECTION
+  // ✅ PERSIST METAMASK CONNECTION
   useEffect(() => {
     if (!window.ethereum) return;
 
@@ -534,7 +534,7 @@ const PredictionMarketsPage: React.FC = () => {
 
     const handleChainChanged = (chainId: string) => {
       if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('âš ï¸ Please switch back to BaseCAMP network');
+        toast.error('⚠️ Please switch back to BaseCAMP network');
         setWalletConnected(false);
       } else {
         toast.success('Connected to BaseCAMP');
@@ -554,7 +554,7 @@ const PredictionMarketsPage: React.FC = () => {
     };
   }, []);
 
-  // ðŸ”¥ UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
+  // 🦊 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
   const statsData = [
     { 
       label: 'Total Volume', 
@@ -585,7 +585,7 @@ const PredictionMarketsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* ðŸ”¥ WALLET CONNECTION HEADER */}
+        {/* 🦊 WALLET CONNECTION HEADER */}
         <div className="flex justify-end mb-4">
           {walletConnected ? (
             <div className="flex items-center gap-3">
@@ -866,7 +866,7 @@ const PredictionMarketsPage: React.FC = () => {
                               {bet.prediction ? 'YES' : 'NO'}
                             </span>
 
-                            {/* âœ… LIVE STATUS BADGE */}
+                            {/* ✅ LIVE STATUS BADGE */}
                             {bet.status === 'pending' && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
@@ -910,7 +910,7 @@ const PredictionMarketsPage: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* âœ… BLOCKCHAIN EXPLORER LINK */}
+                      {/* ✅ BLOCKCHAIN EXPLORER LINK */}
                       {bet.tx_hash && (
                         <a
                             href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
@@ -1124,7 +1124,7 @@ const PredictionMarketsPage: React.FC = () => {
           </div>
         )}
 
-        {/* ðŸ”¥ IN-APP WALLET CONNECTION MODAL */}
+        {/* 🦊 IN-APP WALLET CONNECTION MODAL */}
         {showWalletModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-md w-full p-6 relative">
@@ -1145,7 +1145,7 @@ const PredictionMarketsPage: React.FC = () => {
                 </p>
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                   <p className="text-blue-300 text-xs">
-                    â„¹ï¸ <strong>Judges:</strong> Use your MetaMask BaseCAMP testnet wallet. 
+                    ℹ️ <strong>Use your MetaMask BaseCAMP testnet wallet.</strong> 
                     Get free CAMP at <a 
                       href="https://faucet.campnetwork.xyz/" 
                       target="_blank"
@@ -1166,7 +1166,7 @@ const PredictionMarketsPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">ðŸ¦Š</span>
+                      <span className="text-white font-bold text-sm">💡</span>
                     </div>
                     <div className="text-left">
                       <div className="text-white font-semibold">MetaMask</div>
@@ -1195,7 +1195,7 @@ const PredictionMarketsPage: React.FC = () => {
 
               <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <div className="flex gap-2">
-                  <span className="text-yellow-400 text-sm">ðŸ’¡</span>
+                  <span className="text-yellow-400 text-sm">💡</span>
                   <div>
                     <p className="text-yellow-200 text-sm font-semibold mb-1">New to BaseCAMP?</p>
                     <p className="text-yellow-200/80 text-xs">
