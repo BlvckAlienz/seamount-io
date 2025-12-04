@@ -1146,7 +1146,7 @@ const PredictionMarketsPage: React.FC = () => {
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                   <p className="text-blue-300 text-xs">
                     ℹ️ <strong>Use your MetaMask BaseCAMP testnet wallet.</strong> 
-                    Get free CAMP at <a 
+                    \nGet free CAMP at <a 
                       href="https://faucet.campnetwork.xyz/" 
                       target="_blank"
                       rel="noopener noreferrer"
@@ -1166,7 +1166,7 @@ const PredictionMarketsPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">💡</span>
+                      <span className="text-white font-bold text-sm">🦊</span>
                     </div>
                     <div className="text-left">
                       <div className="text-white font-semibold">MetaMask</div>
