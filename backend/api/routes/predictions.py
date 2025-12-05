@@ -1014,7 +1014,7 @@ async def get_bet_status(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
-    ðŸ” POLL TRANSACTION STATUS
+    POLL TRANSACTION STATUS
     Returns: pending | confirmed | failed | not_found
     """
     try:
@@ -1190,7 +1190,10 @@ async def get_my_bets(
                         bet_enriched['won'] = won_bet
                         bet_enriched['payout'] = payout_amount
                         
-                        logger.info(f"âœ… Synced resolution for bet {bet['id']}: won={won_bet}, payout={payout_amount}")
+                        logger.info(f"✅ Synced resolution for bet {bet['id']}: won={won_bet}, payout={payout_amount}")
+                        
+                        # ✅ FLAG: New resolution detected (frontend should poll more frequently)
+                        bet_enriched['just_resolved'] = True
                     except Exception as sync_error:
                         logger.error(f"Failed to sync resolution for bet {bet['id']}: {sync_error}")
                 

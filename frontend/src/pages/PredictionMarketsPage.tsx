@@ -181,7 +181,7 @@ const PredictionMarketsPage: React.FC = () => {
         }
       });
       
-      const data = await response.json();
+     const data = await response.json();
       
       if (data.success) {
         setMyBets(data.bets);
@@ -195,15 +195,19 @@ const PredictionMarketsPage: React.FC = () => {
         console.log(`✅ Loaded ${data.bets.length} confirmed bets`);
         
         const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
+        const justResolvedCount = data.bets.filter((b: any) => b.just_resolved === true).length;
+        
         if (pendingCount > 0) {
           console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
           setTimeout(fetchMyBets, 5000);
         }
+        
+        // ✅ FORCE REFRESH IF MARKETS JUST RESOLVED
+        if (justResolvedCount > 0) {
+          console.log(`🔄 ${justResolvedCount} bets just resolved - refreshing in 2s`);
+          setTimeout(fetchMyBets, 2000);
+        }
       }
-    } catch (error) {
-      console.error('Failed to fetch my bets:', error);
-    }
-  };
 
   // 🦊 IN-APP WALLET CONNECTION
   const connectWallet = async () => {
@@ -390,6 +394,12 @@ const PredictionMarketsPage: React.FC = () => {
   };
 
   const handlePlaceBet = async () => {
+    // 🚨 GUARD: Prevent double-clicks and race conditions
+    if (loading || signingTransaction) {
+      console.warn('⚠️ Bet already in progress');
+      return;
+    }
+
     if (!walletConnected) {
       setShowWalletModal(true);
       return;
@@ -398,6 +408,7 @@ const PredictionMarketsPage: React.FC = () => {
     if (!selectedMarket || !betAmount) return;
     
     setLoading(true);
+    setSigningTransaction(false); // Ensure clean state
     
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -489,8 +500,13 @@ const PredictionMarketsPage: React.FC = () => {
       setBetAmount('10');
       
     } catch (error: any) {
-      console.error('Bet placement error:', error);
+      console.error('💥 Bet placement error:', error);
       toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
+    
+      // 🔧 Reset states on error
+      setLoading(false);
+      setSigningTransaction(false);
+      setActiveTransaction(null);
     } finally {
       setLoading(false);
       setSigningTransaction(false);
@@ -715,7 +731,7 @@ const PredictionMarketsPage: React.FC = () => {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
-            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS $0 VOLUME</span>
+            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS</span>
           </div>
 
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
@@ -784,6 +800,11 @@ const PredictionMarketsPage: React.FC = () => {
                     onClick={() => {
                       setSelectedMarket(market);
                       setShowBetModal(true);
+                      // 🔧 Reset all bet states when opening modal
+                      setLoading(false);
+                      setSigningTransaction(false);
+                      setActiveTransaction(null);
+                      setBetAmount('10');
                     }}
                     className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-green-500/50 transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/10"
                   >
@@ -1025,9 +1046,16 @@ const PredictionMarketsPage: React.FC = () => {
                           View Bet Transaction
                         </a>
                       )}
+                      
+                      {/* 🐛 DEBUG: Show bet state */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <div className="text-xs text-gray-500 mb-2">
+                          resolved={String(bet.resolved)} | won={String(bet.won)} | claimed={String(bet.claimed)}
+                        </div>
+                      )}
 
-                      {/* 🎯 CLAIM WINNINGS BUTTON */}
-                      {bet.resolved && bet.won && !bet.claimed && (
+                      {/* 🎯 Show claim button if market resolved + user won + not claimed yet */}
+                      {bet.resolved && bet.won === true && bet.claimed !== true && (
                         <button
                           onClick={() => handleClaimWinnings(bet.id, bet.market_id)}
                           disabled={claimingBetId === bet.id}
