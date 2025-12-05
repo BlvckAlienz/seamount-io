@@ -27,7 +27,12 @@ useEffect(() => {
 
   const pollStatus = async () => {
     try {
-      const response = await fetch(`/api/v1/predictions/bet/${betId}/status`, {
+      // Auto-detect if this is a bet or claim transaction
+      const endpoint = txHash.startsWith('0x') && betId.includes('-')
+        ? `/api/v1/predictions/bet/${betId}/status`
+        : `/api/v1/predictions/claim/${betId}/status`;
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         }

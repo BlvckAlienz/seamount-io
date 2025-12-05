@@ -1256,6 +1256,270 @@ async def get_my_bets(
         logger.error(f"Failed to fetch user bets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ========================================================================
+# CLAIM WINNINGS ENDPOINTS
+# ========================================================================
+
+class InitiateClaimRequest(BaseModel):
+    bet_id: str  # UUID of the bet to claim
+
+class ConfirmClaimRequest(BaseModel):
+    bet_id: str
+    claim_tx_hash: str
+
+@router.post("/initiate-claim")
+async def initiate_claim(
+    request: InitiateClaimRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    🎯 STEP 1: PREPARE CLAIM TRANSACTION
+    Returns encoded contract call for user to sign via MetaMask
+    """
+    try:
+        user_id = current_user.get("id")
+        supabase = get_supabase_client()
+        
+        # 1️⃣ Fetch bet from database
+        bet_result = supabase.table('prediction_bets')\
+            .select('*')\
+            .eq('id', request.bet_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+        
+        if not bet_result.data:
+            raise HTTPException(status_code=404, detail="Bet not found")
+        
+        bet = bet_result.data
+        
+        # 2️⃣ Validate bet is claimable
+        if not bet.get('resolved'):
+            raise HTTPException(status_code=400, detail="Market not resolved yet")
+        
+        if not bet.get('won'):
+            raise HTTPException(status_code=400, detail="This bet did not win")
+        
+        if bet.get('claimed'):
+            raise HTTPException(status_code=400, detail="Winnings already claimed")
+        
+        market_id = bet['market_id']
+        user_wallet = bet['user_wallet']
+        
+        # 3️⃣ Verify on-chain eligibility
+        if not CONTRACT_ADDRESS:
+            raise HTTPException(status_code=503, detail="Contract not configured")
+        
+        contract = w3.eth.contract(
+            address=Web3.to_checksum_address(CONTRACT_ADDRESS),
+            abi=MARKET_ABI
+        )
+        
+        # Check if already claimed on-chain
+        already_claimed = contract.functions.claimed(market_id, user_wallet).call()
+        if already_claimed:
+            # Update DB to match chain state
+            supabase.table('prediction_bets').update({
+                'claimed': True,
+                'claimed_at': datetime.utcnow().isoformat()
+            }).eq('id', request.bet_id).execute()
+            
+            raise HTTPException(status_code=400, detail="Already claimed on-chain")
+        
+        # 4️⃣ Calculate expected payout
+        market_info = contract.functions.getMarket(market_id).call()
+        pools = contract.functions.getPools(market_id).call()
+        
+        # Use locked pools (post-resolution values)
+        market_data = contract.functions.markets(market_id).call()
+        locked_yes = market_data[6]  # lockedYes
+        locked_no = market_data[7]   # lockedNo
+        locked_total = market_data[8]  # lockedTotal
+        
+        # Get user's bet amount from contract
+        user_bet_data = contract.functions.getUserBet(market_id, user_wallet).call()
+        yes_bet = user_bet_data[0]
+        no_bet = user_bet_data[1]
+        
+        outcome = market_info[3]  # Market outcome (true/false)
+        user_bet_amount = yes_bet if outcome else no_bet
+        winning_pool = locked_yes if outcome else locked_no
+        
+        if user_bet_amount == 0:
+            raise HTTPException(status_code=400, detail="No bet found on-chain")
+        
+        # Calculate payout (matching contract logic)
+        gross_payout = (user_bet_amount * locked_total) // winning_pool
+        
+        # Tiered fee (matching contract)
+        if locked_total < int(1000 * 1e18):
+            fee_rate = 10  # 1.0%
+        elif locked_total < int(10000 * 1e18):
+            fee_rate = 7   # 0.7%
+        else:
+            fee_rate = 5   # 0.5%
+        
+        fee = (gross_payout * fee_rate) // 1000
+        net_payout = gross_payout - fee
+        
+        # 5️⃣ Encode claim transaction
+        from eth_abi import encode
+        
+        function_signature = "claim(uint256)"
+        function_selector = w3.keccak(text=function_signature)[:4].hex()
+        encoded_params = encode(['uint256'], [market_id]).hex()
+        encoded_data = f"0x{function_selector[2:]}{encoded_params}"
+        
+        logger.info(f"🎯 Claim prepared for bet {request.bet_id} - Market {market_id} - Expected payout: {net_payout / 1e18} CAMP")
+        
+        return {
+            "success": True,
+            "message": "Claim transaction ready",
+            "bet_id": request.bet_id,
+            "market_id": market_id,
+            "contract_address": CONTRACT_ADDRESS,
+            "expected_payout": round(net_payout / 1e18, 4),
+            "contract_function": {
+                "name": "claim",
+                "params": [market_id],
+                "encoded_data": encoded_data
+            },
+            "explorer_url": f"https://basecamp.cloud.blockscout.com"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Claim initiation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/confirm-claim")
+async def confirm_claim(
+    request: ConfirmClaimRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    ✅ STEP 2: RECORD CLAIM TRANSACTION HASH
+    Called after user signs claim transaction via MetaMask
+    """
+    try:
+        user_id = current_user.get("id")
+        supabase = get_supabase_client()
+        
+        # Update bet with claim tx hash
+        update_result = supabase.table('prediction_bets').update({
+            'claim_tx_hash': request.claim_tx_hash,
+            'updated_at': datetime.utcnow().isoformat()
+        }).eq('id', request.bet_id)\
+          .eq('user_id', user_id)\
+          .execute()
+        
+        if not update_result.data:
+            raise HTTPException(status_code=404, detail="Bet not found")
+        
+        logger.info(f"✅ Claim tx recorded: {request.bet_id} - TX: {request.claim_tx_hash}")
+        
+        return {
+            "success": True,
+            "message": "Claim transaction submitted",
+            "bet_id": request.bet_id,
+            "claim_tx_hash": request.claim_tx_hash,
+            "explorer_url": f"https://basecamp.cloud.blockscout.com/tx/{request.claim_tx_hash}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Claim confirmation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/claim/{bet_id}/status")
+async def get_claim_status(
+    bet_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    🔄 POLL CLAIM TRANSACTION STATUS
+    Checks blockchain for claim confirmation
+    """
+    try:
+        user_id = current_user.get("id")
+        supabase = get_supabase_client()
+        
+        # Fetch bet
+        bet_result = supabase.table('prediction_bets')\
+            .select('*')\
+            .eq('id', bet_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+        
+        if not bet_result.data:
+            raise HTTPException(status_code=404, detail="Bet not found")
+        
+        bet = bet_result.data
+        claim_tx_hash = bet.get('claim_tx_hash')
+        
+        if not claim_tx_hash:
+            return {
+                "success": True,
+                "status": "pending",
+                "message": "Waiting for claim transaction signature"
+            }
+        
+        # Check transaction on blockchain
+        try:
+            tx_receipt = w3.eth.get_transaction_receipt(claim_tx_hash)
+            
+            if tx_receipt:
+                confirmation_status = "confirmed" if tx_receipt['status'] == 1 else "failed"
+                block_number = tx_receipt['blockNumber']
+                
+                # Update DB if newly confirmed
+                if confirmation_status == "confirmed" and not bet.get('claimed'):
+                    supabase.table('prediction_bets').update({
+                        'claimed': True,
+                        'claimed_at': datetime.utcnow().isoformat(),
+                        'block_number': block_number,
+                        'updated_at': datetime.utcnow().isoformat()
+                    }).eq('id', bet_id).execute()
+                
+                return {
+                    "success": True,
+                    "status": confirmation_status,
+                    "claim_tx_hash": claim_tx_hash,
+                    "block_number": block_number,
+                    "confirmations": w3.eth.block_number - block_number,
+                    "explorer_url": f"https://basecamp.cloud.blockscout.com/tx/{claim_tx_hash}",
+                    "message": "✅ Claim successful!" if confirmation_status == "confirmed" else "❌ Claim failed"
+                }
+            else:
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "claim_tx_hash": claim_tx_hash,
+                    "message": "⏳ Waiting for blockchain confirmation...",
+                    "explorer_url": f"https://basecamp.cloud.blockscout.com/tx/{claim_tx_hash}"
+                }
+                
+        except Exception as chain_error:
+            logger.warning(f"Claim tx {claim_tx_hash} not found: {chain_error}")
+            return {
+                "success": True,
+                "status": "pending",
+                "claim_tx_hash": claim_tx_hash,
+                "message": "⏳ Broadcasting to network...",
+                "explorer_url": f"https://basecamp.cloud.blockscout.com/tx/{claim_tx_hash}"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Claim status check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.get("/health")
 async def predictions_health():
     """

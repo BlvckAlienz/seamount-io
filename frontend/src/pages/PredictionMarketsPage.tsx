@@ -46,7 +46,11 @@ interface Bet {
   won?: boolean;
   payout?: number;
   tx_hash?: string;
-  status?: 'pending' | 'confirmed' | 'failed';
+  status?: 'pending' | 'confirmed' | 'failed' | 'won' | 'lost' | 'claimable';
+  claimed?: boolean;
+  claimed_at?: string;
+  claim_tx_hash?: string;
+  updated_at?: string;
 }
 
 interface PortfolioBet extends Bet {
@@ -57,7 +61,6 @@ interface PortfolioBet extends Bet {
     no: number;
   };
   roi: number;
-  status: 'pending' | 'won' | 'lost' | 'claimable';
 }
 
 // ✅ CORRECT BASECAMP TESTNET CONFIG
@@ -100,14 +103,21 @@ const PredictionMarketsPage: React.FC = () => {
     txHash: string;
   } | null>(null);
 
+  // 🎯 CLAIM WINNINGS STATE
+  const [claimingBetId, setClaimingBetId] = useState<string | null>(null);
+  const [claimTransaction, setClaimTransaction] = useState<{
+    betId: string;
+    txHash: string;
+  } | null>(null);
+
   const [portfolioStats, setPortfolioStats] = useState({
-  total_staked: 0,
-  potential_winnings: 0,
-  realized_winnings: 0,
-  active_bets: 0,
-  profit_loss: 0,
-  win_rate: 0
-});
+    total_staked: 0,
+    potential_winnings: 0,
+    realized_winnings: 0,
+    active_bets: 0,
+    profit_loss: 0,
+    win_rate: 0
+  });
 
   // ✅ CHECK METAMASK PERSISTENCE
   useEffect(() => {
@@ -487,6 +497,94 @@ const PredictionMarketsPage: React.FC = () => {
     }
   };
 
+  // 🎯 CLAIM WINNINGS HANDLER
+  const handleClaimWinnings = async (betId: string, marketId: number) => {
+    if (!walletConnected) {
+        toast.error('Please connect wallet first');
+        return;
+    }
+    
+    setClaimingBetId(betId);
+    
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Please sign in to claim winnings');
+        return;
+        }
+        
+        // Step 1: Get encoded claim transaction
+        const response = await fetch('/api/v1/predictions/initiate-claim', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ bet_id: betId })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+        throw new Error(data.detail || 'Failed to initiate claim');
+        }
+        
+        toast.success(`Expected payout: ${data.expected_payout} CAMP`, { duration: 3000 });
+        
+        // Step 2: Execute claim transaction via MetaMask
+        const txHash = await window.ethereum!.request({
+        method: 'eth_sendTransaction',
+        params: [{
+            from: userAddress,
+            to: data.contract_address,
+            data: data.contract_function.encoded_data,
+            gas: '0x30D40'  // 200k gas
+        }]
+        }) as string;
+        
+        console.log('✅ Claim tx submitted:', txHash);
+        
+        // Step 3: Confirm claim transaction
+        const confirmResponse = await fetch('/api/v1/predictions/confirm-claim', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+            bet_id: betId,
+            claim_tx_hash: txHash
+        })
+        });
+        
+        const confirmData = await confirmResponse.json();
+        
+        if (!confirmData.success) {
+        throw new Error('Failed to record claim transaction');
+        }
+        
+        // Show transaction monitor
+        setClaimTransaction({
+        betId: betId,
+        txHash: txHash
+        });
+        
+        toast.success('Claim transaction submitted!', { duration: 10000 });
+        
+    } catch (error: any) {
+        console.error('Claim error:', error);
+        
+        if (error.code === 4001) {
+        toast.error('Claim cancelled by user');
+        } else {
+        toast.error(error.message || 'Claim failed');
+        }
+    } finally {
+        setClaimingBetId(null);
+    }
+  };
+
   const getCategoryFromQuestion = (question: string) => {
     if (question.toLowerCase().includes('bitcoin') || question.toLowerCase().includes('btc')) return 'crypto';
     if (question.toLowerCase().includes('eagles') || question.toLowerCase().includes('arsenal')) return 'sports';
@@ -782,64 +880,64 @@ const PredictionMarketsPage: React.FC = () => {
               <div className="space-y-6">
                 {/* Portfolio Summary Card */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {/* Card 1: Total Staked */}
-                <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
+                  {/* Card 1: Total Staked */}
+                  <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
                     <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
-                    {portfolioStats.total_staked.toFixed(2)} CAMP
+                      {portfolioStats.total_staked.toFixed(2)} CAMP
                     </div>
                     <div className="text-xs text-blue-300/70 mt-1">Confirmed bets</div>
-                </div>
-                
-                {/* Card 2: Potential Winnings */}
-                <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
+                  </div>
+                  
+                  {/* Card 2: Potential Winnings */}
+                  <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
                     <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
                     <div className="text-3xl font-black text-white">
-                    {portfolioStats.potential_winnings.toFixed(2)} CAMP
+                      {portfolioStats.potential_winnings.toFixed(2)} CAMP
                     </div>
                     <div className="text-xs text-purple-300/70 mt-1">If all active win</div>
-                </div>
-                
-                {/* Card 3: Realized Winnings */}
-                <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
+                  </div>
+                  
+                  {/* Card 3: Realized Winnings */}
+                  <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
                     <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Realized Winnings</div>
                     <div className="text-3xl font-black text-white">
-                    {portfolioStats.realized_winnings.toFixed(2)} CAMP
+                      {portfolioStats.realized_winnings.toFixed(2)} CAMP
                     </div>
                     <div className="text-xs text-green-300/70 mt-1">From won bets</div>
-                </div>
-                
-                {/* Card 4: Active Bets */}
-                <div className="bg-gradient-to-br from-slate-800/30 to-slate-700/20 border border-slate-500/30 rounded-2xl p-6">
+                  </div>
+                  
+                  {/* Card 4: Active Bets */}
+                  <div className="bg-gradient-to-br from-slate-800/30 to-slate-700/20 border border-slate-500/30 rounded-2xl p-6">
                     <div className="text-sm text-slate-400 mb-1 uppercase tracking-wide">Active Bets</div>
                     <div className="text-3xl font-black text-white">
-                    {portfolioStats.active_bets}
+                      {portfolioStats.active_bets}
                     </div>
                     <div className="text-xs text-slate-300/70 mt-1">Unresolved</div>
-                </div>
-                
-                {/* Card 5: Your Profit (Dynamic Color) */}
-                <div className={`bg-gradient-to-br rounded-2xl p-6 ${
+                  </div>
+                  
+                  {/* Card 5: Your Profit (Dynamic Color) */}
+                  <div className={`bg-gradient-to-br rounded-2xl p-6 ${
                     portfolioStats.profit_loss >= 0 
-                    ? 'from-yellow-900/30 to-yellow-800/20 border border-yellow-500/30' 
-                    : 'from-red-900/30 to-red-800/20 border border-red-500/30'
-                }`}>
+                      ? 'from-yellow-900/30 to-yellow-800/20 border border-yellow-500/30' 
+                      : 'from-red-900/30 to-red-800/20 border border-red-500/30'
+                  }`}>
                     <div className={`text-sm mb-1 uppercase tracking-wide ${
-                    portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
+                      portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                    Your Profit
+                      Your Profit
                     </div>
                     <div className={`text-3xl font-black ${
-                    portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
+                      portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                    {portfolioStats.profit_loss >= 0 ? '+' : ''}{portfolioStats.profit_loss.toFixed(2)} CAMP
+                      {portfolioStats.profit_loss >= 0 ? '+' : ''}{portfolioStats.profit_loss.toFixed(2)} CAMP
                     </div>
                     <div className={`text-xs mt-1 ${
-                    portfolioStats.profit_loss >= 0 ? 'text-yellow-300/70' : 'text-red-300/70'
+                      portfolioStats.profit_loss >= 0 ? 'text-yellow-300/70' : 'text-red-300/70'
                     }`}>
-                    Win rate: {portfolioStats.win_rate.toFixed(1)}%
+                      Win rate: {portfolioStats.win_rate.toFixed(1)}%
                     </div>
-                </div>
+                  </div>
                 </div>
 
                 {/* Bets List */}
@@ -873,15 +971,20 @@ const PredictionMarketsPage: React.FC = () => {
                                 Pending
                               </span>
                             )}
-                            {bet.status === 'confirmed' && (
+                            {bet.status === 'confirmed' && !bet.resolved && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
                                 <CheckCircle className="w-3 h-3" />
                                 Confirmed
                               </span>
                             )}
-                            {bet.resolved && bet.won && (
+                            {bet.resolved && bet.won && !bet.claimed && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
-                                WON
+                                🏆 CLAIMABLE
+                              </span>
+                            )}
+                            {bet.resolved && bet.won && bet.claimed && (
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+                                ✅ CLAIMED
                               </span>
                             )}
                             {bet.resolved && !bet.won && (
@@ -913,24 +1016,60 @@ const PredictionMarketsPage: React.FC = () => {
                       {/* ✅ BLOCKCHAIN EXPLORER LINK */}
                       {bet.tx_hash && (
                         <a
-                            href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
+                          href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
                         >
-                            <ExternalLink className="w-3 h-3" />
-                            View on Blockchain Explorer
+                          <ExternalLink className="w-3 h-3" />
+                          View Bet Transaction
                         </a>
-                        )}
-                      
-                      {bet.won && !bet.resolved && (
+                      )}
+
+                      {/* 🎯 CLAIM WINNINGS BUTTON */}
+                      {bet.resolved && bet.won && !bet.claimed && (
                         <button
-                          onClick={() => {/* Claim winnings logic */}}
-                          className="w-full mt-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all flex items-center justify-center gap-2"
+                          onClick={() => handleClaimWinnings(bet.id, bet.market_id)}
+                          disabled={claimingBetId === bet.id}
+                          className="w-full mt-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Trophy className="h-5 w-5" />
-                          Claim {bet.payout?.toFixed(2)} CAMP
+                          {claimingBetId === bet.id ? (
+                            <>
+                              <Loader className="h-5 w-5 animate-spin" />
+                              Claiming...
+                            </>
+                          ) : (
+                            <>
+                              <Trophy className="h-5 w-5" />
+                              Claim {bet.payout?.toFixed(2)} CAMP
+                            </>
+                          )}
                         </button>
+                      )}
+
+                      {/* ✅ CLAIMED STATUS */}
+                      {bet.claimed && (
+                        <div className="w-full mt-4 space-y-2">
+                          <div className="py-3 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center gap-2">
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                            <span className="text-green-400 font-semibold">
+                              Claimed on {new Date(bet.claimed_at || bet.updated_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          
+                          {/* Claim Transaction Link */}
+                          {bet.claim_tx_hash && (
+                            <a
+                              href={`https://basecamp.cloud.blockscout.com/tx/${bet.claim_tx_hash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              View Claim Transaction
+                            </a>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -1124,6 +1263,44 @@ const PredictionMarketsPage: React.FC = () => {
           </div>
         )}
 
+        {/* 🎯 CLAIM TRANSACTION MONITOR MODAL */}
+        {claimTransaction && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">💰 Claiming Winnings</h2>
+                  <p className="text-gray-400 text-sm">Your claim transaction is being processed</p>
+                </div>
+                <button
+                  onClick={() => setClaimTransaction(null)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <TransactionMonitor
+                betId={claimTransaction.betId}
+                txHash={claimTransaction.txHash}
+                onConfirmed={() => {
+                  fetchMyBets();
+                  toast.success('🎉 Winnings claimed successfully!', { duration: 6000 });
+                  setTimeout(() => {
+                    setClaimTransaction(null);
+                  }, 3000);
+                }}
+              />
+
+              <div className="mt-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                <p className="text-sm text-green-300 text-center">
+                  ⏳ Please wait for blockchain confirmation. This usually takes 10-30 seconds.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* 🦊 IN-APP WALLET CONNECTION MODAL */}
         {showWalletModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
