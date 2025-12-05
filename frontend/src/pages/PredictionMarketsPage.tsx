@@ -589,15 +589,15 @@ const PredictionMarketsPage: React.FC = () => {
         toast.success('Claim transaction submitted!', { duration: 10000 });
         
     } catch (error: any) {
-        console.error('Claim error:', error);
-        
-        if (error.code === 4001) {
+      console.error('Claim error:', error);
+      
+      if (error.code === 4001) {
         toast.error('Claim cancelled by user');
-        } else {
+      } else {
         toast.error(error.message || 'Claim failed');
-        }
+      }
     } finally {
-        setClaimingBetId(null);
+      setClaimingBetId(null);
     }
   };
 
