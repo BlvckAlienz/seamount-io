@@ -1423,7 +1423,7 @@ const PredictionMarketsPage: React.FC = () => {
         )}
       </div>
     </div>
-  );
-};
+   );
+  };
 
 export default PredictionMarketsPage;
