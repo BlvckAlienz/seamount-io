@@ -51,6 +51,7 @@ interface Bet {
   claimed_at?: string;
   claim_tx_hash?: string;
   updated_at?: string;
+  just_resolved?: boolean;
 }
 
 interface PortfolioBet extends Bet {
@@ -181,7 +182,7 @@ const PredictionMarketsPage: React.FC = () => {
         }
       });
       
-     const data = await response.json();
+      const data = await response.json();
       
       if (data.success) {
         setMyBets(data.bets);
@@ -208,6 +209,10 @@ const PredictionMarketsPage: React.FC = () => {
           setTimeout(fetchMyBets, 2000);
         }
       }
+    } catch (error) {
+      console.error('Failed to fetch my bets:', error);
+    }
+  };
 
   // 🦊 IN-APP WALLET CONNECTION
   const connectWallet = async () => {
@@ -408,7 +413,7 @@ const PredictionMarketsPage: React.FC = () => {
     if (!selectedMarket || !betAmount) return;
     
     setLoading(true);
-    setSigningTransaction(false); // Ensure clean state
+    setSigningTransaction(true);
     
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -502,11 +507,6 @@ const PredictionMarketsPage: React.FC = () => {
     } catch (error: any) {
       console.error('💥 Bet placement error:', error);
       toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
-    
-      // 🔧 Reset states on error
-      setLoading(false);
-      setSigningTransaction(false);
-      setActiveTransaction(null);
     } finally {
       setLoading(false);
       setSigningTransaction(false);
@@ -516,78 +516,78 @@ const PredictionMarketsPage: React.FC = () => {
   // 🎯 CLAIM WINNINGS HANDLER
   const handleClaimWinnings = async (betId: string, marketId: number) => {
     if (!walletConnected) {
-        toast.error('Please connect wallet first');
-        return;
+      toast.error('Please connect wallet first');
+      return;
     }
     
     setClaimingBetId(betId);
     
     try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.access_token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
         toast.error('Please sign in to claim winnings');
         return;
-        }
-        
-        // Step 1: Get encoded claim transaction
-        const response = await fetch('/api/v1/predictions/initiate-claim', {
+      }
+      
+      // Step 1: Get encoded claim transaction
+      const response = await fetch('/api/v1/predictions/initiate-claim', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({ bet_id: betId })
-        });
-        
-        const data = await response.json();
-        
-        if (!data.success) {
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
         throw new Error(data.detail || 'Failed to initiate claim');
-        }
-        
-        toast.success(`Expected payout: ${data.expected_payout} CAMP`, { duration: 3000 });
-        
-        // Step 2: Execute claim transaction via MetaMask
-        const txHash = await window.ethereum!.request({
+      }
+      
+      toast.success(`Expected payout: ${data.expected_payout} CAMP`, { duration: 3000 });
+      
+      // Step 2: Execute claim transaction via MetaMask
+      const txHash = await window.ethereum!.request({
         method: 'eth_sendTransaction',
         params: [{
-            from: userAddress,
-            to: data.contract_address,
-            data: data.contract_function.encoded_data,
-            gas: '0x30D40'  // 200k gas
+          from: userAddress,
+          to: data.contract_address,
+          data: data.contract_function.encoded_data,
+          gas: '0x30D40'  // 200k gas
         }]
-        }) as string;
-        
-        console.log('✅ Claim tx submitted:', txHash);
-        
-        // Step 3: Confirm claim transaction
-        const confirmResponse = await fetch('/api/v1/predictions/confirm-claim', {
+      }) as string;
+      
+      console.log('✅ Claim tx submitted:', txHash);
+      
+      // Step 3: Confirm claim transaction
+      const confirmResponse = await fetch('/api/v1/predictions/confirm-claim', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-            bet_id: betId,
-            claim_tx_hash: txHash
+          bet_id: betId,
+          claim_tx_hash: txHash
         })
-        });
-        
-        const confirmData = await confirmResponse.json();
-        
-        if (!confirmData.success) {
+      });
+      
+      const confirmData = await confirmResponse.json();
+      
+      if (!confirmData.success) {
         throw new Error('Failed to record claim transaction');
-        }
-        
-        // Show transaction monitor
-        setClaimTransaction({
+      }
+      
+      // Show transaction monitor
+      setClaimTransaction({
         betId: betId,
         txHash: txHash
-        });
-        
-        toast.success('Claim transaction submitted!', { duration: 10000 });
-        
+      });
+      
+      toast.success('Claim transaction submitted!', { duration: 10000 });
+      
     } catch (error: any) {
       console.error('Claim error:', error);
       
@@ -1423,7 +1423,7 @@ const PredictionMarketsPage: React.FC = () => {
         )}
       </div>
     </div>
-   );
-  };
+  );
+};
 
 export default PredictionMarketsPage;
