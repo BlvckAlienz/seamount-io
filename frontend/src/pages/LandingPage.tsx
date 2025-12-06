@@ -284,7 +284,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                Powered by Algorand + Tether WDK • Prediction Markets (BaseCAMP Net) • Yield-Farming (Pact + Folks Finance)
+                Powered by Algorand + Tether WDK • Prediction Markets (BaseCAMP) • Yield-Farming (Pact + Folks Finance + Securitize)
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
