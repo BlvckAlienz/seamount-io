@@ -284,7 +284,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="max-w-4xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 glass-card rounded-full text-xs sm:text-sm font-medium text-green-700 mb-4 sm:mb-6 shadow-sm">
                 <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                Powered by Algorand • Securitize Markets (FINRA/SIPC Member) • Tether WDK
+                Powered by Algorand + Tether WDK • Prediction Markets (On BaseCAMP Network) • Yield-Farming (Pact + Folks Finance)
               </div>
               
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-4 sm:mb-6 leading-tight">
@@ -294,7 +294,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </h1>
               
               <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-600 mb-3 sm:mb-4 max-w-3xl mx-auto leading-relaxed px-4">
-                Build real wealth with digital currencies no government can devalue. <strong className="text-indigo-600">Earn 5.25-8.20% net yearly returns</strong> through institutional-grade funds—automatically. Send money instantly anywhere in the world, no banks needed.
+                Build real wealth with digital currencies no government can devalue. <strong className="text-indigo-600">Earn 5.25-8.20% net yearly returns and trade prediction markets.</strong> Send money instantly anywhere in the world, no banks needed.
               </p>
               
               <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-6 text-xs sm:text-sm text-gray-600 mb-6 sm:mb-8 px-4">
