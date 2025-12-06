@@ -552,7 +552,7 @@ const DashboardPage = () => {
                   <Target className="h-6 w-6 text-green-400" />
                   Prediction Markets
                 </h2>
-                <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with USDC on Camp Net</p>
+                <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with CAMP</p>
               </div>
               <button
                 onClick={() => setShowPredictionMarkets(true)}
