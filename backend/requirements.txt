@@ -1,5 +1,5 @@
 # Seamount.io API - Production Dependencies
-# Version: 3.1.9 (Python 3.11, wheel-only)
+# Version: 3.11.9 (Python 3.11, wheel-only)
 
 # Core FastAPI
 fastapi==0.109.0
