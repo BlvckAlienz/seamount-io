@@ -583,6 +583,34 @@ const DashboardPage = () => {
                 <span className="sm:hidden">View</span>
               </button>
             </div>
+
+            {/* Live Price Preview (Top 4 Assets) */}
+            <LiveMarketPreview onOpenTerminal={() => setShowMarketTerminal(true)} />
+          </div>
+
+            {/* Live Markets Preview (Top 3) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { title: 'Super Eagles AFCON 2025', yes: 67, no: 33, volume: '$0' },
+                { title: 'Bitcoin $150K by Q1 2026', yes: 52, no: 48, volume: '$0' },
+                { title: 'NGN/USD hits ₦1,400 Q1 2026', yes: 71, no: 29, volume: '$0' }
+              ].map((market, idx) => (
+                <div key={idx} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+                  <h4 className="text-sm font-semibold text-white mb-3 line-clamp-2">{market.title}</h4>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-green-400 font-bold">YES</div>
+                      <div className="text-lg font-black text-white">{market.yes}%</div>
+                    </div>
+                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-2 text-center">
+                      <div className="text-xs text-red-400 font-bold">NO</div>
+                      <div className="text-lg font-black text-white">{market.no}%</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">{market.volume} volume</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {walletCreationStatus && !walletCreationStatus.overall_complete && (
