@@ -1,3 +1,4 @@
+// File: frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -29,6 +30,7 @@ import WalletRecovery from './pages/wallet-recovery';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { WalletConnectProvider } from './contexts/WalletConnectContext'; // ✅ NEW
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
 
@@ -62,7 +64,7 @@ const AppContent: React.FC = () => {
     const initializeAnonymousSession = async () => {
       try {
         const response = await api.post('/api/v1/session/initialize');
-        console.log('📄 Session initialize response:', response);
+        console.log('🔄 Session initialize response:', response);
         
         if (response && response.data) {
           setSessionId(response.data.session_id || response.data.id);
@@ -215,11 +217,13 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <DebugEnv />
-          <Toaster position="top-right" />
-          <AppContent />
-          <Analytics />
-          <SpeedInsights /> 
+          <WalletConnectProvider> {/* ✅ NEW: Wraps entire app */}
+            <DebugEnv />
+            <Toaster position="top-right" />
+            <AppContent />
+            <Analytics />
+            <SpeedInsights /> 
+          </WalletConnectProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>

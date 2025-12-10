@@ -27,6 +27,7 @@ import { EarnModal } from '@/components/modals/EarnModal';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
+import WalletConnectCard from '../components/wallet/WalletConnectCard';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -210,13 +211,16 @@ const DashboardPage = () => {
     }
   };
 
+  // ✅ UPDATE SUPPORTED_CHAINS to include Base and Celo
   const SUPPORTED_CHAINS = [
-  { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
-  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
-  { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
-  { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
-  { id: 'tron', name: 'TRON', symbol: 'TRX' }
-];
+    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'auto' },
+    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', type: 'auto' },
+    { id: 'polygon', name: 'Polygon', symbol: 'MATIC', type: 'auto' },
+    { id: 'algorand', name: 'Algorand', symbol: 'ALGO', type: 'auto' },
+    { id: 'tron', name: 'TRON', symbol: 'TRX', type: 'auto' },
+    { id: 'base', name: 'Base', symbol: 'ETH', type: 'connect' }, // ✅ NEW
+    { id: 'celo', name: 'Celo', symbol: 'CELO', type: 'connect' }  // ✅ NEW
+  ];
 
   // Update the validation useEffect to only expect 5 chains
   useEffect(() => {
@@ -592,16 +596,46 @@ const DashboardPage = () => {
 
           <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
 
-          {/* Multi-Chain Wallets Section */}
+          {/* ✅ UPDATED: Multi-Chain Wallets Section */}
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
-              <span className="text-sm text-gray-400">{createdChains} of {SUPPORTED_CHAINS.length} created</span>
+              <span className="text-sm text-gray-400">
+                {createdChains} of {SUPPORTED_CHAINS.filter(c => c.type === 'auto').length} auto-created
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {SUPPORTED_CHAINS.map(chain => (
-                <ChainWalletCard key={chain.id} chain={chain.id} address={multiChainWallets[chain.id]?.address || ''} balance={calculateChainBalance(chain.id)} status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} onCardClick={() => handleWalletCardClick(chain.id)} />
-              ))}
+
+            {/* Auto-Created Wallets (Bitcoin, Ethereum, Polygon, Algorand, Tron) */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
+                Auto-Created Wallets
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {SUPPORTED_CHAINS.filter(chain => chain.type === 'auto').map(chain => (
+                  <ChainWalletCard 
+                    key={chain.id} 
+                    chain={chain.id} 
+                    address={multiChainWallets[chain.id]?.address || ''} 
+                    balance={calculateChainBalance(chain.id)} 
+                    status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} 
+                    onCardClick={() => handleWalletCardClick(chain.id)} 
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* ✅ NEW: WalletConnect Chains (Base, Celo) */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
+                Connect External Wallets
+              </h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Connect your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <WalletConnectCard blockchain="base" />
+                <WalletConnectCard blockchain="celo" />
+              </div>
             </div>
           </div>
 
