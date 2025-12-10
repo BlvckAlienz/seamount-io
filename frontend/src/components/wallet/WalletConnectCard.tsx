@@ -97,7 +97,7 @@ const WalletConnectCard: React.FC<WalletConnectCardProps> = ({ blockchain }) => 
           {address && (
             <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
               <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-              
+              <a
                 href={`${config.explorer}/address/${address}`}
                 target="_blank"
                 rel="noopener noreferrer"
