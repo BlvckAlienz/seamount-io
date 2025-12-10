@@ -1,7 +1,7 @@
 // File: frontend/src/components/wallet/WalletConnectCard.tsx
 import React from 'react';
 import { Link2, Check, ExternalLink, AlertCircle } from 'lucide-react';
-import { useWeb3Modal } from '@web3modal/wagmi/react';
+import { useAppKit } from '@reown/appkit/react';
 import { useWalletConnect } from '@/contexts/WalletConnectContext';
 import toast from 'react-hot-toast';
 
@@ -10,7 +10,7 @@ interface WalletConnectCardProps {
 }
 
 const WalletConnectCard: React.FC<WalletConnectCardProps> = ({ blockchain }) => {
-  const { open } = useWeb3Modal();
+  const { open } = useAppKit();
   const {
     isConnected,
     address,

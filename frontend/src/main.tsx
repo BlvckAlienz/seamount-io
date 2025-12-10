@@ -1,11 +1,17 @@
 // File: frontend/src/main.tsx
 // ✅ FIXED: Removed duplicate BrowserRouter
 
+import './polyfills';
+
+// Now safe to import React and other libraries
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'react-hot-toast';
 import App from './App.tsx';
 import './index.css';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { appkit } from './config/walletConnect'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

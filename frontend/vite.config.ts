@@ -1,15 +1,26 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    nodePolyfills({
+      include: ['buffer', 'process', 'crypto', 'stream', 'util'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+    }),
+  ],
   base: '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'viem/chains': path.resolve(__dirname, 'node_modules/viem/chains'),
+      'wagmi/chains': path.resolve(__dirname, 'node_modules/wagmi/chains'),
     },
   },
   define: {
@@ -19,39 +30,59 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'esbuild',
-    target: 'es2015',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        // 🚨 Prevent terser from optimizing away BigInt checks
+        pure_getters: false,
+        keep_fargs: true,
+        keep_fnames: true,
+      },
+      mangle: {
+        // 🚨 Don't mangle Math.pow - keep our override
+        reserved: ['Math', 'pow', 'BigInt']
+      }
+    },
+    target: 'es2020',
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'web3-vendor': ['wagmi', 'viem', '@reown/appkit', '@reown/appkit-adapter-wagmi'],  // ✅ NEW
+        },
       },
     },
   },
   server: {
     port: 5173,
-    host: true, // 🎯 ADD THIS - Allow external access
+    host: true,
     proxy: {
-      // 🎯 NUCLEAR FIX: Proxy ALL API calls through Vite dev server
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('🔄 Vite Proxy Error:', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('🔄 Vite Proxy: Sending Request to:', req.url);
-          });
-        },
       },
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'buffer'],
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'buffer',
+      'wagmi',
+      'viem',
+      '@reown/appkit',               // ✅ NEW
+      '@reown/appkit-adapter-wagmi', // ✅ NEW
+      'process',
+    ],
     esbuildOptions: {
       define: {
         global: 'globalThis',
+      },
+      target: 'es2020',
+      supported: {
+        'bigint': true,
       },
     },
   },

@@ -1,6 +1,6 @@
 // File: frontend/src/components/WalletConnector.tsx
 import React, { useState } from 'react'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { useAppKit } from '@reown/appkit/react'
 import { useWalletConnect } from '../contexts/WalletConnectContext'
 
 interface WalletConnectorProps {
@@ -9,7 +9,7 @@ interface WalletConnectorProps {
 }
 
 export function WalletConnector({ blockchain, className = '' }: WalletConnectorProps) {
-  const { open } = useWeb3Modal()
+  const { open } = useAppKit()
   const { 
     isConnected, 
     address, 

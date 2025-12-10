@@ -2,36 +2,13 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createWeb3Modal } from '@web3modal/wagmi/react'
-import { config, projectId } from '../config/walletConnect'
+import { config, modal, queryClient } from '../config/walletConnect'
 import { useAccount, useDisconnect, useSignMessage } from 'wagmi'
 import { useAuth } from './AuthContext'
 import { apiClient } from '../config/api'
 import toast from 'react-hot-toast'
 
-// Create query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1
-    }
-  }
-})
-
-// Create Web3Modal
-createWeb3Modal({
-  wagmiConfig: config,
-  projectId,
-  enableAnalytics: false,
-  themeMode: 'dark',
-  themeVariables: {
-    '--w3m-accent': '#6366f1',
-    '--w3m-border-radius-master': '8px'
-  }
-})
-
-// Context types
+// Context types (same as before)
 interface WalletConnectContextType {
   isConnected: boolean
   address: string | undefined
@@ -46,7 +23,7 @@ interface WalletConnectContextType {
 
 const WalletConnectContext = createContext<WalletConnectContextType | undefined>(undefined)
 
-// Internal provider (uses wagmi hooks)
+// Internal provider
 function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
   const { address, isConnected, chainId, chain } = useAccount()
   const { disconnect } = useDisconnect()
@@ -111,7 +88,6 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       let walletProvider = 'walletconnect'
       if ((window as any).ethereum?.isMetaMask) walletProvider = 'metamask'
       else if ((window as any).ethereum?.isCoinbaseWallet) walletProvider = 'coinbase_wallet'
-      else if ((window as any).ethereum?.isRabby) walletProvider = 'rabby'
 
       // Save to backend
       const response = await apiClient.post('/api/v1/wallet/connect', {
@@ -182,7 +158,7 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
   )
 }
 
-// Main provider (wraps with Wagmi/QueryClient)
+// Main provider
 export function WalletConnectProvider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={config}>
