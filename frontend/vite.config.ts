@@ -45,10 +45,29 @@ export default defineConfig({
     },
     target: 'es2020',
     rollupOptions: {
+      // ✅ NEW: Suppress ox library warnings
+      onwarn(warning, defaultHandler) {
+        // Ignore ox library pure annotation warnings
+        if (
+          warning.code === 'INVALID_ANNOTATION' ||
+          warning.message?.includes('ox/_esm') ||
+          warning.message?.includes('/*#__PURE__*/')
+        ) {
+          return;
+        }
+        
+        // Ignore circular dependency warnings (common in web3 libs)
+        if (warning.code === 'CIRCULAR_DEPENDENCY') {
+          return;
+        }
+        
+        defaultHandler(warning);
+      },
+      
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'web3-vendor': ['wagmi', 'viem', '@reown/appkit', '@reown/appkit-adapter-wagmi'],  // ✅ NEW
+          'web3-vendor': ['wagmi', 'viem', '@reown/appkit', '@reown/appkit-adapter-wagmi'],
         },
       },
     },
@@ -72,8 +91,8 @@ export default defineConfig({
       'buffer',
       'wagmi',
       'viem',
-      '@reown/appkit',               // ✅ NEW
-      '@reown/appkit-adapter-wagmi', // ✅ NEW
+      '@reown/appkit',
+      '@reown/appkit-adapter-wagmi',
       'process',
     ],
     esbuildOptions: {
