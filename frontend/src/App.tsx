@@ -30,9 +30,9 @@ import WalletRecovery from './pages/wallet-recovery';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { WalletConnectProvider } from './contexts/WalletConnectContext'; // ✅ NEW
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
+import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -217,13 +217,13 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <WalletConnectProvider> {/* ✅ NEW: Wraps entire app */}
+          <WalletOrchestratorProvider> {/* 🎯 UNIFIED SYSTEM */}
             <DebugEnv />
             <Toaster position="top-right" />
             <AppContent />
             <Analytics />
             <SpeedInsights /> 
-          </WalletConnectProvider>
+          </WalletOrchestratorProvider>  {/* ✅ CORRECT TAG! */}
         </AuthProvider>
       </Router>
     </ErrorBoundary>

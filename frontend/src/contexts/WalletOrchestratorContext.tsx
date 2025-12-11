@@ -52,8 +52,8 @@ interface WalletOrchestratorContextType {
   getTotalBalanceUSD: () => number;
 }
 
-// Network configurations
-const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
+// Network configurations - EXPORTED for shared use
+export const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
   base: {
     id: 'base',
     name: 'Base',
@@ -80,16 +80,16 @@ const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
   },
   basecamp: {
     id: 'basecamp',
-    name: 'BaseCAMP',
+    name: 'Basecamp',
     type: 'testnet',
-    chainId: 8453, // Note: Same as Base but testnet
-    chainIdHex: '0x1cbc67c35a',
+    chainId: 7862324359210, // Decimal representation
+    chainIdHex: '0x1cbc67c35a', // ✅ MATCHES YOUR CONFIG
     nativeCurrency: 'CAMP',
     connectionMethod: 'metamask_direct',
-    icon: 'https://campnetwork.xyz/logo.png',
+    icon: 'https://framerusercontent.com/images/dPliKDHkuu04Yd2hmU2tjrRG18.svg',
     description: 'Prediction markets testnet',
     explorer: 'https://basecamp.cloud.blockscout.com',
-    rpcUrl: 'https://rpc.basecamp.t.raas.gelato.cloud'
+    rpcUrl: 'https://rpc.basecamp.t.raas.gelato.cloud' // ✅ MATCHES YOUR CONFIG
   },
   camp_mainnet: {
     id: 'camp_mainnet',

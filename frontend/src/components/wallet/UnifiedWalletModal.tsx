@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Wallet, ChevronRight, Check, ExternalLink, AlertCircle } from 'lucide-react';
-import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
+import { useWalletOrchestrator, NETWORK_CONFIGS } from '@/contexts/WalletOrchestratorContext'; // ✅ CORRECT
 
 interface UnifiedWalletModalProps {
   isOpen: boolean;
@@ -8,34 +8,7 @@ interface UnifiedWalletModalProps {
   defaultAction?: 'send' | 'bet' | 'earn' | 'swap';
 }
 
-// Define NETWORK_CONFIGS locally if not exported from context
-const NETWORK_CONFIGS = {
-  basecamp: {
-    name: 'Basecamp',
-    description: 'CAMP Testnet',
-    type: 'testnet' as const,
-    nativeCurrency: 'CAMP',
-    chainId: '0x1cbc67c35a',
-    icon: '/networks/basecamp.svg'
-  },
-  // Add other networks as needed
-  ethereum: {
-    name: 'Ethereum',
-    description: 'Ethereum Mainnet',
-    type: 'mainnet' as const,
-    nativeCurrency: 'ETH',
-    chainId: '0x1',
-    icon: '/networks/ethereum.svg'
-  },
-  polygon: {
-    name: 'Polygon',
-    description: 'Polygon Mainnet',
-    type: 'mainnet' as const,
-    nativeCurrency: 'MATIC',
-    chainId: '0x89',
-    icon: '/networks/polygon.svg'
-  }
-};
+// Use shared configs from orchestrator
 
 export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWalletModalProps) {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
@@ -52,13 +25,18 @@ export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWa
 
   if (!isOpen) return null;
 
-  // Determine which networks to show based on default action
+  // 🎯 ACTION-TO-NETWORK MAPPING
   const getRecommendedNetworks = () => {
-    if (defaultAction) {
-      const bestNetwork = getBestNetworkForAction(defaultAction);
-      return [bestNetwork];
-    }
-    return Object.keys(NETWORK_CONFIGS) as Array<keyof typeof NETWORK_CONFIGS>;
+    if (!defaultAction) return Object.keys(NETWORK_CONFIGS) as Array<keyof typeof NETWORK_CONFIGS>;
+    
+    const actionMap: Record<string, string[]> = {
+      bet: ['basecamp'],           // Testnet for predictions
+      send: ['base', 'celo'],      // Real money transfers
+      earn: ['base', 'celo'],      // Yield farming
+      swap: ['base', 'celo']       // Token swaps
+    };
+    
+    return (actionMap[defaultAction] || ['base']) as Array<keyof typeof NETWORK_CONFIGS>;
   };
 
   const handleConnect = async (network: keyof typeof NETWORK_CONFIGS) => {

@@ -25,9 +25,11 @@ import { WalletProvider } from '@/contexts/WalletContext';
 import { SendForm } from '@/components/payments/SendForm.tsx';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
+import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
+
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -175,6 +177,7 @@ const DashboardPage = () => {
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
   const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
+  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -974,6 +977,15 @@ const DashboardPage = () => {
             onClose={() => setShowMarketTerminal(false)} 
           />
         </div>
+
+        {/* Unified Wallet Modal */}
+        {showUnifiedWalletModal && (
+          <UnifiedWalletModal
+            isOpen={showUnifiedWalletModal}
+            onClose={() => setShowUnifiedWalletModal(false)}
+            defaultAction={undefined} // Or pass 'bet', 'send', etc.
+          />
+        )}
 
         {/* Prediction Markets Modal */}
         {showPredictionMarkets && (
