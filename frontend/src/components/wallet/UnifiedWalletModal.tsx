@@ -1,13 +1,41 @@
 import React, { useState } from 'react';
 import { X, Wallet, ChevronRight, Check, ExternalLink, AlertCircle } from 'lucide-react';
 import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
-import { NETWORK_CONFIGS } from '@/contexts/WalletOrchestratorContext';
 
 interface UnifiedWalletModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultAction?: 'send' | 'bet' | 'earn' | 'swap';
 }
+
+// Define NETWORK_CONFIGS locally if not exported from context
+const NETWORK_CONFIGS = {
+  basecamp: {
+    name: 'Basecamp',
+    description: 'CAMP Testnet',
+    type: 'testnet' as const,
+    nativeCurrency: 'CAMP',
+    chainId: '0x1cbc67c35a',
+    icon: '/networks/basecamp.svg'
+  },
+  // Add other networks as needed
+  ethereum: {
+    name: 'Ethereum',
+    description: 'Ethereum Mainnet',
+    type: 'mainnet' as const,
+    nativeCurrency: 'ETH',
+    chainId: '0x1',
+    icon: '/networks/ethereum.svg'
+  },
+  polygon: {
+    name: 'Polygon',
+    description: 'Polygon Mainnet',
+    type: 'mainnet' as const,
+    nativeCurrency: 'MATIC',
+    chainId: '0x89',
+    icon: '/networks/polygon.svg'
+  }
+};
 
 export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWalletModalProps) {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
@@ -60,7 +88,17 @@ export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWa
             <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
               isConnected ? 'bg-green-500/20' : 'bg-gray-700'
             }`}>
-              <img src={config.icon} alt={config.name} className="w-8 h-8" />
+              <div className="w-8 h-8 flex items-center justify-center">
+                {networkId === 'basecamp' && (
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-green-500 to-emerald-600"></div>
+                )}
+                {networkId === 'ethereum' && (
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
+                )}
+                {networkId === 'polygon' && (
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600"></div>
+                )}
+              </div>
             </div>
             <div>
               <div className="font-semibold text-white">{config.name}</div>
