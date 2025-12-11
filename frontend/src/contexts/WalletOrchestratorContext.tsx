@@ -4,6 +4,9 @@ import { useAccount, useDisconnect, useSignMessage, useChainId } from 'wagmi';
 import { apiClient } from '@/config/api';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config as wagmiConfig, queryClient } from '@/config/walletConnect';
 
 // Network types
 type NetworkType = 'mainnet' | 'testnet' | 'camp_mainnet_future';
@@ -117,8 +120,8 @@ const ACTION_NETWORK_MAP: Record<string, ChainId[]> = {
 // Create context
 const WalletOrchestratorContext = createContext<WalletOrchestratorContextType | undefined>(undefined);
 
-// Main provider component
-export function WalletOrchestratorProvider({ children }: { children: ReactNode }) {
+// Internal provider (uses wagmi hooks)
+function WalletOrchestratorProviderInternal({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { open } = useAppKit();
   const { address, isConnected, chain } = useAccount();
@@ -414,6 +417,19 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
     <WalletOrchestratorContext.Provider value={contextValue}>
       {children}
     </WalletOrchestratorContext.Provider>
+  );
+}
+
+// Main provider (wraps with Wagmi + QueryClient)
+export function WalletOrchestratorProvider({ children }: { children: ReactNode }) {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <WalletOrchestratorProviderInternal>
+          {children}
+        </WalletOrchestratorProviderInternal>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
 
