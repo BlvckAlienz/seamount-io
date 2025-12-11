@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
+import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
+import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 
 // 🦊 ENHANCED METAMASK TYPE DECLARATION
 declare global {
@@ -89,13 +91,17 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // 🦊 IN-APP WALLET CONNECTION
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-
-  // WALLET STATE FOR ON-CHAIN TRANSACTIONS
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [userAddress, setUserAddress] = useState<string>('');
+  // 🎯 USE UNIFIED WALLET ORCHESTRATOR (REPLACES OLD WALLET LOGIC)
+  const {
+    wallets,
+    connectWallet,
+    disconnectWallet,
+    isConnecting,
+    getBestNetworkForAction
+  } = useWalletOrchestrator();
+  
+  // Local state for prediction markets UI
+  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
   const [signingTransaction, setSigningTransaction] = useState(false);
 
   // ✅ TRANSACTION MONITOR STATE
@@ -405,8 +411,10 @@ const PredictionMarketsPage: React.FC = () => {
       return;
     }
 
-    if (!walletConnected) {
-      setShowWalletModal(true);
+    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
+    if (!wallets.basecamp?.isConnected) {
+      // Show unified modal with 'bet' action (will recommend BaseCAMP)
+      setShowUnifiedWalletModal(true);
       return;
     }
     
@@ -423,6 +431,9 @@ const PredictionMarketsPage: React.FC = () => {
         return;
       }
       
+      // 🎯 USE UNIFIED WALLET ADDRESS
+      const campAddress = wallets.basecamp.address;
+      
       const response = await fetch('/api/v1/predictions/bet', {
         method: 'POST',
         headers: {
@@ -433,7 +444,7 @@ const PredictionMarketsPage: React.FC = () => {
           market_id: selectedMarket.id,
           prediction: betPrediction,
           amount: parseFloat(betAmount),
-          user_wallet: userAddress
+          user_wallet: campAddress  // ✅ Uses unified wallet address
         })
       });
       
@@ -515,8 +526,9 @@ const PredictionMarketsPage: React.FC = () => {
 
   // 🎯 CLAIM WINNINGS HANDLER
   const handleClaimWinnings = async (betId: string, marketId: number) => {
-    if (!walletConnected) {
-      toast.error('Please connect wallet first');
+    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
+    if (!wallets.basecamp?.isConnected) {
+      toast.error('Please connect BaseCAMP wallet first');
       return;
     }
     
@@ -529,6 +541,9 @@ const PredictionMarketsPage: React.FC = () => {
         toast.error('Please sign in to claim winnings');
         return;
       }
+      
+      // 🎯 USE UNIFIED WALLET ADDRESS
+      const campAddress = wallets.basecamp.address;
       
       // Step 1: Get encoded claim transaction
       const response = await fetch('/api/v1/predictions/initiate-claim', {
@@ -701,16 +716,16 @@ const PredictionMarketsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* 🦊 WALLET CONNECTION HEADER */}
         <div className="flex justify-end mb-4">
-          {walletConnected ? (
+          {wallets.basecamp?.isConnected ? (
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                  {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
+                  {wallets.basecamp.address.slice(0, 6)}...{wallets.basecamp.address.slice(-4)}
                 </span>
               </div>
               <button
-                onClick={disconnectWallet}
+                onClick={() => disconnectWallet('basecamp')}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
               >
                 Disconnect
@@ -718,11 +733,16 @@ const PredictionMarketsPage: React.FC = () => {
             </div>
           ) : (
             <button
-              onClick={() => setShowWalletModal(true)}
+              onClick={() => {
+                // Show unified modal for betting action
+                // This will trigger the modal with defaultAction='bet'
+                // which shows BaseCAMP as recommended
+                setShowUnifiedWalletModal(true);
+              }}
               className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
             >
               <Wallet className="w-5 h-5" />
-              Connect Wallet
+              Connect for Predictions
             </button>
           )}
         </div>
@@ -1425,5 +1445,14 @@ const PredictionMarketsPage: React.FC = () => {
     </div>
   );
 };
+
+{/* Unified Wallet Modal for all wallet connections */}
+{showUnifiedWalletModal && (
+  <UnifiedWalletModal
+    isOpen={showUnifiedWalletModal}
+    onClose={() => setShowUnifiedWalletModal(false)}
+    defaultAction="bet"
+  />
+)}
 
 export default PredictionMarketsPage;
