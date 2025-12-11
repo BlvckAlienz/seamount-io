@@ -302,3 +302,28 @@ class WalletCreationQueue(BaseModel):
     
     class Config:
         from_attributes = True
+
+class WalletNonce(BaseModel):
+    id: uuid.UUID
+    address: str
+    blockchain: str
+    nonce: str
+    expires_at: datetime
+    used: bool = False
+    used_at: Optional[datetime] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class NonceRequest(BaseModel):
+    address: str
+    blockchain: str
+
+class NonceResponse(BaseModel):
+    success: bool
+    nonce: Optional[str] = None
+    message: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    blockchain: Optional[str] = None
+    error: Optional[str] = None

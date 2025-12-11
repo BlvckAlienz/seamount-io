@@ -1,14 +1,13 @@
-// File: frontend/src/contexts/WalletConnectContext.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { config, modal, queryClient } from '../config/walletConnect'
-import { useAccount, useDisconnect, useSignMessage } from 'wagmi'
+import { useAccount, useDisconnect, useSignMessage, useChainId } from 'wagmi'
 import { useAuth } from './AuthContext'
 import { apiClient } from '../config/api'
 import toast from 'react-hot-toast'
 
-// Context types (same as before)
+// Context types
 interface WalletConnectContextType {
   isConnected: boolean
   address: string | undefined
@@ -25,7 +24,8 @@ const WalletConnectContext = createContext<WalletConnectContextType | undefined>
 
 // Internal provider
 function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
-  const { address, isConnected, chainId, chain } = useAccount()
+  const { address, isConnected, chain } = useAccount()
+  const chainId = useChainId()
   const { disconnect } = useDisconnect()
   const { signMessageAsync } = useSignMessage()
   const { user } = useAuth()
@@ -33,6 +33,24 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
   const [connectedChains, setConnectedChains] = useState<string[]>([])
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Chain configurations
+  const CHAIN_CONFIGS = {
+    base: {
+      name: 'Base',
+      id: 8453,
+      idHex: '0x2105',
+      icon: '🔵',
+      color: 'from-blue-500 to-blue-700'
+    },
+    celo: {
+      name: 'Celo',
+      id: 42220,
+      idHex: '0xA4EC',
+      icon: '🌿',
+      color: 'from-green-500 to-emerald-700'
+    }
+  }
 
   // Fetch connected wallets on mount
   useEffect(() => {
@@ -47,6 +65,7 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       if (response.data.success) {
         const chains = response.data.wallet_connect_chains || []
         setConnectedChains(chains)
+        console.log('✅ Connected wallets:', chains)
       }
     } catch (err) {
       console.error('Failed to fetch connected wallets:', err)
@@ -55,7 +74,7 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
 
   const connectWallet = async (blockchain: 'base' | 'celo') => {
     if (!user) {
-      toast.error('Please sign in first')
+      toast.error('Please sign in to connect wallets')
       return
     }
 
@@ -63,54 +82,95 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      // Verify wallet is connected
+      // Step 1: Open WalletConnect modal if not connected
       if (!isConnected || !address) {
-        toast.error('Please connect your wallet first')
-        setIsConnecting(false)
-        return
+        console.log('🔄 Opening WalletConnect modal...')
+        await modal.open()
+        
+        // Wait for connection
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        if (!isConnected || !address) {
+          throw new Error('Wallet connection cancelled or failed')
+        }
       }
 
-      // Verify correct chain
-      const expectedChainId = blockchain === 'base' ? 8453 : 42220
-      if (chainId !== expectedChainId) {
-        toast.error(`Please switch to ${blockchain === 'base' ? 'Base' : 'Celo'} network in your wallet`)
-        setIsConnecting(false)
-        return
-      }
-
-      // Sign message to prove ownership
-      const message = `Connect ${blockchain} wallet to Seamount\n\nAddress: ${address}\nTimestamp: ${Date.now()}`
+      const chainConfig = CHAIN_CONFIGS[blockchain]
       
+      // Step 2: Verify correct network (accept both hex and decimal)
+      const currentChainId = chainId
+      const isCorrectChain = currentChainId === chainConfig.id || 
+                           `0x${currentChainId?.toString(16)}` === chainConfig.idHex
+      
+      if (!isCorrectChain) {
+        console.log(`⚠️ Wrong network. Current: ${currentChainId}, Expected: ${chainConfig.id}`)
+        
+        try {
+          // Try to switch network via WalletConnect
+          await modal.open({ view: 'Networks' })
+          toast.error(`Please switch to ${chainConfig.name} network in your wallet`)
+          setIsConnecting(false)
+          return
+        } catch (switchError) {
+          throw new Error(`Please switch to ${chainConfig.name} network manually`)
+        }
+      }
+
+      // Step 3: Get nonce from backend
+      toast.loading('Generating authentication challenge...')
+      const nonceResponse = await apiClient.post('/api/v1/wallet/nonce', {
+        address,
+        blockchain
+      })
+
+      if (!nonceResponse.data.success) {
+        throw new Error(nonceResponse.data.error || 'Failed to generate authentication challenge')
+      }
+
+      const { nonce, message } = nonceResponse.data
+      toast.dismiss()
+
+      // Step 4: Sign the nonce message
       toast.loading('Please sign the message in your wallet...')
       const signature = await signMessageAsync({ message })
 
-      // Detect wallet provider
+      // Step 5: Detect wallet provider
       let walletProvider = 'walletconnect'
       if ((window as any).ethereum?.isMetaMask) walletProvider = 'metamask'
       else if ((window as any).ethereum?.isCoinbaseWallet) walletProvider = 'coinbase_wallet'
+      else if ((window as any).ethereum?.isMiniPay) walletProvider = 'minipay'
+      else if ((window as any).ethereum?.isValora) walletProvider = 'valora'
 
-      // Save to backend
-      const response = await apiClient.post('/api/v1/wallet/connect', {
+      // Step 6: Send connection request to backend
+      const connectResponse = await apiClient.post('/api/v1/wallet/connect', {
         blockchain,
         address,
         wallet_provider: walletProvider,
         signature,
-        message
+        nonce
       })
 
-      if (response.data.success) {
-        setConnectedChains(prev => [...new Set([...prev, blockchain])])
-        toast.success(`${blockchain === 'base' ? 'Base' : 'Celo'} wallet connected!`)
-        setError(null)
-      } else {
-        throw new Error(response.data.error || 'Failed to connect wallet')
+      if (!connectResponse.data.success) {
+        throw new Error(connectResponse.data.error || 'Failed to connect wallet')
       }
+
+      // Success!
+      setConnectedChains(prev => [...new Set([...prev, blockchain])])
+      toast.success(`${chainConfig.name} wallet connected successfully!`)
+      setError(null)
+
     } catch (err: any) {
-      console.error('Wallet connection error:', err)
+      console.error('❌ Wallet connection error:', err)
       const errorMsg = err.message || 'Failed to connect wallet'
       setError(errorMsg)
-      toast.error(errorMsg)
-      throw err
+      
+      if (errorMsg.includes('User rejected')) {
+        toast.error('Connection rejected by user')
+      } else if (errorMsg.includes('network')) {
+        toast.error(`Please switch to ${CHAIN_CONFIGS[blockchain].name} network`)
+      } else {
+        toast.error(errorMsg)
+      }
     } finally {
       setIsConnecting(false)
       toast.dismiss()
@@ -125,17 +185,16 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       
       if (response.data.success) {
         setConnectedChains(prev => prev.filter(c => c !== blockchain))
-        toast.success(`${blockchain === 'base' ? 'Base' : 'Celo'} wallet disconnected`)
+        toast.success(`${CHAIN_CONFIGS[blockchain].name} wallet disconnected`)
         
         // If disconnecting current chain, disconnect from wallet provider too
-        if (chainId === (blockchain === 'base' ? 8453 : 42220)) {
+        if (chainId === CHAIN_CONFIGS[blockchain].id) {
           disconnect()
         }
       }
     } catch (err: any) {
       console.error('Wallet disconnection error:', err)
       toast.error('Failed to disconnect wallet')
-      throw err
     }
   }
 

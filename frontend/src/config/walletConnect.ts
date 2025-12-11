@@ -1,16 +1,18 @@
-// File: frontend/src/config/walletConnect.ts
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { base, celo } from '@reown/appkit/networks'
 import { QueryClient } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
 
-// ⚠️ REPLACE WITH YOUR PROJECT ID FROM https://cloud.reown.com
-export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || 'PASTE_YOUR_PROJECT_ID_HERE'
+// ✅ PROJECT ID FROM USER
+export const projectId = 'cc4e6128dba540ad2ef4a2d8328c8c90'
 
-if (!projectId || projectId === 'PASTE_YOUR_PROJECT_ID_HERE') {
-  console.warn('⚠️ VITE_REOWN_PROJECT_ID not set - WalletConnect will not work')
+if (!projectId) {
+  console.error('❌ VITE_REOWN_PROJECT_ID not set - WalletConnect will not work')
+  throw new Error('Missing WalletConnect Project ID')
 }
+
+console.log('✅ WalletConnect Project ID loaded:', projectId.slice(0, 8) + '...')
 
 // 1️⃣ Create Wagmi Adapter
 export const wagmiAdapter = new WagmiAdapter({
@@ -30,7 +32,14 @@ export const modal = createAppKit({
     icons: ['https://seamount.io/logo.png']
   },
   features: {
-    analytics: false
+    analytics: true,
+    email: false,
+    socials: false,
+    allWallets: true
+  },
+  themeVariables: {
+    '--w3m-accent': '#0052FF', // Base blue
+    '--w3m-border-radius-master': '12px'
   }
 })
 
@@ -42,7 +51,8 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1
+      retry: 1,
+      staleTime: 30000
     }
   }
 })

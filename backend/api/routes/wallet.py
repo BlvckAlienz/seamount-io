@@ -804,3 +804,82 @@ async def get_wallet_connect_config(
     except Exception as e:
         logger.error(f"❌ Failed to get WalletConnect config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+class NonceRequest(BaseModel):
+    address: str
+    blockchain: str
+
+class ConnectWalletRequest(BaseModel):
+    blockchain: str
+    address: str
+    wallet_provider: str
+    signature: str
+    nonce: str
+
+@router.post("/nonce")
+async def generate_nonce(
+    request: NonceRequest,
+    current_user: dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🔐 GENERATE NONCE FOR WALLET AUTHENTICATION
+    
+    Nonce-based authentication prevents replay attacks
+    """
+    try:
+        wallet_connect = WalletConnectService(db_service)
+        
+        result = await wallet_connect.generate_nonce(
+            address=request.address,
+            blockchain=request.blockchain
+        )
+        
+        if not result["success"]:
+            raise HTTPException(status_code=400, detail=result.get("error"))
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Nonce generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/connect")
+async def connect_external_wallet(
+    request: ConnectWalletRequest,
+    current_user: dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🔗 CONNECT EXTERNAL WALLET (Base/Celo via WalletConnect)
+    
+    Uses nonce-based authentication for security
+    """
+    try:
+        user_id = current_user["id"]
+        
+        # Initialize WalletConnect service
+        wallet_connect = WalletConnectService(db_service)
+        
+        # Connect wallet with nonce verification
+        result = await wallet_connect.connect_wallet(
+            user_id=user_id,
+            blockchain=request.blockchain,
+            address=request.address,
+            wallet_provider=request.wallet_provider,
+            signature=request.signature,
+            nonce=request.nonce
+        )
+        
+        if not result["success"]:
+            raise HTTPException(status_code=400, detail=result.get("error", "Connection failed"))
+        
+        logger.info(f"✅ {request.blockchain} wallet connected for user {user_id[:8]}...")
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Wallet connection failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
