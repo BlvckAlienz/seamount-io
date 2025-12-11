@@ -26,9 +26,9 @@ export const modal = createAppKit({
   metadata: {
     name: 'Seamount',
     description: 'Cross-border payments & multi-chain treasury',
-    url: 'https://seamount.io',
-    icons: ['https://seamount.io/logo.png']
-  },
+    url: 'https://www.seamount.io', // ✅ FIXED: Match actual domain
+    icons: ['https://www.seamount.io/logo.png']
+},
   features: {
     analytics: false
   }

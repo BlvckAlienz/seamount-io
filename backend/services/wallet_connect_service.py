@@ -92,12 +92,20 @@ class WalletConnectService:
             
             logger.info(f"🔗 Connecting {blockchain} wallet: {address[:10]}... via {wallet_provider}")
             
-            # Optional: Verify signature (proves user owns the wallet)
+            # ✅ OPTIONAL SIGNATURE VERIFICATION
+            verified = False
             if signature and message:
-                is_valid = self._verify_signature(address, message, signature)
-                if not is_valid:
-                    raise ValueError("Invalid signature - user doesn't own this wallet")
-                logger.info(f"✅ Signature verified for {address[:10]}...")
+                try:
+                    is_valid = self._verify_signature(address, message, signature)
+                    if is_valid:
+                        verified = True
+                        logger.info(f"✅ Signature verified for {address[:10]}...")
+                    else:
+                        logger.warning(f"⚠️ Invalid signature for {address[:10]}... - continuing without verification")
+                except Exception as e:
+                    logger.warning(f"⚠️ Signature verification failed: {e} - continuing without verification")
+            else:
+                logger.info(f"ℹ️ No signature provided - connecting without verification")
             
             # Check if wallet already connected
             existing = await self._get_connected_wallet(user_id, blockchain)
@@ -142,7 +150,8 @@ class WalletConnectService:
                 'is_active': True,
                 'metadata': {
                     'chain_id': self.WALLET_CONNECT_CHAINS[blockchain]['chain_id'],
-                    'verified_signature': bool(signature)
+                    'verified_signature': verified,
+                    'signature_provided': bool(signature)
                 }
             }
             

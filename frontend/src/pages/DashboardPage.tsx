@@ -28,6 +28,7 @@ import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
 import WalletConnectCard from '../components/wallet/WalletConnectCard';
+import { Link2, AlertCircle } from 'lucide-react';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -624,17 +625,39 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* ✅ NEW: WalletConnect Chains (Base, Celo) */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
-                Connect External Wallets
-              </h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Connect your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
-              </p>
+            {/* 🔗 EXTERNAL WALLET CONNECTIONS (Base + Celo) */}
+            <div className="mt-8 pt-6 border-t border-gray-700/50">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Link2 className="h-5 w-5 text-blue-400" />
+                    External Wallets
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Connect existing wallets from other providers
+                  </p>
+                </div>
+                <span className="text-xs text-gray-500 bg-gray-800 px-3 py-1 rounded-full">
+                  Optional
+                </span>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <WalletConnectCard blockchain="base" />
                 <WalletConnectCard blockchain="celo" />
+              </div>
+              
+              <div className="mt-4 p-4 bg-blue-900/10 border border-blue-500/20 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-300">
+                    <strong className="text-blue-400">Why connect external wallets?</strong>
+                    <p className="mt-1">
+                      Use your existing MetaMask, Coinbase Wallet, MiniPay, or Valora to access Base and Celo networks. 
+                      Your private keys stay in your wallet - we never store them.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

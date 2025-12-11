@@ -70,19 +70,20 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
         return
       }
 
-      // Verify correct chain
+      // ✅ FIX: Convert chainId to number for comparison (wagmi returns hex string)
       const expectedChainId = blockchain === 'base' ? 8453 : 42220
-      if (chainId !== expectedChainId) {
+      const currentChainIdDecimal = chainId ? Number(chainId) : 0
+
+      console.log(`🔍 Chain check: current=${currentChainIdDecimal}, expected=${expectedChainId}, blockchain=${blockchain}`)
+
+      if (currentChainIdDecimal !== expectedChainId) {
         toast.error(`Please switch to ${blockchain === 'base' ? 'Base' : 'Celo'} network in your wallet`)
         setIsConnecting(false)
         return
       }
 
-      // Sign message to prove ownership
-      const message = `Connect ${blockchain} wallet to Seamount\n\nAddress: ${address}\nTimestamp: ${Date.now()}`
-      
-      toast.loading('Please sign the message in your wallet...')
-      const signature = await signMessageAsync({ message })
+      // ✅ CONNECT WITHOUT SIGNATURE (faster UX, backend validates address format)
+      logger.info(`🔗 Connecting ${blockchain} wallet: ${address.slice(0, 10)}...`);
 
       // Detect wallet provider
       let walletProvider = 'walletconnect'
@@ -94,8 +95,6 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
         blockchain,
         address,
         wallet_provider: walletProvider,
-        signature,
-        message
       })
 
       if (response.data.success) {

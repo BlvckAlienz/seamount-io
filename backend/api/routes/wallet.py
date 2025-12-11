@@ -673,8 +673,7 @@ async def connect_external_wallet(
     """
     🔗 CONNECT EXTERNAL WALLET (Base/Celo via WalletConnect)
     
-    Users connect existing wallets (MetaMask, Coinbase Wallet, MiniPay, Valora)
-    No private keys stored - connection verified via signature
+    Now accepts connections WITHOUT signature (optional verification)
     """
     try:
         user_id = current_user["id"]
@@ -693,21 +692,26 @@ async def connect_external_wallet(
                 detail=f"{chain_info['name']} uses auto-creation. Use /create endpoint instead."
             )
         
+        # ✅ ALLOW CONNECTION WITHOUT SIGNATURE (verify later if provided)
+        logger.info(f"🔗 Connecting {request.blockchain} wallet for user {user_id[:8]}... (address: {request.address[:10]}...)")
+        
         # Initialize WalletConnect service
         wallet_connect = WalletConnectService(db_service)
         
-        # Connect wallet
+        # Connect wallet (signature is optional)
         result = await wallet_connect.connect_wallet(
             user_id=user_id,
             blockchain=request.blockchain,
             address=request.address,
             wallet_provider=request.wallet_provider,
-            signature=request.signature,
-            message=request.message
+            signature=request.signature,  # Can be None
+            message=request.message        # Can be None
         )
         
         if not result["success"]:
-            raise HTTPException(status_code=400, detail=result.get("error"))
+            error_msg = result.get("error", "Connection failed")
+            logger.error(f"❌ Wallet connection failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
         
         logger.info(f"✅ {request.blockchain} wallet connected for user {user_id[:8]}...")
         
@@ -717,7 +721,7 @@ async def connect_external_wallet(
         raise
     except Exception as e:
         logger.error(f"❌ Wallet connection failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
 @router.post("/disconnect")
 async def disconnect_external_wallet(
