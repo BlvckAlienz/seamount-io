@@ -68,7 +68,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
       bg: 'bg-orange-50 dark:bg-orange-900/20',
       border: 'border-orange-200 dark:border-orange-800',
       text: 'text-orange-800 dark:text-orange-200',
-      icon: <AlertTriangle className="w-5 w-5" />,
+      icon: <AlertTriangle className="w-5 h-5" />,
       title: '⚠️ Approaching Transaction Limit',
       message: `Only $${remaining.toFixed(2)} remaining. Complete KYC verification to continue transacting.`,
       action: 'Complete KYC',
@@ -126,7 +126,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
         </div>
         {config.dismissible && (
           <button onClick={() => setDismissed(true)} className={`${config.text} hover:opacity-70`}>
-            <Check className="w-5 h-5" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
@@ -291,10 +291,10 @@ const DashboardPage = () => {
       const response = await apiClient.get('/api/v1/wallet-creation/status');
       if (response.data.success) {
         // Extract wallets from the status response
-        const wallets = {};
+        const wallets: Record<string, any> = {};
         Object.entries(response.data.chains || {}).forEach(([chain, data]: [string, any]) => {
           if (data.address) {
-            (wallets as Record<string, any>)[chain] = { address: data.address };
+            wallets[chain] = { address: data.address };
           }
         });
         setMultiChainWallets(wallets);
@@ -800,6 +800,7 @@ const DashboardPage = () => {
                 </div>
               </div>
             </div>
+          </div>
 
           {/* Balance Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -865,72 +866,73 @@ const DashboardPage = () => {
               </button>
             </div>
           </div>
+
+          {/* Modals */}
+          {selectedChain && (
+            <WalletDetailModal 
+              isOpen={showWalletModal} 
+              onClose={() => { 
+                setShowWalletModal(false); 
+                setSelectedChain(null); 
+              }} 
+              chain={selectedChain} 
+              chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
+              address={multiChainWallets[selectedChain]?.address || ''} 
+              balance={calculateChainBalance(selectedChain)}
+              onOpenFundModal={() => setShowFundModal(true)}
+            />
+          )}
+          
+          {showRecoveryModal && (
+            <WalletRecoveryModal
+              isOpen={showBackupModal}
+              onClose={() => setShowBackupModal(false)}
+            />
+          )}
+          <FundWalletModal 
+            open={showFundModal} 
+            onOpenChange={setShowFundModal} 
+          />
+          <WithdrawModal 
+            open={showWithdrawModal} 
+            onOpenChange={setShowWithdrawModal} 
+          />
+          <SendForm 
+            open={showSendModal} 
+            onOpenChange={setShowSendModal} 
+          />
+          <SwapModal 
+            open={showSwapModal} 
+            onOpenChange={setShowSwapModal} 
+          />
+          <EarnModal 
+            open={showEarnModal} 
+            onOpenChange={setShowEarnModal} 
+          />
+          <MarketTerminalModal 
+            isOpen={showMarketTerminal} 
+            onClose={() => setShowMarketTerminal(false)} 
+          />
         </div>
 
-        {/* Modals */}
-        {selectedChain && (
-          <WalletDetailModal 
-            isOpen={showWalletModal} 
-            onClose={() => { 
-              setShowWalletModal(false); 
-              setSelectedChain(null); 
-            }} 
-            chain={selectedChain} 
-            chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
-            address={multiChainWallets[selectedChain]?.address || ''} 
-            balance={calculateChainBalance(selectedChain)}
-            onOpenFundModal={() => setShowFundModal(true)}
-          />
-        )}
-        
-        {showRecoveryModal && (
-          <WalletRecoveryModal
-            isOpen={showBackupModal}
-            onClose={() => setShowBackupModal(false)}
-          />
-        )}
-        <FundWalletModal 
-          open={showFundModal} 
-          onOpenChange={setShowFundModal} 
-        />
-        <WithdrawModal 
-          open={showWithdrawModal} 
-          onOpenChange={setShowWithdrawModal} 
-        />
-        <SendForm 
-          open={showSendModal} 
-          onOpenChange={setShowSendModal} 
-        />
-        <SwapModal 
-          open={showSwapModal} 
-          onOpenChange={setShowSwapModal} 
-        />
-        <EarnModal 
-          open={showEarnModal} 
-          onOpenChange={setShowEarnModal} 
-        />
-        <MarketTerminalModal 
-          isOpen={showMarketTerminal} 
-          onClose={() => setShowMarketTerminal(false)} 
-        />
-      </div>
-      {/* Prediction Markets Modal */}
-      {showPredictionMarkets && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="min-h-screen">
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-            <div className="relative">
-              <button
-                 onClick={() => setShowPredictionMarkets(false)}
-                 className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-               >
-                 <X className="h-6 w-6" />
-               </button>
-               <PredictionMarketsPage />
+        {/* Prediction Markets Modal */}
+        {showPredictionMarkets && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="min-h-screen">
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
+              <div className="relative">
+                <button
+                  onClick={() => setShowPredictionMarkets(false)}
+                  className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+                <PredictionMarketsPage />
+              </div>
             </div>
-           </div>
-         </div>
-       )}      
+          </div>
+        )}
+      </div>
     </WalletProvider>
   );
 };
