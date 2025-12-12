@@ -180,7 +180,6 @@ const DashboardPage = () => {
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
-  const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
   const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
   const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
 
