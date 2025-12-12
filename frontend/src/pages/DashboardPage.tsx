@@ -6,7 +6,7 @@ import {
   TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine, Target, Link2, Loader2
+  Wallet, ArrowDownToLine, Target, Link2, Loader2, CheckCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useWalletConnect } from '../contexts/WalletConnectContext';
@@ -31,7 +31,6 @@ import { useSearchParams } from 'react-router-dom';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
-
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -138,6 +137,13 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   );
 };
 
+// Network configurations for external wallets
+const NETWORK_CONFIGS = {
+  base: { name: 'Base', icon: '/icons/base.svg' },
+  celo: { name: 'Celo', icon: '/icons/celo.svg' },
+  basecamp: { name: 'Basecamp', icon: '/icons/basecamp.svg' }
+};
+
 // Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
@@ -185,6 +191,8 @@ const DashboardPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
 
+  const [serviceStatus, setServiceStatus] = useState<any>(null);
+
   // ✅ Check backup status on mount
   useEffect(() => {
     if (searchParams.get('openWallet')) {
@@ -196,6 +204,7 @@ const DashboardPage = () => {
     }
   }, [searchParams]);
 
+  useEffect(() => {
     const checkBackupStatus = async () => {
       try {
         const response = await apiClient.get('/api/v1/wallet-backup/status');
@@ -225,9 +234,7 @@ const DashboardPage = () => {
     if (user) {
       checkBackupStatus();
     }
-  }, [user];
-
-  const [serviceStatus, setServiceStatus] = useState<any>(null);
+  }, [user]);
 
   // Enhanced health monitoring
   const checkServiceHealth = async () => {
@@ -652,59 +659,60 @@ const DashboardPage = () => {
               </div>
             </div>
 
-          // ✅ REPLACE WITH SINGLE BUTTON:
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">External Wallets</h3>
-                <p className="text-gray-400 text-sm">
-                  Connect MetaMask, Coinbase Wallet, or other Web3 wallets
-                </p>
+            {/* ✅ REPLACE WITH SINGLE BUTTON */}
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-2">External Wallets</h3>
+                  <p className="text-gray-400 text-sm">
+                    Connect MetaMask, Coinbase Wallet, or other Web3 wallets
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => setShowUnifiedWalletModal(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all"
+                >
+                  <Wallet className="w-5 h-5" />
+                  Manage Wallets
+                </button>
               </div>
               
-              <button
-                onClick={() => setShowUnifiedWalletModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all"
-              >
-                <Wallet className="w-5 h-5" />
-                Manage Wallets
-              </button>
-            </div>
-            
-            {/* ✅ SHOW CONNECTED WALLETS (Read-only summary) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {['base', 'celo', 'basecamp'].map(network => {
-                const wallet = wallets[network];
-                return (
-                  <div
-                    key={network}
-                    className={`p-4 rounded-xl border ${
-                      wallet?.isConnected
-                        ? 'bg-green-500/10 border-green-500/30'
-                        : 'bg-gray-800/50 border-gray-700/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <img 
-                        src={NETWORK_CONFIGS[network].icon} 
-                        alt={NETWORK_CONFIGS[network].name}
-                        className="w-6 h-6"
-                      />
-                      <span className="font-semibold text-white">
-                        {NETWORK_CONFIGS[network].name}
-                      </span>
-                    </div>
-                    {wallet?.isConnected ? (
-                      <div className="text-xs text-green-400 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Connected
+              {/* ✅ SHOW CONNECTED WALLETS (Read-only summary) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {['base', 'celo', 'basecamp'].map(network => {
+                  const wallet = wallets[network];
+                  return (
+                    <div
+                      key={network}
+                      className={`p-4 rounded-xl border ${
+                        wallet?.isConnected
+                          ? 'bg-green-500/10 border-green-500/30'
+                          : 'bg-gray-800/50 border-gray-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <img 
+                          src={NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].icon} 
+                          alt={NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].name}
+                          className="w-6 h-6"
+                        />
+                        <span className="font-semibold text-white">
+                          {NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].name}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="text-xs text-gray-500">Not connected</div>
-                    )}
-                  </div>
-                );
-              })}
+                      {wallet?.isConnected ? (
+                        <div className="text-xs text-green-400 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Connected
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-500">Not connected</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -819,34 +827,34 @@ const DashboardPage = () => {
             isOpen={showMarketTerminal} 
             onClose={() => setShowMarketTerminal(false)} 
           />
-        </div>
 
-        {/* Unified Wallet Modal */}
-        {showUnifiedWalletModal && (
-          <UnifiedWalletModal
-            isOpen={showUnifiedWalletModal}
-            onClose={() => setShowUnifiedWalletModal(false)}
-            defaultAction={undefined} // Or pass 'bet', 'send', etc.
-          />
-        )}
+          {/* Unified Wallet Modal */}
+          {showUnifiedWalletModal && (
+            <UnifiedWalletModal
+              isOpen={showUnifiedWalletModal}
+              onClose={() => setShowUnifiedWalletModal(false)}
+              defaultAction={undefined}
+            />
+          )}
 
-        {/* Prediction Markets Modal */}
-        {showPredictionMarkets && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="min-h-screen">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-              <div className="relative">
-                <button
-                  onClick={() => setShowPredictionMarkets(false)}
-                  className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-                <PredictionMarketsPage />
+          {/* Prediction Markets Modal */}
+          {showPredictionMarkets && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="min-h-screen">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPredictionMarkets(false)}
+                    className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                  <PredictionMarketsPage />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </WalletProvider>
   );
