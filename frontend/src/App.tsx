@@ -38,6 +38,7 @@ import WalletRecovery from './pages/wallet-recovery';
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
+import { WalletProvider } from './contexts/WalletContext';
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
 
@@ -222,14 +223,17 @@ function App() {
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              {/* ✅ Now WalletOrchestratorProvider can use useAppKit */}
-              <WalletOrchestratorProvider>
-                <DebugEnv />
-                <Toaster position="top-right" />
-                <AppContent />
-                <Analytics />
-                <SpeedInsights />
-              </WalletOrchestratorProvider>
+              {/* 🌊 WalletProvider: Auto-created wallets (Algo, BTC, ETH, MATIC, TRX) */}
+              <WalletProvider>
+                {/* âœ… WalletOrchestratorProvider: External wallets (Base, Celo, BaseCAMP) */}
+                <WalletOrchestratorProvider>
+                  <DebugEnv />
+                  <Toaster position="top-right" />
+                  <AppContent />
+                  <Analytics />
+                  <SpeedInsights />
+                </WalletOrchestratorProvider>
+              </WalletProvider>
             </AuthProvider>
           </QueryClientProvider>
         </WagmiProvider>
