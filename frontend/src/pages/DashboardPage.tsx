@@ -24,6 +24,7 @@ import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
+import { safeTruncate } from '@/utils/stringUtils';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '@/components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
@@ -673,11 +674,11 @@ const DashboardPage = () => {
                 <div className="mb-4">
                   <div className="text-white font-semibold">Base</div>
                   <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
-                  {isChainConnected('base') && getChainAddress && (
+                  {isChainConnected('base') && getChainAddress('base') && (
                     <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{getChainAddress.slice(0, 8)}...{getChainAddress.slice(-6)}</span>
+                      <span className="truncate">{safeTruncate(getChainAddress('base'), 8, 6)}</span>
                       <a
-                        href={`https://basescan.org/address/${address}`}
+                        href={`https://basescan.org/address/${getChainAddress('base')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-blue-400 transition-colors"
@@ -723,7 +724,7 @@ const DashboardPage = () => {
 
               {/* Celo Card */}
               <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                connectedChains.includes('celo') 
+                isChainConnected('celo') 
                   ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
                   : 'border-gray-700/50 hover:border-green-500/30'
               }`}>
@@ -736,7 +737,7 @@ const DashboardPage = () => {
                     />
                   </div>
                   <div className="text-right">
-                    {connectedChains.includes('celo') ? (
+                    {isChainConnected('celo') ? (
                       <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                         <Check className="w-4 h-4" />
                         Connected
@@ -750,11 +751,11 @@ const DashboardPage = () => {
                 <div className="mb-4">
                   <div className="text-white font-semibold">Celo</div>
                   <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
-                  {isChainConnected('celo') && getChainAddress && (
+                  {isChainConnected('celo') && getChainAddress('celo') && (
                     <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{getChainAddress.slice(0, 8)}...{getChainAddress.slice(-6)}</span>
+                      <span className="truncate">{safeTruncate(getChainAddress('celo'), 8, 6)}</span>
                       <a
-                        href={`https://celoscan.io/address/${address}`}
+                        href={`https://celoscan.io/address/${getChainAddress('celo')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-green-400 transition-colors"
@@ -802,7 +803,7 @@ const DashboardPage = () => {
             {/* 🎮 BASECAMP TESTNET (For Predictions) */}
             <div className="mt-6">
               <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 ${
-                connectedChains.includes('basecamp') 
+                isChainConnected('basecamp') 
                   ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/20' 
                   : 'border-gray-700/50'
               }`}>
@@ -817,7 +818,7 @@ const DashboardPage = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    {connectedChains.includes('basecamp') ? (
+                    {isChainConnected('basecamp') ? (
                       <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                         <Check className="w-4 h-4" />
                         Connected
@@ -832,26 +833,30 @@ const DashboardPage = () => {
                   Connect to place bets in prediction markets. Uses test CAMP tokens.
                 </p>
 
-                {isChainConnected('basecamp') && getChainAddress ? (
-                  <div className="space-y-3">
-                    <div className="text-gray-300 text-sm flex items-center gap-2">
-                      <span className="font-mono">{getChainAddress.slice(0, 10)}...{getChainAddress.slice(-8)}</span>
-                      <a
-                        href={`https://basecamp.cloud.blockscout.com/address/${address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-yellow-400 transition-colors"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <button
-                      onClick={() => disconnectWallet('basecamp')}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors"
-                    >
-                      Disconnect Testnet
-                    </button>
-                  </div>
+                {isChainConnected('basecamp') ? (
+                  <>
+                    {getChainAddress('basecamp') && (
+                      <div className="space-y-3">
+                        <div className="text-gray-300 text-sm flex items-center gap-2">
+                          <span className="font-mono">{safeTruncate(getChainAddress('basecamp'), 10, 8)}</span>
+                          <a
+                            href={`https://basecamp.cloud.blockscout.com/address/${getChainAddress('basecamp')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-yellow-400 transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                        <button
+                          onClick={() => disconnectWallet('basecamp')}
+                          className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors"
+                        >
+                          Disconnect Testnet
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <button
                     onClick={() => connectWallet('basecamp')}

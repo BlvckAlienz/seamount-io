@@ -92,7 +92,10 @@ const PredictionMarketsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
   // Use unified wallet connection
-  const { connectedChains, connectWallet, address } = useWalletConnect();
+  const { wallets, connectWallet, disconnectWallet } = useWalletOrchestrator();
+  const campWallet = wallets.basecamp;
+  const address = campWallet?.address;
+  const connectedChains = Object.keys(wallets).filter(chain => wallets[chain as keyof typeof wallets]?.isConnected);
   const [signingTransaction, setSigningTransaction] = useState(false);
 
   // ✅ TRANSACTION MONITOR STATE
