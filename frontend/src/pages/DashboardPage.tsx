@@ -8,27 +8,25 @@ import {
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
   Wallet, ArrowDownToLine, Target, Link2, Loader2
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useWalletConnect } from '../contexts/WalletConnectContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWalletConnect } from '@/contexts/WalletConnectContext';
 import toast from 'react-hot-toast';
-import { apiClient } from '../config/api';
+import { apiClient } from '@/config/api';
 import { useNavigate } from 'react-router-dom';
-import NigerianUserBanner from '../components/layout/NigerianUserBanner';
-import ChainWalletCard from '../components/wallet/ChainWalletCard';
-import WalletDetailModal from '../components/wallet/WalletDetailModal';
-import WalletCreationStatusBanner from '../components/wallet/WalletCreationStatusBanner';
-import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
-import { FundWalletModal } from '@/components/wallet/FundWalletModal.tsx';
-import { WithdrawModal } from '@/components/wallet/WithdrawModal.tsx';
+import NigerianUserBanner from '@/components/layout/NigerianUserBanner';
+import ChainWalletCard from '@/components/wallet/ChainWalletCard';
+import WalletDetailModal from '@/components/wallet/WalletDetailModal';
+import WalletCreationStatusBanner from '@/components/wallet/WalletCreationStatusBanner';
+import WalletRecoveryModal from '@/components/wallet/WalletRecoveryModal';
+import { FundWalletModal } from '@/components/wallet/FundWalletModal';
+import { WithdrawModal } from '@/components/wallet/WithdrawModal';
 import { toastInfo, toastWarning } from '@/lib/toast-helpers';
-import { WalletProvider } from '@/contexts/WalletContext';
-import { SendForm } from '@/components/payments/SendForm.tsx';
+import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
-import LiveMarketPreview from '../components/market/LiveMarketPreview';
+import LiveMarketPreview from '@/components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
-import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -140,7 +138,7 @@ const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [portfolioData, setportfolioData] = useState<any>(null);
+  const [portfolioData, setPortfolioData] = useState<any>(null);
   const [kycInfo, setKycInfo] = useState({
     status: 'not_started',
     cumulative_volume: 0,
@@ -175,13 +173,6 @@ const DashboardPage = () => {
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
-  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
-
-  // ✅ Define wallets state for external wallet connections
-  const [wallets, setWallets] = useState<Record<string, { 
-    isConnected: boolean; 
-    address: string;
-  }>>({});
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -235,8 +226,8 @@ const DashboardPage = () => {
     { id: 'polygon', name: 'Polygon', symbol: 'MATIC', type: 'auto' },
     { id: 'algorand', name: 'Algorand', symbol: 'ALGO', type: 'auto' },
     { id: 'tron', name: 'TRON', symbol: 'TRX', type: 'auto' },
-    { id: 'base', name: 'Base', symbol: 'ETH', type: 'connect' }, // ✅ NEW
-    { id: 'celo', name: 'Celo', symbol: 'CELO', type: 'connect' }  // ✅ NEW
+    { id: 'base', name: 'Base', symbol: 'ETH', type: 'connect' },
+    { id: 'celo', name: 'Celo', symbol: 'CELO', type: 'connect' }
   ];
 
   // Update the validation useEffect to only expect 5 chains
@@ -248,7 +239,6 @@ const DashboardPage = () => {
         
         console.log('✅ ACTIVE CHAINS:', chains);
         
-        // ✅ ONLY EXPECT 5 CHAINS
         const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron'];
         const missingChains = expectedChains.filter(chain => !chains.includes(chain));
         
@@ -269,7 +259,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (user && userProfile) {
-      fetchportfolioData();
+      fetchPortfolioData();
       fetchKYCStatus();
       fetchMultiChainWallets();
       fetchWalletCreationStatus();
@@ -290,7 +280,7 @@ const DashboardPage = () => {
   const handleRetrySuccess = () => {
     fetchWalletCreationStatus();
     fetchMultiChainWallets();
-    fetchportfolioData();
+    fetchPortfolioData();
   };
 
   const fetchMultiChainWallets = async () => {
@@ -328,12 +318,12 @@ const DashboardPage = () => {
       .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
   };
 
-  const fetchportfolioData = async () => {
+  const fetchPortfolioData = async () => {
     try {
       setLoading(true);
       const response = await apiClient.get('/api/v1/wallet/balances');
       if (response.data.success) {
-        setportfolioData({
+        setPortfolioData({
           total_usd: response.data.total_usd,
           assets: response.data.assets,
           timestamp: response.data.timestamp
@@ -345,7 +335,7 @@ const DashboardPage = () => {
     } catch (error: any) {
       console.error('portfolio fetch error:', error);
       if (userProfile?.algorand_address) {
-        setportfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
+        setPortfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
       }
     } finally {
       setLoading(false);
@@ -420,595 +410,594 @@ const DashboardPage = () => {
   }
 
   return (
-    <WalletProvider>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-6 md:mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
-                <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
-              </div>
-              
-              {/* Desktop Profile Menu */}
-              <div className="hidden md:block relative">
-                <button 
-                  onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                    {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                  <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
-                </button>
-                {showProfileMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                      <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                        <Key className="h-4 w-4" />
-                        <span>Recovery Phrases</span>
-                      </button>
-                      <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                        <Shield className="h-4 w-4" />
-                        <span>Verify</span>
-                      </button>
-                      
-                      {/* ✅ CORRECTED: Admin link (only show if is_admin=true) */}
-                      {userProfile?.is_admin && (
-                        <button 
-                          onClick={() => navigate('/admin')} 
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors"
-                        >
-                          <Shield className="h-4 w-4" />
-                          <span>Admin Dashboard</span>
-                        </button>
-                      )}
-                      
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                        <LogOut className="h-4 w-4" />
-                        <span>Logout</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
+              <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
             </div>
-
-            {/* Action Buttons - Responsive Layout */}
-            <div className="flex flex-wrap gap-2">
-              {/* Primary Actions */}
+            
+            {/* Desktop Profile Menu */}
+            <div className="hidden md:block relative">
               <button 
-                onClick={() => setShowFundModal(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+                onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
               >
-                <Wallet className="h-4 w-4" />
-                <span className="hidden sm:inline">Fund</span>
-              </button>
-              
-              <button 
-                onClick={() => setShowSendModal(true)} 
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-              >
-                <ArrowUpRight className="h-4 w-4" />
-                <span className="hidden sm:inline">Send</span>
-              </button>
-              
-              <button 
-                onClick={() => setShowSwapModal(true)}
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-              >
-                <SwapIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">Swap</span>
-              </button>
-              
-              <button 
-                onClick={() => setShowEarnModal(true)}
-                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-              >
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Earn</span>
-              </button>
-              
-              <button 
-                onClick={() => setShowWithdrawModal(true)}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
-              >
-                <ArrowDownToLine className="h-4 w-4" />
-                <span className="hidden sm:inline">Withdraw</span>
-              </button>
-
-              {/* Mobile Profile Menu */}
-              <div className="md:hidden ml-auto relative">
-                <button 
-                  onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                  className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
-                >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                    {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                </button>
-                {showProfileMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                      {/* ✅ ADMIN MENU ITEM - Only for admins */}
-                      {userProfile?.is_admin && (
-                        <button 
-                          onClick={() => {
-                            setShowProfileMenu(false); // Close menu
-                            navigate('/admin');
-                          }} 
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
-                        >
-                          <Shield className="h-4 w-4" />
-                          <span>Admin Dashboard</span>
-                        </button>
-                      )}
-                      <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                        <Key className="h-4 w-4" />
-                        <span>Recovery Phrases</span>
-                      </button>
-                      <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                        <Shield className="h-4 w-4" />
-                        <span>Verify</span>
-                      </button>
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                        <LogOut className="h-4 w-4" />
-                        <span>Logout</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* 📍 BLOOMBERG-GRADE MARKET TERMINAL PREVIEW */}
-          <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <TrendingUp className="h-6 w-6 text-blue-400" />
-                  Live Market Terminal
-                </h2>
-                <p className="text-gray-400 text-sm">Bloomberg-Grade Real-Time Market Data</p>
-              </div>
-              <button
-                onClick={() => setShowMarketTerminal(true)}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 animate-pulse"
-              >
-                <Activity className="h-5 w-5" />
-                <span className="hidden sm:inline">Open Terminal</span>
-                <span className="sm:hidden">View</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 🎯 PREDICTION MARKETS CARD */}
-          <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-green-500/10 transition-all">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Target className="h-6 w-6 text-green-400" />
-                  Prediction Markets
-                </h2>
-                <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with CAMP</p>
-              </div>
-              <button
-                onClick={() => setShowPredictionMarkets(true)}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
-              >
-                <TrendingUp className="h-5 w-5" />
-                <span className="hidden sm:inline">View Markets</span>
-                <span className="sm:hidden">Bet</span>
-              </button>
-            </div>
-          </div>
-
-          {walletCreationStatus && !walletCreationStatus.overall_complete && (
-            <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
-          )}
-
-          <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
-
-          {/* ✅ UPDATED: Multi-Chain Wallets Section */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
-              <span className="text-sm text-gray-400">
-                {createdChains} of {SUPPORTED_CHAINS.filter(c => c.type === 'auto').length} auto-created
-              </span>
-            </div>
-
-            {/* Auto-Created Wallets (Bitcoin, Ethereum, Polygon, Algorand, Tron) */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
-                Auto-Created Wallets
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {SUPPORTED_CHAINS.filter(chain => chain.type === 'auto').map(chain => (
-                  <ChainWalletCard 
-                    key={chain.id} 
-                    chain={chain.id} 
-                    address={multiChainWallets[chain.id]?.address || ''} 
-                    balance={calculateChainBalance(chain.id)} 
-                    status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} 
-                    onCardClick={() => handleWalletCardClick(chain.id)} 
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* 🌐 EXTERNAL WALLETS: Base + Celo */}
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
-                <Link2 className="h-4 w-4" />
-                Connect External Wallets
-              </h3>
-              <p className="text-xs text-gray-500 mb-4">
-                Use your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Base Card */}
-                <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                  connectedChains.includes('base') 
-                    ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
-                    : 'border-gray-700/50 hover:border-blue-500/30'
-                }`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800">
-                      <img 
-                        src="https://icons.llamao.fi/icons/chains/rsz_base.jpg" 
-                        alt="Base" 
-                        className="w-6 h-6"
-                      />
-                    </div>
-                    <div className="text-right">
-                      {connectedChains.includes('base') ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">Mainnet</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <div className="text-white font-semibold">Base</div>
-                    <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
-                    {connectedChains.includes('base') && address && (
-                      <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-                        
-                          href={`https://basescan.org/address/${address}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-blue-400 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {connectedChains.includes('base') ? (
-                    <button
-                      onClick={() => disconnectWallet('base')}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Disconnect
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => connectWallet('base')}
-                      disabled={isConnecting}
-                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="w-5 h-5" />
-                          Connect Wallet
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  <div className="mt-3 text-center text-xs text-gray-500">
-                    MetaMask • Coinbase • Rabby
-                  </div>
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </div>
-
-                {/* Celo Card */}
-                <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                  connectedChains.includes('celo') 
-                    ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
-                    : 'border-gray-700/50 hover:border-green-500/30'
-                }`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700">
-                      <img 
-                        src="https://cryptologos.cc/logos/celo-celo-logo.svg" 
-                        alt="Celo" 
-                        className="w-6 h-6"
-                      />
-                    </div>
-                    <div className="text-right">
-                      {connectedChains.includes('celo') ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">Mainnet</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <div className="text-white font-semibold">Celo</div>
-                    <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
-                    {connectedChains.includes('celo') && address && (
-                      <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-                        
-                          href={`https://celoscan.io/address/${address}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-green-400 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {connectedChains.includes('celo') ? (
-                    <button
-                      onClick={() => disconnectWallet('celo')}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Disconnect
+                <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
+              </button>
+              {showProfileMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Key className="h-4 w-4" />
+                      <span>Recovery Phrases</span>
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => connectWallet('celo')}
-                      disabled={isConnecting}
-                      className="w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="w-5 h-5" />
-                          Connect Wallet
-                        </>
-                      )}
+                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Shield className="h-4 w-4" />
+                      <span>Verify</span>
                     </button>
-                  )}
-
-                  <div className="mt-3 text-center text-xs text-gray-500">
-                    Valora • MiniPay • MetaMask
-                  </div>
-                </div>
-              </div>
-              
-              {/* 🎮 BASECAMP TESTNET (For Predictions) */}
-              <div className="mt-6">
-                <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 ${
-                  connectedChains.includes('basecamp') 
-                    ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/20' 
-                    : 'border-gray-700/50'
-                }`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600">
-                        <Target className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-white font-semibold">BaseCAMP Testnet</div>
-                        <div className="text-gray-400 text-sm">For prediction markets (test tokens)</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      {connectedChains.includes('basecamp') ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                          <Check className="w-4 h-4" />
-                          Connected
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-400">Testnet</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-gray-400 mb-4">
-                    Connect to place bets in prediction markets. Uses test CAMP tokens.
-                  </p>
-
-                  {connectedChains.includes('basecamp') && address ? (
-                    <div className="space-y-3">
-                      <div className="text-gray-300 text-sm flex items-center gap-2">
-                        <span className="font-mono">{address.slice(0, 10)}...{address.slice(-8)}</span>
-                        
-                          href={`https://basecamp.cloud.blockscout.com/address/${address}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:text-yellow-400 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                      <button
-                        onClick={() => disconnectWallet('basecamp')}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors"
+                    
+                    {/* ✅ CORRECTED: Admin link (only show if is_admin=true) */}
+                    {userProfile?.is_admin && (
+                      <button 
+                        onClick={() => navigate('/admin')} 
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors"
                       >
-                        Disconnect Testnet
+                        <Shield className="h-4 w-4" />
+                        <span>Admin Dashboard</span>
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => connectWallet('basecamp')}
-                      disabled={isConnecting}
-                      className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isConnecting ? 'Connecting...' : 'Connect for Predictions'}
+                    )}
+                    
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
                     </button>
-                  )}
-
-                  <div className="mt-3 text-center text-xs text-gray-500">
-                    MetaMask only • <a href="https://faucet.campnetwork.xyz" target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:underline">Get test CAMP</a>
                   </div>
-                </div>
-              </div>
-            </div>
-
-          {/* Balance Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-sm text-gray-400 mb-1">Total Balance</div>
-                  <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
-                </div>
-                <button onClick={fetchportfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
-                  <RefreshCw className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Activity className="h-4 w-4 text-green-400 animate-pulse" />
-                <span className="text-green-400">Live Multi-Chain Balances</span>
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="text-sm text-gray-400 mb-2">Networks</div>
-              <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
-              <div className="space-y-2">
-                {SUPPORTED_CHAINS.map(chain => (
-                  <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
-                    <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
-                    {chain.name}
-                  </div>
-                ))}
-              </div>
+                </>
+              )}
             </div>
           </div>
-          
-          {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-            <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => setShowSendModal(true) },
-                { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => setShowSwapModal(true) },
-                { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => setShowEarnModal(true) },
-              ].map(action => (
-                <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
-                  <action.icon className={`h-6 w-6 ${action.color}`} />
-                  <span className="text-sm text-gray-300">{action.label}</span>
-                </button>
+
+          {/* Action Buttons - Responsive Layout */}
+          <div className="flex flex-wrap gap-2">
+            {/* Primary Actions */}
+            <button 
+              onClick={() => setShowFundModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Fund</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowSendModal(true)} 
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowSwapModal(true)}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <SwapIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Swap</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowEarnModal(true)}
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Earn</span>
+            </button>
+            
+            <button 
+              onClick={() => setShowWithdrawModal(true)}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              <span className="hidden sm:inline">Withdraw</span>
+            </button>
+
+            {/* Mobile Profile Menu */}
+            <div className="md:hidden ml-auto relative">
+              <button 
+                onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
+              >
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
+                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                </div>
+              </button>
+              {showProfileMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    {/* ✅ ADMIN MENU ITEM - Only for admins */}
+                    {userProfile?.is_admin && (
+                      <button 
+                        onClick={() => {
+                          setShowProfileMenu(false); // Close menu
+                          navigate('/admin');
+                        }} 
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </button>
+                    )}
+                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Key className="h-4 w-4" />
+                      <span>Recovery Phrases</span>
+                    </button>
+                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
+                      <Shield className="h-4 w-4" />
+                      <span>Verify</span>
+                    </button>
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* 📍 BLOOMBERG-GRADE MARKET TERMINAL PREVIEW */}
+        <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <TrendingUp className="h-6 w-6 text-blue-400" />
+                Live Market Terminal
+              </h2>
+              <p className="text-gray-400 text-sm">Bloomberg-Grade Real-Time Market Data</p>
+            </div>
+            <button
+              onClick={() => setShowMarketTerminal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 animate-pulse"
+            >
+              <Activity className="h-5 w-5" />
+              <span className="hidden sm:inline">Open Terminal</span>
+              <span className="sm:hidden">View</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 🎯 PREDICTION MARKETS CARD */}
+        <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-green-500/10 transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Target className="h-6 w-6 text-green-400" />
+                Prediction Markets
+              </h2>
+              <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with CAMP</p>
+            </div>
+            <button
+              onClick={() => setShowPredictionMarkets(true)}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
+            >
+              <TrendingUp className="h-5 w-5" />
+              <span className="hidden sm:inline">View Markets</span>
+              <span className="sm:hidden">Bet</span>
+            </button>
+          </div>
+        </div>
+
+        {walletCreationStatus && !walletCreationStatus.overall_complete && (
+          <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
+        )}
+
+        <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
+
+        {/* ✅ UPDATED: Multi-Chain Wallets Section */}
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
+            <span className="text-sm text-gray-400">
+              {createdChains} of {SUPPORTED_CHAINS.filter(c => c.type === 'auto').length} auto-created
+            </span>
+          </div>
+
+          {/* Auto-Created Wallets (Bitcoin, Ethereum, Polygon, Algorand, Tron) */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
+              Auto-Created Wallets
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {SUPPORTED_CHAINS.filter(chain => chain.type === 'auto').map(chain => (
+                <ChainWalletCard 
+                  key={chain.id} 
+                  chain={chain.id} 
+                  address={multiChainWallets[chain.id]?.address || ''} 
+                  balance={calculateChainBalance(chain.id)} 
+                  status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} 
+                  onCardClick={() => handleWalletCardClick(chain.id)} 
+                />
               ))}
             </div>
           </div>
 
-          {/* Cross-Border Payments Banner */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
-                <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
-                <div className="flex flex-wrap items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
-                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
+          {/* 🌐 EXTERNAL WALLETS: Base + Celo */}
+          <div className="mt-8">
+            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              Connect External Wallets
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Use your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Base Card */}
+              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
+                connectedChains.includes('base') 
+                  ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
+                  : 'border-gray-700/50 hover:border-blue-500/30'
+              }`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800">
+                    <img 
+                      src="https://icons.llamao.fi/icons/chains/rsz_base.jpg" 
+                      alt="Base" 
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  <div className="text-right">
+                    {connectedChains.includes('base') ? (
+                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                        <Check className="w-4 h-4" />
+                        Connected
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Mainnet</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-white font-semibold">Base</div>
+                  <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
+                  {connectedChains.includes('base') && address && (
+                    <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
+                      <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                      <a
+                        href={`https://basescan.org/address/${address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-blue-400 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {connectedChains.includes('base') ? (
+                  <button
+                    onClick={() => disconnectWallet('base')}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => connectWallet('base')}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-5 h-5" />
+                        Connect Wallet
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <div className="mt-3 text-center text-xs text-gray-500">
+                  MetaMask • Coinbase • Rabby
                 </div>
               </div>
-              <button onClick={() => setShowSendModal(true)} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
-                Send Money
-              </button>
+
+              {/* Celo Card */}
+              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
+                connectedChains.includes('celo') 
+                  ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
+                  : 'border-gray-700/50 hover:border-green-500/30'
+              }`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700">
+                    <img 
+                      src="https://cryptologos.cc/logos/celo-celo-logo.svg" 
+                      alt="Celo" 
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  <div className="text-right">
+                    {connectedChains.includes('celo') ? (
+                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                        <Check className="w-4 h-4" />
+                        Connected
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Mainnet</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-white font-semibold">Celo</div>
+                  <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
+                  {connectedChains.includes('celo') && address && (
+                    <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
+                      <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                      <a
+                        href={`https://celoscan.io/address/${address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-green-400 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {connectedChains.includes('celo') ? (
+                  <button
+                    onClick={() => disconnectWallet('celo')}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => connectWallet('celo')}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-5 h-5" />
+                        Connect Wallet
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <div className="mt-3 text-center text-xs text-gray-500">
+                  Valora • MiniPay • MetaMask
+                </div>
+              </div>
             </div>
-          </div>
+            
+            {/* 🎮 BASECAMP TESTNET (For Predictions) */}
+            <div className="mt-6">
+              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 ${
+                connectedChains.includes('basecamp') 
+                  ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/20' 
+                  : 'border-gray-700/50'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold">BaseCAMP Testnet</div>
+                      <div className="text-gray-400 text-sm">For prediction markets (test tokens)</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {connectedChains.includes('basecamp') ? (
+                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                        <Check className="w-4 h-4" />
+                        Connected
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Testnet</div>
+                    )}
+                  </div>
+                </div>
 
-          {/* Modals */}
-          {selectedChain && (
-            <WalletDetailModal 
-              isOpen={showWalletModal} 
-              onClose={() => { 
-                setShowWalletModal(false); 
-                setSelectedChain(null); 
-              }} 
-              chain={selectedChain} 
-              chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
-              address={multiChainWallets[selectedChain]?.address || ''} 
-              balance={calculateChainBalance(selectedChain)}
-              onOpenFundModal={() => setShowFundModal(true)}
-            />
-          )}
-          
-          {showRecoveryModal && (
-            <WalletRecoveryModal
-              isOpen={showBackupModal}
-              onClose={() => setShowBackupModal(false)}
-            />
-          )}
-          <FundWalletModal 
-            open={showFundModal} 
-            onOpenChange={setShowFundModal} 
-          />
-          <WithdrawModal 
-            open={showWithdrawModal} 
-            onOpenChange={setShowWithdrawModal} 
-          />
-          <SendForm 
-            open={showSendModal} 
-            onOpenChange={setShowSendModal} 
-          />
-          <SwapModal 
-            open={showSwapModal} 
-            onOpenChange={setShowSwapModal} 
-          />
-          <EarnModal 
-            open={showEarnModal} 
-            onOpenChange={setShowEarnModal} 
-          />
-          <MarketTerminalModal 
-            isOpen={showMarketTerminal} 
-            onClose={() => setShowMarketTerminal(false)} 
-          />
-        </div>
+                <p className="text-sm text-gray-400 mb-4">
+                  Connect to place bets in prediction markets. Uses test CAMP tokens.
+                </p>
 
-        {/* Prediction Markets Modal */}
-        {showPredictionMarkets && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="min-h-screen">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-              <div className="relative">
-                <button
-                  onClick={() => setShowPredictionMarkets(false)}
-                  className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-                <PredictionMarketsPage />
+                {connectedChains.includes('basecamp') && address ? (
+                  <div className="space-y-3">
+                    <div className="text-gray-300 text-sm flex items-center gap-2">
+                      <span className="font-mono">{address.slice(0, 10)}...{address.slice(-8)}</span>
+                      <a
+                        href={`https://basecamp.cloud.blockscout.com/address/${address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-yellow-400 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <button
+                      onClick={() => disconnectWallet('basecamp')}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors"
+                    >
+                      Disconnect Testnet
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => connectWallet('basecamp')}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isConnecting ? 'Connecting...' : 'Connect for Predictions'}
+                  </button>
+                )}
+
+                <div className="mt-3 text-center text-xs text-gray-500">
+                  MetaMask only • <a href="https://faucet.campnetwork.xyz" target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:underline">Get test CAMP</a>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Balance Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm text-gray-400 mb-1">Total Balance</div>
+                <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+              </div>
+              <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
+                <RefreshCw className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Activity className="h-4 w-4 text-green-400 animate-pulse" />
+              <span className="text-green-400">Live Multi-Chain Balances</span>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="text-sm text-gray-400 mb-2">Networks</div>
+            <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
+            <div className="space-y-2">
+              {SUPPORTED_CHAINS.map(chain => (
+                <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
+                  {chain.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
+          <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => setShowSendModal(true) },
+              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => setShowSwapModal(true) },
+              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => setShowEarnModal(true) },
+            ].map(action => (
+              <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
+                <action.icon className={`h-6 w-6 ${action.color}`} />
+                <span className="text-sm text-gray-300">{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Cross-Border Payments Banner */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
+              <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
+                <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
+              </div>
+            </div>
+            <button onClick={() => setShowSendModal(true)} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
+              Send Money
+            </button>
+          </div>
+        </div>
+
+        {/* Modals */}
+        {selectedChain && (
+          <WalletDetailModal 
+            isOpen={showWalletModal} 
+            onClose={() => { 
+              setShowWalletModal(false); 
+              setSelectedChain(null); 
+            }} 
+            chain={selectedChain} 
+            chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
+            address={multiChainWallets[selectedChain]?.address || ''} 
+            balance={calculateChainBalance(selectedChain)}
+            onOpenFundModal={() => setShowFundModal(true)}
+          />
         )}
+        
+        {showRecoveryModal && (
+          <WalletRecoveryModal
+            isOpen={showBackupModal}
+            onClose={() => setShowBackupModal(false)}
+          />
+        )}
+        <FundWalletModal 
+          open={showFundModal} 
+          onOpenChange={setShowFundModal} 
+        />
+        <WithdrawModal 
+          open={showWithdrawModal} 
+          onOpenChange={setShowWithdrawModal} 
+        />
+        <SendForm 
+          open={showSendModal} 
+          onOpenChange={setShowSendModal} 
+        />
+        <SwapModal 
+          open={showSwapModal} 
+          onOpenChange={setShowSwapModal} 
+        />
+        <EarnModal 
+          open={showEarnModal} 
+          onOpenChange={setShowEarnModal} 
+        />
+        <MarketTerminalModal 
+          isOpen={showMarketTerminal} 
+          onClose={() => setShowMarketTerminal(false)} 
+        />
       </div>
-    </WalletProvider>
+
+      {/* Prediction Markets Modal */}
+      {showPredictionMarkets && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="min-h-screen">
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
+            <div className="relative">
+              <button
+                onClick={() => setShowPredictionMarkets(false)}
+                className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              <PredictionMarketsPage />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
