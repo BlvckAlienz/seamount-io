@@ -34,6 +34,14 @@ import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
 import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
 
+// --- ADD THESE IMPORTS ---
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { config } from './config/wagmi'; // Your existing config
+
+// Create a QueryClient for React Query
+const queryClient = new QueryClient();
+
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register'>('register');
@@ -217,13 +225,18 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          <WalletOrchestratorProvider> {/* 🎯 THIS PROVIDER ALREADY INCLUDES WALLETCONNECT */}
-            <DebugEnv />
-            <Toaster position="top-right" />
-            <AppContent />
-            <Analytics />
-            <SpeedInsights />
-          </WalletOrchestratorProvider>
+          {/* ADD WAGMI AND QUERY PROVIDERS HERE */}
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+              <WalletOrchestratorProvider>
+                <DebugEnv />
+                <Toaster position="top-right" />
+                <AppContent />
+                <Analytics />
+                <SpeedInsights />
+              </WalletOrchestratorProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>
