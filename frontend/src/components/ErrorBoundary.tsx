@@ -61,7 +61,7 @@ class EnhancedErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     // 🎯 CHECK IF ERROR IS NON-CRITICAL (WalletConnect, network issues)
-    const isNonCritical = EnhancedErrorBoundary.isNonCriticalError(error); // ✅ FIXED
+    const isNonCritical = this.isNonCriticalError(error);
     
     if (isNonCritical) {
       console.warn('⚠️ Non-critical error suppressed by boundary:', error.message);

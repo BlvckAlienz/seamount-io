@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
+import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
+import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 
 // 🦊 ENHANCED METAMASK TYPE DECLARATION
 declare global {
@@ -89,13 +91,17 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // 🦊 IN-APP WALLET CONNECTION
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-
-  // WALLET STATE FOR ON-CHAIN TRANSACTIONS
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [userAddress, setUserAddress] = useState<string>('');
+  // 🎯 USE UNIFIED WALLET ORCHESTRATOR (REPLACES OLD WALLET LOGIC)
+  const {
+    wallets,
+    connectWallet,
+    disconnectWallet,
+    isConnecting,
+    getBestNetworkForAction
+  } = useWalletOrchestrator();
+  
+  // Local state for prediction markets UI
+  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
   const [signingTransaction, setSigningTransaction] = useState(false);
 
   // ✅ TRANSACTION MONITOR STATE
@@ -120,7 +126,7 @@ const PredictionMarketsPage: React.FC = () => {
     win_rate: 0
   });
 
-  // ✅ CHECK METAMASK PERSISTENCE
+  // ✅ CHECK METAMASK PERSISTENCE (Updated to use unified wallet)
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
       try {
@@ -136,16 +142,12 @@ const PredictionMarketsPage: React.FC = () => {
           });
 
           if (chainId === BASECAMP_CONFIG.chainId) {
-            setUserAddress(accounts[0]);
-            setWalletConnected(true);
-            console.log('✅ MetaMask reconnected:', accounts[0]);
+            // Use unified wallet orchestrator to handle connection
+            // The orchestrator will manage the state
+            console.log('✅ MetaMask detected with BaseCAMP:', accounts[0]);
           } else {
             console.warn('⚠️ Wrong network, please switch to BaseCAMP');
           }
-        } else {
-          setTimeout(() => {
-            setShowWalletModal(true);
-          }, 1000);
         }
       } catch (error) {
         console.error('MetaMask check failed:', error);
@@ -212,102 +214,6 @@ const PredictionMarketsPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch my bets:', error);
     }
-  };
-
-  // 🦊 IN-APP WALLET CONNECTION
-  const connectWallet = async () => {
-    setConnecting(true);
-    
-    try {
-      if (!window.ethereum) {
-        const shouldInstall = window.confirm(
-          '⚠️ MetaMask not detected.\n\nInstall MetaMask to place bets?'
-        );
-        
-        if (shouldInstall) {
-          window.open('https://metamask.io/download/', '_blank');
-        }
-        setConnecting(false);
-        return;
-      }
-
-      const accounts = await window.ethereum.request({ 
-        method: 'eth_requestAccounts' 
-      }) as string[];
-
-      try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: BASECAMP_CONFIG.chainId }]
-        });
-        
-        console.log('✅ Switched to existing BaseCAMP network');
-        
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          console.log('⚠️ BaseCAMP not found in MetaMask, adding now...');
-          
-          try {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [BASECAMP_CONFIG]
-            });
-            console.log('✅ BaseCAMP network added successfully');
-          } catch (addError: any) {
-            if (addError.code === -32603 && addError.message.includes('same RPC endpoint')) {
-              toast.error(
-                'BaseCAMP network already exists in MetaMask.\n\n' +
-                'Please manually switch to "Basecamp" network in MetaMask.',
-                { duration: 6000 }
-              );
-              setConnecting(false);
-              return;
-            }
-            throw addError;
-          }
-        } else {
-          throw switchError;
-        }
-      }
-
-      const chainId = await window.ethereum.request({ 
-        method: 'eth_chainId' 
-      });
-      
-      if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('Please switch to BaseCAMP network in MetaMask');
-        setConnecting(false);
-        return;
-      }
-
-      setUserAddress(accounts[0]);
-      setWalletConnected(true);
-      setShowWalletModal(false);
-      
-      toast.success(
-        `✅ Wallet connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`,
-        { duration: 3000 }
-      );
-      
-    } catch (error: any) {
-      console.error('Wallet connection failed:', error);
-      
-      if (error.code === 4001) {
-        toast.error('Connection cancelled by user');
-      } else if (error.message?.includes('already processing')) {
-        toast.error('Please check MetaMask popup');
-      } else {
-        toast.error(error.message || 'Failed to connect wallet');
-      }
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const disconnectWallet = () => {
-    setWalletConnected(false);
-    setUserAddress('');
-    toast.success('Wallet disconnected');
   };
 
   const fetchMarkets = async () => {
@@ -405,8 +311,10 @@ const PredictionMarketsPage: React.FC = () => {
       return;
     }
 
-    if (!walletConnected) {
-      setShowWalletModal(true);
+    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
+    if (!wallets.basecamp?.isConnected) {
+      // Show unified modal with 'bet' action (will recommend BaseCAMP)
+      setShowUnifiedWalletModal(true);
       return;
     }
     
@@ -423,6 +331,9 @@ const PredictionMarketsPage: React.FC = () => {
         return;
       }
       
+      // 🎯 USE UNIFIED WALLET ADDRESS
+      const campAddress = wallets.basecamp.address;
+      
       const response = await fetch('/api/v1/predictions/bet', {
         method: 'POST',
         headers: {
@@ -433,7 +344,7 @@ const PredictionMarketsPage: React.FC = () => {
           market_id: selectedMarket.id,
           prediction: betPrediction,
           amount: parseFloat(betAmount),
-          user_wallet: userAddress
+          user_wallet: campAddress  // ✅ Uses unified wallet address
         })
       });
       
@@ -452,13 +363,13 @@ const PredictionMarketsPage: React.FC = () => {
         to: data.contract_address,
         value: `0x${data.contract_function.value_in_wei.toString(16)}`,
         data: data.contract_function.encoded_data,
-        from: userAddress
+        from: campAddress
       });
 
       const txHash = await window.ethereum!.request({
         method: 'eth_sendTransaction',
         params: [{
-          from: userAddress,
+          from: campAddress,
           to: data.contract_address,
           value: `0x${data.contract_function.value_in_wei.toString(16)}`,
           data: data.contract_function.encoded_data,
@@ -478,7 +389,7 @@ const PredictionMarketsPage: React.FC = () => {
           market_id: selectedMarket.id,
           prediction: betPrediction,
           amount: parseFloat(betAmount),
-          user_wallet: userAddress,
+          user_wallet: campAddress,
           tx_hash: txHash
         })
       });
@@ -515,8 +426,9 @@ const PredictionMarketsPage: React.FC = () => {
 
   // 🎯 CLAIM WINNINGS HANDLER
   const handleClaimWinnings = async (betId: string, marketId: number) => {
-    if (!walletConnected) {
-      toast.error('Please connect wallet first');
+    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
+    if (!wallets.basecamp?.isConnected) {
+      toast.error('Please connect BaseCAMP wallet first');
       return;
     }
     
@@ -529,6 +441,9 @@ const PredictionMarketsPage: React.FC = () => {
         toast.error('Please sign in to claim winnings');
         return;
       }
+      
+      // 🎯 USE UNIFIED WALLET ADDRESS
+      const campAddress = wallets.basecamp.address;
       
       // Step 1: Get encoded claim transaction
       const response = await fetch('/api/v1/predictions/initiate-claim', {
@@ -552,7 +467,7 @@ const PredictionMarketsPage: React.FC = () => {
       const txHash = await window.ethereum!.request({
         method: 'eth_sendTransaction',
         params: [{
-          from: userAddress,
+          from: campAddress,
           to: data.contract_address,
           data: data.contract_function.encoded_data,
           gas: '0x30D40'  // 200k gas
@@ -631,25 +546,23 @@ const PredictionMarketsPage: React.FC = () => {
     return colors[category] || 'from-gray-500 to-slate-500';
   };
 
-  // ✅ PERSIST METAMASK CONNECTION
+  // ✅ PERSIST METAMASK CONNECTION (Updated to use unified wallet)
   useEffect(() => {
     if (!window.ethereum) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
-        setWalletConnected(false);
-        setUserAddress('');
-        toast.error('Wallet disconnected');
+        // Wallet disconnected - let unified orchestrator handle this
+        console.log('Wallet disconnected via accountsChanged');
       } else {
-        setUserAddress(accounts[0]);
-        toast.success(`Switched to ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`);
+        console.log('Accounts changed:', accounts[0]);
+        // The unified orchestrator will handle account changes
       }
     };
 
     const handleChainChanged = (chainId: string) => {
       if (chainId !== BASECAMP_CONFIG.chainId) {
         toast.error('⚠️ Please switch back to BaseCAMP network');
-        setWalletConnected(false);
       } else {
         toast.success('Connected to BaseCAMP');
         window.location.reload();
@@ -701,16 +614,16 @@ const PredictionMarketsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* 🦊 WALLET CONNECTION HEADER */}
         <div className="flex justify-end mb-4">
-          {walletConnected ? (
+          {wallets.basecamp?.isConnected ? (
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                  {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
+                  {wallets.basecamp.address.slice(0, 6)}...{wallets.basecamp.address.slice(-4)}
                 </span>
               </div>
               <button
-                onClick={disconnectWallet}
+                onClick={() => disconnectWallet('basecamp')}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
               >
                 Disconnect
@@ -718,11 +631,16 @@ const PredictionMarketsPage: React.FC = () => {
             </div>
           ) : (
             <button
-              onClick={() => setShowWalletModal(true)}
+              onClick={() => {
+                // Show unified modal for betting action
+                // This will trigger the modal with defaultAction='bet'
+                // which shows BaseCAMP as recommended
+                setShowUnifiedWalletModal(true);
+              }}
               className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
             >
               <Wallet className="w-5 h-5" />
-              Connect Wallet
+              Connect for Predictions
             </button>
           )}
         </div>
@@ -1328,100 +1246,16 @@ const PredictionMarketsPage: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* 🦊 IN-APP WALLET CONNECTION MODAL */}
-        {showWalletModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-md w-full p-6 relative">
-              <button
-                onClick={() => setShowWalletModal(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Wallet className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Connect to Place Bets</h2>
-                <p className="text-gray-400 text-sm mb-4">
-                  Tiered fees: 1.0% under 1K CAMP, 0.7% for 1K-10K CAMP, 0.5% for 10K+ CAMP
-                </p>
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
-                  <p className="text-blue-300 text-xs">
-                    ℹ️ <strong>Use your MetaMask BaseCAMP testnet wallet.</strong>
-                    <br />
-                    Get free CAMP at <a 
-                      href="https://faucet.campnetwork.xyz/" 
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-blue-200"
-                    >
-                      faucet.campnetwork.xyz
-                    </a>
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={connectWallet}
-                  disabled={connecting}
-                  className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-green-500/50 rounded-xl transition flex items-center justify-between group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">🦊</span>
-                    </div>
-                    <div className="text-left">
-                      <div className="text-white font-semibold">MetaMask</div>
-                      <div className="text-gray-400 text-xs">Most popular wallet</div>
-                    </div>
-                  </div>
-                  {connecting ? (
-                    <Loader className="w-5 h-5 text-green-400 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-5 h-5 text-gray-600 group-hover:text-green-400 transition" />
-                  )}
-                </button>
-
-                <div className="text-center text-xs text-gray-500 pt-2">
-                  Don't have a wallet?{' '}
-                  <a 
-                    href="https://metamask.io/download/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-green-400 hover:underline"
-                  >
-                    Download MetaMask
-                  </a>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                <div className="flex gap-2">
-                  <span className="text-yellow-400 text-sm">💡</span>
-                  <div>
-                    <p className="text-yellow-200 text-sm font-semibold mb-1">New to BaseCAMP?</p>
-                    <p className="text-yellow-200/80 text-xs">
-                      Get free testnet CAMP tokens at{' '}
-                      <a 
-                        href="https://faucet.campnetwork.xyz/" 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-yellow-100"
-                      >
-                        faucet.campnetwork.xyz
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Unified Wallet Modal for all wallet connections */}
+      {showUnifiedWalletModal && (
+        <UnifiedWalletModal
+          isOpen={showUnifiedWalletModal}
+          onClose={() => setShowUnifiedWalletModal(false)}
+          defaultAction="bet"
+        />
+      )}
     </div>
   );
 };
