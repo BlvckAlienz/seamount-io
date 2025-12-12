@@ -9,6 +9,11 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
+// ✅ ADD THESE IMPORTS
+import { WagmiProvider } from 'wagmi';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { config, queryClient } from '@/config/walletConnect';
+
 // --- Core Components & Pages ---
 import EnhancedErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -32,13 +37,9 @@ import WalletRecovery from './pages/wallet-recovery';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext'; // ✅ UNIFIED PROVIDER
+import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
-
-// 🚨 REMOVE THESE IMPORTS (causing conflicts):
-// import { WalletConnectProvider } from './contexts/WalletConnectContext'; ❌
-// import { WalletProvider } from './contexts/WalletContext'; ❌
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -217,16 +218,21 @@ function App() {
   return (
     <EnhancedErrorBoundary>
       <Router>
-        <AuthProvider>
-          {/* ✅ SINGLE UNIFIED WALLET PROVIDER */}
-          <WalletOrchestratorProvider>
-            <DebugEnv />
-            <Toaster position="top-right" />
-            <AppContent />
-            <Analytics />
-            <SpeedInsights />
-          </WalletOrchestratorProvider>
-        </AuthProvider>
+        {/* 🚨 CRITICAL: Provider Order Matters */}
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              {/* ✅ Now WalletOrchestratorProvider can use useAppKit */}
+              <WalletOrchestratorProvider>
+                <DebugEnv />
+                <Toaster position="top-right" />
+                <AppContent />
+                <Analytics />
+                <SpeedInsights />
+              </WalletOrchestratorProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
       </Router>
     </EnhancedErrorBoundary>
   );
