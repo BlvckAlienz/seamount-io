@@ -641,25 +641,25 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* Updated: WalletConnect Chains - USING UNIFIED SYSTEM */}
+            {/* 🌐 EXTERNAL WALLETS: Base + Celo */}
             <div className="mt-8">
               <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
                 <Link2 className="h-4 w-4" />
-                External Wallets (Unified)
+                Connect External Wallets
               </h3>
               <p className="text-xs text-gray-500 mb-4">
-                Connect once, use across all features
+                Use your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Base Card */}
                 <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                  wallets.base?.isConnected 
+                  connectedChains.includes('base') 
                     ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
                     : 'border-gray-700/50 hover:border-blue-500/30'
                 }`}>
                   <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg`}>
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800">
                       <img 
                         src="https://icons.llamao.fi/icons/chains/rsz_base.jpg" 
                         alt="Base" 
@@ -667,25 +667,25 @@ const DashboardPage = () => {
                       />
                     </div>
                     <div className="text-right">
-                      {wallets.base?.isConnected ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium mb-1">
+                      {connectedChains.includes('base') ? (
+                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                           <Check className="w-4 h-4" />
                           Connected
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">Ready to Connect</div>
+                        <div className="text-sm text-gray-400">Mainnet</div>
                       )}
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-white font-semibold">Base Mainnet</div>
+                    <div className="text-white font-semibold">Base</div>
                     <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
-                    {wallets.base?.address && (
+                    {connectedChains.includes('base') && address && (
                       <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                        <span className="truncate">{wallets.base.address.slice(0, 8)}...{wallets.base.address.slice(-6)}</span>
-                        <a
-                          href={`https://basescan.org/address/${wallets.base.address}`}
+                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                        
+                          href={`https://basescan.org/address/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:text-blue-400 transition-colors"
@@ -696,7 +696,7 @@ const DashboardPage = () => {
                     )}
                   </div>
 
-                  {wallets.base?.isConnected ? (
+                  {connectedChains.includes('base') ? (
                     <button
                       onClick={() => disconnectWallet('base')}
                       className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -706,7 +706,7 @@ const DashboardPage = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => setShowUnifiedWalletModal(true)}
+                      onClick={() => connectWallet('base')}
                       disabled={isConnecting}
                       className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
@@ -731,12 +731,12 @@ const DashboardPage = () => {
 
                 {/* Celo Card */}
                 <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                  wallets.celo?.isConnected 
+                  connectedChains.includes('celo') 
                     ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
                     : 'border-gray-700/50 hover:border-green-500/30'
                 }`}>
                   <div className="flex items-start justify-between mb-4">
-                    <div className={`p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-lg`}>
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700">
                       <img 
                         src="https://cryptologos.cc/logos/celo-celo-logo.svg" 
                         alt="Celo" 
@@ -744,25 +744,25 @@ const DashboardPage = () => {
                       />
                     </div>
                     <div className="text-right">
-                      {wallets.celo?.isConnected ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium mb-1">
+                      {connectedChains.includes('celo') ? (
+                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                           <Check className="w-4 h-4" />
                           Connected
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">Ready to Connect</div>
+                        <div className="text-sm text-gray-400">Mainnet</div>
                       )}
                     </div>
                   </div>
 
                   <div className="mb-4">
-                    <div className="text-white font-semibold">Celo Mainnet</div>
+                    <div className="text-white font-semibold">Celo</div>
                     <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
-                    {wallets.celo?.address && (
+                    {connectedChains.includes('celo') && address && (
                       <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                        <span className="truncate">{wallets.celo.address.slice(0, 8)}...{wallets.celo.address.slice(-6)}</span>
-                        <a
-                          href={`https://celoscan.io/address/${wallets.celo.address}`}
+                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                        
+                          href={`https://celoscan.io/address/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:text-green-400 transition-colors"
@@ -773,7 +773,7 @@ const DashboardPage = () => {
                     )}
                   </div>
 
-                  {wallets.celo?.isConnected ? (
+                  {connectedChains.includes('celo') ? (
                     <button
                       onClick={() => disconnectWallet('celo')}
                       className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -783,7 +783,7 @@ const DashboardPage = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => setShowUnifiedWalletModal(true)}
+                      onClick={() => connectWallet('celo')}
                       disabled={isConnecting}
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
@@ -807,47 +807,51 @@ const DashboardPage = () => {
                 </div>
               </div>
               
-              {/* BaseCAMP Testnet Card (for predictions) */}
+              {/* 🎮 BASECAMP TESTNET (For Predictions) */}
               <div className="mt-6">
                 <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 ${
-                  wallets.basecamp?.isConnected 
+                  connectedChains.includes('basecamp') 
                     ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/20' 
                     : 'border-gray-700/50'
                 }`}>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-xl ${wallets.basecamp?.isConnected ? 'bg-yellow-500/20' : 'bg-gray-700'} text-white`}>
-                        <img 
-                          src="https://campnetwork.xyz/logo.png" 
-                          alt="BaseCAMP" 
-                          className="w-6 h-6"
-                        />
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600">
+                        <Target className="w-6 h-6 text-white" />
                       </div>
                       <div>
                         <div className="text-white font-semibold">BaseCAMP Testnet</div>
-                        <div className="text-gray-400 text-sm">Prediction markets (Testnet)</div>
+                        <div className="text-gray-400 text-sm">For prediction markets (test tokens)</div>
                       </div>
                     </div>
                     <div className="text-right">
-                      {wallets.basecamp?.isConnected ? (
-                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium mb-1">
+                      {connectedChains.includes('basecamp') ? (
+                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                           <Check className="w-4 h-4" />
                           Connected
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">Optional for predictions</div>
+                        <div className="text-sm text-gray-400">Testnet</div>
                       )}
                     </div>
                   </div>
 
                   <p className="text-sm text-gray-400 mb-4">
-                    Connect to use prediction markets. Uses test tokens.
+                    Connect to place bets in prediction markets. Uses test CAMP tokens.
                   </p>
 
-                  {wallets.basecamp?.isConnected ? (
+                  {connectedChains.includes('basecamp') && address ? (
                     <div className="space-y-3">
-                      <div className="text-gray-300 text-sm">
-                        Connected: {wallets.basecamp.address.slice(0, 10)}...{wallets.basecamp.address.slice(-8)}
+                      <div className="text-gray-300 text-sm flex items-center gap-2">
+                        <span className="font-mono">{address.slice(0, 10)}...{address.slice(-8)}</span>
+                        
+                          href={`https://basecamp.cloud.blockscout.com/address/${address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-yellow-400 transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
                       </div>
                       <button
                         onClick={() => disconnectWallet('basecamp')}
@@ -858,16 +862,20 @@ const DashboardPage = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => setShowUnifiedWalletModal(true)}
-                      className="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+                      onClick={() => connectWallet('basecamp')}
+                      disabled={isConnecting}
+                      className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Connect for Predictions
+                      {isConnecting ? 'Connecting...' : 'Connect for Predictions'}
                     </button>
                   )}
+
+                  <div className="mt-3 text-center text-xs text-gray-500">
+                    MetaMask only • <a href="https://faucet.campnetwork.xyz" target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:underline">Get test CAMP</a>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
           {/* Balance Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -980,15 +988,6 @@ const DashboardPage = () => {
             isOpen={showMarketTerminal} 
             onClose={() => setShowMarketTerminal(false)} 
           />
-          
-          {/* Unified Wallet Modal */}
-          {showUnifiedWalletModal && (
-            <UnifiedWalletModal
-              isOpen={showUnifiedWalletModal}
-              onClose={() => setShowUnifiedWalletModal(false)}
-              defaultAction={undefined}
-            />
-          )}
         </div>
 
         {/* Prediction Markets Modal */}

@@ -13,14 +13,27 @@ interface WalletConnectContextType {
   address: string | undefined
   chainId: number | undefined
   chainName: string | undefined
-  connectWallet: (blockchain: 'base' | 'celo') => Promise<void>
-  disconnectWallet: (blockchain: 'base' | 'celo') => Promise<void>
+  connectWallet: (blockchain: 'base' | 'celo' | 'basecamp') => Promise<void>
+  disconnectWallet: (blockchain: 'base' | 'celo' | 'basecamp') => Promise<void>
   connectedChains: string[]
   isConnecting: boolean
   error: string | null
 }
 
 const WalletConnectContext = createContext<WalletConnectContextType | undefined>(undefined)
+
+// BaseCAMP Testnet Config
+const BASECAMP_CONFIG = {
+  chainId: '0x1cbc67c35a',
+  chainName: 'Basecamp',
+  nativeCurrency: {
+    name: 'CAMP',
+    symbol: 'CAMP',
+    decimals: 18
+  },
+  rpcUrls: ['https://rpc.basecamp.t.raas.gelato.cloud'],
+  blockExplorerUrls: ['https://basecamp.cloud.blockscout.com']
+}
 
 // Internal provider
 function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
@@ -40,15 +53,19 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       name: 'Base',
       id: 8453,
       idHex: '0x2105',
-      icon: '🔵',
-      color: 'from-blue-500 to-blue-700'
+      requiresBackend: true // Uses nonce auth
     },
     celo: {
       name: 'Celo',
       id: 42220,
       idHex: '0xA4EC',
-      icon: '🌿',
-      color: 'from-green-500 to-emerald-700'
+      requiresBackend: true // Uses nonce auth
+    },
+    basecamp: {
+      name: 'Basecamp',
+      id: parseInt(BASECAMP_CONFIG.chainId, 16),
+      idHex: BASECAMP_CONFIG.chainId,
+      requiresBackend: false // Direct MetaMask, no backend
     }
   }
 
@@ -58,6 +75,26 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       fetchConnectedWallets()
     }
   }, [user])
+
+  // Persist BaseCAMP connection in localStorage
+  useEffect(() => {
+    if (chainId === CHAIN_CONFIGS.basecamp.id && address) {
+      localStorage.setItem('basecamp_address', address)
+      setConnectedChains(prev => [...new Set([...prev, 'basecamp'])])
+    }
+  }, [chainId, address])
+
+  // Check for persisted BaseCAMP on mount
+  useEffect(() => {
+    const savedAddress = localStorage.getItem('basecamp_address')
+    if (savedAddress && window.ethereum) {
+      window.ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
+        if (accounts.includes(savedAddress)) {
+          setConnectedChains(prev => [...new Set([...prev, 'basecamp'])])
+        }
+      })
+    }
+  }, [])
 
   const fetchConnectedWallets = async () => {
     try {
@@ -72,7 +109,7 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
     }
   }
 
-  const connectWallet = async (blockchain: 'base' | 'celo') => {
+  const connectWallet = async (blockchain: 'base' | 'celo' | 'basecamp') => {
     if (!user) {
       toast.error('Please sign in to connect wallets')
       return
@@ -82,6 +119,44 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
+      const chainConfig = CHAIN_CONFIGS[blockchain]
+
+      // 🎯 BASECAMP: Direct MetaMask (no backend)
+      if (blockchain === 'basecamp') {
+        if (!window.ethereum) {
+          throw new Error('MetaMask not installed')
+        }
+
+        // Request accounts
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[]
+
+        // Switch or add network
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: BASECAMP_CONFIG.chainId }]
+          })
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            // Network not added, add it
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [BASECAMP_CONFIG]
+            })
+          } else {
+            throw switchError
+          }
+        }
+
+        // Store in localStorage
+        localStorage.setItem('basecamp_address', accounts[0])
+        setConnectedChains(prev => [...new Set([...prev, 'basecamp'])])
+        toast.success('BaseCAMP testnet connected!')
+        setIsConnecting(false)
+        return
+      }
+
+      // 🔗 BASE/CELO: WalletConnect + Backend nonce auth
       // Step 1: Open WalletConnect modal if not connected
       if (!isConnected || !address) {
         console.log('🔄 Opening WalletConnect modal...')
@@ -95,25 +170,17 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
         }
       }
 
-      const chainConfig = CHAIN_CONFIGS[blockchain]
-      
-      // Step 2: Verify correct network (accept both hex and decimal)
+      // Step 2: Verify correct network
       const currentChainId = chainId
       const isCorrectChain = currentChainId === chainConfig.id || 
                            `0x${currentChainId?.toString(16)}` === chainConfig.idHex
       
       if (!isCorrectChain) {
         console.log(`⚠️ Wrong network. Current: ${currentChainId}, Expected: ${chainConfig.id}`)
-        
-        try {
-          // Try to switch network via WalletConnect
-          await modal.open({ view: 'Networks' })
-          toast.error(`Please switch to ${chainConfig.name} network in your wallet`)
-          setIsConnecting(false)
-          return
-        } catch (switchError) {
-          throw new Error(`Please switch to ${chainConfig.name} network manually`)
-        }
+        await modal.open({ view: 'Networks' })
+        toast.error(`Please switch to ${chainConfig.name} network in your wallet`)
+        setIsConnecting(false)
+        return
       }
 
       // Step 3: Get nonce from backend
@@ -124,7 +191,7 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
       })
 
       if (!nonceResponse.data.success) {
-        throw new Error(nonceResponse.data.error || 'Failed to generate authentication challenge')
+        throw new Error(nonceResponse.data.error || 'Failed to generate nonce')
       }
 
       const { nonce, message } = nonceResponse.data
@@ -177,17 +244,26 @@ function WalletConnectProviderInternal({ children }: { children: ReactNode }) {
     }
   }
 
-  const disconnectWallet = async (blockchain: 'base' | 'celo') => {
+  const disconnectWallet = async (blockchain: 'base' | 'celo' | 'basecamp') => {
     if (!user) return
 
     try {
+      // BaseCAMP: Just remove from localStorage
+      if (blockchain === 'basecamp') {
+        localStorage.removeItem('basecamp_address')
+        setConnectedChains(prev => prev.filter(c => c !== 'basecamp'))
+        toast.success('BaseCAMP testnet disconnected')
+        return
+      }
+
+      // Base/Celo: Backend disconnect
       const response = await apiClient.post('/api/v1/wallet/disconnect', { blockchain })
       
       if (response.data.success) {
         setConnectedChains(prev => prev.filter(c => c !== blockchain))
         toast.success(`${CHAIN_CONFIGS[blockchain].name} wallet disconnected`)
         
-        // If disconnecting current chain, disconnect from wallet provider too
+        // If disconnecting current chain, disconnect from wallet provider
         if (chainId === CHAIN_CONFIGS[blockchain].id) {
           disconnect()
         }

@@ -32,7 +32,6 @@ import WalletRecovery from './pages/wallet-recovery';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
-import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
 import { WalletConnectProvider } from './contexts/WalletConnectContext'; // ✅ ADDED
 
 const AppContent: React.FC = () => {
@@ -215,13 +214,11 @@ function App() {
         <AuthProvider>
           {/* ✅ WalletConnect provides Wagmi + Query internally */}
           <WalletConnectProvider>
-            <WalletOrchestratorProvider>
               <DebugEnv />
               <Toaster position="top-right" />
               <AppContent />
               <Analytics />
               <SpeedInsights />
-            </WalletOrchestratorProvider>
           </WalletConnectProvider>
         </AuthProvider>
       </Router>
