@@ -28,6 +28,7 @@ import { EarnModal } from '@/components/modals/EarnModal';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
+import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -173,8 +174,14 @@ const DashboardPage = () => {
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
-  const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
   const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
+  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
+
+  // ✅ Define wallets state for external wallet connections
+  const [wallets, setWallets] = useState<Record<string, { 
+    isConnected: boolean; 
+    address: string;
+  }>>({});
 
   // ✅ Check backup status on mount
   useEffect(() => {
@@ -860,6 +867,7 @@ const DashboardPage = () => {
                 </div>
               </div>
             </div>
+          </div>
 
           {/* Balance Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -972,6 +980,15 @@ const DashboardPage = () => {
             isOpen={showMarketTerminal} 
             onClose={() => setShowMarketTerminal(false)} 
           />
+          
+          {/* Unified Wallet Modal */}
+          {showUnifiedWalletModal && (
+            <UnifiedWalletModal
+              isOpen={showUnifiedWalletModal}
+              onClose={() => setShowUnifiedWalletModal(false)}
+              defaultAction={undefined}
+            />
+          )}
         </div>
 
         {/* Prediction Markets Modal */}
