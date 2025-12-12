@@ -33,14 +33,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
 import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext';
-
-// --- ADD THESE IMPORTS ---
-import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { config } from './config/wagmi'; // Your existing config
-
-// Create a QueryClient for React Query
-const queryClient = new QueryClient();
+import { WalletConnectProvider } from './contexts/WalletConnectContext'; // ✅ ADDED
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -48,14 +41,10 @@ const AppContent: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [consentGiven, setConsentGiven] = useState<boolean>(false);
 
-  // ✅ Auto-logout hook
   useAutoLogout();
-
-  // ✅ Auth hook
   const auth = useAuth();
   const authSession = auth?.session || null;
 
-  // ✅ Initialize consent from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('seamount_consent_given');
@@ -67,7 +56,6 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
-  // ✅ Initialize anonymous session
   useEffect(() => {
     const initializeAnonymousSession = async () => {
       try {
@@ -225,18 +213,16 @@ function App() {
     <ErrorBoundary>
       <Router>
         <AuthProvider>
-          {/* ADD WAGMI AND QUERY PROVIDERS HERE */}
-          <WagmiProvider config={config}>
-            <QueryClientProvider client={queryClient}>
-              <WalletOrchestratorProvider>
-                <DebugEnv />
-                <Toaster position="top-right" />
-                <AppContent />
-                <Analytics />
-                <SpeedInsights />
-              </WalletOrchestratorProvider>
-            </QueryClientProvider>
-          </WagmiProvider>
+          {/* ✅ WalletConnect provides Wagmi + Query internally */}
+          <WalletConnectProvider>
+            <WalletOrchestratorProvider>
+              <DebugEnv />
+              <Toaster position="top-right" />
+              <AppContent />
+              <Analytics />
+              <SpeedInsights />
+            </WalletOrchestratorProvider>
+          </WalletConnectProvider>
         </AuthProvider>
       </Router>
     </ErrorBoundary>
