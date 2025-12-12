@@ -26,6 +26,7 @@ import { SendForm } from '@/components/payments/SendForm.tsx';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
 import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
+import { useWalletOrchestrator } from '../contexts/WalletOrchestratorContext';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
@@ -158,14 +159,18 @@ const DashboardPage = () => {
   const [backupStatus, setBackupStatus] = useState<any>(null);
   const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
   
-  // ✅ ADD WALLET CONNECT HOOK HERE
+  // ✅ USE UNIFIED WALLET ORCHESTRATOR
   const { 
-    connectedChains, 
+    wallets,
     connectWallet, 
     disconnectWallet, 
-    address, 
-    isConnecting 
-  } = useWalletConnect();
+    isConnecting,
+    getAllConnectedNetworks
+  } = useWalletOrchestrator();
+
+  // Map to old interface for compatibility
+  const connectedChains = getAllConnectedNetworks();
+  const address = wallets.basecamp?.address || wallets.base?.address || wallets.celo?.address;
 
   // Payment modal states
   const [showFundModal, setShowFundModal] = useState(false);
