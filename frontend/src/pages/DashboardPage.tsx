@@ -225,7 +225,7 @@ const DashboardPage = () => {
     if (user) {
       checkBackupStatus();
     }
-  }, [user]);
+  }, [user];
 
   const [serviceStatus, setServiceStatus] = useState<any>(null);
 
