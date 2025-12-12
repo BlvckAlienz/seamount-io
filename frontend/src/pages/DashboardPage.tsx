@@ -8,8 +8,8 @@ import {
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
   Wallet, ArrowDownToLine, Target, Link2, Loader2
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWalletConnect } from '@/contexts/WalletConnectContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useWalletOrchestrator } from '../contexts/WalletOrchestratorContext'; // ✅ UNIFIED HOOK
 import toast from 'react-hot-toast';
 import { apiClient } from '@/config/api';
 import { useNavigate } from 'react-router-dom';
@@ -157,12 +157,15 @@ const DashboardPage = () => {
   
   // ✅ ADD WALLET CONNECT HOOK HERE
   const { 
-    connectedChains, 
+    wallets,
     connectWallet, 
     disconnectWallet, 
-    address, 
     isConnecting 
-  } = useWalletConnect();
+  } = useWalletOrchestrator(); // ✅ UNIFIED SYSTEM
+
+  // Helper to check chain connection status
+  const isChainConnected = (chain: 'base' | 'celo' | 'basecamp') => wallets[chain]?.isConnected || false;
+  const getChainAddress = (chain: 'base' | 'celo' | 'basecamp') => wallets[chain]?.address || '';
 
   // Payment modal states
   const [showFundModal, setShowFundModal] = useState(false);
@@ -643,7 +646,7 @@ const DashboardPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Base Card */}
               <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                connectedChains.includes('base') 
+                isChainConnected('base') 
                   ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
                   : 'border-gray-700/50 hover:border-blue-500/30'
               }`}>
@@ -656,7 +659,7 @@ const DashboardPage = () => {
                     />
                   </div>
                   <div className="text-right">
-                    {connectedChains.includes('base') ? (
+                    {isChainConnected('base') ? (
                       <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
                         <Check className="w-4 h-4" />
                         Connected
@@ -670,9 +673,9 @@ const DashboardPage = () => {
                 <div className="mb-4">
                   <div className="text-white font-semibold">Base</div>
                   <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
-                  {connectedChains.includes('base') && address && (
+                  {isChainConnected('base') && getChainAddress && (
                     <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                      <span className="truncate">{getChainAddress.slice(0, 8)}...{getChainAddress.slice(-6)}</span>
                       <a
                         href={`https://basescan.org/address/${address}`}
                         target="_blank"
@@ -685,7 +688,7 @@ const DashboardPage = () => {
                   )}
                 </div>
 
-                {connectedChains.includes('base') ? (
+                {isChainConnected('base') ? (
                   <button
                     onClick={() => disconnectWallet('base')}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -747,9 +750,9 @@ const DashboardPage = () => {
                 <div className="mb-4">
                   <div className="text-white font-semibold">Celo</div>
                   <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
-                  {connectedChains.includes('celo') && address && (
+                  {isChainConnected('celo') && getChainAddress && (
                     <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                      <span className="truncate">{getChainAddress.slice(0, 8)}...{getChainAddress.slice(-6)}</span>
                       <a
                         href={`https://celoscan.io/address/${address}`}
                         target="_blank"
@@ -762,7 +765,7 @@ const DashboardPage = () => {
                   )}
                 </div>
 
-                {connectedChains.includes('celo') ? (
+                {isChainConnected('celo') ? (
                   <button
                     onClick={() => disconnectWallet('celo')}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -829,10 +832,10 @@ const DashboardPage = () => {
                   Connect to place bets in prediction markets. Uses test CAMP tokens.
                 </p>
 
-                {connectedChains.includes('basecamp') && address ? (
+                {isChainConnected('basecamp') && getChainAddress ? (
                   <div className="space-y-3">
                     <div className="text-gray-300 text-sm flex items-center gap-2">
-                      <span className="font-mono">{address.slice(0, 10)}...{address.slice(-8)}</span>
+                      <span className="font-mono">{getChainAddress.slice(0, 10)}...{getChainAddress.slice(-8)}</span>
                       <a
                         href={`https://basecamp.cloud.blockscout.com/address/${address}`}
                         target="_blank"

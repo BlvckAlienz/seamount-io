@@ -1,4 +1,6 @@
 // File: frontend/src/App.tsx
+// ✅ UNIFIED WALLET ARCHITECTURE - SINGLE PROVIDER SYSTEM
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -8,7 +10,7 @@ import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 // --- Core Components & Pages ---
-import ErrorBoundary from './components/ErrorBoundary';
+import EnhancedErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthModal from './components/auth/AuthModal';
 import InvestorContact from './components/InvestorContact';
@@ -19,7 +21,7 @@ import LandingPage from './pages/LandingPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminDashboard from './pages/AdminDashboard';
-import portfolioPage from './pages/portfolioPage';
+import PortfolioPage from './pages/PortfolioPage';
 import TradingPage from './pages/TradingPage';
 import PaymentsPage from './pages/PaymentsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -30,9 +32,13 @@ import WalletRecovery from './pages/wallet-recovery';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { WalletOrchestratorProvider } from './contexts/WalletOrchestratorContext'; // ✅ UNIFIED PROVIDER
 import { useAutoLogout } from './hooks/useAutoLogout';
 import { DebugEnv } from './components/DebugEnv';
-import { WalletConnectProvider } from './contexts/WalletConnectContext'; // ✅ ADDED
+
+// 🚨 REMOVE THESE IMPORTS (causing conflicts):
+// import { WalletConnectProvider } from './contexts/WalletConnectContext'; ❌
+// import { WalletProvider } from './contexts/WalletContext'; ❌
 
 const AppContent: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -164,7 +170,7 @@ const AppContent: React.FC = () => {
           path="/portfolio" 
           element={
             <ProtectedRoute>
-              <portfolioPage />
+              <PortfolioPage />
             </ProtectedRoute>
           } 
         />
@@ -209,20 +215,20 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <ErrorBoundary>
+    <EnhancedErrorBoundary>
       <Router>
         <AuthProvider>
-          {/* ✅ WalletConnect provides Wagmi + Query internally */}
-          <WalletConnectProvider>
-              <DebugEnv />
-              <Toaster position="top-right" />
-              <AppContent />
-              <Analytics />
-              <SpeedInsights />
-          </WalletConnectProvider>
+          {/* ✅ SINGLE UNIFIED WALLET PROVIDER */}
+          <WalletOrchestratorProvider>
+            <DebugEnv />
+            <Toaster position="top-right" />
+            <AppContent />
+            <Analytics />
+            <SpeedInsights />
+          </WalletOrchestratorProvider>
         </AuthProvider>
       </Router>
-    </ErrorBoundary>
+    </EnhancedErrorBoundary>
   );
 }
 

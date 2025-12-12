@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
-import { useWalletConnect } from '@/contexts/WalletConnectContext';
+import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
+import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
 
 // 🦊 ENHANCED METAMASK TYPE DECLARATION
 declare global {
@@ -599,20 +600,29 @@ const PredictionMarketsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* 🎯 BASECAMP STATUS (READ ONLY) */}
         <div className="flex justify-end mb-4">
-          {connectedChains.includes('basecamp') && address ? (
+          {campWallet?.isConnected ? (
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                  {address.slice(0, 6)}...{address.slice(-4)}
+                  {campWallet.address.slice(0, 6)}...{campWallet.address.slice(-4)}
                 </span>
               </div>
-              <span className="text-xs text-gray-400">BaseCAMP Testnet</span>
+              <button
+                onClick={() => disconnectWallet('basecamp')}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
+              >
+                Disconnect
+              </button>
             </div>
           ) : (
-            <div className="px-6 py-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-yellow-300 text-sm">
-              ⚠️ Connect BaseCAMP wallet in Dashboard to place bets
-            </div>
+            <button
+              onClick={() => setShowUnifiedWalletModal(true)}
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
+            >
+              <Wallet className="w-5 h-5" />
+              Connect for Predictions
+            </button>
           )}
         </div>
 

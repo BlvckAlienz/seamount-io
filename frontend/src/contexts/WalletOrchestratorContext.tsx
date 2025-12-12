@@ -425,3 +425,6 @@ export function useWalletOrchestrator() {
   }
   return context;
 }
+
+// Export configs for use in other components
+export { NETWORK_CONFIGS };
