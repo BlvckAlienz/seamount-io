@@ -82,7 +82,7 @@ const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
     id: 'basecamp',
     name: 'BaseCAMP',
     type: 'testnet',
-    chainId: 8453, // Note: Same as Base but testnet
+    chainId: 123456789, // Placeholder - actual BaseCAMP testnet ID
     chainIdHex: '0x1cbc67c35a',
     nativeCurrency: 'CAMP',
     connectionMethod: 'metamask_direct',
@@ -95,7 +95,7 @@ const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
     id: 'camp_mainnet',
     name: 'CAMP Mainnet',
     type: 'camp_mainnet_future',
-    chainId: 84532, // Placeholder
+    chainId: 84532,
     chainIdHex: '0x14A34',
     nativeCurrency: 'CAMP',
     connectionMethod: 'walletconnect',
@@ -108,10 +108,16 @@ const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
 
 // Action to network mapping
 const ACTION_NETWORK_MAP: Record<string, ChainId[]> = {
-  send: ['base', 'celo'], // Real money transfers
-  bet: ['basecamp'], // Testnet for now, will be camp_mainnet
-  earn: ['base', 'celo'], // Real yield
-  swap: ['base', 'celo'] // Real swaps
+  send: ['base', 'celo'],
+  bet: ['basecamp'],
+  earn: ['base', 'celo'],
+  swap: ['base', 'celo']
+};
+
+// 🚨 TYPE GUARD: Ensure address is always a string
+const safeAddress = (addr: string | undefined | null): string => {
+  if (!addr || typeof addr !== 'string') return '';
+  return addr;
 };
 
 // Create context
@@ -121,10 +127,13 @@ const WalletOrchestratorContext = createContext<WalletOrchestratorContextType | 
 export function WalletOrchestratorProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { open } = useAppKit();
-  const { address, isConnected, chain } = useAccount();
+  const { address: rawAddress, isConnected, chain } = useAccount();
   const chainId = useChainId();
   const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
+  
+  // 🚨 CRITICAL: Always ensure address is a string
+  const address = safeAddress(rawAddress);
   
   const [wallets, setWallets] = useState<Record<ChainId, WalletState | null>>({
     base: null,
@@ -139,28 +148,37 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
   useEffect(() => {
     if (user) {
       loadSavedWallets();
+    }
+  }, [user]);
+
+  // Detect current network when connection changes
+  useEffect(() => {
+    if (chainId && isConnected && address) {
       detectCurrentNetwork();
     }
-  }, [user, chainId, address]);
+  }, [chainId, address, isConnected]);
 
   const loadSavedWallets = async () => {
     try {
-      // Load WalletConnect wallets (Base, Celo)
       const response = await apiClient.get('/api/v1/wallet/connected-wallets');
       if (response.data.success) {
         const newWallets = { ...wallets };
-        response.data.wallets.forEach((wallet: any) => {
-          if (wallet.blockchain === 'base' || wallet.blockchain === 'celo') {
-            newWallets[wallet.blockchain] = {
-              address: wallet.address,
-              chainId: NETWORK_CONFIGS[wallet.blockchain].chainId,
-              network: wallet.blockchain,
+        const walletList = response.data.wallets || [];
+        
+        walletList.forEach((wallet: any) => {
+          const networkId = wallet.blockchain as ChainId;
+          if (networkId === 'base' || networkId === 'celo') {
+            newWallets[networkId] = {
+              address: safeAddress(wallet.address),
+              chainId: NETWORK_CONFIGS[networkId].chainId,
+              network: networkId,
               isConnected: true,
-              walletProvider: wallet.wallet_provider,
+              walletProvider: wallet.wallet_provider || 'unknown',
               connectionType: 'walletconnect'
             };
           }
         });
+        
         setWallets(newWallets);
       }
     } catch (error) {
@@ -173,7 +191,11 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
     
     // Check which network we're currently on
     Object.entries(NETWORK_CONFIGS).forEach(([networkId, config]) => {
-      if (config.chainId === chainId || config.chainIdHex === `0x${chainId.toString(16)}`) {
+      const isMatch = 
+        config.chainId === chainId || 
+        config.chainIdHex === `0x${chainId.toString(16)}`;
+      
+      if (isMatch) {
         setActiveNetwork(networkId as ChainId);
         
         // Update wallet state if connected
@@ -181,7 +203,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
           setWallets(prev => ({
             ...prev,
             [networkId]: {
-              address,
+              address: safeAddress(address),
               chainId,
               network: networkId as ChainId,
               isConnected: true,
@@ -196,10 +218,11 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
 
   const detectWalletProvider = (): string => {
     const ethereum = (window as any).ethereum;
-    if (ethereum?.isMetaMask) return 'metamask';
-    if (ethereum?.isCoinbaseWallet) return 'coinbase_wallet';
-    if (ethereum?.isMiniPay) return 'minipay';
-    if (ethereum?.isValora) return 'valora';
+    if (!ethereum) return 'unknown';
+    if (ethereum.isMetaMask) return 'metamask';
+    if (ethereum.isCoinbaseWallet) return 'coinbase_wallet';
+    if (ethereum.isMiniPay) return 'minipay';
+    if (ethereum.isValora) return 'valora';
     return 'walletconnect';
   };
 
@@ -245,7 +268,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
 
     // Step 3: Get nonce and authenticate
     const nonceResponse = await apiClient.post('/api/v1/wallet/nonce', {
-      address,
+      address: safeAddress(address),
       blockchain: network
     });
 
@@ -259,7 +282,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
     // Step 4: Register connection with backend
     const connectResponse = await apiClient.post('/api/v1/wallet/connect', {
       blockchain: network,
-      address,
+      address: safeAddress(address),
       wallet_provider: detectWalletProvider(),
       signature,
       nonce
@@ -273,7 +296,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
     setWallets(prev => ({
       ...prev,
       [network]: {
-        address,
+        address: safeAddress(address),
         chainId: config.chainId,
         network,
         isConnected: true,
@@ -284,14 +307,18 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
   };
 
   const connectViaMetaMask = async (network: ChainId, config: NetworkConfig) => {
-    if (!(window as any).ethereum) {
+    const ethereum = (window as any).ethereum;
+    
+    if (!ethereum) {
       throw new Error('MetaMask not installed');
     }
 
-    const ethereum = (window as any).ethereum;
-    
     // Request accounts
     const accounts = await ethereum.request({ method: 'eth_requestAccounts' }) as string[];
+    
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts found');
+    }
     
     // Switch or add network
     try {
@@ -325,7 +352,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
     setWallets(prev => ({
       ...prev,
       [network]: {
-        address: accounts[0],
+        address: safeAddress(accounts[0]),
         chainId: config.chainId,
         network,
         isConnected: true,
@@ -389,7 +416,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
       }
     }
     
-    return availableNetworks[0]; // Default to first option
+    return availableNetworks[0];
   };
 
   // Context value
@@ -407,7 +434,7 @@ export function WalletOrchestratorProvider({ children }: { children: ReactNode }
       Object.entries(wallets)
         .filter(([_, wallet]) => wallet?.isConnected)
         .map(([network]) => network as ChainId),
-    getTotalBalanceUSD: () => 0 // TODO: Implement balance aggregation
+    getTotalBalanceUSD: () => 0
   };
 
   return (

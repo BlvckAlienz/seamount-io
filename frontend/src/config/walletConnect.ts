@@ -4,7 +4,6 @@ import { base, celo } from '@reown/appkit/networks'
 import { QueryClient } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
 
-// ✅ PROJECT ID FROM USER
 export const projectId = 'cc4e6128dba540ad2ef4a2d8328c8c90'
 
 if (!projectId) {
@@ -32,13 +31,13 @@ export const modal = createAppKit({
     icons: ['https://www.seamount.io/logo.png']
   },
   features: {
-    analytics: true,
+    analytics: false, // 🚨 DISABLE to fix 403 error
     email: false,
     socials: false,
     allWallets: true
   },
   themeVariables: {
-    '--w3m-accent': '#0052FF', // Base blue
+    '--w3m-accent': '#0052FF',
     '--w3m-border-radius-master': '12px'
   }
 })
