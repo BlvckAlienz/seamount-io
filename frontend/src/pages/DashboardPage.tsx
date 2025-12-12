@@ -6,7 +6,7 @@ import {
   TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
   Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
   ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine, Target, Link2, Loader2, CheckCircle
+  Wallet, ArrowDownToLine, Target, Link2, Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useWalletConnect } from '../contexts/WalletConnectContext';
@@ -25,9 +25,6 @@ import { WalletProvider } from '@/contexts/WalletContext';
 import { SendForm } from '@/components/payments/SendForm.tsx';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
-import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
-import { useWalletOrchestrator } from '../contexts/WalletOrchestratorContext';
-import { useSearchParams } from 'react-router-dom';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
 import LiveMarketPreview from '../components/market/LiveMarketPreview';
 import PredictionMarketsPage from './PredictionMarketsPage';
@@ -137,13 +134,6 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   );
 };
 
-// Network configurations for external wallets
-const NETWORK_CONFIGS = {
-  base: { name: 'Base', icon: '/icons/base.svg' },
-  celo: { name: 'Celo', icon: '/icons/celo.svg' },
-  basecamp: { name: 'Basecamp', icon: '/icons/basecamp.svg' }
-};
-
 // Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile, signOut } = useAuth();
@@ -166,18 +156,14 @@ const DashboardPage = () => {
   const [backupStatus, setBackupStatus] = useState<any>(null);
   const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
   
-  // ✅ USE UNIFIED WALLET ORCHESTRATOR
+  // ✅ ADD WALLET CONNECT HOOK HERE
   const { 
-    wallets,
+    connectedChains, 
     connectWallet, 
     disconnectWallet, 
-    isConnecting,
-    getAllConnectedNetworks
-  } = useWalletOrchestrator();
-
-  // Map to old interface for compatibility
-  const connectedChains = getAllConnectedNetworks();
-  const address = wallets.basecamp?.address || wallets.base?.address || wallets.celo?.address;
+    address, 
+    isConnecting 
+  } = useWalletConnect();
 
   // Payment modal states
   const [showFundModal, setShowFundModal] = useState(false);
@@ -187,23 +173,10 @@ const DashboardPage = () => {
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [wallets, setWallets] = useState<Record<string, { address: string }>>({});
   const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
-
-  const [serviceStatus, setServiceStatus] = useState<any>(null);
 
   // ✅ Check backup status on mount
-  useEffect(() => {
-    if (searchParams.get('openWallet')) {
-      setShowUnifiedWalletModal(true);
-      
-      // Clear param after opening
-      searchParams.delete('openWallet');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams]);
-
   useEffect(() => {
     const checkBackupStatus = async () => {
       try {
@@ -235,6 +208,8 @@ const DashboardPage = () => {
       checkBackupStatus();
     }
   }, [user]);
+
+  const [serviceStatus, setServiceStatus] = useState<any>(null);
 
   // Enhanced health monitoring
   const checkServiceHealth = async () => {
@@ -659,59 +634,170 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* ✅ REPLACE WITH SINGLE BUTTON */}
-            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white mb-2">External Wallets</h3>
-                  <p className="text-gray-400 text-sm">
-                    Connect MetaMask, Coinbase Wallet, or other Web3 wallets
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => setShowUnifiedWalletModal(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all"
-                >
-                  <Wallet className="w-5 h-5" />
-                  Manage Wallets
-                </button>
-              </div>
+            {/* ✅ NEW: WalletConnect Chains (Base, Celo) - UNISWAP-INSPIRED DESIGN */}
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                External Wallets
+              </h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Connect your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
+              </p>
               
-              {/* ✅ SHOW CONNECTED WALLETS (Read-only summary) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {['base', 'celo', 'basecamp'].map(network => {
-                  const wallet = wallets[network];
-                  return (
-                    <div
-                      key={network}
-                      className={`p-4 rounded-xl border ${
-                        wallet?.isConnected
-                          ? 'bg-green-500/10 border-green-500/30'
-                          : 'bg-gray-800/50 border-gray-700/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <img 
-                          src={NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].icon} 
-                          alt={NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].name}
-                          className="w-6 h-6"
-                        />
-                        <span className="font-semibold text-white">
-                          {NETWORK_CONFIGS[network as keyof typeof NETWORK_CONFIGS].name}
-                        </span>
-                      </div>
-                      {wallet?.isConnected ? (
-                        <div className="text-xs text-green-400 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Base Card */}
+                <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
+                  connectedChains.includes('base') 
+                    ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
+                    : 'border-gray-700/50 hover:border-blue-500/30'
+                }`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg`}>
+                      <img 
+                        src="https://cryptologos.cc/logos/base-base-logo.svg" 
+                        alt="Base" 
+                        className="w-6 h-6"
+                      />
+                    </div>
+                    <div className="text-right">
+                      {connectedChains.includes('base') ? (
+                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium mb-1">
+                          <Check className="w-4 h-4" />
                           Connected
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-500">Not connected</div>
+                        <div className="text-sm text-gray-400">Ready to Connect</div>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-white font-semibold">Base</div>
+                    <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
+                    {connectedChains.includes('base') && address && (
+                      <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
+                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                        <a
+                          href={`https://basescan.org/address/${address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-blue-400 transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {connectedChains.includes('base') ? (
+                    <button
+                      onClick={() => disconnectWallet('base')}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => connectWallet('base')}
+                      disabled={isConnecting}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="w-5 h-5" />
+                          Connect Wallet
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <div className="mt-3 text-center text-xs text-gray-500">
+                    MetaMask • Coinbase • Rabby
+                  </div>
+                </div>
+
+                {/* Celo Card */}
+                <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
+                  connectedChains.includes('celo') 
+                    ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
+                    : 'border-gray-700/50 hover:border-green-500/30'
+                }`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700 text-white shadow-lg`}>
+                      <img 
+                        src="https://cryptologos.cc/logos/celo-celo-logo.svg" 
+                        alt="Celo" 
+                        className="w-6 h-6"
+                      />
+                    </div>
+                    <div className="text-right">
+                      {connectedChains.includes('celo') ? (
+                        <div className="flex items-center gap-1 text-green-400 text-sm font-medium mb-1">
+                          <Check className="w-4 h-4" />
+                          Connected
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">Ready to Connect</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-white font-semibold">Celo</div>
+                    <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
+                    {connectedChains.includes('celo') && address && (
+                      <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
+                        <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                        <a
+                          href={`https://celoscan.io/address/${address}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-green-400 transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {connectedChains.includes('celo') ? (
+                    <button
+                      onClick={() => disconnectWallet('celo')}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => connectWallet('celo')}
+                      disabled={isConnecting}
+                      className="w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isConnecting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="w-5 h-5" />
+                          Connect Wallet
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <div className="mt-3 text-center text-xs text-gray-500">
+                    Valora • MiniPay • MetaMask
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -827,34 +913,25 @@ const DashboardPage = () => {
             isOpen={showMarketTerminal} 
             onClose={() => setShowMarketTerminal(false)} 
           />
+        </div>
 
-          {/* Unified Wallet Modal */}
-          {showUnifiedWalletModal && (
-            <UnifiedWalletModal
-              isOpen={showUnifiedWalletModal}
-              onClose={() => setShowUnifiedWalletModal(false)}
-              defaultAction={undefined}
-            />
-          )}
-
-          {/* Prediction Markets Modal */}
-          {showPredictionMarkets && (
-            <div className="fixed inset-0 z-50 overflow-y-auto">
-              <div className="min-h-screen">
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-                <div className="relative">
-                  <button
-                    onClick={() => setShowPredictionMarkets(false)}
-                    className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                  <PredictionMarketsPage />
-                </div>
+        {/* Prediction Markets Modal */}
+        {showPredictionMarkets && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="min-h-screen">
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
+              <div className="relative">
+                <button
+                  onClick={() => setShowPredictionMarkets(false)}
+                  className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+                <PredictionMarketsPage />
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </WalletProvider>
   );

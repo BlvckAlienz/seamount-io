@@ -62,44 +62,6 @@ class WalletConnectService:
         self.nonce_secret = os.getenv('NONCE_SECRET', secrets.token_hex(32))
         logger.info("✅ WalletConnectService initialized (Base + Celo) with nonce auth")
     
-    # Add this method to WalletConnectService class (after __init__)
-    async def get_connected_wallets(self, user_id: str) -> Dict[str, Any]:
-        """Get all connected wallets for a user (WalletConnect chains only)"""
-        try:
-            result = self.db.supabase.table('multi_chain_addresses') \
-                .select('blockchain, address, wallet_provider, created_at') \
-                .eq('user_id', user_id) \
-                .eq('connection_type', 'wallet_connect') \
-                .execute()
-            
-            wallets = []
-            for wallet in result.data:
-                wallets.append({
-                    'blockchain': wallet['blockchain'],
-                    'address': wallet['address'],
-                    'wallet_provider': wallet['wallet_provider'],
-                    'created_at': wallet['created_at']
-                })
-            
-            connected_chains = [w['blockchain'] for w in wallets]
-            
-            logger.info(f"✅ Found {len(connected_chains)} WalletConnect wallets for user {user_id[:8]}...")
-            
-            return {
-                'success': True,
-                'wallet_connect_chains': connected_chains,
-                'wallets': wallets
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to get connected wallets: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'wallet_connect_chains': [],
-                'wallets': []
-            }
-    
     async def generate_nonce(self, address: str, blockchain: str) -> Dict[str, Any]:
         """
         Generate a nonce for wallet authentication
