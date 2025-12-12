@@ -1,25 +1,24 @@
+// File: frontend/src/pages/PredictionMarketsPage.tsx
+// 🎯 WALLET LOGIC: READ-ONLY from WalletOrchestrator
+// 🔗 CONNECTION: Handled ONLY in Dashboard via UnifiedWalletModal
+
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, DollarSign, Users, Clock, AlertTriangle, CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, Info, Wallet, X, Loader, ExternalLink } from 'lucide-react';
+import { 
+  TrendingUp, DollarSign, Users, Clock, AlertTriangle, 
+  CheckCircle, XCircle, Zap, Trophy, Target, ArrowRight, 
+  Info, Wallet, X, Loader, ExternalLink 
+} from 'lucide-react';
 
 import { apiClient } from '@/config/api';
 import { supabase } from '@/lib/supabase'; 
 import toast from 'react-hot-toast';
-
 import { TransactionMonitor } from '@/components/predictions/TransactionMonitor';
 import { useWalletOrchestrator } from '@/contexts/WalletOrchestratorContext';
-import { UnifiedWalletModal } from '@/components/wallet/UnifiedWalletModal';
+import { useNavigate } from 'react-router-dom';
 
-// 🦊 ENHANCED METAMASK TYPE DECLARATION
-declare global {
-  interface Window {
-    ethereum?: {
-      isMetaMask?: boolean;
-      request: (args: { method: string; params?: any[] }) => Promise<any>;
-      on?: (event: string, handler: (...args: any[]) => void) => void;
-      removeListener?: (event: string, handler: (...args: any[]) => void) => void;
-    };
-  }
-}
+// ================================================================================
+// TYPE DEFINITIONS
+// ================================================================================
 
 interface Market {
   id: number;
@@ -56,17 +55,7 @@ interface Bet {
   just_resolved?: boolean;
 }
 
-interface PortfolioBet extends Bet {
-  market_question: string;
-  market_end_time: number;
-  current_odds: {
-    yes: number;
-    no: number;
-  };
-  roi: number;
-}
-
-// ✅ CORRECT BASECAMP TESTNET CONFIG
+// ✅ BASECAMP NETWORK CONFIG (READONLY)
 const BASECAMP_CONFIG = {
   chainId: '0x1cbc67c35a',
   chainName: 'Basecamp',
@@ -75,13 +64,33 @@ const BASECAMP_CONFIG = {
     symbol: 'CAMP',
     decimals: 18
   },
-  rpcUrls: [
-    'https://rpc.basecamp.t.raas.gelato.cloud'
-  ],
+  rpcUrls: ['https://rpc.basecamp.t.raas.gelato.cloud'],
   blockExplorerUrls: ['https://basecamp.cloud.blockscout.com']
-};
+} as const;
+
+// ================================================================================
+// MAIN COMPONENT
+// ================================================================================
 
 const PredictionMarketsPage: React.FC = () => {
+  const navigate = useNavigate();
+  
+  // ================================================================================
+  // 🎯 WALLET STATE (READ-ONLY from Orchestrator)
+  // ================================================================================
+  const { 
+    wallets,              // All wallet states
+    isWalletConnected     // Helper function
+  } = useWalletOrchestrator();
+  
+  // ✅ We ONLY care about BaseCAMP for predictions
+  const basecampWallet = wallets.basecamp;
+  const isBasecampConnected = isWalletConnected('basecamp');
+  const basecampAddress = basecampWallet?.address;
+  
+  // ================================================================================
+  // STATE MANAGEMENT
+  // ================================================================================
   const [markets, setMarkets] = useState<Market[]>([]);
   const [myBets, setMyBets] = useState<Bet[]>([]);
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
@@ -90,33 +99,22 @@ const PredictionMarketsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
-
-  // 🎯 USE UNIFIED WALLET ORCHESTRATOR (REPLACES OLD WALLET LOGIC)
-  const {
-    wallets,
-    connectWallet,
-    disconnectWallet,
-    isConnecting,
-    getBestNetworkForAction
-  } = useWalletOrchestrator();
-  
-  // Local state for prediction markets UI
-  const [showUnifiedWalletModal, setShowUnifiedWalletModal] = useState(false);
   const [signingTransaction, setSigningTransaction] = useState(false);
-
-  // ✅ TRANSACTION MONITOR STATE
+  
+  // Transaction monitoring
   const [activeTransaction, setActiveTransaction] = useState<{
     betId: string;
     txHash: string;
   } | null>(null);
-
-  // 🎯 CLAIM WINNINGS STATE
+  
+  // Claim winnings state
   const [claimingBetId, setClaimingBetId] = useState<string | null>(null);
   const [claimTransaction, setClaimTransaction] = useState<{
     betId: string;
     txHash: string;
   } | null>(null);
-
+  
+  // Portfolio stats
   const [portfolioStats, setPortfolioStats] = useState({
     total_staked: 0,
     potential_winnings: 0,
@@ -126,40 +124,13 @@ const PredictionMarketsPage: React.FC = () => {
     win_rate: 0
   });
 
-  // ✅ CHECK METAMASK PERSISTENCE (Updated to use unified wallet)
-  useEffect(() => {
-    const checkMetaMaskConnection = async () => {
-      try {
-        if (!window.ethereum) return;
-
-        const accounts = await window.ethereum.request({ 
-          method: 'eth_accounts' 
-        }) as string[];
-
-        if (accounts.length > 0) {
-          const chainId = await window.ethereum.request({ 
-            method: 'eth_chainId' 
-          });
-
-          if (chainId === BASECAMP_CONFIG.chainId) {
-            // Use unified wallet orchestrator to handle connection
-            // The orchestrator will manage the state
-            console.log('✅ MetaMask detected with BaseCAMP:', accounts[0]);
-          } else {
-            console.warn('⚠️ Wrong network, please switch to BaseCAMP');
-          }
-        }
-      } catch (error) {
-        console.error('MetaMask check failed:', error);
-      }
-    };
-
-    checkMetaMaskConnection();
-  }, []);
-
+  // ================================================================================
+  // DATA FETCHING
+  // ================================================================================
+  
   useEffect(() => {
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 10000);
+    const interval = setInterval(fetchMarkets, 10000); // Refresh every 10s
     return () => clearInterval(interval);
   }, []);
 
@@ -168,6 +139,22 @@ const PredictionMarketsPage: React.FC = () => {
       fetchMyBets();
     }
   }, [activeTab]);
+
+  const fetchMarkets = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/v1/predictions/markets');
+      const data = await response.json();
+      if (data.success) {
+        setMarkets(data.markets);
+      }
+    } catch (error) {
+      console.error('Failed to fetch markets:', error);
+      toast.error('Failed to load markets');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchMyBets = async () => {
     try {
@@ -189,25 +176,22 @@ const PredictionMarketsPage: React.FC = () => {
       if (data.success) {
         setMyBets(data.bets);
         
-        // 💨 UPDATE PORTFOLIO STATS FROM BACKEND
+        // Update portfolio stats from backend
         if (data.stats) {
           setPortfolioStats(data.stats);
-          console.log('📊 Stats updated:', data.stats);
         }
         
-        console.log(`✅ Loaded ${data.bets.length} confirmed bets`);
+        console.log(`✅ Loaded ${data.bets.length} bets`);
         
+        // Auto-refresh if pending bets exist
         const pendingCount = data.bets.filter((b: any) => b.status === 'pending').length;
-        const justResolvedCount = data.bets.filter((b: any) => b.just_resolved === true).length;
-        
         if (pendingCount > 0) {
-          console.log(`⏳ ${pendingCount} pending bets - will auto-refresh`);
           setTimeout(fetchMyBets, 5000);
         }
         
-        // ✅ FORCE REFRESH IF MARKETS JUST RESOLVED
+        // Force refresh if markets just resolved
+        const justResolvedCount = data.bets.filter((b: any) => b.just_resolved === true).length;
         if (justResolvedCount > 0) {
-          console.log(`🔄 ${justResolvedCount} bets just resolved - refreshing in 2s`);
           setTimeout(fetchMyBets, 2000);
         }
       }
@@ -216,109 +200,27 @@ const PredictionMarketsPage: React.FC = () => {
     }
   };
 
-  const fetchMarkets = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/v1/predictions/markets');
-      const data = await response.json();
-      if (data.success) {
-        setMarkets(data.markets);
-      }
-    } catch (error) {
-      console.error('Failed to fetch markets:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatTimeRemaining = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m`;
-  };
-
-  const formatVolume = (volume: string) => {
-    const num = parseFloat(volume) / 1e18; // Convert from wei to CAMP
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M CAMP`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K CAMP`;
-    return `${num.toFixed(1)} CAMP`;
-  };
-
-  const calculateMarketStats = () => {
-    if (markets.length === 0) return { totalVolume: 0, totalTraders: 0 };
-    
-    let totalVolume = 0;
-    
-    markets.forEach(market => {
-      const marketVolume = parseFloat(market.totalVolume) / 1e18;
-      totalVolume += marketVolume;
-    });
-    
-    const uniqueTraders = markets.reduce((sum, m) => sum + m.participantCount, 0);
-    
-    return {
-      totalVolume,
-      totalTraders: uniqueTraders
-    };
-  };
-
-  // 🦊 TIERED FEE CALCULATION FUNCTIONS - MATCHING SMART CONTRACT
-  const calculateFeeRate = (totalVolume: number): number => {
-    // Convert from wei to CAMP and use same thresholds as smart contract
-    const totalCAMP = totalVolume / 1e18;
-    
-    if (totalCAMP < 1000) return 10;    // 1.0% (10/1000) - LOW_FEE
-    if (totalCAMP < 10000) return 7;    // 0.7% (7/1000) - MED_FEE
-    return 5;                           // 0.5% (5/1000) - HIGH_FEE
-  };
-
-  const getFeePercentage = (totalVolume: number): string => {
-    const rate = calculateFeeRate(totalVolume);
-    // Convert to percentage: 10 = 1.0%, 7 = 0.7%, 5 = 0.5%
-    return (rate / 10).toFixed(1);
-  };
-
-  const calculatePotentialPayout = () => {
-    if (!selectedMarket || !betAmount) return 0;
-    
-    const amount = parseFloat(betAmount);
-    const totalVolume = parseFloat(selectedMarket.totalVolume || '0');
-    const totalPool = (totalVolume / 1e18) + amount;
-    const winningPool = betPrediction 
-      ? ((selectedMarket.yesPercent / 100) * (totalVolume / 1e18)) + amount
-      : ((selectedMarket.noPercent / 100) * (totalVolume / 1e18)) + amount;
-    
-    if (winningPool === 0) return amount * 1.98; // 2x minus minimum fee approximation
-    
-    const grossPayout = (amount / winningPool) * totalPool;
-    
-    // Use the same tiered fee logic as the smart contract
-    const feeRate = calculateFeeRate(totalVolume);
-    const fee = (grossPayout * feeRate) / 1000;
-    const netPayout = grossPayout - fee;
-    
-    return netPayout;
-  };
-
+  // ================================================================================
+  // BET PLACEMENT LOGIC
+  // ================================================================================
+  
   const handlePlaceBet = async () => {
-    // 🚨 GUARD: Prevent double-clicks and race conditions
+    // 🚨 GUARD: Prevent double-clicks
     if (loading || signingTransaction) {
       console.warn('⚠️ Bet already in progress');
       return;
     }
 
-    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
-    if (!wallets.basecamp?.isConnected) {
-      // Show unified modal with 'bet' action (will recommend BaseCAMP)
-      setShowUnifiedWalletModal(true);
+    // 🚨 GUARD: Check wallet connection
+    if (!isBasecampConnected || !basecampAddress) {
+      toast.error('Please connect BaseCAMP wallet first', { duration: 4000 });
       return;
     }
     
-    if (!selectedMarket || !betAmount) return;
+    if (!selectedMarket || !betAmount) {
+      toast.error('Invalid bet details');
+      return;
+    }
     
     setLoading(true);
     setSigningTransaction(true);
@@ -331,9 +233,7 @@ const PredictionMarketsPage: React.FC = () => {
         return;
       }
       
-      // 🎯 USE UNIFIED WALLET ADDRESS
-      const campAddress = wallets.basecamp.address;
-      
+      // Step 1: Record bet in backend
       const response = await fetch('/api/v1/predictions/bet', {
         method: 'POST',
         headers: {
@@ -344,7 +244,7 @@ const PredictionMarketsPage: React.FC = () => {
           market_id: selectedMarket.id,
           prediction: betPrediction,
           amount: parseFloat(betAmount),
-          user_wallet: campAddress  // ✅ Uses unified wallet address
+          user_wallet: basecampAddress
         })
       });
       
@@ -356,29 +256,30 @@ const PredictionMarketsPage: React.FC = () => {
       
       if (!data.contract_function.encoded_data || 
           !data.contract_function.encoded_data.startsWith('0x')) {
-        throw new Error('💨 Invalid contract data from backend');
+        throw new Error('Invalid contract data from backend');
       }
 
       console.log('📤 Sending transaction:', {
         to: data.contract_address,
         value: `0x${data.contract_function.value_in_wei.toString(16)}`,
-        data: data.contract_function.encoded_data,
-        from: campAddress
+        from: basecampAddress
       });
 
-      const txHash = await window.ethereum!.request({
+      // Step 2: Sign transaction with MetaMask
+      const txHash = await (window as any).ethereum.request({
         method: 'eth_sendTransaction',
         params: [{
-          from: campAddress,
+          from: basecampAddress,
           to: data.contract_address,
           value: `0x${data.contract_function.value_in_wei.toString(16)}`,
           data: data.contract_function.encoded_data,
-          gas: '0x30D40'
+          gas: '0x30D40' // 200k gas
         }]
       }) as string;
 
       console.log('✅ Transaction submitted:', txHash);
       
+      // Step 3: Confirm bet with backend
       const confirmResponse = await fetch('/api/v1/predictions/confirm-bet', {
         method: 'POST',
         headers: {
@@ -389,7 +290,7 @@ const PredictionMarketsPage: React.FC = () => {
           market_id: selectedMarket.id,
           prediction: betPrediction,
           amount: parseFloat(betAmount),
-          user_wallet: campAddress,
+          user_wallet: basecampAddress,
           tx_hash: txHash
         })
       });
@@ -400,34 +301,42 @@ const PredictionMarketsPage: React.FC = () => {
         throw new Error('Failed to confirm bet');
       }
 
-      // ✅ SHOW TRANSACTION MONITOR
+      // ✅ Show transaction monitor
       setActiveTransaction({
         betId: confirmData.bet_id,
         txHash: txHash
       });
 
       toast.success(
-        `Transaction submitted! Monitoring status...`,
+        'Transaction submitted! Monitoring status...',
         { id: 'bet-tx', duration: 10000 }
       );
       
+      // Refresh data
       await fetchMarkets();
       await fetchMyBets();
       setBetAmount('10');
       
     } catch (error: any) {
       console.error('💥 Bet placement error:', error);
-      toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
+      
+      if (error.code === 4001) {
+        toast.error('Transaction cancelled by user', { id: 'bet-tx' });
+      } else {
+        toast.error(error.message || 'Bet placement failed', { id: 'bet-tx' });
+      }
     } finally {
       setLoading(false);
       setSigningTransaction(false);
     }
   };
 
-  // 🎯 CLAIM WINNINGS HANDLER
+  // ================================================================================
+  // CLAIM WINNINGS LOGIC
+  // ================================================================================
+  
   const handleClaimWinnings = async (betId: string, marketId: number) => {
-    // 🎯 USE UNIFIED WALLET: Check if BaseCAMP wallet is connected
-    if (!wallets.basecamp?.isConnected) {
+    if (!isBasecampConnected || !basecampAddress) {
       toast.error('Please connect BaseCAMP wallet first');
       return;
     }
@@ -441,9 +350,6 @@ const PredictionMarketsPage: React.FC = () => {
         toast.error('Please sign in to claim winnings');
         return;
       }
-      
-      // 🎯 USE UNIFIED WALLET ADDRESS
-      const campAddress = wallets.basecamp.address;
       
       // Step 1: Get encoded claim transaction
       const response = await fetch('/api/v1/predictions/initiate-claim', {
@@ -463,14 +369,14 @@ const PredictionMarketsPage: React.FC = () => {
       
       toast.success(`Expected payout: ${data.expected_payout} CAMP`, { duration: 3000 });
       
-      // Step 2: Execute claim transaction via MetaMask
-      const txHash = await window.ethereum!.request({
+      // Step 2: Execute claim transaction
+      const txHash = await (window as any).ethereum.request({
         method: 'eth_sendTransaction',
         params: [{
-          from: campAddress,
+          from: basecampAddress,
           to: data.contract_address,
           data: data.contract_function.encoded_data,
-          gas: '0x30D40'  // 200k gas
+          gas: '0x30D40'
         }]
       }) as string;
       
@@ -516,11 +422,78 @@ const PredictionMarketsPage: React.FC = () => {
     }
   };
 
+  // ================================================================================
+  // UTILITY FUNCTIONS
+  // ================================================================================
+  
+  const formatTimeRemaining = (seconds: number) => {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  };
+
+  const formatVolume = (volume: string) => {
+    const num = parseFloat(volume) / 1e18;
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M CAMP`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K CAMP`;
+    return `${num.toFixed(1)} CAMP`;
+  };
+
+  const calculateMarketStats = () => {
+    if (markets.length === 0) return { totalVolume: 0, totalTraders: 0 };
+    
+    let totalVolume = 0;
+    markets.forEach(market => {
+      totalVolume += parseFloat(market.totalVolume) / 1e18;
+    });
+    
+    const uniqueTraders = markets.reduce((sum, m) => sum + m.participantCount, 0);
+    
+    return { totalVolume, totalTraders };
+  };
+
+  const calculateFeeRate = (totalVolume: number): number => {
+    const totalCAMP = totalVolume / 1e18;
+    if (totalCAMP < 1000) return 10;    // 1.0%
+    if (totalCAMP < 10000) return 7;    // 0.7%
+    return 5;                           // 0.5%
+  };
+
+  const getFeePercentage = (totalVolume: number): string => {
+    const rate = calculateFeeRate(totalVolume);
+    return (rate / 10).toFixed(1);
+  };
+
+  const calculatePotentialPayout = () => {
+    if (!selectedMarket || !betAmount) return 0;
+    
+    const amount = parseFloat(betAmount);
+    const totalVolume = parseFloat(selectedMarket.totalVolume || '0');
+    const totalPool = (totalVolume / 1e18) + amount;
+    const winningPool = betPrediction 
+      ? ((selectedMarket.yesPercent / 100) * (totalVolume / 1e18)) + amount
+      : ((selectedMarket.noPercent / 100) * (totalVolume / 1e18)) + amount;
+    
+    if (winningPool === 0) return amount * 1.98;
+    
+    const grossPayout = (amount / winningPool) * totalPool;
+    const feeRate = calculateFeeRate(totalVolume);
+    const fee = (grossPayout * feeRate) / 1000;
+    const netPayout = grossPayout - fee;
+    
+    return netPayout;
+  };
+
   const getCategoryFromQuestion = (question: string) => {
-    if (question.toLowerCase().includes('bitcoin') || question.toLowerCase().includes('btc')) return 'crypto';
-    if (question.toLowerCase().includes('eagles') || question.toLowerCase().includes('arsenal')) return 'sports';
-    if (question.toLowerCase().includes('ngn') || question.toLowerCase().includes('exchange')) return 'forex';
-    if (question.toLowerCase().includes('election') || question.toLowerCase().includes('jonathan')) return 'politics';
+    const q = question.toLowerCase();
+    if (q.includes('bitcoin') || q.includes('btc')) return 'crypto';
+    if (q.includes('eagles') || q.includes('arsenal')) return 'sports';
+    if (q.includes('ngn') || q.includes('exchange')) return 'forex';
+    if (q.includes('election') || q.includes('jonathan')) return 'politics';
     return 'other';
   };
 
@@ -546,42 +519,6 @@ const PredictionMarketsPage: React.FC = () => {
     return colors[category] || 'from-gray-500 to-slate-500';
   };
 
-  // ✅ PERSIST METAMASK CONNECTION (Updated to use unified wallet)
-  useEffect(() => {
-    if (!window.ethereum) return;
-
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) {
-        // Wallet disconnected - let unified orchestrator handle this
-        console.log('Wallet disconnected via accountsChanged');
-      } else {
-        console.log('Accounts changed:', accounts[0]);
-        // The unified orchestrator will handle account changes
-      }
-    };
-
-    const handleChainChanged = (chainId: string) => {
-      if (chainId !== BASECAMP_CONFIG.chainId) {
-        toast.error('⚠️ Please switch back to BaseCAMP network');
-      } else {
-        toast.success('Connected to BaseCAMP');
-        window.location.reload();
-      }
-    };
-
-    const ethereum = window.ethereum as any;
-    ethereum.on('accountsChanged', handleAccountsChanged);
-    ethereum.on('chainChanged', handleChainChanged);
-
-    return () => {
-      if (ethereum.removeListener) {
-        ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        ethereum.removeListener('chainChanged', handleChainChanged);
-      }
-    };
-  }, []);
-
-  // 🦊 UPDATED STATS DATA ARRAY WITH TIERED FEE DISPLAY
   const statsData = [
     { 
       label: 'Total Volume', 
@@ -609,39 +546,48 @@ const PredictionMarketsPage: React.FC = () => {
     }
   ];
 
+  // ================================================================================
+  // RENDER
+  // ================================================================================
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* 🦊 WALLET CONNECTION HEADER */}
+        
+        {/* ================================================================================
+            🎯 WALLET CONNECTION STATUS (READ-ONLY)
+            ================================================================================ */}
         <div className="flex justify-end mb-4">
-          {wallets.basecamp?.isConnected ? (
+          {isBasecampConnected && basecampAddress ? (
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                  {wallets.basecamp.address.slice(0, 6)}...{wallets.basecamp.address.slice(-4)}
+                  {basecampAddress.slice(0, 6)}...{basecampAddress.slice(-4)}
                 </span>
               </div>
-              <button
-                onClick={() => disconnectWallet('basecamp')}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
-              >
-                Disconnect
-              </button>
+              <span className="text-xs text-gray-500">
+                (Manage in Dashboard)
+              </span>
             </div>
           ) : (
-            <button
-              onClick={() => {
-                // Show unified modal for betting action
-                // This will trigger the modal with defaultAction='bet'
-                // which shows BaseCAMP as recommended
-                setShowUnifiedWalletModal(true);
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
-            >
-              <Wallet className="w-5 h-5" />
-              Connect for Predictions
-            </button>
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-6 py-3 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+              <div>
+                <div className="text-yellow-400 font-semibold text-sm">
+                  BaseCAMP Wallet Required
+                </div>
+                <div className="text-yellow-300/70 text-xs">
+                  Connect in Dashboard to place bets
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/dashboard?openWallet=basecamp')}
+                className="ml-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg transition-colors"
+              >
+                Connect Wallet
+              </button>
+            </div>
           )}
         </div>
         
@@ -649,7 +595,7 @@ const PredictionMarketsPage: React.FC = () => {
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-full border border-green-500/30">
             <Zap className="h-5 w-5 text-green-400 animate-pulse" />
-            <span className="text-green-400 font-semibold text-sm">5 LIVE MARKETS</span>
+            <span className="text-green-400 font-semibold text-sm">{markets.length} LIVE MARKETS</span>
           </div>
 
           <h1 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-green-100 to-emerald-300 mb-3">
@@ -701,106 +647,146 @@ const PredictionMarketsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Markets Grid */}
+        {/* ================================================================================
+            MARKETS TAB
+            ================================================================================ */}
         {activeTab === 'markets' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {loading && markets.length === 0 ? (
-              <div className="col-span-full text-center py-20">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-500 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">Loading markets...</p>
-              </div>
-            ) : (
-              markets.map(market => {
-                const category = getCategoryFromQuestion(market.question);
-                return (
-                  <div
-                    key={market.id}
-                    onClick={() => {
-                      setSelectedMarket(market);
-                      setShowBetModal(true);
-                      // 🔧 Reset all bet states when opening modal
-                      setLoading(false);
-                      setSigningTransaction(false);
-                      setActiveTransaction(null);
-                      setBetAmount('10');
-                    }}
-                    className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-green-500/50 transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/10"
+          <>
+            {/* 🚨 WALLET REQUIRED WARNING (if not connected) */}
+            {!isBasecampConnected && (
+              <div className="bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 rounded-2xl p-8 mb-6 text-center">
+                <Wallet className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Connect BaseCAMP Wallet to Start
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  You'll need a BaseCAMP testnet wallet to place bets on prediction markets
+                </p>
+                <button
+                  onClick={() => navigate('/dashboard?openWallet=basecamp')}
+                  className="px-8 py-4 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-yellow-500/30 transition-all"
+                >
+                  Connect in Dashboard
+                </button>
+                <p className="text-sm text-gray-500 mt-4">
+                  Get free CAMP tokens at{' '}
+                  <a
+                    href="https://faucet.campnetwork.xyz"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-yellow-400 hover:underline"
                   >
-                    {/* Category Badge */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r ${getCategoryColor(category)}`}>
-                          {getCategoryEmoji(category)} {category.toUpperCase()}
-                        </span>
-                        {market.participantCount === 0 && (
-                          <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
-                            NEW
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <Clock className="h-4 w-4" />
-                        <span className="text-sm font-semibold">{formatTimeRemaining(market.timeRemaining)}</span>
-                      </div>
-                    </div>
-
-                    {/* Question */}
-                    <h3 className="text-xl font-bold text-white mb-3 group-hover:text-green-400 transition-colors leading-tight">
-                      {market.question}
-                    </h3>
-                    
-                    <p className="text-gray-400 text-sm mb-5 line-clamp-2 leading-relaxed">
-                      {market.description}
-                    </p>
-
-                    {/* Odds Display */}
-                    <div className="grid grid-cols-2 gap-3 mb-5">
-                      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 p-4 hover:border-green-400/50 transition-all">
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
-                        <div className="relative">
-                          <div className="text-xs text-green-400 font-bold mb-1 uppercase tracking-wide">YES</div>
-                          <div className="text-3xl font-black text-white">{market.yesPercent.toFixed(1)}%</div>
-                          <div className="text-xs text-green-300/70 mt-1">{(10000 / market.yesOdds).toFixed(2)}x payout</div>
-                        </div>
-                      </div>
-                      
-                      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/30 p-4 hover:border-red-400/50 transition-all">
-                        <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent" />
-                        <div className="relative">
-                          <div className="text-xs text-red-400 font-bold mb-1 uppercase tracking-wide">NO</div>
-                          <div className="text-3xl font-black text-white">{market.noPercent.toFixed(1)}%</div>
-                          <div className="text-xs text-red-300/70 mt-1">{(10000 / market.noOdds).toFixed(2)}x payout</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Stats */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
-                      <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-1.5">
-                          <DollarSign className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-400">{formatVolume(market.totalVolume)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Users className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-400">{market.participantCount}</span>
-                        </div>
-                      </div>
-                      
-                      <button className="flex items-center gap-2 text-green-400 font-semibold text-sm group-hover:gap-3 transition-all">
-                        Place Bet
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+                    faucet.campnetwork.xyz
+                  </a>
+                </p>
+              </div>
             )}
-          </div>
+
+            {/* Markets Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {loading && markets.length === 0 ? (
+                <div className="col-span-full text-center py-20">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-500 mx-auto mb-4" />
+                  <p className="text-gray-400 text-lg">Loading markets...</p>
+                </div>
+              ) : (
+                markets.map(market => {
+                  const category = getCategoryFromQuestion(market.question);
+                  return (
+                    <div
+                      key={market.id}
+                      onClick={() => {
+                        if (!isBasecampConnected) {
+                          toast.error('Please connect BaseCAMP wallet first', { duration: 3000 });
+                          return;
+                        }
+                        setSelectedMarket(market);
+                        setShowBetModal(true);
+                        setLoading(false);
+                        setSigningTransaction(false);
+                        setActiveTransaction(null);
+                        setBetAmount('10');
+                      }}
+                      className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-green-500/50 transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-xl hover:shadow-green-500/10"
+                    >
+                      {/* Category Badge */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-4 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r ${getCategoryColor(category)}`}>
+                            {getCategoryEmoji(category)} {category.toUpperCase()}
+                          </span>
+                          {market.participantCount === 0 && (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-sm font-semibold">{formatTimeRemaining(market.timeRemaining)}</span>
+                        </div>
+                      </div>
+
+                      {/* Question */}
+                      <h3 className="text-xl font-bold text-white mb-3 group-hover:text-green-400 transition-colors leading-tight">
+                        {market.question}
+                      </h3>
+                      
+                      <p className="text-gray-400 text-sm mb-5 line-clamp-2 leading-relaxed">
+                        {market.description}
+                      </p>
+
+                      {/* Odds Display */}
+                      <div className="grid grid-cols-2 gap-3 mb-5">
+                        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 p-4 hover:border-green-400/50 transition-all">
+                          <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent" />
+                          <div className="relative">
+                            <div className="text-xs text-green-400 font-bold mb-1 uppercase tracking-wide">YES</div>
+                            <div className="text-3xl font-black text-white">{market.yesPercent.toFixed(1)}%</div>
+                            <div className="text-xs text-green-300/70 mt-1">{(10000 / market.yesOdds).toFixed(2)}x payout</div>
+                          </div>
+                        </div>
+                        
+                        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-900/30 to-red-800/20 border border-red-500/30 p-4 hover:border-red-400/50 transition-all">
+                          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent" />
+                          <div className="relative">
+                            <div className="text-xs text-red-400 font-bold mb-1 uppercase tracking-wide">NO</div>
+                            <div className="text-3xl font-black text-white">{market.noPercent.toFixed(1)}%</div>
+                            <div className="text-xs text-red-300/70 mt-1">{(10000 / market.noOdds).toFixed(2)}x payout</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Stats */}
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-1.5">
+                            <DollarSign className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-400">{formatVolume(market.totalVolume)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            <span className="text-gray-400">{market.participantCount}</span>
+                          </div>
+                        </div>
+                        
+                        <button className="flex items-center gap-2 text-green-400 font-semibold text-sm group-hover:gap-3 transition-all">
+                          Place Bet
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
         )}
 
-        {/* My Bets Tab */}
+        {/* ================================================================================
+            MY BETS TAB
+            ================================================================================ */}
         {activeTab === 'mybets' && (
           <>
             {myBets.length === 0 ? (
@@ -817,45 +803,36 @@ const PredictionMarketsPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Portfolio Summary Card */}
+                {/* Portfolio Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {/* Card 1: Total Staked */}
                   <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
                     <div className="text-sm text-blue-400 mb-1 uppercase tracking-wide">Total Staked</div>
                     <div className="text-3xl font-black text-white">
                       {portfolioStats.total_staked.toFixed(2)} CAMP
                     </div>
-                    <div className="text-xs text-blue-300/70 mt-1">Confirmed bets</div>
                   </div>
                   
-                  {/* Card 2: Potential Winnings */}
                   <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Potential Winnings</div>
+                    <div className="text-sm text-purple-400 mb-1 uppercase tracking-wide">Potential</div>
                     <div className="text-3xl font-black text-white">
                       {portfolioStats.potential_winnings.toFixed(2)} CAMP
                     </div>
-                    <div className="text-xs text-purple-300/70 mt-1">If all active win</div>
                   </div>
                   
-                  {/* Card 3: Realized Winnings */}
                   <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Realized Winnings</div>
+                    <div className="text-sm text-green-400 mb-1 uppercase tracking-wide">Won</div>
                     <div className="text-3xl font-black text-white">
                       {portfolioStats.realized_winnings.toFixed(2)} CAMP
                     </div>
-                    <div className="text-xs text-green-300/70 mt-1">From won bets</div>
                   </div>
                   
-                  {/* Card 4: Active Bets */}
                   <div className="bg-gradient-to-br from-slate-800/30 to-slate-700/20 border border-slate-500/30 rounded-2xl p-6">
-                    <div className="text-sm text-slate-400 mb-1 uppercase tracking-wide">Active Bets</div>
+                    <div className="text-sm text-slate-400 mb-1 uppercase tracking-wide">Active</div>
                     <div className="text-3xl font-black text-white">
                       {portfolioStats.active_bets}
                     </div>
-                    <div className="text-xs text-slate-300/70 mt-1">Unresolved</div>
                   </div>
                   
-                  {/* Card 5: Your Profit (Dynamic Color) */}
                   <div className={`bg-gradient-to-br rounded-2xl p-6 ${
                     portfolioStats.profit_loss >= 0 
                       ? 'from-yellow-900/30 to-yellow-800/20 border border-yellow-500/30' 
@@ -864,17 +841,12 @@ const PredictionMarketsPage: React.FC = () => {
                     <div className={`text-sm mb-1 uppercase tracking-wide ${
                       portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                      Your Profit
+                      Profit
                     </div>
                     <div className={`text-3xl font-black ${
                       portfolioStats.profit_loss >= 0 ? 'text-yellow-400' : 'text-red-400'
                     }`}>
-                      {portfolioStats.profit_loss >= 0 ? '+' : ''}{portfolioStats.profit_loss.toFixed(2)} CAMP
-                    </div>
-                    <div className={`text-xs mt-1 ${
-                      portfolioStats.profit_loss >= 0 ? 'text-yellow-300/70' : 'text-red-300/70'
-                    }`}>
-                      Win rate: {portfolioStats.win_rate.toFixed(1)}%
+                      {portfolioStats.profit_loss >= 0 ? '+' : ''}{portfolioStats.profit_loss.toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -903,7 +875,6 @@ const PredictionMarketsPage: React.FC = () => {
                               {bet.prediction ? 'YES' : 'NO'}
                             </span>
 
-                            {/* ✅ LIVE STATUS BADGE */}
                             {bet.status === 'pending' && (
                               <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
@@ -952,10 +923,9 @@ const PredictionMarketsPage: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* ✅ BLOCKCHAIN EXPLORER LINK */}
                       {bet.tx_hash && (
                         <a
-                          href={`https://basecamp.cloud.blockscout.com/tx/${bet.tx_hash}`}
+                          href={`${BASECAMP_CONFIG.blockExplorerUrls[0]}/tx/${bet.tx_hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-4 flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
@@ -964,15 +934,7 @@ const PredictionMarketsPage: React.FC = () => {
                           View Bet Transaction
                         </a>
                       )}
-                      
-                      {/* 🐛 DEBUG: Show bet state */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="text-xs text-gray-500 mb-2">
-                          resolved={String(bet.resolved)} | won={String(bet.won)} | claimed={String(bet.claimed)}
-                        </div>
-                      )}
 
-                      {/* 🎯 Show claim button if market resolved + user won + not claimed yet */}
                       {bet.resolved && bet.won === true && bet.claimed !== true && (
                         <button
                           onClick={() => handleClaimWinnings(bet.id, bet.market_id)}
@@ -993,7 +955,6 @@ const PredictionMarketsPage: React.FC = () => {
                         </button>
                       )}
 
-                      {/* ✅ CLAIMED STATUS */}
                       {bet.claimed && (
                         <div className="w-full mt-4 space-y-2">
                           <div className="py-3 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center gap-2">
@@ -1003,10 +964,9 @@ const PredictionMarketsPage: React.FC = () => {
                             </span>
                           </div>
                           
-                          {/* Claim Transaction Link */}
                           {bet.claim_tx_hash && (
                             <a
-                              href={`https://basecamp.cloud.blockscout.com/tx/${bet.claim_tx_hash}`}
+                              href={`${BASECAMP_CONFIG.blockExplorerUrls[0]}/tx/${bet.claim_tx_hash}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center justify-center gap-2 py-2 px-4 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg text-xs text-gray-400 hover:text-white transition-all"
@@ -1025,11 +985,12 @@ const PredictionMarketsPage: React.FC = () => {
           </>
         )}
 
-        {/* Bet Modal */}
+        {/* ================================================================================
+            BET MODAL
+            ================================================================================ */}
         {showBetModal && selectedMarket && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
             <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-              {/* Modal Header */}
               <div className="p-6 border-b border-slate-700">
                 <div className="flex items-start justify-between">
                   <div>
@@ -1051,9 +1012,7 @@ const PredictionMarketsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Modal Body */}
               <div className="p-6">
-                {/* Transaction Monitor - Shows during/after bet placement */}
                 {activeTransaction ? (
                   <div className="mb-6">
                     <TransactionMonitor
@@ -1072,7 +1031,6 @@ const PredictionMarketsPage: React.FC = () => {
                   </div>
                 ) : (
                   <>
-                    {/* YES/NO Toggle */}
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       <button
                         onClick={() => setBetPrediction(true)}
@@ -1101,22 +1059,17 @@ const PredictionMarketsPage: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Amount Input */}
                     <div className="mb-6">
                       <label className="block text-sm font-semibold text-gray-400 mb-2">Bet Amount (CAMP)</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-500"></span>
-                        <input
-                          type="number"
-                          value={betAmount}
-                          onChange={(e) => setBetAmount(e.target.value)}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-4 text-2xl font-bold text-white focus:border-green-500 focus:outline-none"
-                          placeholder="10"
-                          min="1"
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        value={betAmount}
+                        onChange={(e) => setBetAmount(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-2xl font-bold text-white focus:border-green-500 focus:outline-none"
+                        placeholder="10"
+                        min="1"
+                      />
                       
-                      {/* Quick Amounts */}
                       <div className="grid grid-cols-4 gap-2 mt-3">
                         {[1, 5, 10, 50].map(amount => (
                           <button
@@ -1130,7 +1083,6 @@ const PredictionMarketsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Payout Breakdown - TIERED FEE CALCULATION */}
                     <div className="bg-slate-800/50 rounded-xl p-5 mb-6 border border-slate-700">
                       <div className="flex justify-between mb-3">
                         <span className="text-gray-400">Your Bet</span>
@@ -1169,7 +1121,6 @@ const PredictionMarketsPage: React.FC = () => {
                       })()}
                     </div>
 
-                    {/* Warning - UPDATED FEE INFORMATION */}
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex gap-3">
                       <Info className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-yellow-200">
@@ -1177,7 +1128,6 @@ const PredictionMarketsPage: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="flex gap-3">
                       <button
                         onClick={() => setShowBetModal(false)}
@@ -1187,10 +1137,12 @@ const PredictionMarketsPage: React.FC = () => {
                       </button>
                       <button
                         onClick={handlePlaceBet}
-                        disabled={loading || signingTransaction || !betAmount || parseFloat(betAmount) < 1}
+                        disabled={loading || signingTransaction || !betAmount || parseFloat(betAmount) < 1 || !isBasecampConnected}
                         className="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {signingTransaction ? (
+                        {!isBasecampConnected ? (
+                          'Connect Wallet First'
+                        ) : signingTransaction ? (
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                             <span>Signing Transaction...</span>
@@ -1209,7 +1161,9 @@ const PredictionMarketsPage: React.FC = () => {
           </div>
         )}
 
-        {/* 🎯 CLAIM TRANSACTION MONITOR MODAL */}
+        {/* ================================================================================
+            CLAIM TRANSACTION MONITOR MODAL
+            ================================================================================ */}
         {claimTransaction && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full p-6">
@@ -1247,15 +1201,6 @@ const PredictionMarketsPage: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Unified Wallet Modal for all wallet connections */}
-      {showUnifiedWalletModal && (
-        <UnifiedWalletModal
-          isOpen={showUnifiedWalletModal}
-          onClose={() => setShowUnifiedWalletModal(false)}
-          defaultAction="bet"
-        />
-      )}
     </div>
   );
 };

@@ -46,6 +46,7 @@ export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWa
     }
   };
 
+  // ✅ ADD ACTION BUTTONS TO EACH CARD
   const renderNetworkCard = (networkId: keyof typeof NETWORK_CONFIGS) => {
     const config = NETWORK_CONFIGS[networkId];
     const wallet = wallets[networkId];
@@ -54,53 +55,65 @@ export function UnifiedWalletModal({ isOpen, onClose, defaultAction }: UnifiedWa
     return (
       <div
         key={networkId}
-        className={`p-4 rounded-xl border transition-all cursor-pointer hover:scale-[1.02] ${
+        className={`p-6 rounded-xl border-2 transition-all ${
           isConnected
             ? 'bg-green-500/10 border-green-500/30'
-            : 'bg-gray-800/50 border-gray-700/50 hover:border-blue-500/30'
+            : 'bg-gray-800/50 border-gray-700/50 hover:border-blue-500/50 cursor-pointer'
         }`}
-        onClick={() => setSelectedNetwork(networkId)}
+        onClick={() => !isConnected && setSelectedNetwork(networkId)}
       >
-        <div className="flex items-center justify-between mb-3">
+        {/* Network Icon & Name */}
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-              isConnected ? 'bg-green-500/20' : 'bg-gray-700'
-            }`}>
-              <div className="w-8 h-8 flex items-center justify-center">
-                {networkId === 'basecamp' && (
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-green-500 to-emerald-600"></div>
-                )}
-                {networkId === 'ethereum' && (
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500"></div>
-                )}
-                {networkId === 'polygon' && (
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600"></div>
-                )}
-              </div>
-            </div>
+            <img src={config.icon} alt={config.name} className="w-10 h-10" />
             <div>
-              <div className="font-semibold text-white">{config.name}</div>
-              <div className="text-sm text-gray-400">{config.description}</div>
+              <div className="font-bold text-white text-lg">{config.name}</div>
+              <div className="text-xs text-gray-400">{config.description}</div>
             </div>
           </div>
           
           {isConnected ? (
-            <div className="flex items-center gap-2 text-green-400">
-              <Check className="w-5 h-5" />
-              <span className="text-sm font-medium">Connected</span>
-            </div>
+            <CheckCircle className="w-6 h-6 text-green-400" />
           ) : (
             <ChevronRight className="w-5 h-5 text-gray-400" />
           )}
         </div>
         
-        <div className="flex items-center justify-between text-sm">
-          <div className="text-gray-400">
-            {config.type === 'testnet' && '🟡 Testnet'}
-            {config.type === 'mainnet' && '🟢 Mainnet'}
-            {config.type === 'camp_mainnet_future' && '🔵 Future'}
+        {/* Connected: Show address + Disconnect button */}
+        {isConnected && wallet ? (
+          <div className="space-y-3">
+            <div className="p-3 bg-gray-900/50 rounded-lg">
+              <div className="text-xs text-gray-400 mb-1">Address</div>
+              <div className="font-mono text-sm text-white">
+                {wallet.address.slice(0, 10)}...{wallet.address.slice(-8)}
+              </div>
+            </div>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                disconnectWallet(networkId);
+              }}
+              className="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Disconnect
+            </button>
           </div>
-          <div className="text-gray-400">{config.nativeCurrency}</div>
+        ) : (
+          /* Not Connected: Show Connect button */
+          <button
+            onClick={() => connectWallet(networkId)}
+            disabled={isConnecting}
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-lg transition-all disabled:opacity-50"
+          >
+            {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </button>
+        )}
+        
+        {/* Network Info */}
+        <div className="mt-3 pt-3 border-t border-gray-700/50 text-xs text-gray-400 space-y-1">
+          <div>Chain ID: {config.chainId}</div>
+          <div>Type: {config.type}</div>
         </div>
       </div>
     );
