@@ -1,35 +1,34 @@
 // File: frontend/src/pages/DashboardPage.tsx
-// ✅ COMPLETE VERSION - Ready for production
+// 🔄 REDESIGNED - Sidebar layout, removed external wallet cards
 
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, X, Activity, RefreshCw, Shield, AlertTriangle,
-  Copy, Check, ExternalLink, ArrowUpRight, LogOut, User,
-  ArrowDownLeft, RefreshCw as SwapIcon, Key,
-  Wallet, ArrowDownToLine, Target, Link2, Loader2
+  TrendingUp,
+  Activity,
+  RefreshCw,
+  Shield,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownToLine,
+  Target,
+  Coins,    // ➕ New
+  Plus,     // ➕ New
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';  // ➕ New
 import { useAuth } from '../contexts/AuthContext';
-import { useWalletOrchestrator } from '../contexts/WalletOrchestratorContext'; // ✅ UNIFIED HOOK
-import toast from 'react-hot-toast';
 import { apiClient } from '@/config/api';
-import { useNavigate } from 'react-router-dom';
-import NigerianUserBanner from '@/components/layout/NigerianUserBanner';
+import toast from 'react-hot-toast';
+import Sidebar from '@/components/layout/Sidebar';
 import ChainWalletCard from '@/components/wallet/ChainWalletCard';
-import WalletDetailModal from '@/components/wallet/WalletDetailModal';
-import WalletCreationStatusBanner from '@/components/wallet/WalletCreationStatusBanner';
-import WalletRecoveryModal from '@/components/wallet/WalletRecoveryModal';
 import { FundWalletModal } from '@/components/wallet/FundWalletModal';
 import { WithdrawModal } from '@/components/wallet/WithdrawModal';
-import { toastInfo, toastWarning } from '@/lib/toast-helpers';
 import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
-import { safeTruncate } from '@/utils/stringUtils';
 import MarketTerminalModal from '@/components/market/MarketTerminalModal';
-import LiveMarketPreview from '@/components/market/LiveMarketPreview';
-import PredictionMarketsPage from './PredictionMarketsPage';
+import CreateRepoModal from '@/components/modals/CreateRepoModal';
 
-// KYC Banner Component
+// KYC Banner Component (unchanged)
 interface KYCPromptBannerProps {
   kycStatus: string;
   cumulativeVolume: number;
@@ -50,85 +49,23 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   }
   
   const remaining = Math.max(0, limit - cumulativeVolume);
-  const percentUsed = (cumulativeVolume / limit) * 100;
-  const navigate = useNavigate();
-  
-  const urgencyConfig = {
-    info: {
-      bg: 'bg-blue-50 dark:bg-blue-900/20',
-      border: 'border-blue-200 dark:border-blue-800',
-      text: 'text-blue-800 dark:text-blue-200',
-      icon: <AlertTriangle className="w-5 h-5" />,
-      title: '💡 Unlock Unlimited Transactions',
-      message: `You've used $${cumulativeVolume.toFixed(2)} of your $${limit} limit. Verify your identity to remove all limits.`,
-      action: 'Verify Now',
-      dismissible: true,
-    },
-    warning: {
-      bg: 'bg-orange-50 dark:bg-orange-900/20',
-      border: 'border-orange-200 dark:border-orange-800',
-      text: 'text-orange-800 dark:text-orange-200',
-      icon: <AlertTriangle className="w-5 h-5" />,
-      title: '⚠️ Approaching Transaction Limit',
-      message: `Only $${remaining.toFixed(2)} remaining. Complete KYC verification to continue transacting.`,
-      action: 'Complete KYC',
-      dismissible: false,
-    },
-    critical: {
-      bg: 'bg-red-50 dark:bg-red-900/20',
-      border: 'border-red-200 dark:border-red-800',
-      text: 'text-red-800 dark:text-red-200',
-      icon: <Shield className="w-5 h-5" />,
-      title: '🚨 Transaction Limit Reached',
-      message: `You've reached your $${limit} limit. Verify your identity to continue.`,
-      action: 'Verify Now (Required)',
-      dismissible: false,
-    },
-  };
-  
-  const config = urgencyConfig[urgency as keyof typeof urgencyConfig] || urgencyConfig.info;
   
   return (
-    <div className={`rounded-2xl border p-4 mb-6 ${config.bg} ${config.border} backdrop-blur-sm animate-in slide-in-from-top duration-500`}>
+    <div className="rounded-2xl border border-orange-500/30 bg-orange-900/20 p-4 mb-6 backdrop-blur-sm">
       <div className="flex items-start gap-3">
-        <div className={config.text}>{config.icon}</div>
+        <AlertTriangle className="w-5 h-5 text-orange-400" />
         <div className="flex-1">
-          <h3 className={`font-semibold mb-1 ${config.text}`}>{config.title}</h3>
-          <p className={`text-sm mb-3 ${config.text}`}>{config.message}</p>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
-            <div
-              className={`h-2 rounded-full transition-all duration-300 ${
-                urgency === 'critical' ? 'bg-red-600' :
-                urgency === 'warning' ? 'bg-orange-500' : 'bg-blue-500'
-              }`}
-              style={{ width: `${Math.min(100, percentUsed)}%` }}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => window.location.href = '/onboarding'}
-              className={`px-4 py-2 rounded-lg font-medium transition-all shadow-lg ${
-                urgency === 'critical' 
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : urgency === 'warning'
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              {config.action}
-            </button>
-            {config.dismissible && (
-              <button onClick={() => setDismissed(true)} className={`text-sm ${config.text} hover:underline`}>
-                Remind me later
-              </button>
-            )}
-          </div>
-        </div>
-        {config.dismissible && (
-          <button onClick={() => setDismissed(true)} className={`${config.text} hover:opacity-70`}>
-            <X className="w-5 h-5" />
+          <h3 className="font-semibold text-orange-200 mb-1">Complete KYC Verification</h3>
+          <p className="text-sm text-orange-300 mb-3">
+            ${remaining.toFixed(2)} remaining before verification required
+          </p>
+          <button
+            onClick={() => window.location.href = '/onboarding'}
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-all"
+          >
+            Verify Now
           </button>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -136,7 +73,7 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
 
 // Main Dashboard Component
 const DashboardPage = () => {
-  const { user, userProfile, signOut } = useAuth();
+  const { user, userProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [portfolioData, setPortfolioData] = useState<any>(null);
@@ -146,181 +83,35 @@ const DashboardPage = () => {
     limit: 5000,
     urgency: 'none',
   });
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [multiChainWallets, setMultiChainWallets] = useState<any>({});
-  const [selectedChain, setSelectedChain] = useState<string | null>(null);
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [walletCreationStatus, setWalletCreationStatus] = useState<any>(null);
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
-  const [backupStatus, setBackupStatus] = useState<any>(null);
-  const [newWalletsForBackup, setNewWalletsForBackup] = useState<string[]>([]);
-  
-  // ✅ ADD WALLET CONNECT HOOK HERE
-  const { 
-    wallets,
-    connectWallet, 
-    disconnectWallet, 
-    isConnecting 
-  } = useWalletOrchestrator(); // ✅ UNIFIED SYSTEM
-
-  // Helper to check chain connection status
-  const isChainConnected = (chain: 'base' | 'celo' | 'basecamp') => wallets[chain]?.isConnected || false;
-  const getChainAddress = (chain: 'base' | 'celo' | 'basecamp') => wallets[chain]?.address || '';
-
-  // Payment modal states
+  // Modal states
   const [showFundModal, setShowFundModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showMarketTerminal, setShowMarketTerminal] = useState(false);
-  const [showBackupModal, setShowBackupModal] = useState(false);
-  const [showPredictionMarkets, setShowPredictionMarkets] = useState(false);
+  const [showCreateRepoModal, setShowCreateRepoModal] = useState(false);
+  const [tokenizedAssets, setTokenizedAssets] = useState<any[]>([]);
 
-  // ✅ Check backup status on mount
-  useEffect(() => {
-    const checkBackupStatus = async () => {
-      try {
-        const response = await apiClient.get('/api/v1/wallet-backup/status');
-        if (response.data.success) {
-          setBackupStatus(response.data);
-          
-          // Check if there are new wallets from sessionStorage
-          const newWallets = sessionStorage.getItem('new_wallets');
-          if (newWallets) {
-            const chains = JSON.parse(newWallets);
-            const unbacked = chains.filter(
-              (c: string) => !response.data.backed_up_chains.includes(c)
-            );
-            
-            if (unbacked.length > 0) {
-              setNewWalletsForBackup(unbacked);
-              setShowRecoveryModal(true);
-              sessionStorage.removeItem('new_wallets'); // Clear after showing
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Backup status check failed:', error);
-      }
-    };
-
-    if (user) {
-      checkBackupStatus();
-    }
-  }, [user]);
-
-  const [serviceStatus, setServiceStatus] = useState<any>(null);
-
-  // Enhanced health monitoring
-  const checkServiceHealth = async () => {
-    try {
-      const response = await apiClient.get('/api/v1/health');
-      setServiceStatus(response.data);
-    } catch (error) {
-      setServiceStatus({ status: 'degraded', wdk: 'offline' });
-    }
-  };
-
-  // ✅ UPDATE SUPPORTED_CHAINS to include Base and Celo
-  const SUPPORTED_CHAINS = [
-    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', type: 'auto' },
-    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', type: 'auto' },
-    { id: 'polygon', name: 'Polygon', symbol: 'MATIC', type: 'auto' },
-    { id: 'algorand', name: 'Algorand', symbol: 'ALGO', type: 'auto' },
-    { id: 'tron', name: 'TRON', symbol: 'TRX', type: 'auto' },
-    { id: 'base', name: 'Base', symbol: 'ETH', type: 'connect' },
-    { id: 'celo', name: 'Celo', symbol: 'CELO', type: 'connect' }
+  // ✅ ONLY Auto-created chains (removed Base, Celo, BaseCAMP)
+  const AUTO_CREATED_CHAINS = [
+    { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
+    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
+    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
+    { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
+    { id: 'tron', name: 'TRON', symbol: 'TRX' },
   ];
-
-  // Update the validation useEffect to only expect 5 chains
-  useEffect(() => {
-    const verifyChainIntegration = async () => {
-      try {
-        const response = await apiClient.get('/api/v1/wallet/multi-chain-status');
-        const chains = Object.keys(response.data.wallets || {});
-        
-        console.log('✅ ACTIVE CHAINS:', chains);
-        
-        const expectedChains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron'];
-        const missingChains = expectedChains.filter(chain => !chains.includes(chain));
-        
-        if (missingChains.length > 0) {
-          console.warn('⚠️ Missing chains:', missingChains);
-        } else {
-          console.log('🎯 5 CHAINS ACTIVE!');
-        }
-      } catch (error) {
-        console.error('Chain verification failed:', error);
-      }
-    };
-    
-    if (user) {
-      verifyChainIntegration();
-    }
-  }, [user]);
 
   useEffect(() => {
     if (user && userProfile) {
       fetchPortfolioData();
       fetchKYCStatus();
       fetchMultiChainWallets();
-      fetchWalletCreationStatus();
+      fetchTokenizedAssets();  // ➕ New
     }
   }, [user, userProfile]);
-
-  const fetchWalletCreationStatus = async () => {
-    try {
-      const response = await apiClient.get('/api/v1/wallet-creation/status');
-      if (response.data.success) {
-        setWalletCreationStatus(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch wallet creation status:', error);
-    }
-  };
-
-  const handleRetrySuccess = () => {
-    fetchWalletCreationStatus();
-    fetchMultiChainWallets();
-    fetchPortfolioData();
-  };
-
-  const fetchMultiChainWallets = async () => {
-    try {
-      const response = await apiClient.get('/api/v1/wallet-creation/status');
-      if (response.data.success) {
-        // Extract wallets from the status response
-        const wallets: Record<string, any> = {};
-        Object.entries(response.data.chains || {}).forEach(([chain, data]: [string, any]) => {
-          if (data.address) {
-            wallets[chain] = { address: data.address };
-          }
-        });
-        setMultiChainWallets(wallets);
-      }
-    } catch (error) {
-      console.error('Multi-chain wallet status fetch failed:', error);
-      setMultiChainWallets({});
-    }
-  };
-
-  const getAssetChain = (symbol: string) => {
-    const chainMap: { [key: string]: string } = {
-      'ALGO': 'algorand', 'USDCa': 'algorand', 'USDT': 'algorand', 
-      'goBTC': 'algorand', 'goETH': 'algorand', 'BTC': 'bitcoin',
-      'ETH': 'ethereum', 'MATIC': 'polygon'
-    };
-    return chainMap[symbol] || 'algorand';
-  };
-
-  const calculateChainBalance = (chain: string) => {
-    if (!portfolioData?.assets) return 0;
-    return portfolioData.assets
-      .filter((asset: any) => getAssetChain(asset.symbol) === chain)
-      .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
-  };
 
   const fetchPortfolioData = async () => {
     try {
@@ -332,26 +123,23 @@ const DashboardPage = () => {
           assets: response.data.assets,
           timestamp: response.data.timestamp
         });
-        if (response.data.wallet_addresses) {
-          setMultiChainWallets(response.data.wallet_addresses);
-        }
       }
     } catch (error: any) {
-      console.error('portfolio fetch error:', error);
-      if (userProfile?.algorand_address) {
-        setPortfolioData({ success: true, total_usd: 0, assets: [], wallet_address: userProfile.algorand_address });
-      }
+      console.error('Portfolio fetch error:', error);
+      toast.error('Failed to load portfolio data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleWalletCardClick = (chain: string) => {
-    if (multiChainWallets[chain]?.address) {
-      setSelectedChain(chain);
-      setShowWalletModal(true);
-    } else {
-      toast.error(`${chain} wallet not created yet`);
+  const fetchTokenizedAssets = async () => {
+    try {
+      const response = await apiClient.get('/api/v1/tokenization/my-assets');
+      if (response.data.success) {
+        setTokenizedAssets(response.data.data.assets || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tokenized assets:', error);
     }
   };
 
@@ -371,32 +159,28 @@ const DashboardPage = () => {
     }
   };
 
-  const handleVerifyKYC = async () => {
+  const fetchMultiChainWallets = async () => {
     try {
-      const kycResponse = await apiClient.get('/api/v1/users/kyc-status');
-      if (kycResponse.data.status === 'verified' || kycResponse.data.status === 'approved') {
-        toast.success('Your account is already verified!');
-        return;
+      const response = await apiClient.get('/api/v1/wallet-creation/status');
+      if (response.data.success) {
+        const wallets: Record<string, any> = {};
+        Object.entries(response.data.chains || {}).forEach(([chain, data]: [string, any]) => {
+          if (data.address) {
+            wallets[chain] = { address: data.address };
+          }
+        });
+        setMultiChainWallets(wallets);
       }
-      window.location.href = '/onboarding';
     } catch (error) {
-      console.error('KYC verification error:', error);
-      toast.error('Unable to start verification process');
+      console.error('Failed to fetch wallets:', error);
     }
   };
 
-  const handleViewSeedPhrases = () => {
-    navigate('/wallet-recovery');
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      toast.success('Logged out successfully');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Logout failed');
-    }
+  const calculateChainBalance = (chain: string) => {
+    if (!portfolioData?.assets) return 0;
+    return portfolioData.assets
+      .filter((asset: any) => asset.chain === chain)
+      .reduce((total: number, asset: any) => total + (asset.usd_value || 0), 0);
   };
 
   const totalBalance = portfolioData?.total_usd || 0;
@@ -404,607 +188,385 @@ const DashboardPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading your portfolio...</p>
+      <div className="flex h-screen">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading your portfolio...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio</h1>
-              <p className="text-gray-400 text-sm md:text-base">Manage your multi-chain wallets</p>
-            </div>
-            
-            {/* Desktop Profile Menu */}
-            <div className="hidden md:block relative">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-white transition-colors"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-                </div>
-                <span className="text-sm">{userProfile?.first_name || user?.email?.split('@')[0] || 'User'}</span>
-              </button>
-              {showProfileMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Key className="h-4 w-4" />
-                      <span>Recovery Phrases</span>
-                    </button>
-                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Shield className="h-4 w-4" />
-                      <span>Verify</span>
-                    </button>
-                    
-                    {/* ✅ CORRECTED: Admin link (only show if is_admin=true) */}
-                    {userProfile?.is_admin && (
-                      <button 
-                        onClick={() => navigate('/admin')} 
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors"
-                      >
-                        <Shield className="h-4 w-4" />
-                        <span>Admin Dashboard</span>
-                      </button>
-                    )}
-                    
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* ✅ NEW: Sidebar */}
+      <Sidebar />
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-white mb-2">Portfolio Overview</h1>
+            <p className="text-gray-400">Manage your multi-chain digital assets</p>
           </div>
 
-          {/* Action Buttons - Responsive Layout */}
-          <div className="flex flex-wrap gap-2">
-            {/* Primary Actions */}
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 mb-6">
             <button 
               onClick={() => setShowFundModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Fund</span>
+              <ArrowDownToLine className="h-4 w-4" />
+              Fund
             </button>
             
             <button 
               onClick={() => setShowSendModal(true)} 
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
               <ArrowUpRight className="h-4 w-4" />
-              <span className="hidden sm:inline">Send</span>
+              Send
             </button>
             
             <button 
               onClick={() => setShowSwapModal(true)}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
-              <SwapIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Swap</span>
+              <RefreshCw className="h-4 w-4" />
+              Swap
             </button>
             
             <button 
               onClick={() => setShowEarnModal(true)}
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
               <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Earn</span>
+              Earn
             </button>
             
             <button 
               onClick={() => setShowWithdrawModal(true)}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-medium transition-colors"
             >
               <ArrowDownToLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Withdraw</span>
+              Withdraw
             </button>
+          </div>
 
-            {/* Mobile Profile Menu */}
-            <div className="md:hidden ml-auto relative">
-              <button 
-                onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors"
-              >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold">
-                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+          {/* ========== TOKENIZATION QUICK STATS ========== */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {/* Tokenized Assets Card */}
+            <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <Coins className="h-5 w-5 text-green-400" />
                 </div>
+                <span className="text-xs text-green-400 font-medium">+12.5%</span>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">3</div>
+              <div className="text-sm text-gray-400">Tokenized Assets</div>
+            </div>
+
+            {/* Active Repos Card */}
+            <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-500/30 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <RefreshCw className="h-5 w-5 text-blue-400" />
+                </div>
+                <span className="text-xs text-blue-400 font-medium">1 Active</span>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">$1,050</div>
+              <div className="text-sm text-gray-400">Repo Loans</div>
+            </div>
+
+            {/* DVP Settlements Card */}
+            <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <Activity className="h-5 w-5 text-purple-400 animate-pulse" />
+                </div>
+                <span className="text-xs text-purple-400 font-medium">Live</span>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">4.2s</div>
+              <div className="text-sm text-gray-400">Avg Settlement</div>
+            </div>
+
+            {/* Collateral LTV Card */}
+            <div className="bg-gradient-to-br from-orange-900/20 to-yellow-900/20 border border-orange-500/30 rounded-xl p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 bg-orange-500/20 rounded-lg">
+                  <Target className="h-5 w-5 text-orange-400" />
+                </div>
+                <span className="text-xs text-orange-400 font-medium">Healthy</span>
+              </div>
+              <div className="text-2xl font-bold text-white mb-1">65%</div>
+              <div className="text-sm text-gray-400">Average LTV</div>
+            </div>
+          </div>
+
+          {/* ========== TOKENIZATION HUB ========== */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+                  <Coins className="h-6 w-6 text-green-400" />
+                  Tokenized Securities
+                </h2>
+                <p className="text-gray-400 text-sm">Digital twins of traditional assets</p>
+              </div>
+              <button
+                onClick={() => navigate('/tokenization/convert')}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium text-white transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Convert Asset
               </button>
-              {showProfileMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
-                    {/* ✅ ADMIN MENU ITEM - Only for admins */}
-                    {userProfile?.is_admin && (
-                      <button 
-                        onClick={() => {
-                          setShowProfileMenu(false); // Close menu
-                          navigate('/admin');
-                        }} 
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors border-b border-gray-700"
-                      >
-                        <Shield className="h-4 w-4" />
-                        <span>Admin Dashboard</span>
+            </div>
+
+            {/* Tokenized Assets Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-700/50">
+                    <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Asset</th>
+                    <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Custodian</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">In Custody</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">On Chain</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Value (USD)</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Example Row - Replace with actual data */}
+                  <tr className="border-b border-gray-700/30 hover:bg-gray-800/30 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">DC</span>
+                        </div>
+                        <div>
+                          <div className="text-white font-medium">DANGCEM</div>
+                          <div className="text-xs text-gray-400">Dangote Cement Plc</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className="text-gray-300">CSCS</span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <span className="text-white font-medium">1,000</span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <span className="text-green-400 font-medium">1,000</span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <span className="text-white font-bold">$45,000</span>
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm font-medium transition-colors">
+                        Trade
                       </button>
-                    )}
-                    <button onClick={handleViewSeedPhrases} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Key className="h-4 w-4" />
-                      <span>Recovery Phrases</span>
-                    </button>
-                    <button onClick={handleVerifyKYC} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors">
-                      <Shield className="h-4 w-4" />
-                      <span>Verify</span>
-                    </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors rounded-b-lg">
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
+                    </td>
+                  </tr>
+                  
+                  {/* Empty State */}
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center">
+                      <div className="text-gray-400 mb-3">No tokenized assets yet</div>
+                      <button
+                        onClick={() => navigate('/tokenization/convert')}
+                        className="text-green-400 hover:text-green-300 font-medium text-sm transition-colors"
+                      >
+                        Convert your first asset →
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ========== ACTIVE REPO TRADES ========== */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+                  <RefreshCw className="h-6 w-6 text-blue-400" />
+                  Active Repo Trades
+                </h2>
+                <p className="text-gray-400 text-sm">Borrow against your tokenized assets</p>
+              </div>
+              <button
+                onClick={() => setShowCreateRepoModal(true)}  // ✅ Updated
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Create Repo
+              </button>
+            </div>
+
+            {/* Repo Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Example Repo Card - Replace with actual data */}
+              <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full font-medium">Active</span>
+                  <span className="text-xs text-gray-400">Matures in 29d</span>
+                </div>
+                
+                <div className="mb-3">
+                  <div className="text-sm text-gray-400 mb-1">Collateral</div>
+                  <div className="text-lg font-bold text-white">25 DANGCEM</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Loan</div>
+                    <div className="text-sm font-semibold text-white">$1,050</div>
                   </div>
-                </>
-              )}
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">LTV</div>
+                    <div className="text-sm font-semibold text-green-400">65%</div>
+                  </div>
+                </div>
+                
+                <div className="pt-3 border-t border-gray-700/50">
+                  <div className="text-xs text-gray-400 mb-1">Repurchase Amount</div>
+                  <div className="text-base font-bold text-white">$1,053.88</div>
+                </div>
+              </div>
+
+              {/* Empty State Card */}
+              <div className="bg-gray-800/30 border border-dashed border-gray-700 rounded-xl p-6 flex flex-col items-center justify-center min-h-[200px]">
+                <RefreshCw className="h-12 w-12 text-gray-600 mb-3" />
+                <div className="text-gray-400 text-sm text-center mb-3">No active repos</div>
+                <button
+                  onClick={() => navigate('/collateral/create-repo')}
+                  className="text-blue-400 hover:text-blue-300 font-medium text-sm transition-colors"
+                >
+                  Create your first repo →
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        
-        {/* 📍 BLOOMBERG-GRADE MARKET TERMINAL PREVIEW */}
-        <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <TrendingUp className="h-6 w-6 text-blue-400" />
-                Live Market Terminal
-              </h2>
-              <p className="text-gray-400 text-sm">Bloomberg-Grade Real-Time Market Data</p>
+
+          {/* KYC Banner */}
+          <KYCPromptBanner 
+            kycStatus={kycInfo.status} 
+            cumulativeVolume={kycInfo.cumulative_volume} 
+            limit={kycInfo.limit} 
+            urgency={kycInfo.urgency} 
+          />
+
+          {/* Market Terminal Preview */}
+          <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-6 w-6 text-blue-400" />
+                  Live Market Terminal
+                </h2>
+                <p className="text-gray-400 text-sm">Real-time market data & analytics</p>
+              </div>
+              <button
+                onClick={() => setShowMarketTerminal(true)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold text-white transition-all"
+              >
+                <Activity className="h-5 w-5" />
+                Open Terminal
+              </button>
             </div>
-            <button
-              onClick={() => setShowMarketTerminal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 animate-pulse"
-            >
-              <Activity className="h-5 w-5" />
-              <span className="hidden sm:inline">Open Terminal</span>
-              <span className="sm:hidden">View</span>
-            </button>
           </div>
-        </div>
 
-        {/* 🎯 PREDICTION MARKETS CARD */}
-        <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-2xl p-6 mb-6 backdrop-blur-sm hover:shadow-xl hover:shadow-green-500/10 transition-all">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Target className="h-6 w-6 text-green-400" />
-                Prediction Markets
-              </h2>
-              <p className="text-gray-400 text-sm">Bet on sports, crypto, FX & politics with CAMP</p>
+          {/* Balance Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-sm text-gray-400 mb-1">Total Balance</div>
+                  <div className="text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                </div>
+                <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
+                  <RefreshCw className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Activity className="h-4 w-4 text-green-400 animate-pulse" />
+                <span className="text-green-400">Live Multi-Chain Balances</span>
+              </div>
             </div>
-            <button
-              onClick={() => setShowPredictionMarkets(true)}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50"
-            >
-              <TrendingUp className="h-5 w-5" />
-              <span className="hidden sm:inline">View Markets</span>
-              <span className="sm:hidden">Bet</span>
-            </button>
-          </div>
-        </div>
 
-        {walletCreationStatus && !walletCreationStatus.overall_complete && (
-          <WalletCreationStatusBanner status={walletCreationStatus} onRetrySuccess={handleRetrySuccess} />
-        )}
-
-        <KYCPromptBanner kycStatus={kycInfo.status} cumulativeVolume={kycInfo.cumulative_volume} limit={kycInfo.limit} urgency={kycInfo.urgency} />
-
-        {/* ✅ UPDATED: Multi-Chain Wallets Section */}
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
-            <span className="text-sm text-gray-400">
-              {createdChains} of {SUPPORTED_CHAINS.filter(c => c.type === 'auto').length} auto-created
-            </span>
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
+              <div className="text-sm text-gray-400 mb-2">Networks</div>
+              <div className="text-2xl font-bold text-white mb-4">{createdChains} / 5 Active</div>
+              <div className="space-y-2">
+                {AUTO_CREATED_CHAINS.map(chain => (
+                  <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
+                    {chain.name}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Auto-Created Wallets (Bitcoin, Ethereum, Polygon, Algorand, Tron) */}
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">
-              Auto-Created Wallets
-            </h3>
+          {/* Multi-Chain Wallets */}
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Multi-Chain Wallets</h2>
+              <span className="text-sm text-gray-400">{createdChains} of 5 created</span>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {SUPPORTED_CHAINS.filter(chain => chain.type === 'auto').map(chain => (
+              {AUTO_CREATED_CHAINS.map(chain => (
                 <ChainWalletCard 
                   key={chain.id} 
                   chain={chain.id} 
                   address={multiChainWallets[chain.id]?.address || ''} 
                   balance={calculateChainBalance(chain.id)} 
                   status={multiChainWallets[chain.id]?.address ? 'created' : 'not_created'} 
-                  onCardClick={() => handleWalletCardClick(chain.id)} 
+                  onCardClick={() => {}} 
                 />
               ))}
             </div>
           </div>
 
-          {/* 🌐 EXTERNAL WALLETS: Base + Celo */}
-          <div className="mt-8">
-            <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              Connect External Wallets
-            </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Use your existing MetaMask, Coinbase Wallet, MiniPay, or Valora
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Base Card */}
-              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                isChainConnected('base') 
-                  ? 'border-blue-500/50 shadow-lg shadow-blue-500/20' 
-                  : 'border-gray-700/50 hover:border-blue-500/30'
-              }`}>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800">
-                    <img 
-                      src="https://icons.llamao.fi/icons/chains/rsz_base.jpg" 
-                      alt="Base" 
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  <div className="text-right">
-                    {isChainConnected('base') ? (
-                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                        <Check className="w-4 h-4" />
-                        Connected
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">Mainnet</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <div className="text-white font-semibold">Base</div>
-                  <div className="text-gray-400 text-sm">Ethereum L2 by Coinbase</div>
-                  {isChainConnected('base') && getChainAddress('base') && (
-                    <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{safeTruncate(getChainAddress('base'), 8, 6)}</span>
-                      <a
-                        href={`https://basescan.org/address/${getChainAddress('base')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-blue-400 transition-colors"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {isChainConnected('base') ? (
-                  <button
-                    onClick={() => disconnectWallet('base')}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Disconnect
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => connectWallet('base')}
-                    disabled={isConnecting}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isConnecting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="w-5 h-5" />
-                        Connect Wallet
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <div className="mt-3 text-center text-xs text-gray-500">
-                  MetaMask • Coinbase • Rabby
-                </div>
-              </div>
-
-              {/* Celo Card */}
-              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 hover:scale-[1.02] ${
-                isChainConnected('celo') 
-                  ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
-                  : 'border-gray-700/50 hover:border-green-500/30'
-              }`}>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-700">
-                    <img 
-                      src="https://cryptologos.cc/logos/celo-celo-logo.svg" 
-                      alt="Celo" 
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  <div className="text-right">
-                    {isChainConnected('celo') ? (
-                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                        <Check className="w-4 h-4" />
-                        Connected
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">Mainnet</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <div className="text-white font-semibold">Celo</div>
-                  <div className="text-gray-400 text-sm">Mobile-first blockchain</div>
-                  {isChainConnected('celo') && getChainAddress('celo') && (
-                    <div className="text-gray-400 text-xs mt-2 flex items-center gap-2">
-                      <span className="truncate">{safeTruncate(getChainAddress('celo'), 8, 6)}</span>
-                      <a
-                        href={`https://celoscan.io/address/${getChainAddress('celo')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-green-400 transition-colors"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {isChainConnected('celo') ? (
-                  <button
-                    onClick={() => disconnectWallet('celo')}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Disconnect
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => connectWallet('celo')}
-                    disabled={isConnecting}
-                    className="w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-green-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isConnecting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="w-5 h-5" />
-                        Connect Wallet
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <div className="mt-3 text-center text-xs text-gray-500">
-                  Valora • MiniPay • MetaMask
-                </div>
-              </div>
-            </div>
-            
-            {/* 🎮 BASECAMP TESTNET (For Predictions) */}
-            <div className="mt-6">
-              <div className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border transition-all duration-300 ${
-                isChainConnected('basecamp') 
-                  ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/20' 
-                  : 'border-gray-700/50'
-              }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-600">
-                      <Target className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-white font-semibold">BaseCAMP Testnet</div>
-                      <div className="text-gray-400 text-sm">For prediction markets (test tokens)</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {isChainConnected('basecamp') ? (
-                      <div className="flex items-center gap-1 text-green-400 text-sm font-medium">
-                        <Check className="w-4 h-4" />
-                        Connected
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">Testnet</div>
-                    )}
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-400 mb-4">
-                  Connect to place bets in prediction markets. Uses test CAMP tokens.
-                </p>
-
-                {isChainConnected('basecamp') ? (
-                  <>
-                    {getChainAddress('basecamp') && (
-                      <div className="space-y-3">
-                        <div className="text-gray-300 text-sm flex items-center gap-2">
-                          <span className="font-mono">{safeTruncate(getChainAddress('basecamp'), 10, 8)}</span>
-                          <a
-                            href={`https://basecamp.cloud.blockscout.com/address/${getChainAddress('basecamp')}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-yellow-400 transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                        <button
-                          onClick={() => disconnectWallet('basecamp')}
-                          className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium text-sm transition-colors"
-                        >
-                          Disconnect Testnet
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    onClick={() => connectWallet('basecamp')}
-                    disabled={isConnecting}
-                    className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 hover:shadow-lg hover:shadow-yellow-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isConnecting ? 'Connecting...' : 'Connect for Predictions'}
-                  </button>
-                )}
-
-                <div className="mt-3 text-center text-xs text-gray-500">
-                  MetaMask only • <a href="https://faucet.campnetwork.xyz" target="_blank" rel="noopener noreferrer" className="text-yellow-400 hover:underline">Get test CAMP</a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Balance Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all">
-            <div className="flex items-center justify-between mb-4">
+          {/* Cross-Border Banner */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <div className="text-sm text-gray-400 mb-1">Total Balance</div>
-                <div className="text-3xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
-              </div>
-              <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors hover:rotate-180 duration-300">
-                <RefreshCw className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Activity className="h-4 w-4 text-green-400 animate-pulse" />
-              <span className="text-green-400">Live Multi-Chain Balances</span>
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
-            <div className="text-sm text-gray-400 mb-2">Networks</div>
-            <div className="text-2xl font-bold text-white mb-4">Multi-Chain</div>
-            <div className="space-y-2">
-              {SUPPORTED_CHAINS.map(chain => (
-                <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
-                  <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
-                  {chain.name}
+                <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
+                <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional</p>
+                <div className="flex flex-wrap items-center gap-4 text-xs">
+                  <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
+                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Quick Actions */}
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 mb-6 md:mb-8 backdrop-blur-sm">
-          <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              { icon: ArrowUpRight, label: 'Send', color: 'text-green-400', action: () => setShowSendModal(true) },
-              { icon: SwapIcon, label: 'Swap', color: 'text-purple-400', action: () => setShowSwapModal(true) },
-              { icon: TrendingUp, label: 'Earn', color: 'text-yellow-400', action: () => setShowEarnModal(true) },
-            ].map(action => (
-              <button key={action.label} onClick={action.action} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all hover:scale-105">
-                <action.icon className={`h-6 w-6 ${action.color}`} />
-                <span className="text-sm text-gray-300">{action.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Cross-Border Payments Banner */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white hover:shadow-2xl hover:shadow-blue-500/50 transition-all">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold mb-2">Cross-Border Payments</h3>
-              <p className="text-blue-100 text-sm mb-3">Send money globally at 1.2% fee vs 8% traditional (6.8% savings!)</p>
-              <div className="flex flex-wrap items-center gap-4 text-xs">
-                <span className="flex items-center gap-1"><Activity className="h-3 w-3" />Sub-5s settlement</span>
-                <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Bank-grade security</span>
               </div>
+              <button onClick={() => setShowSendModal(true)} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors">
+                Send Money
+              </button>
             </div>
-            <button onClick={() => setShowSendModal(true)} className="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold hover:bg-blue-50 transition-colors whitespace-nowrap shadow-lg">
-              Send Money
-            </button>
           </div>
         </div>
-
-        {/* Modals */}
-        {selectedChain && (
-          <WalletDetailModal 
-            isOpen={showWalletModal} 
-            onClose={() => { 
-              setShowWalletModal(false); 
-              setSelectedChain(null); 
-            }} 
-            chain={selectedChain} 
-            chainName={SUPPORTED_CHAINS.find(c => c.id === selectedChain)?.name || selectedChain} 
-            address={multiChainWallets[selectedChain]?.address || ''} 
-            balance={calculateChainBalance(selectedChain)}
-            onOpenFundModal={() => setShowFundModal(true)}
-          />
-        )}
-        
-        {showRecoveryModal && (
-          <WalletRecoveryModal
-            isOpen={showBackupModal}
-            onClose={() => setShowBackupModal(false)}
-          />
-        )}
-        <FundWalletModal 
-          open={showFundModal} 
-          onOpenChange={setShowFundModal} 
-        />
-        <WithdrawModal 
-          open={showWithdrawModal} 
-          onOpenChange={setShowWithdrawModal} 
-        />
-        <SendForm 
-          open={showSendModal} 
-          onOpenChange={setShowSendModal} 
-        />
-        <SwapModal 
-          open={showSwapModal} 
-          onOpenChange={setShowSwapModal} 
-        />
-        <EarnModal 
-          open={showEarnModal} 
-          onOpenChange={setShowEarnModal} 
-        />
-        <MarketTerminalModal 
-          isOpen={showMarketTerminal} 
-          onClose={() => setShowMarketTerminal(false)} 
-        />
       </div>
 
-      {/* Prediction Markets Modal */}
-      {showPredictionMarkets && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="min-h-screen">
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowPredictionMarkets(false)} />
-            <div className="relative">
-              <button
-                onClick={() => setShowPredictionMarkets(false)}
-                className="fixed top-4 right-4 z-50 p-3 bg-slate-800 hover:bg-slate-700 rounded-full text-white transition-all"
-              >
-                <X className="h-6 w-6" />
-              </button>
-              <PredictionMarketsPage />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modals */}
+      <FundWalletModal open={showFundModal} onOpenChange={setShowFundModal} />
+      <WithdrawModal open={showWithdrawModal} onOpenChange={setShowWithdrawModal} />
+      <SendForm open={showSendModal} onOpenChange={setShowSendModal} />
+      <SwapModal open={showSwapModal} onOpenChange={setShowSwapModal} />
+      <EarnModal open={showEarnModal} onOpenChange={setShowEarnModal} />
+      <MarketTerminalModal isOpen={showMarketTerminal} onClose={() => setShowMarketTerminal(false)} />
+      <CreateRepoModal 
+        open={showCreateRepoModal} 
+        onOpenChange={setShowCreateRepoModal}
+        tokenizedAssets={tokenizedAssets}
+      />
+      
     </div>
   );
 };

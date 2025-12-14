@@ -1,138 +1,245 @@
+// File: frontend/src/components/layout/Sidebar.tsx
+// 🆕 DTCC-Inspired Sidebar Navigation
+
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
+import { Link, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Coins,
   TrendingUp,
-  Wallet as WalletIcon,
-  Send,
-  BarChart2,
-  HelpCircle,
-  X,
-  Activity,
+  RefreshCw,
+  CreditCard,
+  Settings,
+  Link2,
+  LogOut,
+  Shield,     
+  Plus,        
+  Activity,    
+  Target,      
+  AlertTriangle, 
+  FileText,    
+  Clock,       
+  Wallet,          
+  ArrowDownToLine,  
+  ArrowUpRight,     
+  ShoppingCart,     
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-// ➕ ADD THIS INTERFACE
 interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string | number;
+  label: string;
+  icon: React.ElementType;
+  path: string;
+  badge?: string;
+  children?: NavItem[];
 }
 
-interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+const Sidebar: React.FC = () => {
+  const location = useLocation();
+  const { userProfile, signOut } = useAuth();
 
-// ➕ ADD TYPE ANNOTATION
-const navigationItems: NavItem[] = [
-  { name: 'Dashboard', href: '/app', icon: Home },
-  { name: 'Wallet', href: '/app/wallet', icon: WalletIcon, badge: 'New' }, // ➕ EXAMPLE
-  { name: 'Send Money', href: '/app/wallet', icon: Send },
-  { name: 'Markets', href: '/app/trading', icon: TrendingUp, badge: 3 }, // ➕ EXAMPLE
-  { name: 'Analytics', href: '/app/analytics', icon: BarChart2 },
-];
+  const navItems: NavItem[] = [
+    {
+      label: 'Portfolio',
+      icon: LayoutDashboard,
+      path: '/dashboard',
+    },
+    {
+      label: 'Wallets',
+      icon: Wallet,
+      path: '/wallets',
+      children: [
+        { label: 'All Wallets', icon: Coins, path: '/wallets/all' },
+        { label: 'Fund', icon: ArrowDownToLine, path: '/wallets/fund' },
+        { label: 'Withdraw', icon: ArrowUpRight, path: '/wallets/withdraw' },
+      ],
+    },
+    {
+      label: 'Tokenization',
+      icon: Coins,
+      path: '/tokenization',
+      badge: 'NEW',
+      children: [
+        { label: 'Convert Asset', icon: RefreshCw, path: '/tokenization/convert' },
+        { label: 'My Tokens', icon: Shield, path: '/tokenization/tokens' },
+        { label: 'Market', icon: TrendingUp, path: '/tokenization/market' },
+        { label: 'Publish Offer', icon: Plus, path: '/tokenization/publish' },
+      ],
+    },
+    {
+      label: 'Collateral',
+      icon: Shield,
+      path: '/collateral',
+      badge: 'NEW',
+      children: [
+        { label: 'Create Repo', icon: Plus, path: '/collateral/create-repo' },
+        { label: 'Active Repos', icon: Activity, path: '/collateral/repos' },
+        { label: 'Manage', icon: Target, path: '/collateral/manage' },
+        { label: 'Margin Calls', icon: AlertTriangle, path: '/collateral/margin-calls' },
+      ],
+    },
+    {
+      label: 'Trading',
+      icon: TrendingUp,
+      path: '/trading',
+      children: [
+        { label: 'Execute Trade', icon: ShoppingCart, path: '/trading/execute' },
+        { label: 'My Orders', icon: FileText, path: '/trading/orders' },
+        { label: 'History', icon: Clock, path: '/trading/history' },
+      ],
+    },
+    {
+      label: 'Payments',
+      icon: CreditCard,
+      path: '/payments',
+      children: [
+        { label: 'Send', icon: ArrowUpRight, path: '/payments/send' },
+        { label: 'Swap', icon: RefreshCw, path: '/payments/swap' },
+        { label: 'Earn', icon: TrendingUp, path: '/payments/earn' },
+      ],
+    },
+    {
+      label: 'Market Terminal',
+      icon: Activity,
+      path: '/market-terminal',
+    },
+    {
+      label: 'Predictions',
+      icon: Target,
+      path: '/predictions',
+    },
+  ];
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+  const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+
+  const toggleExpanded = (path: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
+    );
+  };
+
+  const isActive = (path: string) => location.pathname === path;
+  const isParentActive = (item: NavItem) =>
+    item.children?.some((child) => location.pathname === child.path);
+
   return (
-    <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-md z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-      
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-72 
-        bg-gradient-to-b from-gray-950/95 via-gray-900/95 to-gray-950/95
-        border-r border-gray-800/50 backdrop-blur-xl shadow-2xl
-        transform transition-all duration-300 ease-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="flex flex-col h-full">
-          {/* Logo and close button */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-800/50 bg-gradient-to-r from-gray-900/70 to-gray-800/30">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                {/* Seamount Logo */}
-                <img 
-                  src="https://i.imgur.com/59eVKha.png" 
-                  alt="Seamount Logo" 
-                  className="w-10 h-10 object-contain filter drop-shadow-lg rounded-md"
-                />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-500/40"></div>
-              </div>
-              <div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-white to-gray-300 bg-clip-text text-transparent">
-                  Seamount.io
-                </span>
-                <div className="text-xs text-emerald-400 font-medium tracking-wider">Cross-border payments for emerging markets</div>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="lg:hidden p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+    <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-screen">
+      {/* Logo */}
+      <div className="p-6 border-b border-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xl">S</span>
           </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1">
-            {navigationItems.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                onClick={onClose}
-                className={({ isActive }) => `
-                  group flex items-center px-4 py-3.5 text-sm font-medium rounded-xl transition-all duration-200 relative overflow-hidden
-                  ${isActive 
-                    ? 'bg-gradient-to-r from-blue-600/90 to-teal-600/90 text-white shadow-lg shadow-blue-500/25 scale-[1.03] border border-blue-500/20' 
-                    : 'text-gray-300 hover:bg-gradient-to-r hover:from-gray-800/80 hover:to-gray-700/80 hover:text-white hover:scale-[1.03] border border-transparent hover:border-gray-700/80'
-                  }
-                `}
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/5 to-transparent w-[200%] translate-x-[-100%] group-hover:animate-shine"></span>
-                <item.icon className="mr-3 h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110" />
-                {item.name}
-                {item.name === 'Send Money' && (
-                  <div className="ml-auto w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                )}
-                {item.badge && (
-                  <div className="ml-auto text-xs bg-gradient-to-r from-blue-500/30 to-purple-500/30 text-blue-300 px-2.5 py-1 rounded-full border border-blue-500/30 shadow-inner">
-                    {item.badge}
-                  </div>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-
-          {/* Bottom section */}
-          <div className="p-4 border-t border-gray-800/50 space-y-1 bg-gradient-to-b from-transparent to-gray-900/50">
-            <NavLink
-              to="/help"
-              onClick={onClose}
-              className="group flex items-center px-4 py-3.5 text-sm font-medium text-gray-300 rounded-xl hover:bg-gradient-to-r hover:from-gray-800/80 hover:to-gray-700/80 hover:text-white hover:border-gray-700 border border-transparent transition-all duration-200"
-            >
-              <HelpCircle className="mr-3 h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110" />
-              Help & Support
-            </NavLink>
-            
-            {/* API Status indicator */}
-            <div className="mt-4 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl shadow-inner">
-              <div className="flex items-center space-x-2 mb-1">
-                <div className="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse shadow shadow-green-400/40"></div>
-                <span className="text-xs text-blue-300 font-medium tracking-wide">SYSTEM ONLINE</span>
-              </div>
-              <div className="text-xs text-gray-400 mt-1 ml-4.5">Flutterwave + Circle + M-Pesa</div>
-            </div>
+          <div>
+            <div className="text-white font-bold text-lg">Seamount</div>
+            <div className="text-gray-400 text-xs">Digital Securities</div>
           </div>
         </div>
       </div>
-    </>
+
+      {/* Navigation */}
+      <nav className="flex-1 p-4 overflow-y-auto">
+        {navItems.map((item) => (
+          <div key={item.path} className="mb-2">
+            {/* Parent Item */}
+            <Link
+              to={item.children ? '#' : item.path}
+              onClick={(e) => {
+                if (item.children) {
+                  e.preventDefault();
+                  toggleExpanded(item.path);
+                }
+              }}
+              className={`
+                flex items-center justify-between px-4 py-3 rounded-lg transition-all
+                ${
+                  isActive(item.path) || isParentActive(item)
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/50'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <item.icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
+              </div>
+              {item.badge && (
+                <span className="px-2 py-1 text-xs bg-green-500 text-white rounded-full">
+                  {item.badge}
+                </span>
+              )}
+            </Link>
+
+            {/* Child Items */}
+            {item.children && expandedItems.includes(item.path) && (
+              <div className="ml-4 mt-2 space-y-1">
+                {item.children.map((child) => (
+                  <Link
+                    key={child.path}
+                    to={child.path}
+                    className={`
+                      flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm
+                      ${
+                        isActive(child.path)
+                          ? 'bg-blue-600/20 text-blue-400 border-l-2 border-blue-500'
+                          : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+                      }
+                    `}
+                  >
+                    <child.icon className="w-4 h-4" />
+                    <span>{child.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* External Wallet Connection (Merged) */}
+      <div className="p-4 border-t border-gray-800">
+        <Link
+          to="/wallet-connect"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-all"
+        >
+          <Link2 className="w-5 h-5" />
+          <span className="font-medium">Connect External Wallet</span>
+        </Link>
+      </div>
+
+      {/* User Profile */}
+      <div className="p-4 border-t border-gray-800">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
+            <span className="text-white font-bold">
+              {userProfile?.first_name?.[0] || 'U'}
+            </span>
+          </div>
+          <div className="flex-1">
+            <div className="text-white text-sm font-medium">
+              {userProfile?.first_name || 'User'}
+            </div>
+            <div className="text-gray-400 text-xs">{userProfile?.email}</div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Link
+            to="/settings"
+            className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
+          </Link>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm transition-colors w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 

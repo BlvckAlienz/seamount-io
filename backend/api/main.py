@@ -565,14 +565,14 @@ app.add_middleware(
 try:
     from backend.api.routes.seed_routes import router as seed_routes_router
     app.include_router(seed_routes_router)
-    logger.info("âœ… Seed retrieval routes registered at /api/v1/seeds")
+    logger.info("Seed retrieval routes registered at /api/v1/seeds")
 except ImportError as e:
-    logger.error(f"âŒ Seed routes import error: {e}")
+    logger.error(f"Seed routes import error: {e}")
 
 # âœ… ADD this clean registration (only once)
 if routers_available.get('wallet_creation'):
     app.include_router(routers_available['wallet_creation'], prefix="/api/v1", tags=["Wallet Creation"])
-    logger.info("âœ… Wallet creation routes registered at /api/v1/wallet-creation")
+    logger.info("Wallet creation routes registered at /api/v1/wallet-creation")
 
 # ===== REGISTER ROUTERS =====
 app.include_router(seed_routes.router)
@@ -581,9 +581,9 @@ app.include_router(seed_routes.router)
 try:
     from backend.api.routes.predictions import router as predictions_router
     app.include_router(predictions_router, prefix="/api/v1", tags=["Prediction Markets"])
-    logger.info("âœ… Prediction Markets router registered at /api/v1/predictions")
+    logger.info("Prediction Markets router registered at /api/v1/predictions")
 except ImportError as e:
-    logger.error(f"âŒ Prediction Markets router import error: {e}")
+    logger.error(f"Prediction Markets router import error: {e}")
 
 # Wallet backup tracking
 try:
@@ -596,104 +596,113 @@ try:
         tags=["wallet-backup"]
     )
     
-    logger.info("âœ… Wallet backup routes registered at /api/v1/wallet-backup")
+    logger.info("Wallet backup routes registered at /api/v1/wallet-backup")
     
     # Log registered endpoints
     for route in wallet_backup_router.routes:
         full_path = f"/api/v1/wallet-backup{route.path}"
         logger.info(f"   â†’ {route.methods} {full_path}")
 except ImportError as e:
-    logger.error(f"âŒ Wallet backup routes import error: {e}")
+    logger.error(f"Wallet backup routes import error: {e}")
 
 if routers_available.get('users'):
     app.include_router(routers_available['users'], prefix="/api/v1/user", tags=["User"])
-    logger.info("âœ… Users router registered at /api/v1/user")
+    logger.info("Users router registered at /api/v1/user")
 
 # Register wallet creation routes
 try:
     from backend.api.routes.wallet_creation_routes import router as wallet_creation_router
     app.include_router(wallet_creation_router)
-    logger.info("âœ… Wallet creation routes registered at /api/v1/wallet-creation")
+    logger.info("Wallet creation routes registered at /api/v1/wallet-creation")
 except ImportError as e:
-    logger.error(f"âŒ Failed to import wallet creation routes: {e}")
+    logger.error(f"Failed to import wallet creation routes: {e}")
 
 if routers_available.get('kyc'):
     app.include_router(routers_available['kyc'], prefix="/api/v1/kyc", tags=["KYC"])
-    logger.info("âœ… KYC router registered at /api/v1/kyc")
+    logger.info("KYC router registered at /api/v1/kyc")
 
 if routers_available.get('session'):
     app.include_router(routers_available['session'], prefix="/api/v1/session", tags=["Session"])
-    logger.info("âœ… Session router registered at /api/v1/session")
+    logger.info("Session router registered at /api/v1/session")
 
 if routers_available.get('wallet'):
     app.include_router(routers_available['wallet'].router, prefix="/api/v1", tags=["Multi-Chain Wallet"])
-    logger.info("âœ… Multi-chain wallet router registered at /api/v1/wallet")
+    logger.info("Multi-chain wallet router registered at /api/v1/wallet")
 
 if routers_available.get('oracle'):
     app.include_router(routers_available['oracle'].router, prefix="/api", tags=["Oracle"])
-    logger.info("âœ… Oracle router registered at /api/oracle")
+    logger.info("Oracle router registered at /api/oracle")
 
 if routers_available.get('licensing'):
     app.include_router(routers_available['licensing'], prefix="/api/v1", tags=["Licensing"])
-    logger.info("âœ… Licensing router registered at /api/v1")
+    logger.info("Licensing router registered at /api/v1")
 
 if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
     app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
-    logger.info("âœ… Webhooks router registered at /webhooks")
+    logger.info("Webhooks router registered at /webhooks")
 
 if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
     app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["portfolio"])
-    logger.info("âœ… portfolio router registered at /api/v1")
+    logger.info("portfolio router registered at /api/v1")
 
 if routers_available.get('investor') and hasattr(routers_available['investor'], 'router'):
     app.include_router(routers_available['investor'].router, prefix="/api/v1", tags=["Investor"])
-    logger.info("âœ… Investor router registered at /api/v1")
+    logger.info("Investor router registered at /api/v1")
 
 if routers_available.get('consent') and hasattr(routers_available['consent'], 'router'):
     app.include_router(routers_available['consent'].router, prefix="/api/v1", tags=["Consent"])
-    logger.info("âœ… Consent router registered at /api/v1")
+    logger.info("Consent router registered at /api/v1")
 
 if routers_available.get('payments'):
     app.include_router(routers_available['payments'], prefix="/api/payments", tags=["Payments"])
-    logger.info("âœ… Payments router registered at /api/payments")
+    logger.info("Payments router registered at /api/payments")
 
 if routers_available.get('transactions'):
     app.include_router(routers_available['transactions'], prefix="/api/v1", tags=["Transactions"])
-    logger.info("âœ… Transactions router registered at /api/v1")
+    logger.info("Transactions router registered at /api/v1")
 
 if routers_available.get('onramp'):
     app.include_router(routers_available['onramp'], prefix="/api/v1", tags=["On-Ramp"])
-    logger.info("âœ… On-ramp router registered at /api/v1")
+    logger.info("On-ramp router registered at /api/v1")
 
 if routers_available.get('offramp'):
     app.include_router(routers_available['offramp'], prefix="/api/v1", tags=["Off-Ramp"])
-    logger.info("âœ… Off-ramp router registered at /api/v1")
+    logger.info("Off-ramp router registered at /api/v1")
 
 if routers_available.get('bank_verification'):
     app.include_router(routers_available['bank_verification'].router, prefix="/api/v1", tags=["Bank Verification"])
-    logger.info("âœ… Bank verification router registered at /api/v1/bank")
+    logger.info("Bank verification router registered at /api/v1/bank")
     
 if routers_available.get('wallet_connect'):
     app.include_router(routers_available['wallet_connect'], prefix="/api/v1", tags=["Wallet Connect"])
-    logger.info("âœ… Wallet connect router registered at /api/v1")
+    logger.info("Wallet connect router registered at /api/v1")
 
 if routers_available.get('swap'):
     app.include_router(routers_available['swap'], prefix="/api/v1", tags=["Swap"])
-    logger.info("Ã¢Å“â€¦ Swap router registered at /api/v1/swap")
+    logger.info("Swap router registered at /api/v1/swap")
     
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
-    logger.info("âœ… Yield router registered at /api/v1")
+    logger.info("Yield router registered at /api/v1")
 
 if routers_available.get('market'):
     # Register main market router (/api/v1/market/...)
     app.include_router(routers_available['market'].router, prefix="/api/v1")
-    logger.info("âœ… Market terminal router registered at /api/v1/market")
+    logger.info("Market terminal router registered at /api/v1/market")
     
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
-        logger.info("âœ… Quota health router registered at /api/v1/quota")
+        logger.info("Quota health router registered at /api/v1/quota")
+
+# 🏦 Tokenization Routes (Seamount Protocol)
+try:
+    from backend.api.routes.tokenization import router as tokenization_router
+    app.include_router(tokenization_router, tags=["Tokenization"])
+    logger.info("✅ Tokenization router registered at /api/v1/tokenization")
+except ImportError as e:
+    logger.error(f"❌ Tokenization router import error: {e}")
+    routers_available['tokenization'] = None
 
 # ===== ADMIN ROUTES =====
 try:

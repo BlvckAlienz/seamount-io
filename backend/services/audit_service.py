@@ -66,7 +66,7 @@ class AuditService:
 
     async def log_event(
         self,
-        event_type: AuditEventType,
+        event_type: str | AuditEventType,  # ✅ Accept BOTH string and enum
         user_id: Optional[str] = None,
         resource_id: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
@@ -78,9 +78,9 @@ class AuditService:
         Log an audit event with comprehensive context
         
         Args:
-            event_type: Type of event being logged
-            user_id: ID of user associated with event (if applicable)
-            resource_id: ID of resource being acted upon (if applicable)
+            event_type: Type of event (string or AuditEventType enum)
+            user_id: ID of user associated with event
+            resource_id: ID of resource being acted upon
             details: Additional event-specific details
             severity: Event severity level
             ip_address: Client IP address
@@ -93,17 +93,22 @@ class AuditService:
             event_id = str(uuid.uuid4())
             timestamp = datetime.utcnow().isoformat()
             
+            # ✅ HANDLE BOTH STRING AND ENUM
+            if isinstance(event_type, str):
+                event_type_str = event_type
+            else:
+                event_type_str = event_type.value
+            
             audit_record = {
                 "id": event_id,
-                "event_type": event_type.value,
+                "event_type": event_type_str,
                 "user_id": user_id,
                 "resource_id": resource_id,
-                "severity": severity,
+                "severity": severity if isinstance(severity, str) else severity.value,
                 "ip_address": ip_address,
                 "user_agent": user_agent,
                 "details": details or {},
-                "timestamp": timestamp,
-                "created_at": timestamp
+                "created_at": timestamp  # ✅ Only use created_at
             }
             
             # Log to console for immediate visibility
@@ -112,11 +117,11 @@ class AuditService:
                 AuditSeverity.MEDIUM: logging.INFO,
                 AuditSeverity.HIGH: logging.WARNING,
                 AuditSeverity.CRITICAL: logging.ERROR
-            }.get(severity, logging.INFO)
+            }.get(severity if isinstance(severity, AuditSeverity) else AuditSeverity.MEDIUM, logging.INFO)
             
             logger.log(
                 log_level,
-                f"[AUDIT] {event_type.value} | User: {user_id or 'N/A'} | "
+                f"[AUDIT] {event_type_str} | User: {user_id or 'N/A'} | "
                 f"Resource: {resource_id or 'N/A'} | Severity: {severity}"
             )
             
@@ -127,11 +132,11 @@ class AuditService:
                 logger.debug(f"[AUDIT] Event logged successfully: {event_id}")
                 return True
             else:
-                logger.error(f"[AUDIT] Failed to log event: {event_type.value}")
+                logger.error(f"[AUDIT] Failed to log event: {event_type_str}")
                 return False
                 
         except Exception as e:
-            logger.error(f"[AUDIT] Error logging event {event_type.value}: {str(e)}")
+            logger.error(f"[AUDIT] Error logging event: {str(e)}")
             logger.error(traceback.format_exc())
             # Don't raise - audit failures shouldn't break main functionality
             return False
