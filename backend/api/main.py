@@ -704,6 +704,15 @@ except ImportError as e:
     logger.error(f"❌ Tokenization router import error: {e}")
     routers_available['tokenization'] = None
 
+# 🔐 Collateral Routes (Seamount Protocol)
+try:
+    from backend.api.routes.collateral import router as collateral_router
+    app.include_router(collateral_router, tags=["Collateral"])
+    logger.info("✅ Collateral router registered at /api/v1/collateral")
+except ImportError as e:
+    logger.error(f"❌ Collateral router import error: {e}")
+    routers_available['collateral'] = None
+
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router

@@ -148,6 +148,13 @@ const Sidebar: React.FC = () => {
                 if (item.children) {
                   e.preventDefault();
                   toggleExpanded(item.path);
+                } else {
+                  // Handle direct navigation for single items
+                  if (item.path === '/market-terminal') {
+                    e.preventDefault();
+                    // Trigger market terminal modal from parent
+                    window.dispatchEvent(new CustomEvent('openMarketTerminal'));
+                  }
                 }
               }}
               className={`

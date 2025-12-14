@@ -34,6 +34,9 @@ import UserProfilePage from './pages/UserProfilePage';
 import ComplianceDashboard from './pages/admin/ComplianceDashboard';
 import AuthDebugPage from './pages/AuthDebugPage';
 import WalletRecovery from './pages/wallet-recovery';
+import WalletsPage from './pages/WalletsPage';
+import TokenizationMarketPage from './pages/TokenizationMarketPage';
+import CollateralPage from './pages/CollateralPage';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -129,14 +132,6 @@ const AppContent: React.FC = () => {
           } 
         />
         <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute adminRequired={true}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
           path="/profile" 
           element={
             <ProtectedRoute>
@@ -184,8 +179,110 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           } 
         />
+
+        {/* 🆕 Multi-Chain Wallets Routes */}
+        <Route 
+          path="/wallets" 
+          element={
+            <ProtectedRoute>
+              <WalletsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/wallets/all" 
+          element={
+            <ProtectedRoute>
+              <WalletsPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* 🆕 Tokenization & Secondary Market Routes */}
+        <Route 
+          path="/tokenization" 
+          element={
+            <ProtectedRoute>
+              <TokenizationMarketPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tokenization/convert" 
+          element={
+            <ProtectedRoute>
+              <TokenizationMarketPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tokenization/tokens" 
+          element={
+            <ProtectedRoute>
+              <TokenizationMarketPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tokenization/market" 
+          element={
+            <ProtectedRoute>
+              <TokenizationMarketPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tokenization/publish" 
+          element={
+            <ProtectedRoute>
+              <TokenizationMarketPage />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* 🆕 Collateral Management & Repo Trades Routes */}
+        <Route 
+          path="/collateral" 
+          element={
+            <ProtectedRoute>
+              <CollateralPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/collateral/create-repo" 
+          element={
+            <ProtectedRoute>
+              <CollateralPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/collateral/repos" 
+          element={
+            <ProtectedRoute>
+              <CollateralPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/collateral/manage" 
+          element={
+            <ProtectedRoute>
+              <CollateralPage />
+            </ProtectedRoute>
+          } 
+        />
         
-        {/* Admin Compliance Route */}
+        {/* Admin Routes */}
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute adminRequired={true}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/admin/compliance" 
           element={
@@ -225,7 +322,7 @@ function App() {
             <AuthProvider>
               {/* 🌊 WalletProvider: Auto-created wallets (Algo, BTC, ETH, MATIC, TRX) */}
               <WalletProvider>
-                {/* âœ… WalletOrchestratorProvider: External wallets (Base, Celo, BaseCAMP) */}
+                {/* ✨ WalletOrchestratorProvider: External wallets (Base, Celo, BaseCAMP) */}
                 <WalletOrchestratorProvider>
                   <DebugEnv />
                   <Toaster position="top-right" />
