@@ -72,15 +72,15 @@ const CollateralPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <Sidebar />
-      
-      <main className="flex-1 p-8">
+  <div className="flex min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <Sidebar />
+    
+    <main className="flex-1 p-4 md:p-8 pt-20 lg:pt-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <div className="mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
                 <Shield className="h-10 w-10 text-orange-400" />
                 Collateral Management
               </h1>
@@ -105,7 +105,7 @@ const CollateralPage: React.FC = () => {
         </div>
 
         {/* 📊 REAL DATA STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Total Locked Value */}
           <div className="bg-gradient-to-br from-orange-900/30 to-gray-800 rounded-xl p-6 border border-orange-500/30">
             <div className="flex items-center justify-between mb-2">
@@ -152,7 +152,7 @@ const CollateralPage: React.FC = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8">
           <button
             onClick={() => setShowManageModal(true)}
             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-orange-500/30 transition-all"
@@ -192,7 +192,7 @@ const CollateralPage: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="bg-gray-800/50 rounded-xl overflow-hidden">
+          <div className="bg-gray-800/50 rounded-xl overflow-x-auto">
             <div className="p-6 border-b border-gray-700">
               <h2 className="text-xl font-bold text-white">Active Positions</h2>
             </div>

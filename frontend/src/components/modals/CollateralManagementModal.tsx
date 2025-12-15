@@ -68,9 +68,9 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto mx-2 sm:mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-700">
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               <Shield className="h-6 w-6 text-orange-400" />
@@ -86,7 +86,7 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-500"></div>
@@ -100,7 +100,7 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
           ) : (
             <div className="space-y-4">
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
                 <div className="bg-gradient-to-br from-orange-900/20 to-yellow-900/20 border border-orange-500/30 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="p-2 bg-orange-500/20 rounded-lg">
@@ -139,7 +139,7 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
               </div>
 
               {/* Positions Table */}
-              <div className="bg-gray-800/50 rounded-xl overflow-hidden">
+              <div className="bg-gray-800/50 rounded-xl overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-700">

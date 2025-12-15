@@ -36,7 +36,7 @@ const Sidebar: React.FC = () => {
     { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW' },
     { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW' },
-    { label: 'Trading', icon: TrendingUp, path: '/trading' },
+    { label: 'Trading', icon: TrendingUp, path: '/trading', badge: 'NEW' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
     { label: 'Predictions', icon: Target, path: '/predictions' },
     { label: 'Settings', icon: Settings, path: '/settings' },

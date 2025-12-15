@@ -232,7 +232,18 @@ export const MarketOffersModal: React.FC<MarketOffersModalProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Confirm Purchase</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Confirm Purchase</h3>
+                <button
+                  onClick={() => {
+                    setShowBuyModal(false);
+                    setSelectedOffer(null);
+                  }}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-400" />
+                </button>
+              </div>
               
               <div className="space-y-4 mb-6">
                 <div className="bg-gray-800/50 rounded-xl p-4">

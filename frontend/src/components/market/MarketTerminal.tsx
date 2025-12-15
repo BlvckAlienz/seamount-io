@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { apiClient } from '@/config/api';
 
 interface MarketData {
   crypto: Record<string, number>;
@@ -19,7 +19,7 @@ const MarketTerminal: React.FC = () => {
   const fetchMarketData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8000/api/v1/market/snapshot');
+      const response = await apiClient.get('/api/v1/market/snapshot');
       
       if (response.data.success) {
         setMarketData(response.data.data);

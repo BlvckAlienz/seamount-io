@@ -308,11 +308,11 @@ export const AdminDashboard: React.FC = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
+  <   div className="max-w-7xl mx-auto">
         
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 md:mb-8">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/dashboard')}
@@ -329,7 +329,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-4">
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(Number(e.target.value))}
@@ -371,7 +371,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
         
         {/* TOP 4 METRICS CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           
           <div className="bg-gradient-to-br from-blue-900/20 to-blue-800/20 border border-blue-500/30 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -439,7 +439,7 @@ export const AdminDashboard: React.FC = () => {
         
         {/* REVENUE SUMMARY SECTION */}
         {revenueData && (
-          <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6 mb-8">
+          <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-4 md:p-6 mb-6 md:mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <DollarSign className="h-6 w-6 text-green-400" />
@@ -741,10 +741,10 @@ export const AdminDashboard: React.FC = () => {
       {/* ========== TRANSACTION DETAILS MODAL ========== */}
       {showDetailsModal && selectedTransaction && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-2 sm:mx-4">
             
             {/* Modal Header */}
-            <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-6 flex items-center justify-between">
+            <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 md:p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                 <Activity className="h-6 w-6 text-blue-400" />
                 Transaction Details
@@ -758,7 +758,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
             
             {/* Modal Content */}
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               
               {/* Status Badge */}
               <div className="flex items-center gap-2">
