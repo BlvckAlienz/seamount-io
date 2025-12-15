@@ -3,6 +3,42 @@
 
 import './polyfills';
 
+// ============================================================================
+// 🔇 SUPPRESS HARMLESS CONSOLE ERRORS
+// ============================================================================
+if (typeof window !== 'undefined') {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  
+  console.error = (...args: any[]) => {
+    const msg = args[0]?.toString() || '';
+    
+    // Suppress harmless errors
+    if (
+      msg.includes('MetaMask extension not found') ||
+      msg.includes('Failed to connect to MetaMask') ||
+      msg.includes('Uncaught (in promise)') ||
+      msg.includes('pulse.walletconnect.org') ||
+      args[0]?.message?.includes('MetaMask')
+    ) {
+      return; // Silently ignore
+    }
+    
+    originalError(...args);
+  };
+  
+  console.warn = (...args: any[]) => {
+    const msg = args[0]?.toString() || '';
+    
+    if (msg.includes('pulse.walletconnect.org')) {
+      return; // Silently ignore
+    }
+    
+    originalWarn(...args);
+  };
+}
+// ============================================================================
+
 // Now safe to import React and other libraries
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -57,3 +57,28 @@ export const queryClient = new QueryClient({
 })
 
 export { WagmiProvider }
+
+// ============================================================================
+// 🔇 SUPPRESS WALLETCONNECT PULSE 403 ERRORS
+// ============================================================================
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  
+  window.fetch = async (...args) => {
+    const url = args[0]?.toString() || '';
+    
+    // ✅ Block pulse.walletconnect.org requests entirely
+    if (url.includes('pulse.walletconnect.org')) {
+      console.log('ℹ️ WalletConnect analytics disabled - blocking pulse request');
+      // Return fake successful response immediately
+      return new Response(JSON.stringify({ success: true }), { 
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // All other requests proceed normally
+    return originalFetch(...args);
+  };
+}

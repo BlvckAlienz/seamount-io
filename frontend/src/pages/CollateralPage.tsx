@@ -22,22 +22,28 @@ const CollateralPage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [assetsRes, reposRes, summaryRes] = await Promise.all([
+      
+      // ✅ Use allSettled to handle individual failures gracefully
+      const [assetsRes, reposRes, summaryRes] = await Promise.allSettled([
         apiClient.get('/api/v1/tokenization/my-assets'),
         apiClient.get('/api/v1/tokenization/my-repos'),
         apiClient.get('/api/v1/collateral/summary')
       ]);
 
-      if (assetsRes.data.success) {
-        setTokenizedAssets(assetsRes.data.assets || []);
+      // ✅ Handle successful responses
+      if (assetsRes.status === 'fulfilled' && assetsRes.value.data.success) {
+        setTokenizedAssets(assetsRes.value.data.assets || []);
       }
 
-      if (reposRes.data.success) {
-        setRepos(reposRes.data.repos || []);
+      if (reposRes.status === 'fulfilled' && reposRes.value.data.success) {
+        setRepos(reposRes.value.data.repos || []);
+      } else if (reposRes.status === 'rejected') {
+        console.warn('⚠️ Repos endpoint failed:', reposRes.reason);
+        setRepos([]); // Set empty array, don't crash page
       }
 
-      if (summaryRes.data.success) {
-        setCollateralSummary(summaryRes.data.summary);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data.success) {
+        setCollateralSummary(summaryRes.value.data.summary);
       }
     } catch (error) {
       console.error('Failed to fetch collateral data:', error);

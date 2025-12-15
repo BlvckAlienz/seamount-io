@@ -1,7 +1,7 @@
 // File: frontend/src/components/layout/Sidebar.tsx
 // 🆕 DTCC-Inspired Sidebar Navigation
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -12,17 +12,19 @@ import {
   Settings,
   Link2,
   LogOut,
-  Shield,     
-  Plus,        
-  Activity,    
-  Target,      
-  AlertTriangle, 
-  FileText,    
-  Clock,       
-  Wallet,          
-  ArrowDownToLine,  
-  ArrowUpRight,     
-  ShoppingCart,     
+  Shield,
+  Plus,
+  Activity,
+  Target,
+  AlertTriangle,
+  FileText,
+  Clock,
+  Wallet,
+  ArrowDownToLine,
+  ArrowUpRight,
+  ShoppingCart,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -31,222 +33,152 @@ interface NavItem {
   icon: React.ElementType;
   path: string;
   badge?: string;
-  children?: NavItem[];
 }
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const { userProfile, signOut } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
 
   const navItems: NavItem[] = [
-    {
-      label: 'Portfolio',
-      icon: LayoutDashboard,
-      path: '/dashboard',
-    },
-    {
-      label: 'Wallets',
-      icon: Wallet,
-      path: '/wallets',
-      children: [
-        { label: 'All Wallets', icon: Coins, path: '/wallets/all' },
-        { label: 'Fund', icon: ArrowDownToLine, path: '/wallets/fund' },
-        { label: 'Withdraw', icon: ArrowUpRight, path: '/wallets/withdraw' },
-      ],
-    },
-    {
-      label: 'Tokenization',
-      icon: Coins,
-      path: '/tokenization',
-      badge: 'NEW',
-      children: [
-        { label: 'Convert Asset', icon: RefreshCw, path: '/tokenization/convert' },
-        { label: 'My Tokens', icon: Shield, path: '/tokenization/tokens' },
-        { label: 'Market', icon: TrendingUp, path: '/tokenization/market' },
-        { label: 'Publish Offer', icon: Plus, path: '/tokenization/publish' },
-      ],
-    },
-    {
-      label: 'Collateral',
-      icon: Shield,
-      path: '/collateral',
-      badge: 'NEW',
-      children: [
-        { label: 'Create Repo', icon: Plus, path: '/collateral/create-repo' },
-        { label: 'Active Repos', icon: Activity, path: '/collateral/repos' },
-        { label: 'Manage', icon: Target, path: '/collateral/manage' },
-        { label: 'Margin Calls', icon: AlertTriangle, path: '/collateral/margin-calls' },
-      ],
-    },
-    {
-      label: 'Trading',
-      icon: TrendingUp,
-      path: '/trading',
-      children: [
-        { label: 'Execute Trade', icon: ShoppingCart, path: '/trading/execute' },
-        { label: 'My Orders', icon: FileText, path: '/trading/orders' },
-        { label: 'History', icon: Clock, path: '/trading/history' },
-      ],
-    },
-    {
-      label: 'Payments',
-      icon: CreditCard,
-      path: '/payments',
-      children: [
-        { label: 'Send', icon: ArrowUpRight, path: '/payments/send' },
-        { label: 'Swap', icon: RefreshCw, path: '/payments/swap' },
-        { label: 'Earn', icon: TrendingUp, path: '/payments/earn' },
-      ],
-    },
-    {
-      label: 'Market Terminal',
-      icon: Activity,
-      path: '/market-terminal',
-    },
-    {
-      label: 'Predictions',
-      icon: Target,
-      path: '/predictions',
-    },
+    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Wallets', icon: Wallet, path: '/wallets' },
+    { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW' },
+    { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW' },
+    { label: 'Trading', icon: TrendingUp, path: '/trading' },
+    { label: 'Payments', icon: CreditCard, path: '/payments' },
+    { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
-  const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
-
-  const toggleExpanded = (path: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
-    );
-  };
-
   const isActive = (path: string) => location.pathname === path;
-  const isParentActive = (item: NavItem) =>
-    item.children?.some((child) => location.pathname === child.path);
 
   return (
-    <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-screen">
-      {/* Logo */}
-      <div className="p-6 border-b border-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">S</span>
-          </div>
-          <div>
-            <div className="text-white font-bold text-lg">Seamount</div>
-            <div className="text-gray-400 text-xs">Digital Securities</div>
-          </div>
-        </div>
-      </div>
+    <>
+      {/* 📱 MOBILE: Hamburger Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed top-4 left-4 z-50 lg:hidden bg-gray-800 hover:bg-gray-700 p-3 rounded-xl border border-gray-700 transition-colors shadow-lg"
+        aria-label="Toggle menu"
+      >
+        {isOpen ? (
+          <X className="h-6 w-6 text-white" />
+        ) : (
+          <Menu className="h-6 w-6 text-white" />
+        )}
+      </button>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 overflow-y-auto">
-        {navItems.map((item) => (
-          <div key={item.path} className="mb-2">
-            {/* Parent Item */}
-            <Link
-              to={item.children ? '#' : item.path}
-              onClick={(e) => {
-                if (item.children) {
-                  e.preventDefault();
-                  toggleExpanded(item.path);
-                } else {
-                  // Handle direct navigation for single items
-                  if (item.path === '/market-terminal') {
-                    e.preventDefault();
-                    // Trigger market terminal modal from parent
-                    window.dispatchEvent(new CustomEvent('openMarketTerminal'));
-                  }
-                }
-              }}
-              className={`
-                flex items-center justify-between px-4 py-3 rounded-lg transition-all
-                ${
-                  isActive(item.path) || isParentActive(item)
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/50'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                }
-              `}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
+      {/* 📱 MOBILE: Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* 🖥️ SIDEBAR */}
+      <aside
+        className={`
+          fixed lg:sticky top-0 left-0 h-screen
+          bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900
+          border-r border-gray-700/50
+          transition-all duration-300 ease-in-out
+          z-40
+          ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          w-64 lg:w-20 lg:hover:w-64
+          group
+        `}
+      >
+        <div className="flex flex-col h-full">
+          {/* 🏢 LOGO */}
+          <div className="p-6 border-b border-gray-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-xl">S</span>
               </div>
-              {item.badge && (
-                <span className="px-2 py-1 text-xs bg-green-500 text-white rounded-full">
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-
-            {/* Child Items */}
-            {item.children && expandedItems.includes(item.path) && (
-              <div className="ml-4 mt-2 space-y-1">
-                {item.children.map((child) => (
-                  <Link
-                    key={child.path}
-                    to={child.path}
-                    className={`
-                      flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm
-                      ${
-                        isActive(child.path)
-                          ? 'bg-blue-600/20 text-blue-400 border-l-2 border-blue-500'
-                          : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
-                      }
-                    `}
-                  >
-                    <child.icon className="w-4 h-4" />
-                    <span>{child.label}</span>
-                  </Link>
-                ))}
+              <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                <div className="text-white font-bold text-lg">Seamount</div>
+                <div className="text-gray-400 text-xs">Digital Securities</div>
               </div>
-            )}
-          </div>
-        ))}
-      </nav>
-
-      {/* External Wallet Connection (Merged) */}
-      <div className="p-4 border-t border-gray-800">
-        <Link
-          to="/wallet-connect"
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-all"
-        >
-          <Link2 className="w-5 h-5" />
-          <span className="font-medium">Connect External Wallet</span>
-        </Link>
-      </div>
-
-      {/* User Profile */}
-      <div className="p-4 border-t border-gray-800">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold">
-              {userProfile?.first_name?.[0] || 'U'}
-            </span>
-          </div>
-          <div className="flex-1">
-            <div className="text-white text-sm font-medium">
-              {userProfile?.first_name || 'User'}
             </div>
-            <div className="text-gray-400 text-xs">{userProfile?.email}</div>
+          </div>
+
+          {/* 🧭 NAVIGATION */}
+          <nav className="flex-1 p-4 overflow-y-auto">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsOpen(false)}
+                  className={`
+                    flex items-center gap-3 px-4 py-3 rounded-lg mb-2
+                    transition-all duration-200
+                    ${active
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/50'
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-medium whitespace-nowrap opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span className="ml-auto px-2 py-1 text-xs bg-green-500 text-white rounded-full opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* 👤 USER PROFILE */}
+          <div className="p-4 border-t border-gray-800">
+            <div className="flex items-center gap-3 mb-3 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold">
+                  {userProfile?.first_name?.[0] || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white text-sm font-medium truncate">
+                  {userProfile?.first_name || 'User'}
+                </div>
+                <div className="text-gray-400 text-xs truncate">{userProfile?.email}</div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Link
+                to="/settings"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                <span className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                  Settings
+                </span>
+              </Link>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  signOut();
+                }}
+                className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm transition-colors w-full"
+              >
+                <LogOut className="w-4 h-4 flex-shrink-0" />
+                <span className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                  Logout
+                </span>
+              </button>
+            </div>
           </div>
         </div>
-        <div className="space-y-2">
-          <Link
-            to="/settings"
-            className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </Link>
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm transition-colors w-full"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </button>
-        </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 };
 

@@ -13,6 +13,8 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownToLine,
+  Key,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '@/config/api';
@@ -94,12 +96,14 @@ const DashboardPage = () => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showEarnModal, setShowEarnModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showCreateRepoModal, setShowCreateRepoModal] = useState(false);
   const [showConvertAssetModal, setShowConvertAssetModal] = useState(false);
   const [showPublishOfferModal, setShowPublishOfferModal] = useState(false);
   const [showCollateralModal, setShowCollateralModal] = useState(false);
   const [showMarketModal, setShowMarketModal] = useState(false);
-
+  const { signOut } = useAuth();
+  
   const AUTO_CREATED_CHAINS = [
     { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
     { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
@@ -206,16 +210,15 @@ const DashboardPage = () => {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      {/* Sidebar */}
       <Sidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      
+      {/* Main Content - Mobile padding adjusted */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 pt-20 lg:pt-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-white mb-2">Portfolio Overview</h1>
-            <p className="text-gray-400">Manage your tokenized securities & digital assets</p>
+          <div className="mb-4 md:mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio Overview</h1>
+            <p className="text-sm md:text-base text-gray-400">Manage your tokenized securities & digital assets</p>
           </div>
 
           {/* Quick Action Buttons */}
@@ -259,6 +262,107 @@ const DashboardPage = () => {
               <ArrowDownToLine className="h-4 w-4" />
               Withdraw
             </button>
+          </div>
+
+          {/* 👤 USER MENU - Desktop & Mobile */}
+          <div className="ml-auto relative">
+            <button 
+              onClick={() => setShowProfileMenu(!showProfileMenu)} 
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg text-white transition-colors border border-gray-700"
+            >
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <span className="hidden sm:inline text-sm">
+                {userProfile?.first_name || user?.email?.split('@')[0] || 'User'}
+              </span>
+            </button>
+            
+            {/* 📋 DROPDOWN MENU */}
+            {showProfileMenu && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                
+                {/* Menu */}
+                <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                  {/* User Info Header */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 border-b border-gray-700">
+                    <div className="text-white font-semibold">
+                      {userProfile?.first_name || 'User'}
+                    </div>
+                    <div className="text-blue-100 text-xs">
+                      {user?.email}
+                    </div>
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="py-2">
+                    {/* Recovery Phrases */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/wallet-recovery');
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors text-left"
+                    >
+                      <Key className="h-4 w-4 text-orange-400" />
+                      <div>
+                        <div className="text-sm font-medium">Recovery Phrases</div>
+                        <div className="text-xs text-gray-500">View your seed phrases</div>
+                      </div>
+                    </button>
+
+                    {/* Verify KYC */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/onboarding');
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors text-left"
+                    >
+                      <Shield className="h-4 w-4 text-green-400" />
+                      <div>
+                        <div className="text-sm font-medium">Verify Identity</div>
+                        <div className="text-xs text-gray-500">Complete KYC verification</div>
+                      </div>
+                    </button>
+
+                    {/* Admin Dashboard (only if admin) */}
+                    {userProfile?.is_admin && (
+                      <button 
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          navigate('/admin');
+                        }} 
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors text-left border-t border-gray-700"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <div>
+                          <div className="text-sm font-medium">Admin Dashboard</div>
+                          <div className="text-xs text-yellow-500">Platform management</div>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Logout */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        signOut();
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors text-left border-t border-gray-700"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <div>
+                        <div className="text-sm font-medium">Logout</div>
+                        <div className="text-xs text-red-500">Sign out of your account</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Tokenization Quick Stats */}
@@ -321,12 +425,12 @@ const DashboardPage = () => {
           />
 
           {/* Balance Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-2xl p-6 backdrop-blur-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 md:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="text-sm text-gray-400 mb-1">Total Balance</div>
-                  <div className="text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                  <div className="text-xs md:text-sm text-gray-400 mb-1">Total Balance</div>
+                  <div className="text-2xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
                 </div>
                 <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
                   <RefreshCw className="h-5 w-5" />
@@ -359,7 +463,7 @@ const DashboardPage = () => {
               <span className="text-sm text-gray-400">{createdChains} of 5 created</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
               {AUTO_CREATED_CHAINS.map(chain => (
                 <ChainWalletCard 
                   key={chain.id} 

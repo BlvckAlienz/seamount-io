@@ -91,11 +91,17 @@ const PredictionMarketsPage: React.FC = () => {
   const [showBetModal, setShowBetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'markets' | 'mybets'>('markets');
 
-  // Use unified wallet connection
-  const { wallets, connectWallet, disconnectWallet } = useWalletOrchestrator();
-  const campWallet = wallets.basecamp;
-  const address = campWallet?.address;
-  const connectedChains = Object.keys(wallets).filter(chain => wallets[chain as keyof typeof wallets]?.isConnected);
+  // ✅ Use unified wallet orchestrator
+  const { 
+    baseCampAddress, 
+    isBaseCampConnected, 
+    connectBaseCAMP, 
+    disconnectExternalWallet,
+    isConnecting 
+  } = useWalletOrchestrator();
+
+  const address = baseCampAddress;
+
   const [signingTransaction, setSigningTransaction] = useState(false);
 
   // ✅ TRANSACTION MONITOR STATE
@@ -303,8 +309,8 @@ const PredictionMarketsPage: React.FC = () => {
     }
 
     // 🎯 CHECK BASECAMP CONNECTION
-    if (!connectedChains.includes('basecamp') || !address) {
-      toast.error('Please connect BaseCAMP wallet in Dashboard first');
+    if (!isBaseCampConnected || !address) {
+      toast.error('Please connect BaseCAMP wallet to place bets');
       return;
     }
 
@@ -603,16 +609,16 @@ const PredictionMarketsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         {/* 🎯 BASECAMP STATUS (READ ONLY) */}
         <div className="flex justify-end mb-4">
-          {campWallet?.isConnected ? (
+          {isBaseCampConnected ? (
             <div className="flex items-center gap-3">
               <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-2 flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                 <span className="text-green-400 font-mono text-sm">
-                  {campWallet.address.slice(0, 6)}...{campWallet.address.slice(-4)}
+                  {address?.slice(0, 6)}...{address?.slice(-4)}
                 </span>
               </div>
               <button
-                onClick={() => disconnectWallet('basecamp')}
+                onClick={() => disconnectExternalWallet('basecamp')}
                 className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition"
               >
                 Disconnect
@@ -620,11 +626,12 @@ const PredictionMarketsPage: React.FC = () => {
             </div>
           ) : (
             <button
-              onClick={() => setShowUnifiedWalletModal(true)}
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2"
+              onClick={connectBaseCAMP}
+              disabled={isConnecting}
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition flex items-center gap-2 disabled:opacity-50"
             >
               <Wallet className="w-5 h-5" />
-              Connect for Predictions
+              {isConnecting ? 'Connecting...' : 'Connect for Predictions'}
             </button>
           )}
         </div>

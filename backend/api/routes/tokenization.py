@@ -433,15 +433,30 @@ async def get_my_repos(
 ):
     """💼 List User's Active Repo Trades"""
     try:
-        repos = db_service.supabase.table('repo_trades')\
+        # ✅ FIX: Make two queries and merge (works with all Supabase versions)
+        user_id = current_user['id']
+        
+        # Query repos where user is borrower
+        borrower_repos = db_service.supabase.table('repo_trades')\
             .select('*')\
-            .or_(f"borrower_id.eq.{current_user['id']},lender_id.eq.{current_user['id']}")\
+            .eq('borrower_id', user_id)\
             .execute()
+        
+        # Query repos where user is lender
+        lender_repos = db_service.supabase.table('repo_trades')\
+            .select('*')\
+            .eq('lender_id', user_id)\
+            .execute()
+        
+        # Merge results (remove duplicates by id)
+        all_repos = borrower_repos.data + lender_repos.data
+        unique_repos = {repo['id']: repo for repo in all_repos}.values()
+        repos_list = list(unique_repos)
         
         return {
             "success": True,
-            "count": len(repos.data) if repos.data else 0,
-            "repos": repos.data or []
+            "count": len(repos_list),
+            "repos": repos_list
         }
         
     except Exception as e:

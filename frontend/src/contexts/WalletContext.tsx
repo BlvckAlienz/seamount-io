@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useAuth } from './AuthContext';
 
 // ============================================================================
 // TYPES
@@ -51,6 +52,7 @@ const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 // ============================================================================
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [wallets, setWallets] = useState<MultiChainWallet>({});
   const [balances, setBalances] = useState<{ [asset: string]: WalletBalance }>({});
   const [totalBalanceUSD, setTotalBalanceUSD] = useState(0);
@@ -60,6 +62,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // FETCH WALLETS
   // ============================================================================
   const fetchWallets = useCallback(async () => {
+    // ✅ CRITICAL: Only fetch if authenticated
+    if (!user) {
+      console.log('ℹ️ WalletContext: User not authenticated, skipping wallet fetch');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await api.get<any>('/api/v1/wallet/multi-chain-status');
@@ -67,9 +76,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (response.success) {
         setWallets(response.wallets || {});
       }
-    } catch (error) {
-      console.error('Failed to fetch wallets:', error);
-      toast.error('Failed to load wallets');
+    } catch (error: any) {
+      // ✅ Handle 403 gracefully (expected when not authenticated)
+      if (error?.response?.status === 403) {
+        console.log('ℹ️ Wallet fetch returned 403 (not authenticated)');
+        setWallets({}); // Clear state, no error toast
+      } else {
+        // Real errors (500, network issues, etc.)
+        console.error('Failed to fetch wallets:', error);
+        toast.error('Failed to load wallets');
+      }
     } finally {
       setLoading(false);
     }
@@ -79,6 +95,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // FETCH BALANCES
   // ============================================================================
   const fetchBalances = useCallback(async () => {
+    // ✅ CRITICAL: Only fetch if authenticated
+    if (!user) {
+      console.log('ℹ️ WalletContext: User not authenticated, skipping balance fetch');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await api.get<any>('/api/v1/wallet/balances');
@@ -122,9 +145,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setBalances(balancesObj);
         setTotalBalanceUSD(response.total_usd || 0);
       }
-    } catch (error) {
-      console.error('Failed to fetch balances:', error);
-      toast.error('Failed to load balances');
+    } catch (error: any) {
+      // ✅ Handle 403 gracefully (expected when not authenticated)
+      if (error?.response?.status === 403) {
+        console.log('ℹ️ Balance fetch returned 403 (not authenticated)');
+        setBalances({});
+        setTotalBalanceUSD(0);
+      } else {
+        // Real errors (500, network issues, etc.)
+        console.error('Failed to fetch balances:', error);
+        toast.error('Failed to load balances');
+      }
     } finally {
       setLoading(false);
     }
@@ -184,8 +215,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // INITIAL LOAD
   // ============================================================================
   useEffect(() => {
-    refreshAll();
-  }, []);
+    if (user) {
+      console.log('✅ WalletContext: User authenticated, loading wallet data...');
+      refreshAll();
+    } else {
+      console.log('ℹ️ WalletContext: User not authenticated, skipping wallet fetch');
+      setLoading(false);
+      // Clear state when logged out
+      setWallets({});
+      setBalances({});
+      setTotalBalanceUSD(0);
+    }
+  }, [user]); // ← Changed from [] to [user]
 
   // ============================================================================
   // CONTEXT VALUE

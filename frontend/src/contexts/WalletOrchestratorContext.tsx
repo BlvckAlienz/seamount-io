@@ -5,446 +5,491 @@ import { apiClient } from '@/config/api';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
-// Network types
-type NetworkType = 'mainnet' | 'testnet' | 'camp_mainnet_future';
-type ChainId = 'base' | 'celo' | 'basecamp' | 'camp_mainnet';
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type ChainId = 'algorand' | 'bitcoin' | 'ethereum' | 'polygon' | 'tron' | 'base' | 'celo' | 'basecamp';
+
+interface AutoCreatedWallet {
+  address: string;
+  balance: number;
+  usd_value: number;
+  status: 'created' | 'not_created';
+  type: 'auto_created';
+}
+
+interface ExternalWallet {
+  address: string;
+  chainId: number;
+  walletProvider: string;
+  isConnected: boolean;
+  type: 'external';
+}
 
 interface NetworkConfig {
   id: ChainId;
   name: string;
-  type: NetworkType;
   chainId: number;
   chainIdHex: string;
   nativeCurrency: string;
-  connectionMethod: 'walletconnect' | 'metamask_direct';
-  icon: string;
-  description: string;
-  explorer: string;
+  connectionMethod: 'auto_created' | 'walletconnect' | 'metamask_direct';
   rpcUrl?: string;
-}
-
-interface WalletState {
-  address: string;
-  chainId: number;
-  network: ChainId;
-  isConnected: boolean;
-  walletProvider: string;
-  connectionType: string;
-  balance?: string;
+  explorer: string;
 }
 
 interface WalletOrchestratorContextType {
+  // External wallets ONLY (BaseCAMP, Base, Celo)
+  externalWallets: Record<ChainId, ExternalWallet | null>;
+  
+  // BaseCAMP specific (for predictions)
+  baseCampAddress: string | null;
+  isBaseCampConnected: boolean;
+  
+  // Actions
+  connectExternalWallet: (network: 'base' | 'celo') => Promise<void>;
+  connectBaseCAMP: () => Promise<void>;
+  disconnectExternalWallet: (network: ChainId) => Promise<void>;
+  
   // State
-  wallets: Record<ChainId, WalletState | null>;
-  activeNetwork: ChainId | null;
+  loading: boolean;
   isConnecting: boolean;
-  
-  // Methods
-  connectWallet: (network: ChainId) => Promise<void>;
-  disconnectWallet: (network: ChainId) => Promise<void>;
-  switchNetwork: (from: ChainId, to: ChainId) => Promise<void>;
-  getWallet: (network: ChainId) => WalletState | null;
-  getBestNetworkForAction: (action: 'send' | 'bet' | 'earn' | 'swap') => ChainId;
-  
-  // Queries
-  isWalletConnected: (network: ChainId) => boolean;
-  getAllConnectedNetworks: () => ChainId[];
-  getTotalBalanceUSD: () => number;
 }
 
-// Network configurations
+const WalletOrchestratorContext = createContext<WalletOrchestratorContextType | undefined>(undefined);
+
+// ============================================================================
+// NETWORK CONFIGURATIONS
+// ============================================================================
+
 const NETWORK_CONFIGS: Record<ChainId, NetworkConfig> = {
+  // Auto-created wallets (backend manages)
+  algorand: {
+    id: 'algorand',
+    name: 'Algorand',
+    chainId: 0, // Not EVM
+    chainIdHex: '0x0',
+    nativeCurrency: 'ALGO',
+    connectionMethod: 'auto_created',
+    explorer: 'https://algoexplorer.io'
+  },
+  bitcoin: {
+    id: 'bitcoin',
+    name: 'Bitcoin',
+    chainId: 0,
+    chainIdHex: '0x0',
+    nativeCurrency: 'BTC',
+    connectionMethod: 'auto_created',
+    explorer: 'https://blockchair.com/bitcoin'
+  },
+  ethereum: {
+    id: 'ethereum',
+    name: 'Ethereum',
+    chainId: 1,
+    chainIdHex: '0x1',
+    nativeCurrency: 'ETH',
+    connectionMethod: 'auto_created',
+    explorer: 'https://etherscan.io'
+  },
+  polygon: {
+    id: 'polygon',
+    name: 'Polygon',
+    chainId: 137,
+    chainIdHex: '0x89',
+    nativeCurrency: 'MATIC',
+    connectionMethod: 'auto_created',
+    explorer: 'https://polygonscan.com'
+  },
+  tron: {
+    id: 'tron',
+    name: 'TRON',
+    chainId: 0,
+    chainIdHex: '0x0',
+    nativeCurrency: 'TRX',
+    connectionMethod: 'auto_created',
+    explorer: 'https://tronscan.org'
+  },
+  
+  // External wallets (user connects)
+  basecamp: {
+    id: 'basecamp',
+    name: 'BaseCAMP Testnet',
+    chainId: 123456789, // Actual BaseCAMP chain ID
+    chainIdHex: '0x1cbc67c35a',
+    nativeCurrency: 'CAMP',
+    connectionMethod: 'metamask_direct',
+    rpcUrl: 'https://rpc.basecamp.t.raas.gelato.cloud',
+    explorer: 'https://basecamp.cloud.blockscout.com'
+  },
   base: {
     id: 'base',
     name: 'Base',
-    type: 'mainnet',
     chainId: 8453,
     chainIdHex: '0x2105',
     nativeCurrency: 'ETH',
     connectionMethod: 'walletconnect',
-    icon: 'https://icons.llamao.fi/icons/chains/rsz_base.jpg',
-    description: 'Ethereum L2 by Coinbase',
     explorer: 'https://basescan.org'
   },
   celo: {
     id: 'celo',
     name: 'Celo',
-    type: 'mainnet',
     chainId: 42220,
     chainIdHex: '0xA4EC',
     nativeCurrency: 'CELO',
     connectionMethod: 'walletconnect',
-    icon: 'https://cryptologos.cc/logos/celo-celo-logo.svg',
-    description: 'Mobile-first blockchain',
     explorer: 'https://celoscan.io'
-  },
-  basecamp: {
-    id: 'basecamp',
-    name: 'BaseCAMP',
-    type: 'testnet',
-    chainId: 123456789, // Placeholder - actual BaseCAMP testnet ID
-    chainIdHex: '0x1cbc67c35a',
-    nativeCurrency: 'CAMP',
-    connectionMethod: 'metamask_direct',
-    icon: 'https://campnetwork.xyz/logo.png',
-    description: 'Prediction markets testnet',
-    explorer: 'https://basecamp.cloud.blockscout.com',
-    rpcUrl: 'https://rpc.basecamp.t.raas.gelato.cloud'
-  },
-  camp_mainnet: {
-    id: 'camp_mainnet',
-    name: 'CAMP Mainnet',
-    type: 'camp_mainnet_future',
-    chainId: 84532,
-    chainIdHex: '0x14A34',
-    nativeCurrency: 'CAMP',
-    connectionMethod: 'walletconnect',
-    icon: 'https://campnetwork.xyz/logo.png',
-    description: 'Future prediction markets mainnet',
-    explorer: 'https://campnetwork.xyz',
-    rpcUrl: 'https://rpc.campnetwork.xyz'
   }
 };
 
-// Action to network mapping
-const ACTION_NETWORK_MAP: Record<string, ChainId[]> = {
-  send: ['base', 'celo'],
-  bet: ['basecamp'],
-  earn: ['base', 'celo'],
-  swap: ['base', 'celo']
-};
+// ============================================================================
+// PROVIDER
+// ============================================================================
 
-// 🚨 TYPE GUARD: Ensure address is always a string
-const safeAddress = (addr: string | undefined | null): string => {
-  if (!addr || typeof addr !== 'string') return '';
-  return addr;
-};
-
-// Create context
-const WalletOrchestratorContext = createContext<WalletOrchestratorContextType | undefined>(undefined);
-
-// Main provider component
 export function WalletOrchestratorProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { open } = useAppKit();
-  const { address: rawAddress, isConnected, chain } = useAccount();
+  const { address: wagmiAddress, isConnected: wagmiConnected, chain } = useAccount();
   const chainId = useChainId();
   const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   
-  // 🚨 CRITICAL: Always ensure address is a string
-  const address = safeAddress(rawAddress);
-  
-  const [wallets, setWallets] = useState<Record<ChainId, WalletState | null>>({
+  // State - ONLY external wallets
+  const [externalWallets, setExternalWallets] = useState<Record<ChainId, ExternalWallet | null>>({
     base: null,
     celo: null,
     basecamp: null,
-    camp_mainnet: null
+    algorand: null,
+    bitcoin: null,
+    ethereum: null,
+    polygon: null,
+    tron: null
   });
-  const [activeNetwork, setActiveNetwork] = useState<ChainId | null>(null);
+  const [totalBalanceUSD, setTotalBalanceUSD] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [baseCampAddress, setBaseCampAddress] = useState<string | null>(null);
 
-  // Initialize: Load saved wallet states
-  useEffect(() => {
-    if (user) {
-      loadSavedWallets();
+  // ============================================================================
+  // FETCH EXTERNAL WALLETS (Only when authenticated)
+  // ============================================================================
+  
+  const fetchExternalWallets = async () => {
+    if (!user) {
+      console.log('ℹ️ User not authenticated, skipping external wallets fetch');
+      return;
     }
-  }, [user]);
 
-  // Detect current network when connection changes
-  useEffect(() => {
-    if (chainId && isConnected && address) {
-      detectCurrentNetwork();
-    }
-  }, [chainId, address, isConnected]);
-
-  const loadSavedWallets = async () => {
     try {
       const response = await apiClient.get('/api/v1/wallet/connected-wallets');
+      
       if (response.data.success) {
-        const newWallets = { ...wallets };
         const walletList = response.data.wallets || [];
-        
+        const newExternalWallets = { ...externalWallets };
+
         walletList.forEach((wallet: any) => {
           const networkId = wallet.blockchain as ChainId;
           if (networkId === 'base' || networkId === 'celo') {
-            newWallets[networkId] = {
-              address: safeAddress(wallet.address),
+            newExternalWallets[networkId] = {
+              address: wallet.address,
               chainId: NETWORK_CONFIGS[networkId].chainId,
-              network: networkId,
-              isConnected: true,
               walletProvider: wallet.wallet_provider || 'unknown',
-              connectionType: 'walletconnect'
+              isConnected: true,
+              type: 'external'
             };
           }
         });
-        
-        setWallets(newWallets);
+
+        setExternalWallets(newExternalWallets);
+        console.log(`✅ Fetched external wallets:`, newExternalWallets);
       }
-    } catch (error) {
-      console.warn('Could not load saved wallets:', error);
+    } catch (error: any) {
+      if (error?.response?.status === 403) {
+        console.log('ℹ️ External wallets fetch returned 403 (not authenticated)');
+      } else {
+        console.error('Failed to fetch external wallets:', error);
+      }
     }
   };
 
-  const detectCurrentNetwork = () => {
-    if (!chainId || !address) return;
-    
-    // Check which network we're currently on
-    Object.entries(NETWORK_CONFIGS).forEach(([networkId, config]) => {
-      const isMatch = 
-        config.chainId === chainId || 
-        config.chainIdHex === `0x${chainId.toString(16)}`;
-      
-      if (isMatch) {
-        setActiveNetwork(networkId as ChainId);
-        
-        // Update wallet state if connected
-        if (isConnected && address) {
-          setWallets(prev => ({
-            ...prev,
-            [networkId]: {
-              address: safeAddress(address),
-              chainId,
-              network: networkId as ChainId,
-              isConnected: true,
-              walletProvider: detectWalletProvider(),
-              connectionType: config.connectionMethod
-            }
-          }));
+  // ============================================================================
+  // CHECK BASECAMP PERSISTENCE (Local storage)
+  // ============================================================================
+  
+  const checkBaseCampConnection = () => {
+    if (typeof window === 'undefined' || !window.ethereum) return;
+
+    const savedAddress = localStorage.getItem('basecamp_address');
+    if (savedAddress) {
+      window.ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
+        if (accounts.includes(savedAddress)) {
+          setBaseCampAddress(savedAddress);
+          console.log('✅ BaseCAMP persisted:', savedAddress.slice(0, 8) + '...');
+        } else {
+          localStorage.removeItem('basecamp_address');
+        }
+      });
+    }
+  };
+
+  // ============================================================================
+  // CONNECT BASECAMP (MetaMask Direct - No backend)
+  // ============================================================================
+  
+  const connectBaseCAMP = async () => {
+    if (!window.ethereum) {
+      toast.error('MetaMask not installed');
+      return;
+    }
+
+    setIsConnecting(true);
+
+    try {
+      const config = NETWORK_CONFIGS.basecamp;
+
+      // Request accounts
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      }) as string[];
+
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts found');
+      }
+
+      // Switch or add network
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: config.chainIdHex }]
+        });
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          // Add network
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: config.chainIdHex,
+              chainName: config.name,
+              nativeCurrency: {
+                name: config.nativeCurrency,
+                symbol: config.nativeCurrency,
+                decimals: 18
+              },
+              rpcUrls: [config.rpcUrl],
+              blockExplorerUrls: [config.explorer]
+            }]
+          });
+        } else {
+          throw switchError;
         }
       }
-    });
-  };
 
-  const detectWalletProvider = (): string => {
-    const ethereum = (window as any).ethereum;
-    if (!ethereum) return 'unknown';
-    if (ethereum.isMetaMask) return 'metamask';
-    if (ethereum.isCoinbaseWallet) return 'coinbase_wallet';
-    if (ethereum.isMiniPay) return 'minipay';
-    if (ethereum.isValora) return 'valora';
-    return 'walletconnect';
-  };
+      // Save to localStorage
+      localStorage.setItem('basecamp_address', accounts[0]);
+      setBaseCampAddress(accounts[0]);
 
-  const connectWallet = async (network: ChainId): Promise<void> => {
-    setIsConnecting(true);
-    const config = NETWORK_CONFIGS[network];
-    
-    try {
-      switch (config.connectionMethod) {
-        case 'walletconnect':
-          await connectViaWalletConnect(network, config);
-          break;
-        case 'metamask_direct':
-          await connectViaMetaMask(network, config);
-          break;
-      }
-      
-      setActiveNetwork(network);
-      toast.success(`${config.name} wallet connected!`);
+      toast.success('BaseCAMP connected!');
+      console.log('✅ BaseCAMP connected:', accounts[0].slice(0, 8) + '...');
+
     } catch (error: any) {
-      console.error(`❌ Failed to connect ${network}:`, error);
-      toast.error(`Failed to connect ${config.name}: ${error.message}`);
+      console.error('BaseCAMP connection failed:', error);
+      
+      if (error.code === 4001) {
+        toast.error('Connection rejected');
+      } else {
+        toast.error('Failed to connect BaseCAMP');
+      }
     } finally {
       setIsConnecting(false);
     }
   };
 
-  const connectViaWalletConnect = async (network: ChainId, config: NetworkConfig) => {
-    // Step 1: Open WalletConnect modal if not connected
-    if (!isConnected || !address) {
-      await open();
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      if (!isConnected || !address) {
-        throw new Error('Wallet connection cancelled');
-      }
+  // ============================================================================
+  // CONNECT EXTERNAL WALLET (Base/Celo via WalletConnect)
+  // ============================================================================
+  
+  const connectExternalWallet = async (network: 'base' | 'celo') => {
+    if (!user) {
+      toast.error('Please sign in to connect wallets');
+      return;
     }
 
-    // Step 2: Verify correct network
-    if (chainId !== config.chainId) {
-      throw new Error(`Please switch to ${config.name} network in your wallet`);
-    }
-
-    // Step 3: Get nonce and authenticate
-    const nonceResponse = await apiClient.post('/api/v1/wallet/nonce', {
-      address: safeAddress(address),
-      blockchain: network
-    });
-
-    if (!nonceResponse.data.success) {
-      throw new Error(nonceResponse.data.error || 'Authentication failed');
-    }
-
-    const { nonce, message } = nonceResponse.data;
-    const signature = await signMessageAsync({ message });
-
-    // Step 4: Register connection with backend
-    const connectResponse = await apiClient.post('/api/v1/wallet/connect', {
-      blockchain: network,
-      address: safeAddress(address),
-      wallet_provider: detectWalletProvider(),
-      signature,
-      nonce
-    });
-
-    if (!connectResponse.data.success) {
-      throw new Error(connectResponse.data.error || 'Registration failed');
-    }
-
-    // Step 5: Update local state
-    setWallets(prev => ({
-      ...prev,
-      [network]: {
-        address: safeAddress(address),
-        chainId: config.chainId,
-        network,
-        isConnected: true,
-        walletProvider: detectWalletProvider(),
-        connectionType: 'walletconnect'
-      }
-    }));
-  };
-
-  const connectViaMetaMask = async (network: ChainId, config: NetworkConfig) => {
-    const ethereum = (window as any).ethereum;
-    
-    if (!ethereum) {
-      throw new Error('MetaMask not installed');
-    }
-
-    // Request accounts
-    const accounts = await ethereum.request({ method: 'eth_requestAccounts' }) as string[];
-    
-    if (!accounts || accounts.length === 0) {
-      throw new Error('No accounts found');
-    }
-    
-    // Switch or add network
-    try {
-      await ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: config.chainIdHex }]
-      });
-    } catch (switchError: any) {
-      if (switchError.code === 4902) {
-        // Network not added, add it
-        await ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: config.chainIdHex,
-            chainName: config.name,
-            nativeCurrency: {
-              name: config.nativeCurrency,
-              symbol: config.nativeCurrency,
-              decimals: 18
-            },
-            rpcUrls: [config.rpcUrl],
-            blockExplorerUrls: [config.explorer]
-          }]
-        });
-      } else {
-        throw switchError;
-      }
-    }
-
-    // Update local state (no backend registration for testnet)
-    setWallets(prev => ({
-      ...prev,
-      [network]: {
-        address: safeAddress(accounts[0]),
-        chainId: config.chainId,
-        network,
-        isConnected: true,
-        walletProvider: 'metamask',
-        connectionType: 'metamask_direct'
-      }
-    }));
-  };
-
-  const disconnectWallet = async (network: ChainId) => {
+    setIsConnecting(true);
     const config = NETWORK_CONFIGS[network];
-    const wallet = wallets[network];
-    
-    if (!wallet) return;
-    
+
     try {
-      if (wallet.connectionType === 'walletconnect') {
-        // Disconnect from backend
-        await apiClient.post('/api/v1/wallet/disconnect', { blockchain: network });
+      // Step 1: Open WalletConnect modal if not connected
+      if (!wagmiConnected || !wagmiAddress) {
+        await open();
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // If this is the active network, disconnect from wallet provider too
-        if (activeNetwork === network) {
-          disconnect();
+        if (!wagmiConnected || !wagmiAddress) {
+          throw new Error('Wallet connection cancelled');
         }
       }
-      
-      // Update local state
-      setWallets(prev => ({
+
+      // Step 2: Verify correct network
+      if (chainId !== config.chainId) {
+        toast.error(`Please switch to ${config.name} network in your wallet`);
+        setIsConnecting(false);
+        return;
+      }
+
+      // Step 3: Get nonce
+      const nonceResponse = await apiClient.post('/api/v1/wallet/nonce', {
+        address: wagmiAddress,
+        blockchain: network
+      });
+
+      if (!nonceResponse.data.success) {
+        throw new Error(nonceResponse.data.error || 'Failed to generate nonce');
+      }
+
+      const { nonce, message } = nonceResponse.data;
+
+      // Step 4: Sign message
+      const signature = await signMessageAsync({ message });
+
+      // Step 5: Detect wallet provider
+      let walletProvider = 'walletconnect';
+      const ethereum = (window as any).ethereum;
+      if (ethereum?.isMetaMask) walletProvider = 'metamask';
+      else if (ethereum?.isCoinbaseWallet) walletProvider = 'coinbase_wallet';
+      else if (ethereum?.isMiniPay) walletProvider = 'minipay';
+      else if (ethereum?.isValora) walletProvider = 'valora';
+
+      // Step 6: Register connection
+      const connectResponse = await apiClient.post('/api/v1/wallet/connect', {
+        blockchain: network,
+        address: wagmiAddress,
+        wallet_provider: walletProvider,
+        signature,
+        nonce
+      });
+
+      if (!connectResponse.data.success) {
+        throw new Error(connectResponse.data.error || 'Registration failed');
+      }
+
+      // Update state
+      setExternalWallets(prev => ({
         ...prev,
-        [network]: null
+        [network]: {
+          address: wagmiAddress,
+          chainId: config.chainId,
+          walletProvider,
+          isConnected: true,
+          type: 'external'
+        }
       }));
+
+      toast.success(`${config.name} wallet connected!`);
+      console.log(`✅ ${network} connected:`, wagmiAddress.slice(0, 8) + '...');
+
+    } catch (error: any) {
+      console.error(`${network} connection failed:`, error);
       
-      toast.success(`${config.name} wallet disconnected`);
+      if (error.message?.includes('rejected')) {
+        toast.error('Connection rejected');
+      } else {
+        toast.error(`Failed to connect ${config.name}`);
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // ============================================================================
+  // DISCONNECT WALLET
+  // ============================================================================
+  
+  const disconnectExternalWallet = async (network: ChainId) => {
+    const config = NETWORK_CONFIGS[network];
+
+    try {
+      if (network === 'basecamp') {
+        // Local storage only
+        localStorage.removeItem('basecamp_address');
+        setBaseCampAddress(null);
+        toast.success('BaseCAMP disconnected');
+      } else if (network === 'base' || network === 'celo') {
+        // Backend disconnect
+        await apiClient.post('/api/v1/wallet/disconnect', { blockchain: network });
+        
+        setExternalWallets(prev => ({
+          ...prev,
+          [network]: null
+        }));
+
+        // If this is the active wagmi chain, disconnect
+        if (chainId === config.chainId) {
+          disconnect();
+        }
+
+        toast.success(`${config.name} disconnected`);
+      }
     } catch (error) {
-      console.error(`❌ Failed to disconnect ${network}:`, error);
+      console.error(`${network} disconnection failed:`, error);
       toast.error(`Failed to disconnect ${config.name}`);
     }
   };
 
-  const switchNetwork = async (from: ChainId, to: ChainId) => {
-    const toConfig = NETWORK_CONFIGS[to];
-    
-    // If target is testnet and not connected, connect first
-    if (to === 'basecamp' && !wallets[to]) {
-      await connectWallet(to);
-      return;
-    }
-    
-    // For WalletConnect networks, just update active network
-    setActiveNetwork(to);
-    toast.info(`Switched to ${toConfig.name}`);
-  };
+  // ============================================================================
+  // INITIALIZATION
+  // ============================================================================
+  
+  useEffect(() => {
+    if (user) {
+      console.log('✅ User authenticated, checking external wallets...');
+      // ONLY fetch external wallets (Base, Celo)
+      // Auto-created wallets handled by WalletProvider
+      fetchExternalWallets();
+      checkBaseCampConnection();
+    } else {
+      // Clear external wallet state only
+      setExternalWallets({
+        base: null,
+        celo: null,
+        basecamp: null,
+        algorand: null,
+        bitcoin: null,
+        ethereum: null,
+        polygon: null,
+        tron: null
+      });
+      setBaseCampAddress(null);
+  }
+}, [user]);
 
-  const getBestNetworkForAction = (action: string): ChainId => {
-    const availableNetworks = ACTION_NETWORK_MAP[action] || ['base'];
-    
-    // Return first connected network, or first available
-    for (const network of availableNetworks) {
-      if (wallets[network]?.isConnected) {
-        return network;
-      }
-    }
-    
-    return availableNetworks[0];
-  };
+  // Check BaseCAMP on mount
+  useEffect(() => {
+    checkBaseCampConnection();
+  }, []);
 
-  // Context value
-  const contextValue: WalletOrchestratorContextType = {
-    wallets,
-    activeNetwork,
-    isConnecting,
-    connectWallet,
-    disconnectWallet,
-    switchNetwork,
-    getWallet: (network) => wallets[network],
-    getBestNetworkForAction,
-    isWalletConnected: (network) => !!wallets[network]?.isConnected,
-    getAllConnectedNetworks: () => 
-      Object.entries(wallets)
-        .filter(([_, wallet]) => wallet?.isConnected)
-        .map(([network]) => network as ChainId),
-    getTotalBalanceUSD: () => 0
+  // ============================================================================
+  // CONTEXT VALUE
+  // ============================================================================
+  const value: WalletOrchestratorContextType = {
+    externalWallets,
+    baseCampAddress,
+    isBaseCampConnected: !!baseCampAddress,
+    connectExternalWallet,
+    connectBaseCAMP,
+    disconnectExternalWallet,
+    loading,
+    isConnecting
   };
 
   return (
-    <WalletOrchestratorContext.Provider value={contextValue}>
+    <WalletOrchestratorContext.Provider value={value}>
       {children}
     </WalletOrchestratorContext.Provider>
   );
 }
 
-// Hook
+// ============================================================================
+// HOOK
+// ============================================================================
+
 export function useWalletOrchestrator() {
   const context = useContext(WalletOrchestratorContext);
   if (!context) {
@@ -455,3 +500,4 @@ export function useWalletOrchestrator() {
 
 // Export configs for use in other components
 export { NETWORK_CONFIGS };
+export type { ChainId, AutoCreatedWallet, ExternalWallet };
