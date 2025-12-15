@@ -1,28 +1,18 @@
 // File: frontend/src/components/layout/Sidebar.tsx
-// 🆕 DTCC-Inspired Sidebar Navigation
+// 🆕 DTCC-Inspired Sidebar Navigation - REDESIGNED
 
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard,
+  Briefcase,
   Coins,
   TrendingUp,
-  RefreshCw,
-  CreditCard,
-  Settings,
-  Link2,
-  LogOut,
   Shield,
-  Plus,
-  Activity,
+  Settings,
   Target,
-  AlertTriangle,
-  FileText,
-  Clock,
-  Wallet,
-  ArrowDownToLine,
-  ArrowUpRight,
-  ShoppingCart,
+  Activity,
+  Key,
+  LogOut,
   Menu,
   X,
 } from 'lucide-react';
@@ -37,20 +27,31 @@ interface NavItem {
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { userProfile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { user, userProfile, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const navItems: NavItem[] = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { label: 'Wallets', icon: Wallet, path: '/wallets' },
+    { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW' },
     { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW' },
     { label: 'Trading', icon: TrendingUp, path: '/trading' },
-    { label: 'Payments', icon: CreditCard, path: '/payments' },
+    { label: 'Terminal', icon: Activity, path: '/terminal' },
+    { label: 'Predictions', icon: Target, path: '/predictions' },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   return (
     <>
@@ -136,45 +137,114 @@ const Sidebar: React.FC = () => {
             })}
           </nav>
 
-          {/* 👤 USER PROFILE */}
-          <div className="p-4 border-t border-gray-800">
-            <div className="flex items-center gap-3 mb-3 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold">
-                  {userProfile?.first_name?.[0] || 'U'}
+          {/* 👤 USER PROFILE - ENHANCED VERSION FROM DASHBOARD */}
+          <div className="p-4 border-t border-gray-800 relative">
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="w-full flex items-center gap-3 hover:bg-gray-800 p-2 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm">
+                  {userProfile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 text-left opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300 min-w-0">
                 <div className="text-white text-sm font-medium truncate">
-                  {userProfile?.first_name || 'User'}
+                  {userProfile?.first_name || user?.email?.split('@')[0] || 'User'}
                 </div>
-                <div className="text-gray-400 text-xs truncate">{userProfile?.email}</div>
+                <div className="text-gray-400 text-xs truncate">{user?.email}</div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Link
-                to="/settings"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors"
-              >
-                <Settings className="w-4 h-4 flex-shrink-0" />
-                <span className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
-                  Settings
-                </span>
-              </Link>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  signOut();
-                }}
-                className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm transition-colors w-full"
-              >
-                <LogOut className="w-4 h-4 flex-shrink-0" />
-                <span className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
-                  Logout
-                </span>
-              </button>
-            </div>
+            </button>
+
+            {/* 📋 DROPDOWN MENU */}
+            {showProfileMenu && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                
+                {/* Menu */}
+                <div className="absolute bottom-full left-4 right-4 mb-2 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                  {/* User Info Header */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 border-b border-gray-700">
+                    <div className="text-white font-semibold">
+                      {userProfile?.first_name || 'User'}
+                    </div>
+                    <div className="text-blue-100 text-xs">
+                      {user?.email}
+                    </div>
+                  </div>
+
+                  {/* Menu Items */}
+                  <div className="py-2">
+                    {/* Recovery Phrases */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setIsOpen(false);
+                        navigate('/wallet-recovery');
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors text-left"
+                    >
+                      <Key className="h-4 w-4 text-orange-400" />
+                      <div>
+                        <div className="text-sm font-medium">Recovery Phrases</div>
+                        <div className="text-xs text-gray-500">View your seed phrases</div>
+                      </div>
+                    </button>
+
+                    {/* Verify KYC */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setIsOpen(false);
+                        navigate('/onboarding');
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-gray-300 transition-colors text-left"
+                    >
+                      <Shield className="h-4 w-4 text-green-400" />
+                      <div>
+                        <div className="text-sm font-medium">Verify Identity</div>
+                        <div className="text-xs text-gray-500">Complete KYC verification</div>
+                      </div>
+                    </button>
+
+                    {/* Admin Dashboard (only if admin) */}
+                    {userProfile?.is_admin && (
+                      <button 
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          setIsOpen(false);
+                          navigate('/admin');
+                        }} 
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-yellow-400 transition-colors text-left border-t border-gray-700"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <div>
+                          <div className="text-sm font-medium">Admin Dashboard</div>
+                          <div className="text-xs text-yellow-500">Platform management</div>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Logout */}
+                    <button 
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setIsOpen(false);
+                        handleLogout();
+                      }} 
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-700 text-red-400 transition-colors text-left border-t border-gray-700"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <div>
+                        <div className="text-sm font-medium">Logout</div>
+                        <div className="text-xs text-red-500">Sign out of your account</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </aside>
