@@ -37,6 +37,8 @@ import WalletRecovery from './pages/wallet-recovery';
 import WalletsPage from './pages/WalletsPage';
 import TokenizationMarketPage from './pages/TokenizationMarketPage';
 import CollateralPage from './pages/CollateralPage';
+import PredictionMarketsPage from './pages/PredictionMarketsPage';
+import MarketTerminal from './components/market/MarketTerminal';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -270,6 +272,27 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <CollateralPage />
+            </ProtectedRoute>
+          } 
+        />
+        {/* 🆕 Market Terminal Route */}
+        <Route 
+          path="/terminal" 
+          element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-900">
+                <MarketTerminal />
+              </div>
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* 🆕 Prediction Markets Route */}
+        <Route 
+          path="/predictions" 
+          element={
+            <ProtectedRoute>
+              <PredictionMarketsPage />
             </ProtectedRoute>
           } 
         />

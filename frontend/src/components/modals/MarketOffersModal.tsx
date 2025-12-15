@@ -218,8 +218,19 @@ export const MarketOffersModal: React.FC<MarketOffersModalProps> = ({
 
       {/* Buy Confirmation Modal */}
       {showBuyModal && selectedOffer && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-lg w-full">
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowBuyModal(false);
+              setSelectedOffer(null);
+            }
+          }}
+        >
+          <div 
+            className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6">
               <h3 className="text-xl font-bold text-white mb-4">Confirm Purchase</h3>
               
