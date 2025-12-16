@@ -8,6 +8,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import TerminalPage from './pages/TerminalPage';
 
 // ✅ ADD THESE IMPORTS
 import { WagmiProvider } from 'wagmi';
@@ -280,9 +281,7 @@ const AppContent: React.FC = () => {
           path="/terminal" 
           element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-gray-900">
-                <MarketTerminal />
-              </div>
+              <TerminalPage />
             </ProtectedRoute>
           } 
         />

@@ -1,3 +1,4 @@
+// File: frontend/src/components/market/MarketTerminal.tsx
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '@/config/api';
 
@@ -25,9 +26,12 @@ const MarketTerminal: React.FC = () => {
         setMarketData(response.data.data);
         setLastUpdate(new Date());
         setError(null);
+      } else {
+        setError('Failed to fetch market data');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch market data');
+      console.error('Market data fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -40,23 +44,25 @@ const MarketTerminal: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading && !marketData) {
+  // 🚨 FIX: Add proper loading state check
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading market data...</p>
+          <p className="mt-4 text-gray-400">Loading market data...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  // 🚨 FIX: Check if marketData is null before rendering
+  if (!marketData && !loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h3 className="text-red-800 font-semibold mb-2">⚠️ Connection Error</h3>
-          <p className="text-red-600">{error}</p>
+          <h3 className="text-red-800 font-semibold mb-2">⚠️ No Data Available</h3>
+          <p className="text-red-600">Market data could not be loaded.</p>
           <button 
             onClick={fetchMarketData}
             className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
@@ -67,6 +73,11 @@ const MarketTerminal: React.FC = () => {
       </div>
     );
   }
+
+  // 🚨 FIX: Use safe access with optional chaining
+  const cryptoData = marketData?.crypto || {};
+  const forexData = marketData?.forex || {};
+  const commoditiesData = marketData?.commodities || {};
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -81,7 +92,7 @@ const MarketTerminal: React.FC = () => {
         <div className="text-right">
           <div className="text-sm text-gray-400">Last Updated</div>
           <div className="text-lg font-mono">
-            {lastUpdate?.toLocaleTimeString()}
+            {lastUpdate?.toLocaleTimeString() || 'N/A'}
           </div>
           <button
             onClick={fetchMarketData}
@@ -99,11 +110,11 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">💰</span> Cryptocurrencies
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {marketData?.crypto && Object.entries(marketData.crypto).map(([asset, price]) => (
+          {Object.entries(cryptoData).map(([asset, price]) => (
             <div key={asset} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <div className="text-gray-400 text-sm uppercase">{asset}</div>
               <div className="text-2xl font-bold mt-1">
-                ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-green-400 text-sm mt-1">● Live</div>
             </div>
@@ -117,13 +128,13 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">🏆</span> Precious Metals
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {marketData?.commodities && ['XAU', 'XAG', 'XPT', 'XPD'].map((symbol) => (
+          {['XAU', 'XAG', 'XPT', 'XPD'].map((symbol) => (
             <div key={symbol} className="bg-gradient-to-br from-yellow-900/30 to-gray-800 rounded-lg p-4 border border-yellow-700/50">
               <div className="text-yellow-400 text-sm font-semibold">
                 {symbol === 'XAU' ? 'GOLD' : symbol === 'XAG' ? 'SILVER' : symbol === 'XPT' ? 'PLATINUM' : 'PALLADIUM'}
               </div>
               <div className="text-2xl font-bold mt-1">
-                ${marketData.commodities[symbol].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(commoditiesData[symbol] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-xs text-gray-400 mt-1">per troy ounce</div>
               <div className="text-green-400 text-sm mt-1">● Live (Metals.dev)</div>
@@ -138,15 +149,16 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">⚙️</span> Industrial Metals
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {marketData?.commodities && ['COPP', 'ALUM', 'NICK', 'ZINC'].map((symbol) => {
+          {['COPP', 'ALUM', 'NICK', 'ZINC'].map((symbol) => {
             const names = { COPP: 'Copper', ALUM: 'Aluminum', NICK: 'Nickel', ZINC: 'Zinc' };
             const isLive = ['COPP', 'ALUM'].includes(symbol);
+            const price = commoditiesData[symbol] || 0;
             
             return (
               <div key={symbol} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-gray-400 text-sm font-semibold">{names[symbol as keyof typeof names]}</div>
                 <div className="text-2xl font-bold mt-1">
-                  ${marketData.commodities[symbol].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">per metric ton</div>
                 <div className={`text-sm mt-1 ${isLive ? 'text-green-400' : 'text-yellow-400'}`}>
@@ -164,14 +176,15 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">🔋</span> Critical Minerals (Battery Metals)
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {marketData?.commodities && ['LITH', 'COBT', 'MANG', 'GRPH', 'TANT'].map((symbol) => {
+          {['LITH', 'COBT', 'MANG', 'GRPH', 'TANT'].map((symbol) => {
             const names = { LITH: 'Lithium', COBT: 'Cobalt', MANG: 'Manganese', GRPH: 'Graphite', TANT: 'Tantalum' };
+            const price = commoditiesData[symbol] || 0;
             
             return (
               <div key={symbol} className="bg-gradient-to-br from-purple-900/30 to-gray-800 rounded-lg p-4 border border-purple-700/50">
                 <div className="text-purple-400 text-sm font-semibold">{names[symbol as keyof typeof names]}</div>
                 <div className="text-xl font-bold mt-1">
-                  ${marketData.commodities[symbol].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  ${price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">per metric ton</div>
                 <div className="text-gray-400 text-sm mt-1">◐ Market Reference</div>
@@ -187,21 +200,21 @@ const MarketTerminal: React.FC = () => {
           <span className="mr-2">🌍</span> African Forex Rates
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {marketData?.forex && ['NGN/USD', 'KES/USD', 'ZAR/USD', 'GHS/USD', 'ETB/USD', 'EGP/USD'].map((pair) => {
-            // 🚨 FLIPPED: Show USD/NGN as primary
-            const inversePair = pair.split('/').reverse().join('/');  // USD/NGN
-            const inverseRate = marketData.forex[inversePair];        // 1445.09
-            const secondaryPair = pair;                               // NGN/USD
-            const secondaryRate = marketData.forex[pair];             // 0.000692
+          {['NGN/USD', 'KES/USD', 'ZAR/USD', 'GHS/USD', 'ETB/USD', 'EGP/USD'].map((pair) => {
+            // Safe access with defaults
+            const inversePair = pair.split('/').reverse().join('/');
+            const inverseRate = forexData[inversePair] || 0;
+            const secondaryPair = pair;
+            const secondaryRate = forexData[pair] || 0;
             
             return (
               <div key={pair} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <div className="text-gray-400 text-sm font-semibold">{inversePair}</div>  {/* 🚨 USD/NGN */}
+                <div className="text-gray-400 text-sm font-semibold">{inversePair}</div>
                 <div className="text-2xl font-bold mt-1">
-                  {inverseRate.toFixed(2)}  {/* 🚨 1445.09 (BIG) */}
+                  {inverseRate.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  {secondaryPair}: {secondaryRate.toFixed(6)}  {/* 🚨 NGN/USD: 0.000692 (small) */}
+                  {secondaryPair}: {secondaryRate.toFixed(6)}
                 </div>
                 <div className="text-green-400 text-sm mt-1">● Live</div>
               </div>
