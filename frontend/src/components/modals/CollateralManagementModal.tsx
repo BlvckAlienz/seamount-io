@@ -12,6 +12,7 @@ interface CollateralManagementModalProps {
 interface CollateralPosition {
   id: string;
   asset_id: string;
+  algorand_asa_id: string;
   locked_quantity: number;
   current_value_usd: number;
   lock_type: string;
@@ -28,7 +29,6 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
 }) => {
   const [loading, setLoading] = useState(true);
   const [positions, setPositions] = useState<CollateralPosition[]>([]);
-  const [selectedPosition, setSelectedPosition] = useState<CollateralPosition | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -50,6 +50,11 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewRepo = (algorandAsaId: string) => {
+    const url = `https://allo.info/asset/${algorandAsaId}/token`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleRelease = async (positionId: string) => {
@@ -197,7 +202,7 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
                             )}
                             {position.lock_type === 'repo' && (
                               <button
-                                onClick={() => setSelectedPosition(position)}
+                                onClick={() => handleViewRepo(position.algorand_asa_id)}
                                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm font-medium transition-colors"
                               >
                                 View Repo
@@ -260,7 +265,7 @@ export const CollateralManagementModal: React.FC<CollateralManagementModalProps>
                         )}
                         {position.lock_type === 'repo' && (
                           <button
-                            onClick={() => setSelectedPosition(position)}
+                            onClick={() => handleViewRepo(position.algorand_asa_id)}
                             className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                           >
                             View Repo
