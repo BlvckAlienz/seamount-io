@@ -77,14 +77,14 @@ const CollateralPage: React.FC = () => {
     
     <main className="flex-1 p-4 md:p-8 pt-20 lg:pt-8">
         {/* Header */}
-        <div className="mb-6 md:mb-8">
+        <div className="mb-4 md:mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-                <Shield className="h-10 w-10 text-orange-400" />
+              <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-2 md:gap-3">
+                <Shield className="h-6 w-6 md:h-10 md:w-10 text-orange-400" />
                 Collateral Management
               </h1>
-              <p className="text-gray-400 text-lg">
+              <p className="text-sm md:text-lg text-gray-400">
                 Lock and manage your digital assets as collateral
               </p>
             </div>
@@ -99,7 +99,7 @@ const CollateralPage: React.FC = () => {
               className="p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh data"
             >
-              <RefreshCw className={`h-5 w-5 text-gray-300 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 md:h-5 md:w-5 text-gray-300 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -107,66 +107,65 @@ const CollateralPage: React.FC = () => {
         {/* 📊 REAL DATA STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Total Locked Value */}
-          <div className="bg-gradient-to-br from-orange-900/30 to-gray-800 rounded-xl p-6 border border-orange-500/30">
+          <div className="bg-gradient-to-br from-orange-900/30 to-gray-800 rounded-xl p-4 md:p-6 border border-orange-500/30">
             <div className="flex items-center justify-between mb-2">
               <div className="p-2 bg-orange-500/20 rounded-lg">
-                <Shield className="h-5 w-5 text-orange-400" />
+                <Shield className="h-4 w-4 md:h-5 md:w-5 text-orange-400" />
               </div>
               {loading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-400"></div>
               )}
             </div>
-            <div className="text-orange-400 text-sm font-semibold mb-2">Total Locked</div>
-            <div className="text-3xl font-bold text-white">
+            <div className="text-orange-400 text-xs md:text-sm font-semibold mb-2">Total Locked</div>
+            <div className="text-2xl md:text-3xl font-bold text-white">
               ${totalLocked.toFixed(2)}
             </div>
           </div>
+        </div>
 
           {/* Active Positions */}
-          <div className="bg-gradient-to-br from-blue-900/30 to-gray-800 rounded-xl p-6 border border-blue-500/30">
+          <div className="bg-gradient-to-br from-blue-900/30 to-gray-800 rounded-xl p-4 md:p-6 border border-blue-500/30">
             <div className="flex items-center justify-between mb-2">
               <div className="p-2 bg-blue-500/20 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-blue-400" />
+                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
               </div>
               {loading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
               )}
             </div>
-            <div className="text-blue-400 text-sm font-semibold mb-2">Active Positions</div>
-            <div className="text-3xl font-bold text-white">{activePositions}</div>
+            <div className="text-blue-400 text-xs md:text-sm font-semibold mb-2">Active Positions</div>
+            <div className="text-2xl md:text-3xl font-bold text-white">{activePositions}</div>
           </div>
 
           {/* Repo Trades */}
-          <div className="bg-gradient-to-br from-green-900/30 to-gray-800 rounded-xl p-6 border border-green-500/30">
+          <div className="bg-gradient-to-br from-green-900/30 to-gray-800 rounded-xl p-4 md:p-6 border border-green-500/30">
             <div className="flex items-center justify-between mb-2">
               <div className="p-2 bg-green-500/20 rounded-lg">
-                <Target className="h-5 w-5 text-green-400" />
+                <Target className="h-4 w-4 md:h-5 md:w-5 text-green-400" />
               </div>
               {loading && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400"></div>
               )}
             </div>
-            <div className="text-green-400 text-sm font-semibold mb-2">Active Repo Trades</div>
-            <div className="text-3xl font-bold text-white">{repoPositions}</div>
+            <div className="text-green-400 text-xs md:text-sm font-semibold mb-2">Active Repo Trades</div>
+            <div className="text-2xl md:text-3xl font-bold text-white">{repoPositions}</div>
           </div>
-        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mb-6 md:mb-8">
           <button
             onClick={() => setShowManageModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-orange-500/30 transition-all"
+            className="flex items-center justify-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white text-sm md:text-base font-semibold rounded-lg hover:shadow-lg hover:shadow-orange-500/30 transition-all flex-1 sm:flex-initial"
           >
-            <Shield className="h-5 w-5" />
+            <Shield className="h-4 w-4 md:h-5 md:w-5" />
             Manage Collateral
           </button>
 
-          {/* 🚨 UPDATED BUTTON */}
           <button
             onClick={() => setShowCreateRepoModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all"
+            className="flex items-center justify-center gap-2 px-4 md:px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm md:text-base font-semibold rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all flex-1 sm:flex-initial"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4 md:h-5 md:w-5" />
             Create Repo Trade
           </button>
         </div>
@@ -180,42 +179,95 @@ const CollateralPage: React.FC = () => {
             </div>
           </div>
         ) : positions.length === 0 ? (
-          <div className="text-center py-16 bg-gray-800/30 rounded-xl border border-gray-700">
-            <Shield className="h-20 w-20 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-400 mb-2">No Collateral Positions</h3>
-            <p className="text-gray-500 mb-6">Lock assets to access liquidity or participate in repo markets</p>
+          <div className="text-center py-12 md:py-16 bg-gray-800/30 rounded-xl border border-gray-700">
+            <Shield className="h-16 w-16 md:h-20 md:w-20 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl md:text-2xl font-bold text-gray-400 mb-2">No Collateral Positions</h3>
+            <p className="text-sm md:text-base text-gray-500 mb-6">Lock assets to access liquidity or participate in repo markets</p>
             <button
               onClick={() => setShowCreateRepoModal(true)}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all"
+              className="px-4 md:px-6 py-2 md:py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base font-semibold rounded-lg transition-all"
             >
               Create Your First Repo Trade
             </button>
           </div>
         ) : (
-          <div className="bg-gray-800/50 rounded-xl overflow-x-auto">
-            <div className="p-6 border-b border-gray-700">
-              <h2 className="text-xl font-bold text-white">Active Positions</h2>
+          <div className="bg-gray-800/50 rounded-xl">
+            <div className="p-4 md:p-6 border-b border-gray-700">
+              <h2 className="text-lg md:text-xl font-bold text-white">Active Positions</h2>
             </div>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Asset</th>
-                  <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Type</th>
-                  <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Quantity</th>
-                  <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Value</th>
-                  <th className="text-center text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {positions.map((position) => (
-                  <tr key={position.id} className="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors">
-                    <td className="py-4 px-4">
-                      <div>
-                        <div className="text-white font-medium">{position.asset_symbol || 'Unknown'}</div>
-                        <div className="text-xs text-gray-400">{position.asset_name || 'Asset'}</div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
+
+            {/* 🖥️ DESKTOP TABLE VIEW */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Asset</th>
+                    <th className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Type</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Quantity</th>
+                    <th className="text-right text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Value</th>
+                    <th className="text-center text-xs font-medium text-gray-400 uppercase tracking-wider py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positions.map((position) => (
+                    <tr key={position.id} className="border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors">
+                      <td className="py-4 px-4">
+                        <div>
+                          <div className="text-white font-medium">{position.asset_symbol || 'Unknown'}</div>
+                          <div className="text-xs text-gray-400">{position.asset_name || 'Asset'}</div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          position.lock_type === 'repo' 
+                            ? 'bg-blue-500/20 text-blue-400' 
+                            : 'bg-purple-500/20 text-purple-400'
+                        }`}>
+                          {position.lock_type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-white font-medium">{position.locked_quantity}</span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-white font-bold">${position.current_value_usd.toFixed(2)}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          position.status === 'active'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {position.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 📱 MOBILE CARD VIEW */}
+            <div className="lg:hidden p-4 space-y-4">
+              {positions.map((position) => (
+                <div key={position.id} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-white font-bold text-lg">{position.asset_symbol || 'Unknown'}</h3>
+                      <p className="text-gray-400 text-sm">{position.asset_name || 'Asset'}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      position.status === 'active'
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {position.status}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Type</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         position.lock_type === 'repo' 
                           ? 'bg-blue-500/20 text-blue-400' 
@@ -223,26 +275,19 @@ const CollateralPage: React.FC = () => {
                       }`}>
                         {position.lock_type.toUpperCase()}
                       </span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Quantity</span>
                       <span className="text-white font-medium">{position.locked_quantity}</span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
+                    </div>
+                    <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
+                      <span className="text-gray-400">Value</span>
                       <span className="text-white font-bold">${position.current_value_usd.toFixed(2)}</span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        position.status === 'active'
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {position.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>

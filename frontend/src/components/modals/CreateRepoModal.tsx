@@ -101,12 +101,12 @@ export const CreateRepoModal: React.FC<CreateRepoModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-2 sm:mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-700">
           <div>
-            <h2 className="text-2xl font-bold text-white">Create Repo Trade</h2>
-            <p className="text-gray-400 text-sm mt-1">Borrow cash against tokenized securities</p>
+            <h2 className="text-xl md:text-2xl font-bold text-white">Create Repo Trade</h2>
+            <p className="text-gray-400 text-xs md:text-sm mt-1">Borrow cash against tokenized securities</p>
           </div>
           <button
             onClick={() => onOpenChange(false)}
@@ -117,21 +117,21 @@ export const CreateRepoModal: React.FC<CreateRepoModalProps> = ({
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-2 p-4 bg-gray-800/50">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${step === 1 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
-            <span className="font-semibold">1</span>
-            <span className="text-sm">Collateral</span>
+        <div className="flex items-center justify-center gap-2 p-3 md:p-4 bg-gray-800/50">
+          <div className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg ${step === 1 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
+            <span className="font-semibold text-sm md:text-base">1</span>
+            <span className="text-xs md:text-sm">Collateral</span>
           </div>
-          <div className="w-12 h-0.5 bg-gray-700"></div>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${step === 2 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
-            <span className="font-semibold">2</span>
-            <span className="text-sm">Terms</span>
+          <div className="w-8 md:w-12 h-0.5 bg-gray-700"></div>
+          <div className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg ${step === 2 ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
+            <span className="font-semibold text-sm md:text-base">2</span>
+            <span className="text-xs md:text-sm">Terms</span>
           </div>
         </div>
 
         {/* Step 1: Collateral Selection */}
         {step === 1 && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 md:p-6 space-y-4 md:space-y-6">
             {/* Asset Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -182,37 +182,37 @@ export const CreateRepoModal: React.FC<CreateRepoModalProps> = ({
 
             {/* Auto-Calculated Metrics */}
             {collateralValue > 0 && (
-              <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 space-y-3">
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-3 md:p-4 space-y-3">
                 <div className="flex items-center gap-2 text-blue-400 mb-2">
-                  <TrendingUp className="h-5 w-5" />
-                  <span className="font-semibold">Auto-Calculated Metrics</span>
+                  <TrendingUp className="h-4 w-4 md:h-5 md:w-5" />
+                  <span className="text-sm md:text-base font-semibold">Auto-Calculated Metrics</span>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <div>
                     <div className="text-xs text-gray-400 mb-1">Collateral Value</div>
-                    <div className="text-lg font-bold text-white">${collateralValue.toFixed(2)}</div>
+                    <div className="text-base md:text-lg font-bold text-white">${collateralValue.toFixed(2)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400 mb-1">LTV Ratio</div>
-                    <div className={`text-lg font-bold ${ltv > 85 ? 'text-red-400' : ltv > 75 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    <div className={`text-base md:text-lg font-bold ${ltv > 85 ? 'text-red-400' : ltv > 75 ? 'text-yellow-400' : 'text-green-400'}`}>
                       {ltv.toFixed(2)}%
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400 mb-1">Haircut</div>
-                    <div className="text-lg font-bold text-white">{haircut}%</div>
+                    <div className="text-base md:text-lg font-bold text-white">{haircut}%</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400 mb-1">Coverage Ratio</div>
-                    <div className="text-lg font-bold text-green-400">{coverage.toFixed(2)}%</div>
+                    <div className="text-base md:text-lg font-bold text-green-400">{coverage.toFixed(2)}%</div>
                   </div>
                 </div>
 
                 {ltv > 85 && (
-                  <div className="flex items-start gap-2 mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
-                    <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-red-300">
+                  <div className="flex items-start gap-2 mt-3 p-2 md:p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs md:text-sm text-red-300">
                       LTV ratio exceeds 85% maximum. Reduce loan amount or add more collateral.
                     </div>
                   </div>
@@ -262,9 +262,9 @@ export const CreateRepoModal: React.FC<CreateRepoModalProps> = ({
             </div>
 
             {/* Repurchase Amount */}
-            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
-              <div className="text-sm text-gray-400 mb-2">Repurchase Amount (Principal + Interest)</div>
-              <div className="text-3xl font-bold text-white">${repurchaseAmount.toFixed(2)}</div>
+            <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-3 md:p-4">
+              <div className="text-xs md:text-sm text-gray-400 mb-2">Repurchase Amount (Principal + Interest)</div>
+              <div className="text-2xl md:text-3xl font-bold text-white">${repurchaseAmount.toFixed(2)}</div>
               <div className="text-xs text-gray-400 mt-2">
                 Interest: ${(repurchaseAmount - parseFloat(loanAmount)).toFixed(2)}
               </div>
