@@ -86,7 +86,7 @@ const MarketTerminal: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">🏦 Seamount Market Terminal</h1>
           <p className="text-gray-400 mt-1">
-            Bloomberg-Grade Real-Time Market Data
+            Real-Time Market Data
           </p>
         </div>
         <div className="text-right">
