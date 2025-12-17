@@ -410,10 +410,7 @@ class SeamountProtocol:
                     }
                 )
                 
-                raise Exception(
-                    "❌ Self-trading not allowed. You cannot buy your own asset offering.\n"
-                    "   If you want to cancel this offer, use the 'Cancel Offer' feature instead."
-                )
+                raise ValueError("This is your own listing. You cannot purchase assets you're already selling.")
             
             # STEP 2: Get asset details
             asset = self.db.supabase.table('tokenized_assets').select('*').eq('id', offer_data['asset_id']).single().execute()

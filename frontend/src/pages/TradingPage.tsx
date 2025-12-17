@@ -1,5 +1,6 @@
 // File: frontend/src/pages/TradingPage.tsx
 // 📱 MOBILE-FIRST RESPONSIVE DESIGN - Platform Standard Format
+// ✅ FIXED: Self-trade prevention with visual distinction
 
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, ShoppingCart, Clock, Filter, Search, RefreshCw } from 'lucide-react';
@@ -33,9 +34,23 @@ const TradingPage = () => {
   const [buyLoading, setBuyLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterNetwork, setFilterNetwork] = useState<string>('all');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchOffers();
+    // Get current user ID from auth
+    const fetchUserAndOffers = async () => {
+      try {
+        const response = await apiClient.get('/api/v1/auth/me');
+        if (response.data?.id) {
+          setCurrentUserId(response.data.id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+      }
+      fetchOffers();
+    };
+    
+    fetchUserAndOffers();
   }, []);
 
   useEffect(() => {
@@ -82,18 +97,19 @@ const TradingPage = () => {
   const handleBuy = async () => {
     if (!selectedOffer) return;
 
+    // 🚨 Check if trying to buy own asset
+    if (selectedOffer.seller_id === currentUserId) {
+      toast.error('This is your own listing. You cannot purchase your own assets.', {
+        duration: 4000,
+        icon: '🏷️'
+      });
+      setShowBuyModal(false);
+      setSelectedOffer(null);
+      return;
+    }
+
     try {
       setBuyLoading(true);
-      
-      // 🚨 CRITICAL: Block self-trading on frontend too
-      const currentUserId = localStorage.getItem('user_id'); // Adjust based on your auth setup
-      
-      if (selectedOffer.seller_id === currentUserId) {
-        toast.error('You cannot buy your own offer. Cancel it instead.');
-        setBuyLoading(false);
-        setShowBuyModal(false);
-        return;
-      }
       const response = await apiClient.post('/api/v1/tokenization/execute-trade', {
         offer_id: selectedOffer.id,
         payment_network: selectedOffer.payment_network,
@@ -109,7 +125,19 @@ const TradingPage = () => {
       }
     } catch (error: any) {
       console.error('Trade execution failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to execute trade');
+      
+      // Better error message handling
+      const errorMsg = error.response?.data?.detail || 'Failed to execute trade';
+      
+      // Check for self-trading error from backend
+      if (errorMsg.includes('your own listing') || errorMsg.includes('already selling')) {
+        toast.error('This is your own listing. You cannot purchase your own assets.', {
+          duration: 4000,
+          icon: '🏷️'
+        });
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setBuyLoading(false);
     }
@@ -239,74 +267,114 @@ const TradingPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredOffers.map((offer) => (
-                  <div
-                    key={offer.id}
-                    className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-xl p-4 hover:border-blue-500/50 transition-all cursor-pointer"
-                    onClick={() => {
-                      setSelectedOffer(offer);
-                      setShowBuyModal(true);
-                    }}
-                  >
-                    {/* Asset Info */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-white">
-                          {offer.tokenized_assets?.symbol || 'Unknown'}
-                        </h3>
-                        <p className="text-xs text-gray-400">
-                          {offer.tokenized_assets?.name || 'Asset'}
-                        </p>
-                      </div>
-                      <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-medium">
-                        Live
-                      </span>
-                    </div>
-
-                    {/* Quantity & Price */}
-                    <div className="space-y-2 mb-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-400">Quantity</span>
-                        <span className="text-sm font-semibold text-white">{offer.quantity}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-400">Price/Unit</span>
-                        <span className="text-sm font-semibold text-white">${offer.price_per_unit.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t border-gray-700">
-                        <span className="text-sm text-gray-400">Total Value</span>
-                        <span className="text-base font-bold text-green-400">${offer.total_value.toFixed(2)}</span>
-                      </div>
-                    </div>
-
-                    {/* Payment Network */}
-                    <div className="mb-3">
-                      <span className="text-xs text-gray-400">Payment: </span>
-                      <span className="text-xs font-medium text-blue-400">
-                        {offer.payment_network === 'usdc_circle' ? 'USDC (Circle)' : offer.payment_network}
-                      </span>
-                    </div>
-
-                    {/* Expiry */}
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
-                      <Clock className="h-3 w-3" />
-                      Expires: {new Date(offer.expires_at).toLocaleDateString()}
-                    </div>
-
-                    {/* Buy Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
+                {filteredOffers.map((offer) => {
+                  const isOwnListing = offer.seller_id === currentUserId;
+                  
+                  return (
+                    <div
+                      key={offer.id}
+                      className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 border rounded-xl p-4 transition-all cursor-pointer relative overflow-hidden ${
+                        isOwnListing 
+                          ? 'border-purple-500/50 hover:border-purple-400/70' 
+                          : 'border-gray-700/50 hover:border-blue-500/50'
+                      }`}
+                      onClick={() => {
                         setSelectedOffer(offer);
                         setShowBuyModal(true);
                       }}
-                      className="w-full py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                     >
-                      <ShoppingCart className="h-4 w-4" />
-                      Buy Now
-                    </button>
-                  </div>
-                ))}
+                      {/* 🎀 Ribbon for own listings */}
+                      {isOwnListing && (
+                        <div className="absolute top-0 right-0">
+                          <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white text-xs font-bold px-3 py-1 shadow-lg transform rotate-0 translate-x-0 translate-y-0">
+                            YOUR LISTING
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Asset Info */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-white">
+                            {offer.tokenized_assets?.symbol || 'Unknown'}
+                          </h3>
+                          <p className="text-xs text-gray-400">
+                            {offer.tokenized_assets?.name || 'Asset'}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          isOwnListing 
+                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
+                            : 'bg-green-500/20 text-green-400'
+                        }`}>
+                          {isOwnListing ? 'Your Offer' : 'Live'}
+                        </span>
+                      </div>
+
+                      {/* Quantity & Price */}
+                      <div className="space-y-2 mb-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-400">Quantity</span>
+                          <span className="text-sm font-semibold text-white">{offer.quantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-400">Price/Unit</span>
+                          <span className="text-sm font-semibold text-white">${offer.price_per_unit.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between pt-2 border-t border-gray-700">
+                          <span className="text-sm text-gray-400">Total Value</span>
+                          <span className="text-base font-bold text-green-400">${offer.total_value.toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Payment Network */}
+                      <div className="mb-3">
+                        <span className="text-xs text-gray-400">Payment: </span>
+                        <span className="text-xs font-medium text-blue-400">
+                          {offer.payment_network === 'usdc_circle' ? 'USDC (Circle)' : offer.payment_network}
+                        </span>
+                      </div>
+
+                      {/* Expiry */}
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+                        <Clock className="h-3 w-3" />
+                        Expires: {new Date(offer.expires_at).toLocaleDateString()}
+                      </div>
+
+                      {/* Buy Button - Different for own listings */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isOwnListing) {
+                            toast.info('This is your listing. Use "My Assets" to manage it.', {
+                              icon: '🏷️'
+                            });
+                          } else {
+                            setSelectedOffer(offer);
+                            setShowBuyModal(true);
+                          }
+                        }}
+                        className={`w-full py-2 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                          isOwnListing
+                            ? 'bg-gradient-to-r from-purple-600/50 to-pink-600/50 hover:from-purple-600/70 hover:to-pink-600/70 text-purple-200 border border-purple-500/30'
+                            : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl'
+                        }`}
+                      >
+                        {isOwnListing ? (
+                          <>
+                            <Clock className="h-4 w-4" />
+                            Your Listing
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="h-4 w-4" />
+                            Buy Now
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
