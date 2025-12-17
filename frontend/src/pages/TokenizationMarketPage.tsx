@@ -66,7 +66,7 @@ const TokenizationMarketPage = () => {
               <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
               <span>Tokenization Market</span>
             </h1>
-            <p className="text-sm md:text-base text-gray-400">Convert traditional assets & trade tokenized securities</p>
+            <p className="text-sm md:text-base text-gray-400">Tokenize traditional assets. Sell to retail investors</p>
           </div>
 
           {/* Quick Actions - Responsive */}

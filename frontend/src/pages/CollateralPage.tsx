@@ -100,7 +100,7 @@ const CollateralPage: React.FC = () => {
               </button>
             </div>
             <p className="text-sm md:text-base text-gray-400">
-              Lock and manage your digital assets as collateral
+              Unlock liquidity using your digital assets as collateral
             </p>
           </div>
 

@@ -36,7 +36,7 @@ const Sidebar: React.FC = () => {
     { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW' },
     { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW' },
-    { label: 'Trading', icon: TrendingUp, path: '/trading', badge: 'NEW' },
+    { label: 'Market', icon: TrendingUp, path: '/trading', badge: 'NEW' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
     { label: 'Predictions', icon: Target, path: '/predictions' },
     { label: 'Settings', icon: Settings, path: '/settings' },
@@ -98,7 +98,7 @@ const Sidebar: React.FC = () => {
               </div>
               <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
                 <div className="text-white font-bold text-lg">Seamount</div>
-                <div className="text-gray-400 text-xs">Digital Securities</div>
+                <div className="text-gray-400 text-xs">Private Markets</div>
               </div>
             </div>
           </div>

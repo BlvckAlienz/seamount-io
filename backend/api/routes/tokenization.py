@@ -267,19 +267,42 @@ async def execute_trade(
         )
         
         if not result['success']:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Trade execution failed'))
-    
+            # 🚨 Ensure error message is properly formatted
+            error_detail = result.get('error', 'Trade execution failed')
+            logger.error(f"❌ Trade execution failed with result: {error_detail}")
+            raise HTTPException(status_code=400, detail=error_detail)
+        
+        return {
+            "success": True,
+            "message": result.get('message', 'Trade executed successfully'),
+            "data": result.get('data', {})
+        }
+        
     except ValueError as val_err:
         # 🚨 Self-trade and validation errors (user-friendly)
         logger.warning(f"⚠️ Trade validation failed: {val_err}")
-        raise HTTPException(status_code=400, detail=str(val_err))
+        # Return JSON response instead of raising HTTPException with just string
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": str(val_err),
+                "code": "SELF_TRADE_BLOCKED",
+                "user_id": current_user['id']
+            }
+        )
     
     except HTTPException:
         raise
     
     except Exception as e:
         logger.error(f"❌ Trade execution failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "message": str(e),
+                "code": "INTERNAL_SERVER_ERROR"
+            }
+        )
 
 # ============================================================================
 # ENDPOINT 4: CREATE REPO TRADE
