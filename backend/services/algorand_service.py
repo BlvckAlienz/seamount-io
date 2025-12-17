@@ -350,44 +350,40 @@ class AlgorandService:
                 logger.info(f"✅ Using pre-decrypted key (is_encrypted=False)")
                 decrypted_key = account_private_key
             
-            # ✅ STEP 2: Convert to private key format
+            # ====================================================================
+            # ✅ STEP 2: Convert to private key format (WITH PUBLIC KEY DERIVATION)
+            # ====================================================================
             if len(decrypted_key.split()) == 25:
                 # It's a mnemonic phrase
                 private_key = mnemonic.to_private_key(decrypted_key)
                 account_address = account.address_from_private_key(private_key)
+                
             elif len(decrypted_key) == 64:
-                # It's a raw private key (hex)
-                private_key = decrypted_key
+                # It's a 64-char hex private key (32 bytes)
+                import base64
+                from nacl.signing import SigningKey
+                
+                # Convert hex to bytes
+                private_key_bytes = bytes.fromhex(decrypted_key)
+                
+                # ✅ CRITICAL: Derive public key from private key
+                signing_key = SigningKey(private_key_bytes)
+                verify_key = signing_key.verify_key
+                public_key_bytes = bytes(verify_key)
+                
+                # Concatenate: private (32) + public (32) = 64 bytes
+                full_key_bytes = private_key_bytes + public_key_bytes
+                
+                # Encode to Base64 (88 chars)
+                private_key = base64.b64encode(full_key_bytes).decode('utf-8')
+                
+                # Derive address
                 account_address = account.address_from_private_key(private_key)
+                
+                logger.info(f"✅ Derived public key for opt-in (Base64: {len(private_key)} chars)")
+                
             else:
                 raise ValueError(f"Invalid key format: expected 25-word mnemonic or 64-char hex key, got {len(decrypted_key)} chars")
-            
-            # ✅ STEP 3: Get suggested params
-            params = self.algod_client.suggested_params()
-            
-            # ✅ STEP 4: Create opt-in transaction (0-amount transfer to self)
-            from algosdk.transaction import AssetTransferTxn
-            
-            txn = AssetTransferTxn(
-                sender=account_address,
-                sp=params,
-                receiver=account_address,  # Transfer to self
-                amt=0,  # 0 amount for opt-in
-                index=asset_id
-            )
-            
-            # ✅ STEP 5: Sign transaction
-            signed_txn = txn.sign(private_key)
-            
-            # ✅ STEP 6: Send transaction
-            tx_id = self.algod_client.send_transaction(signed_txn)
-            
-            # ✅ STEP 7: Wait for confirmation
-            await self.wait_for_confirmation(tx_id)
-            
-            logger.info(f"✅ ASA opt-in successful: {tx_id}")
-            
-            return tx_id
             
         except Exception as e:
             logger.error(f"❌ ASA opt-in failed: {e}")

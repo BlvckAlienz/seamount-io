@@ -440,30 +440,7 @@ class SeamountProtocol:
                 'asset_locked_at': datetime.utcnow().isoformat()
             }).eq('id', settlement_id).execute()
             
-            # STEP 5: Execute payment transfer (buyer → seller)
-            payment_result = await self._execute_payment_transfer(
-                from_user_id=buyer_id,
-                to_user_id=offer_data['seller_id'],
-                amount=Decimal(str(offer_data['total_value'])),
-                currency='USDC',
-                network=payment_network,
-                reference=f"DVP-{settlement_id}"
-            )
-            
-            if not payment_result['success']:
-                # Rollback: Release locked collateral
-                await self._release_collateral(collateral_lock['lock_id'])
-                raise Exception(f"Payment transfer failed: {payment_result['error']}")
-            
-            # Update settlement status
-            self.db.supabase.table('settlement_transactions').update({
-                'payment_tx': payment_result['tx_id'],
-                'payment_status': 'completed',
-                'payment_received_at': datetime.utcnow().isoformat(),
-                'dvp_status': self._enum_to_str(SettlementStatus.PAYMENT_RECEIVED)
-            }).eq('id', settlement_id).execute()
-            
-            # STEP 5.5: Verify seller has enough ALGO for transaction fees
+            # STEP 4.5: 🚨 CRITICAL - Verify seller has ALGO for transaction fees BEFORE payment
             try:
                 seller_wallet = self.db.supabase.table('user_wallets')\
                     .select('algorand_address')\
@@ -480,33 +457,69 @@ class SeamountProtocol:
                     MIN_ALGO_REQUIRED = 0.002  # 0.002 ALGO minimum for fees
                     
                     if seller_algo_balance < MIN_ALGO_REQUIRED:
-                        # Rollback: Release collateral + refund buyer
+                        # 🚨 BLOCK TRANSACTION - Release collateral immediately
                         await self._release_collateral(collateral_lock['lock_id'])
                         
                         # Update settlement status
                         self.db.supabase.table('settlement_transactions').update({
                             'dvp_status': self._enum_to_str(SettlementStatus.FAILED),
-                            'error_message': f"Seller has insufficient ALGO balance ({seller_algo_balance} ALGO). Minimum {MIN_ALGO_REQUIRED} ALGO required for transaction fees."
+                            'error_message': f"Seller has insufficient ALGO balance ({seller_algo_balance} ALGO). Minimum {MIN_ALGO_REQUIRED} ALGO required for transaction fees. Seller must fund their wallet before listing assets."
                         }).eq('id', settlement_id).execute()
                         
                         # Log audit event
                         await self.audit.log_event(
-                            event_type="dvp_seller_insufficient_balance",
+                            event_type="dvp_blocked_insufficient_algo",
                             user_id=offer_data['seller_id'],
                             details={
                                 'settlement_id': settlement_id,
                                 'seller_algo_balance': seller_algo_balance,
-                                'required': MIN_ALGO_REQUIRED
+                                'required': MIN_ALGO_REQUIRED,
+                                'buyer_id': buyer_id
                             }
                         )
                         
-                        raise Exception(f"Seller has insufficient ALGO balance. Required: {MIN_ALGO_REQUIRED} ALGO, Available: {seller_algo_balance} ALGO")
+                        raise Exception(
+                            f"❌ DVP BLOCKED: Seller has insufficient ALGO balance.\n"
+                            f"   Required: {MIN_ALGO_REQUIRED} ALGO\n"
+                            f"   Available: {seller_algo_balance} ALGO\n"
+                            f"   Seller must add ALGO to wallet {seller_address[:10]}... before selling assets."
+                        )
                         
                     logger.info(f"✅ Seller has sufficient ALGO balance: {seller_algo_balance} ALGO")
                     
             except Exception as balance_check_error:
-                logger.warning(f"⚠️ Seller balance check failed (non-critical): {balance_check_error}")
-                # Continue anyway - transaction will fail if truly insufficient
+                # 🚨 If balance check itself fails, BLOCK the transaction
+                await self._release_collateral(collateral_lock['lock_id'])
+                
+                self.db.supabase.table('settlement_transactions').update({
+                    'dvp_status': self._enum_to_str(SettlementStatus.FAILED),
+                    'error_message': f"Could not verify seller ALGO balance: {balance_check_error}"
+                }).eq('id', settlement_id).execute()
+                
+                raise Exception(f"DVP BLOCKED: Could not verify seller ALGO balance: {balance_check_error}")
+
+            # STEP 5: Execute payment transfer (buyer → seller) - NOW SAFE
+            payment_result = await self._execute_payment_transfer(
+                from_user_id=buyer_id,
+                to_user_id=offer_data['seller_id'],
+                amount=Decimal(str(offer_data['total_value'])),
+                currency='USDC',
+                network=payment_network,
+                reference=f"DVP-{settlement_id}"
+            )
+
+            if not payment_result['success']:
+                # Rollback: Release locked collateral
+                await self._release_collateral(collateral_lock['lock_id'])
+                raise Exception(f"Payment transfer failed: {payment_result['error']}")
+
+            # Update settlement status
+            self.db.supabase.table('settlement_transactions').update({
+                'payment_tx': payment_result['tx_id'],
+                'payment_status': 'completed',
+                'payment_received_at': datetime.utcnow().isoformat(),
+                'dvp_status': self._enum_to_str(SettlementStatus.PAYMENT_RECEIVED)
+            }).eq('id', settlement_id).execute()
 
             # STEP 6: Transfer asset tokens (seller → buyer)
             asset_transfer_result = await self._transfer_algorand_asa(
