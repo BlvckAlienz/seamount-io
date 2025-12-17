@@ -41,8 +41,16 @@ const TradingPage = () => {
     const fetchUserAndOffers = async () => {
       try {
         const response = await apiClient.get('/api/v1/auth/me');
-        if (response.data?.id) {
-          setCurrentUserId(response.data.id);
+        console.log('🔍 DEBUG: Auth response:', response.data); // DEBUG
+        
+        // Try multiple possible user ID locations
+        const userId = response.data?.id || response.data?.user_id || response.data?.user?.id;
+        
+        if (userId) {
+          console.log('✅ DEBUG: Current user ID:', userId); // DEBUG
+          setCurrentUserId(userId);
+        } else {
+          console.error('❌ DEBUG: No user ID found in response:', response.data);
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
@@ -269,6 +277,16 @@ const TradingPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredOffers.map((offer) => {
                   const isOwnListing = offer.seller_id === currentUserId;
+                  
+                  // 🔍 DEBUG: Log comparison for first offer
+                  if (filteredOffers.indexOf(offer) === 0) {
+                    console.log('🔍 DEBUG: First offer comparison:', {
+                      offerSellerId: offer.seller_id,
+                      currentUserId: currentUserId,
+                      isOwnListing: isOwnListing,
+                      typesMatch: typeof offer.seller_id === typeof currentUserId
+                    });
+                  }
                   
                   return (
                     <div

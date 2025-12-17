@@ -254,20 +254,7 @@ async def execute_trade(
 ):
     """
     💱 Execute Trade with Atomic DVP Settlement
-    
-    **Flow:**
-    1. Lock seller's tokens
-    2. Verify buyer payment
-    3. Atomic swap (tokens ↔ payment)
-    4. Settle in <5 seconds
-    
-    **Example:**
-```json
-    {
-      "offer_id": "uuid-offer",
-      "payment_network": "usdc_circle"
-    }
-```
+    ...
     """
     try:
         logger.info(f"🔄 DVP trade execution: User {current_user['id']} buying offer {request.offer_id}")
@@ -281,20 +268,15 @@ async def execute_trade(
         
         if not result['success']:
             raise HTTPException(status_code=400, detail=result.get('error', 'Trade execution failed'))
-        
-        return {
-            "success": True,
-            "message": result['message'],
-            "data": {
-                "settlement_id": result['settlement_id'],
-                "asset_tx": result['asset_tx'],
-                "payment_tx": result['payment_tx'],
-                "settlement_time_seconds": result['settlement_time_seconds']
-            }
-        }
-        
+    
+    except ValueError as val_err:
+        # 🚨 Self-trade and validation errors (user-friendly)
+        logger.warning(f"⚠️ Trade validation failed: {val_err}")
+        raise HTTPException(status_code=400, detail=str(val_err))
+    
     except HTTPException:
         raise
+    
     except Exception as e:
         logger.error(f"❌ Trade execution failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
