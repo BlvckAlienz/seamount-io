@@ -370,6 +370,7 @@ class MultiChainWalletService:
                                     'usd_value': 0.0
                                 }
                         
+                        # Update the balance query section (around line 207-250)
                         except Exception as balance_err:
                             logger.error(f"❌ Balance query failed for {chain}: {balance_err}")
                             # ✅ NEW: Still report 0 balance on error

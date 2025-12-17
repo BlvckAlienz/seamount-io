@@ -496,7 +496,7 @@ class WDKClient:
             logger.info(f"🎯 Native asset detected ({native_assets.get(chain)}) - using Direct RPC")
             result = await self.get_balance_direct_rpc(address, chain)
             
-            if result.get('success'):
+            if result and result.get('success'):  # ✅ Check if result is not None
                 return result
             else:
                 # Graceful degradation
@@ -900,16 +900,62 @@ class WDKClient:
                     
                     async with session.post(url, json=payload, timeout=timeout) as response:
                         if response.status == 200:
-                            data = await response.json()
-                            balance_wei = int(data.get('result', '0x0'), 16)
-                            balance_matic = Decimal(balance_wei) / Decimal('1000000000000000000')
-                            
-                            logger.info(f"✅ MATIC balance: {balance_matic}")
+                            try:
+                                data = await response.json()
+                                
+                                # ✅ CRITICAL FIX: Handle null or missing data
+                                if not data or 'result' not in data:
+                                    logger.warning(f"⚠️ Polygon API returned invalid data: {data}")
+                                    return {
+                                        'balance': '0',
+                                        'success': True,  # Still success, just 0 balance
+                                        'chain': 'polygon',
+                                        'source': 'alchemy',
+                                        'address': address,
+                                        'note': 'Account has 0 balance'
+                                    }
+                                
+                                balance_hex = data.get('result', '0x0')
+                                
+                                # ✅ FIX: Handle '0x' or empty hex value
+                                if balance_hex == '0x' or balance_hex == '0x0':
+                                    balance_wei = 0
+                                else:
+                                    try:
+                                        balance_wei = int(balance_hex, 16)
+                                    except ValueError:
+                                        logger.error(f"❌ Invalid hex value from Polygon: {balance_hex}")
+                                        balance_wei = 0
+                                
+                                balance_matic = Decimal(balance_wei) / Decimal('1000000000000000000')
+                                
+                                logger.info(f"✅ MATIC balance: {balance_matic}")
+                                return {
+                                    'balance': str(balance_matic),
+                                    'success': True,
+                                    'chain': 'polygon',
+                                    'source': 'alchemy',
+                                    'address': address
+                                }
+                                
+                            except (ValueError, KeyError) as parse_error:
+                                logger.error(f"❌ Failed to parse Polygon response: {parse_error}")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'chain': 'polygon',
+                                    'error': f'JSON parse error: {parse_error}',
+                                    'address': address
+                                }
+                        else:
+                            # Non-200 response
+                            error_text = await response.text()
+                            logger.error(f"❌ Polygon API error {response.status}: {error_text[:200]}")
                             return {
-                                'balance': str(balance_matic),
-                                'success': True,
+                                'balance': '0',
+                                'success': False,
                                 'chain': 'polygon',
-                                'source': 'alchemy',
+                                'error': f'API error {response.status}',
                                 'address': address
                             }
             
