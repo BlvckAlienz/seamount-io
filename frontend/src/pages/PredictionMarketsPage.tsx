@@ -606,6 +606,13 @@ const PredictionMarketsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
+      <button
+        onClick={() => window.history.back()}
+        className="absolute top-6 left-6 p-3 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-gray-400 hover:text-white transition-colors z-10"
+        title="Close"
+      >
+        <X className="h-6 w-6" />
+      </button>
       <div className="max-w-7xl mx-auto">
         {/* 🎯 BASECAMP STATUS (READ ONLY) */}
         <div className="flex justify-end mb-4">

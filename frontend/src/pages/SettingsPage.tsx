@@ -1,401 +1,519 @@
 // File: frontend/src/pages/SettingsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { User, Shield, Bell, Palette, Key, Smartphone, Mail, ArrowLeft, Save } from 'lucide-react';
+import { User, Shield, Key, ArrowLeft, Save, Phone, Globe, CheckCircle, X, Calendar, Briefcase, Building, Target, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { apiClient } from '../config/api';
+import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
+import ResetPassword from '@/components/auth/ResetPassword';
+
+// Country data with calling codes
+const COUNTRIES = [
+  { code: 'NG', name: 'Nigeria', dialCode: '+234' },
+  { code: 'US', name: 'United States', dialCode: '+1' },
+  { code: 'GB', name: 'United Kingdom', dialCode: '+44' },
+  { code: 'CA', name: 'Canada', dialCode: '+1' },
+  { code: 'AU', name: 'Australia', dialCode: '+61' },
+  { code: 'DE', name: 'Germany', dialCode: '+49' },
+  { code: 'FR', name: 'France', dialCode: '+33' },
+  { code: 'IT', name: 'Italy', dialCode: '+39' },
+  { code: 'ES', name: 'Spain', dialCode: '+34' },
+  { code: 'BR', name: 'Brazil', dialCode: '+55' },
+  { code: 'IN', name: 'India', dialCode: '+91' },
+  { code: 'CN', name: 'China', dialCode: '+86' },
+  { code: 'JP', name: 'Japan', dialCode: '+81' },
+  { code: 'ZA', name: 'South Africa', dialCode: '+27' },
+  { code: 'KE', name: 'Kenya', dialCode: '+254' },
+  { code: 'GH', name: 'Ghana', dialCode: '+233' },
+  { code: 'AE', name: 'UAE', dialCode: '+971' },
+  { code: 'SA', name: 'Saudi Arabia', dialCode: '+966' },
+  { code: 'RU', name: 'Russia', dialCode: '+7' },
+  { code: 'KR', name: 'South Korea', dialCode: '+82' }
+];
+
+interface UserProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  country_code: string;
+  country: string;
+  kyc_status: string;
+  kyc_level: number;
+  role: string;
+  created_at: string;
+  updated_at: string;
+  date_of_birth?: string;
+  occupation?: string;
+  source_of_funds?: string;
+  risk_tolerance?: string;
+  cumulative_volume_30d?: number;
+  wallet_addresses?: any;
+  algorand_address?: string;
+}
 
 const SettingsPage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
 
+  // Profile data - only phone_number is editable
   const [profileData, setProfileData] = useState({
-    firstName: user?.first_name || '',
-    lastName: user?.last_name || '',
-    phone: user?.phone_number || '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    countryCode: 'NG',
+    country: 'Nigeria'
   });
 
-  const [notifications, setNotifications] = useState({
-    email: user?.notification_preferences?.email ?? true,
-    push: user?.notification_preferences?.push ?? true,
-    sms: user?.notification_preferences?.sms ?? true,
+  const [currentCountry, setCurrentCountry] = useState({
+    code: 'NG',
+    name: 'Nigeria',
+    dialCode: '+234'
   });
 
-  const [passwords, setPasswords] = useState({
-    current: '',
-    new: '',
-    confirm: ''
+  // KYC additional data
+  const [kycData, setKycData] = useState({
+    date_of_birth: '',
+    occupation: '',
+    source_of_funds: '',
+    risk_tolerance: 'medium'
   });
 
-  const [theme, setTheme] = useState('dark');
-  const [twoFA, setTwoFA] = useState(false);
-
+  // Fetch user profile data
   useEffect(() => {
-    if (user) {
-      setProfileData({
-        firstName: user.first_name || '',
-        lastName: user.last_name || '',
-        phone: user.phone_number || '',
-      });
-      setNotifications({
-        email: user.notification_preferences?.email ?? true,
-        push: user.notification_preferences?.push ?? true,
-        sms: user.notification_preferences?.sms ?? true,
-      });
-    }
+    fetchUserProfile();
   }, [user]);
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfileData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const fetchUserProfile = async () => {
+    try {
+      if (!user?.id) return;
+
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        console.log('Profile data:', data);
+        
+        // Parse phone number
+        let phoneNumber = data.phone_number || '';
+        let countryCode = data.country_code || 'NG';
+        let country = data.country || 'Nigeria';
+        
+        // If phone is stored with country code, extract it
+        if (phoneNumber && phoneNumber.startsWith('+')) {
+          const countryMatch = COUNTRIES.find(c => phoneNumber.startsWith(c.dialCode));
+          if (countryMatch) {
+            countryCode = countryMatch.code;
+            country = countryMatch.name;
+            phoneNumber = phoneNumber.replace(countryMatch.dialCode, '').trim();
+          }
+        }
+
+        const countryObj = COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0];
+        
+        setProfileData({
+          firstName: data.first_name || '',
+          lastName: data.last_name || '',
+          email: data.email || user.email || '',
+          phoneNumber,
+          countryCode,
+          country
+        });
+        
+        setCurrentCountry(countryObj);
+        
+        // Set KYC data
+        setKycData({
+          date_of_birth: data.date_of_birth || '',
+          occupation: data.occupation || '',
+          source_of_funds: data.source_of_funds || '',
+          risk_tolerance: data.risk_tolerance || 'medium'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      toast.error('Failed to load profile data');
+    }
   };
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPasswords(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Only numbers
+    setProfileData(prev => ({ ...prev, phoneNumber: value }));
+  };
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const countryCode = e.target.value;
+    const country = COUNTRIES.find(c => c.code === countryCode) || COUNTRIES[0];
+    setCurrentCountry(country);
+    setProfileData(prev => ({ 
+      ...prev, 
+      countryCode,
+      country: country.name 
+    }));
+  };
+
+  const validatePhoneNumber = (phone: string, country: typeof currentCountry) => {
+    const fullNumber = country.dialCode + phone;
+    
+    // Basic validation - adjust based on country
+    switch (country.code) {
+      case 'NG': // Nigeria: +234 followed by 10 digits
+        return phone.length === 10 && /^[0-9]{10}$/.test(phone);
+      case 'US': // US: +1 followed by 10 digits
+      case 'CA':
+        return phone.length === 10 && /^[0-9]{10}$/.test(phone);
+      case 'GB': // UK: +44 followed by 10-11 digits
+        return phone.length >= 10 && phone.length <= 11 && /^[0-9]+$/.test(phone);
+      default:
+        return phone.length >= 8 && phone.length <= 15 && /^[0-9]+$/.test(phone);
+    }
   };
 
   const handleUpdateProfile = async () => {
-    try {
-      setSaving(true);
-      await apiClient.put('/api/v1/user/profile', {
-        first_name: profileData.firstName,
-        last_name: profileData.lastName,
-        phone_number: profileData.phone,
-      });
-      await refreshProfile();
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Profile update error:', error);
-      toast.error('Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUpdateNotifications = async () => {
-    try {
-      setSaving(true);
-      await apiClient.put('/api/v1/user/profile', {
-        notification_preferences: notifications
-      });
-      await refreshProfile();
-      toast.success('Notification preferences updated');
-    } catch (error) {
-      console.error('Notification update error:', error);
-      toast.error('Failed to update preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUpdatePassword = async () => {
-    if (passwords.new !== passwords.confirm) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    if (passwords.new.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    if (!validatePhoneNumber(profileData.phoneNumber, currentCountry)) {
+      toast.error(`Please enter a valid phone number for ${currentCountry.name}`);
       return;
     }
 
+    setSaving(true);
     try {
-      setSaving(true);
-      await apiClient.post('/api/v1/user/change-password', {
-        current_password: passwords.current,
-        new_password: passwords.new,
-      });
-      setPasswords({ current: '', new: '', confirm: '' });
-      toast.success('Password updated successfully');
+      const fullPhone = currentCountry.dialCode + profileData.phoneNumber;
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          phone_number: fullPhone,
+          country_code: currentCountry.code,
+          country: currentCountry.name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id);
+
+      if (error) throw error;
+
+      toast.success('Phone number updated successfully');
+      await refreshProfile();
     } catch (error: any) {
-      console.error('Password update error:', error);
-      toast.error(error.response?.data?.detail || 'Failed to update password');
+      console.error('Profile update error:', error);
+      toast.error('Failed to update phone number');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetPasswordSuccess = () => {
+    setResetPasswordOpen(false);
+    toast.success('Password reset email sent. Please check your inbox.');
   };
 
   const handleBack = () => {
-    window.location.href = '/dashboard';
+    navigate('/dashboard');
+  };
+
+  // Format date nicely
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not set';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Get KYC status color
+  const getKycStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'verified':
+      case 'approved':
+        return 'text-green-400';
+      case 'pending':
+      case 'in_progress':
+        return 'text-yellow-400';
+      default:
+        return 'text-gray-400';
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-8">
+      {/* Close Button */}
+      <button
+        onClick={handleBack}
+        className="absolute top-6 left-6 p-3 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-gray-400 hover:text-white transition-colors z-10"
+        title="Close"
+      >
+        <X className="h-6 w-6" />
+      </button>
+
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6 flex items-center gap-4">
-          <button
-            onClick={handleBack}
-            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Settings</h1>
-            <p className="text-gray-400 text-sm">Manage your account preferences</p>
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-3 mb-4 px-6 py-3 bg-gradient-to-r from-blue-500/20 to-blue-500/20 rounded-full border border-blue-500/30">
+            <User className="h-5 w-5 text-blue-400" />
+            <span className="text-blue-400 font-semibold text-sm">ACCOUNT SETTINGS</span>
           </div>
+
+          <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-blue-300 mb-3">
+            Account Settings
+          </h1>
+
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Manage your account information and preferences
+          </p>
         </div>
 
         <div className="space-y-6">
           {/* Profile Settings */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-blue-600/20">
-                <User className="h-5 w-5 text-blue-400" />
+              <div className="p-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700">
+                <User className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Profile Settings</h3>
+              <h3 className="text-xl font-bold text-white">Profile Information</h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* First Name - Read Only */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">First Name</label>
-                <input 
-                  type="text" 
-                  name="firstName" 
-                  value={profileData.firstName} 
-                  onChange={handleProfileChange} 
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                />
+                <label className="block text-sm font-medium text-gray-400 mb-2">First Name</label>
+                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-gray-400 cursor-not-allowed">
+                  {profileData.firstName || 'Not set'}
+                </div>
               </div>
+              
+              {/* Last Name - Read Only */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
-                <input 
-                  type="text" 
-                  name="lastName" 
-                  value={profileData.lastName} 
-                  onChange={handleProfileChange} 
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                />
+                <label className="block text-sm font-medium text-gray-400 mb-2">Last Name</label>
+                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-gray-400 cursor-not-allowed">
+                  {profileData.lastName || 'Not set'}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
-                <input 
-                  type="email" 
-                  value={user?.email || ''} 
-                  disabled 
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-400 cursor-not-allowed"
-                />
+              
+              {/* Email - Read Only */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Email Address</label>
+                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-lg text-gray-400 cursor-not-allowed">
+                  {profileData.email || user?.email || 'Not set'}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
-                <input 
-                  type="tel" 
-                  name="phone" 
-                  value={profileData.phone} 
-                  onChange={handleProfileChange} 
-                  placeholder="+234..."
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                />
+
+              {/* Phone Number - Editable */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-400 mb-2">Phone Number</label>
+                <div className="flex gap-2">
+                  {/* Country Code Dropdown */}
+                  <div className="relative flex-1 max-w-[200px]">
+                    <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                    <select
+                      value={currentCountry.code}
+                      onChange={handleCountryChange}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer"
+                    >
+                      {COUNTRIES.map(country => (
+                        <option key={country.code} value={country.code}>
+                          {country.name} ({country.dialCode})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
+                      ▼
+                    </div>
+                  </div>
+
+                  {/* Phone Number Input */}
+                  <div className="flex-1 relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                    <input
+                      type="tel"
+                      value={profileData.phoneNumber}
+                      onChange={handlePhoneChange}
+                      placeholder={`Enter phone number`}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                    />
+                    {profileData.phoneNumber && validatePhoneNumber(profileData.phoneNumber, currentCountry) && (
+                      <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-4 w-4" />
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Format: {currentCountry.dialCode} XXX XXX XXXX
+                </p>
               </div>
             </div>
             
             <button
               onClick={handleUpdateProfile}
-              disabled={saving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
+              disabled={saving || !validatePhoneNumber(profileData.phoneNumber, currentCountry)}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Update Profile'}
+              {saving ? 'Saving...' : 'Update Phone Number'}
             </button>
           </div>
 
           {/* Security Settings */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-green-600/20">
-                <Shield className="h-5 w-5 text-green-400" />
+              <div className="p-2 rounded-lg bg-gradient-to-r from-green-600 to-green-700">
+                <Shield className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Security Settings</h3>
+              <h3 className="text-xl font-bold text-white">Security Settings</h3>
             </div>
             
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+              {/* Two-Factor Authentication - Coming Soon */}
+              <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-lg border border-slate-700/50">
                 <div>
                   <h4 className="font-medium text-white">Two-Factor Authentication</h4>
                   <p className="text-sm text-gray-400">Add an extra layer of security (Coming Soon)</p>
                 </div>
                 <button 
-                  onClick={() => setTwoFA(!twoFA)} 
                   disabled
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition opacity-50 cursor-not-allowed ${twoFA ? 'bg-blue-600' : 'bg-gray-600'}`}
+                  className="px-4 py-2 bg-slate-700 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${twoFA ? 'translate-x-6' : 'translate-x-1'}`}/>
+                  Enable
                 </button>
               </div>
 
-              <div className="border-t border-gray-700 pt-6">
+              {/* Change Password */}
+              <div className="border-t border-slate-700/50 pt-6">
                 <h4 className="font-medium text-white mb-4">Change Password</h4>
-                <div className="space-y-4 mb-4">
-                  <input 
-                    type="password" 
-                    name="current"
-                    value={passwords.current}
-                    onChange={handlePasswordChange}
-                    placeholder="Current Password" 
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input 
-                      type="password" 
-                      name="new"
-                      value={passwords.new}
-                      onChange={handlePasswordChange}
-                      placeholder="New Password" 
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                    />
-                    <input 
-                      type="password" 
-                      name="confirm"
-                      value={passwords.confirm}
-                      onChange={handlePasswordChange}
-                      placeholder="Confirm New Password" 
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
+                <p className="text-gray-400 mb-4">Secure your account with a new password</p>
                 <button
-                  onClick={handleUpdatePassword}
-                  disabled={saving || !passwords.current || !passwords.new}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
+                  onClick={() => setResetPasswordOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition-all"
                 >
                   <Key className="h-4 w-4" />
-                  {saving ? 'Updating...' : 'Update Password'}
+                  Reset Password via Email
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Notification Settings */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50">
+          {/* Account Information */}
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all">
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-yellow-600/20">
-                <Bell className="h-5 w-5 text-yellow-400" />
+              <div className="p-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700">
+                <User className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Notification Preferences</h3>
+              <h3 className="text-xl font-bold text-white">Account Information</h3>
             </div>
             
-            <div className="space-y-4 mb-6">
-              {[
-                { key: 'email', label: 'Email Notifications', icon: Mail, desc: 'Receive updates via email' },
-                { key: 'push', label: 'Push Notifications', icon: Smartphone, desc: 'Browser notifications' },
-                { key: 'sms', label: 'SMS Alerts', icon: Smartphone, desc: 'Text message notifications' },
-              ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                  <div className="flex items-center gap-3">
-                    <item.icon className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <h4 className="font-medium text-white">{item.label}</h4>
-                      <p className="text-xs text-gray-400">{item.desc}</p>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* KYC Level */}
+              <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm text-gray-400">KYC Level</div>
+                </div>
+                <div className="text-2xl font-black text-white mb-2">
+                  {user?.kyc_level || 0} / 3
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3].map(level => (
+                    <div 
+                      key={level}
+                      className={`h-2 flex-1 rounded-full ${level <= (user?.kyc_level || 0) ? 'bg-green-500' : 'bg-slate-700'}`}
+                    />
+                  ))}
+                </div>
+                <div className={`text-xs mt-2 ${getKycStatusColor(user?.kyc_status || '')}`}>
+                  {user?.kyc_status?.replace('_', ' ') || 'Not started'}
+                </div>
+              </div>
+
+              {/* Account Created */}
+              <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm text-gray-400">Account Created</div>
+                </div>
+                <div className="text-xl font-bold text-white">
+                  {user?.created_at ? formatDate(user.created_at) : 'N/A'}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Member since</div>
+              </div>
+
+              {/* User Role */}
+              <div className={`rounded-xl p-5 border ${user?.role === 'tribe' ? 'bg-green-900/20 border-green-700/50' : 'bg-blue-900/20 border-blue-700/50'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm text-gray-400">Account Tier</div>
+                </div>
+                <div className={`text-xl font-bold ${user?.role === 'tribe' ? 'text-green-400' : 'text-blue-400'}`}>
+                  {user?.role === 'tribe' ? 'Verified Tribe' : 'Alien'}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {user?.role === 'tribe' ? 'Full access' : 'Basic features'}
+                </div>
+              </div>
+
+              {/* Trading Volume */}
+              <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm text-gray-400">30-Day Volume</div>
+                </div>
+                <div className="text-xl font-bold text-white">
+                  {formatCurrency(user?.cumulative_volume_30d || 0)}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">Total trading</div>
+              </div>
+
+              {/* KYC Additional Info */}
+              {kycData.occupation && (
+                <div className="md:col-span-2 bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="h-4 w-4 text-blue-400" />
+                    <div className="text-sm text-gray-400">Occupation</div>
                   </div>
-                  <button 
-                    onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof prev] }))} 
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${notifications[item.key as keyof typeof notifications] ? 'bg-blue-600' : 'bg-gray-600'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${notifications[item.key as keyof typeof notifications] ? 'translate-x-6' : 'translate-x-1'}`}/>
-                  </button>
+                  <div className="text-lg font-medium text-white">
+                    {kycData.occupation}
+                  </div>
                 </div>
-              ))}
-            </div>
+              )}
 
-            <button
-              onClick={handleUpdateNotifications}
-              disabled={saving}
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Preferences'}
-            </button>
-          </div>
-
-          {/* Appearance */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-purple-600/20">
-                <Palette className="h-5 w-5 text-purple-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Appearance</h3>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">Theme</label>
-              <div className="space-y-2">
-                {[
-                  { value: 'dark', label: 'Dark Mode', desc: 'Easier on the eyes' },
-                  { value: 'light', label: 'Light Mode', desc: 'Coming soon' },
-                  { value: 'auto', label: 'Auto', desc: 'Match system settings' }
-                ].map((option) => (
-                  <label 
-                    key={option.value} 
-                    className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition ${
-                      theme === option.value 
-                        ? 'bg-blue-600/20 border-blue-500' 
-                        : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="radio" 
-                        name="theme" 
-                        value={option.value} 
-                        checked={theme === option.value} 
-                        onChange={(e) => setTheme(e.target.value)}
-                        disabled={option.value !== 'dark'}
-                        className="text-blue-500"
-                      />
-                      <div>
-                        <span className="text-white font-medium">{option.label}</span>
-                        <p className="text-xs text-gray-400">{option.desc}</p>
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Account Info */}
-          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-gray-600/20">
-                <Shield className="h-5 w-5 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Account Information</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-400">Account Status</p>
-                  <p className="text-white font-medium capitalize">{user?.kyc_status?.replace('_', ' ') || 'Not Started'}</p>
+              {/* Source of Funds */}
+              {kycData.source_of_funds && (
+                <div className="md:col-span-2 bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building className="h-4 w-4 text-blue-400" />
+                    <div className="text-sm text-gray-400">Source of Funds</div>
+                  </div>
+                  <div className="text-lg font-medium text-white">
+                    {kycData.source_of_funds}
+                  </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  user?.kyc_status === 'verified' || user?.kyc_status === 'approved'
-                    ? 'bg-green-600/20 text-green-400'
-                    : user?.kyc_status === 'pending' || user?.kyc_status === 'in_progress'
-                    ? 'bg-yellow-600/20 text-yellow-400'
-                    : 'bg-gray-600/20 text-gray-400'
-                }`}>
-                  {user?.role === 'tribe' ? 'Verified' : 'Alien'}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-400">KYC Level</p>
-                  <p className="text-white font-medium">{user?.kyc_level || 0} / 3</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-400">Account Created</p>
-                  <p className="text-white font-medium">
-                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Reset Password Dialog */}
+      <ResetPassword
+        open={resetPasswordOpen}
+        onOpenChange={setResetPasswordOpen}
+        onSuccess={handleResetPasswordSuccess}
+      />
     </div>
   );
 };
