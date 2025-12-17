@@ -84,6 +84,16 @@ const TradingPage = () => {
 
     try {
       setBuyLoading(true);
+      
+      // 🚨 CRITICAL: Block self-trading on frontend too
+      const currentUserId = localStorage.getItem('user_id'); // Adjust based on your auth setup
+      
+      if (selectedOffer.seller_id === currentUserId) {
+        toast.error('You cannot buy your own offer. Cancel it instead.');
+        setBuyLoading(false);
+        setShowBuyModal(false);
+        return;
+      }
       const response = await apiClient.post('/api/v1/tokenization/execute-trade', {
         offer_id: selectedOffer.id,
         payment_network: selectedOffer.payment_network,

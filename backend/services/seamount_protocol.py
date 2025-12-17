@@ -396,6 +396,25 @@ class SeamountProtocol:
             if offer_data['status'] != 'published':
                 raise Exception(f"Offer not available for settlement (status: {offer_data['status']})")
             
+            # 🚨 CRITICAL: Block self-trading (buyer can't buy their own offer)
+            if offer_data['seller_id'] == buyer_id:
+                logger.warning(f"⚠️ Self-trade attempt blocked: User {buyer_id} tried to buy their own offer")
+                
+                await self.audit.log_event(
+                    event_type="dvp_self_trade_blocked",
+                    user_id=buyer_id,
+                    details={
+                        'offer_id': offer_id,
+                        'asset_symbol': offer_data.get('asset_id'),
+                        'reason': 'User attempted to buy their own offer'
+                    }
+                )
+                
+                raise Exception(
+                    "❌ Self-trading not allowed. You cannot buy your own asset offering.\n"
+                    "   If you want to cancel this offer, use the 'Cancel Offer' feature instead."
+                )
+            
             # STEP 2: Get asset details
             asset = self.db.supabase.table('tokenized_assets').select('*').eq('id', offer_data['asset_id']).single().execute()
             
