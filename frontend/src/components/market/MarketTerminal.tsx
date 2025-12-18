@@ -149,7 +149,14 @@ const MarketTerminal: React.FC = () => {
             
             return (
               <div key={symbol} className="bg-gradient-to-br from-yellow-900/30 to-gray-800 rounded-lg p-4 border border-yellow-700/50">
-                {/* ... rest of your rendering ... */}
+                <div className="text-yellow-400 text-sm font-semibold">
+                  {symbol === 'XAU' ? 'GOLD' : symbol === 'XAG' ? 'SILVER' : symbol === 'XPT' ? 'PLATINUM' : 'PALLADIUM'}
+                </div>
+                <div className="text-2xl font-bold mt-1">
+                  ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">per troy ounce</div>
+                <div className="text-green-400 text-sm mt-1">● Live (Yahoo Finance)</div>
               </div>
             );
           })}

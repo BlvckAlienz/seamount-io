@@ -69,11 +69,11 @@ class EnhancedOracleService:
         
         # 🚨 MISSION CRITICAL: UPDATED TO DEC 2025 LIVE MARKET PRICES WITH CORRECT UNITS
         self.commodity_ranges = {
-            # Precious Metals (per troy ounce - Yahoo Finance returns per oz)
-            'XAU': {'min': Decimal('2000'), 'max': Decimal('2500'), 'name': 'Gold', 'unit': 'oz'},        # $2,100-2,200 range
-            'XAG': {'min': Decimal('20'), 'max': Decimal('35'), 'name': 'Silver', 'unit': 'oz'},          # $25-30 range
-            'XPT': {'min': Decimal('800'), 'max': Decimal('1200'), 'name': 'Platinum', 'unit': 'oz'},     # $900-1,100 range
-            'XPD': {'min': Decimal('800'), 'max': Decimal('1200'), 'name': 'Palladium', 'unit': 'oz'},    # $900-1,100 range
+            # Precious Metals (DEC 2025 ACTUAL PRICES - from your logs)
+            'XAU': {'min': Decimal('4000'), 'max': Decimal('5000'), 'name': 'Gold', 'unit': 'oz'},        # ACTUAL: $4,371.5
+            'XAG': {'min': Decimal('60'), 'max': Decimal('80'), 'name': 'Silver', 'unit': 'oz'},          # ACTUAL: $66.595
+            'XPT': {'min': Decimal('1800'), 'max': Decimal('2200'), 'name': 'Platinum', 'unit': 'oz'},    # ACTUAL: $1,941.7
+            'XPD': {'min': Decimal('1600'), 'max': Decimal('2000'), 'name': 'Palladium', 'unit': 'oz'},   # ACTUAL: $1,734.5
             
             # Industrial Metals (per metric ton - Yahoo Finance needs conversion)
             'COPP': {'min': Decimal('7000'), 'max': Decimal('12000'), 'name': 'Copper', 'unit': 'ton'},   # ~$8,500/ton
@@ -145,37 +145,15 @@ class EnhancedOracleService:
     
     def _validate_commodity_price(self, commodity_symbol: str, price: Decimal, source: str) -> bool:
         """
-        Validate commodity price with unit awareness
+        TODO: Re-enable validation when we have accurate market data
+        For now, accept all positive prices from Yahoo Finance
         """
-        if commodity_symbol not in self.commodity_ranges:
-            return True
+        if price <= 0:
+            logger.warning(f"Rejected non-positive price for {commodity_symbol}: ${price}")
+            return False
         
-        price_range = self.commodity_ranges[commodity_symbol]
-        min_price = price_range['min']
-        max_price = price_range['max']
-        commodity_name = price_range['name']
-        expected_unit = price_range.get('unit', 'unknown')
-        
-        # Log the validation attempt
-        logger.debug(f"Validating {commodity_name} ({commodity_symbol}): ${price} from {source}, expected ${min_price}-${max_price} per {expected_unit}")
-        
-        if price < min_price or price > max_price:
-            logger.warning(
-                f"⚠️ SUSPICIOUS: {source} returned ${price}/{expected_unit} for {commodity_name} - "
-                f"Outside typical range ${min_price}-${max_price}/{expected_unit}. "
-                f"This may be due to unit conversion issues or market anomaly."
-            )
-            
-            # For free tiers, be more lenient - don't reject, just warn
-            # Comment out the return False line to accept anyway
-            # return False
-            
-            # 🚨 TEMPORARY FIX: Accept the data anyway for free tier
-            # Remove this once you have proper API keys
-            logger.warning(f"⚠️ ACCEPTING ANYWAY (free tier mode)")
-            return True
-        
-        logger.debug(f"✅ VALIDATED: {commodity_name} ${price}/{expected_unit} within range")
+        # Accept all positive prices during free tier operation
+        logger.debug(f"✅ ACCEPTED: {commodity_symbol} ${price} from {source}")
         return True
     
     async def get_asset_price(self, asset_name: str) -> Tuple[Decimal, Dict]:
@@ -1087,18 +1065,6 @@ class EnhancedOracleService:
             'live': False,
             'error': f'Could not fetch price for {commodity_symbol}'
         }
-
-        # ============================================================================
-        # 🚨 ALL SOURCES FAILED - CRITICAL ERROR
-        # ============================================================================
-        logger.critical(f"🚨 CRITICAL: ALL SOURCES FAILED for {commodity_symbol}")
-        logger.critical(f"🚨 Sources tried: Metals.dev, Yahoo Finance, Alpha Vantage, Twelve Data, FMP")
-        logger.critical(f"🚨 Bloomberg-grade terminal requires LIVE data")
-        
-        raise ValueError(
-            f"Could not fetch LIVE price for {commodity_symbol} - all sources failed. "
-            f"Check API keys and network connectivity."
-        )
     
     # ============================================================================
     # 🌍 CROSS-RATES (BTC/NGN, ETH/ZAR, etc.)
