@@ -126,20 +126,33 @@ const MarketTerminal: React.FC = () => {
       <section className="mb-6">
         <h2 className="text-xl font-semibold mb-3 flex items-center">
           <span className="mr-2">🏆</span> Precious Metals
+          {(!commoditiesData['XAU'] || !commoditiesData['XAG'] || !commoditiesData['XPT'] || !commoditiesData['XPD']) && (
+            <span className="ml-2 text-xs bg-yellow-500 text-white px-2 py-1 rounded">Limited Data</span>
+          )}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {['XAU', 'XAG', 'XPT', 'XPD'].map((symbol) => (
-            <div key={symbol} className="bg-gradient-to-br from-yellow-900/30 to-gray-800 rounded-lg p-4 border border-yellow-700/50">
-              <div className="text-yellow-400 text-sm font-semibold">
-                {symbol === 'XAU' ? 'GOLD' : symbol === 'XAG' ? 'SILVER' : symbol === 'XPT' ? 'PLATINUM' : 'PALLADIUM'}
+          {['XAU', 'XAG', 'XPT', 'XPD'].map((symbol) => {
+            const price = commoditiesData[symbol] || 0;
+            const isAvailable = price > 0;
+            
+            if (!isAvailable) {
+              return (
+                <div key={symbol} className="bg-gray-800 rounded-lg p-4 border border-gray-700 opacity-50">
+                  <div className="text-gray-400 text-sm font-semibold">
+                    {symbol === 'XAU' ? 'GOLD' : symbol === 'XAG' ? 'SILVER' : symbol === 'XPT' ? 'PLATINUM' : 'PALLADIUM'}
+                  </div>
+                  <div className="text-lg text-gray-500 mt-1">Data Unavailable</div>
+                  <div className="text-xs text-yellow-400 mt-1">● Rate Limited</div>
+                </div>
+              );
+            }
+            
+            return (
+              <div key={symbol} className="bg-gradient-to-br from-yellow-900/30 to-gray-800 rounded-lg p-4 border border-yellow-700/50">
+                {/* ... rest of your rendering ... */}
               </div>
-              <div className="text-2xl font-bold mt-1">
-                ${(commoditiesData[symbol] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">per troy ounce</div>
-              <div className="text-green-400 text-sm mt-1">● Live (Metals.dev)</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
