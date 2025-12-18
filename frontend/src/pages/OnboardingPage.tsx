@@ -12,6 +12,7 @@ import {
   Bitcoin, Coins, Sparkles
 } from 'lucide-react';
 import BVNCollectionModal from '../components/onboarding/BVNCollectionModal';
+import BusinessQuestionnaireStep from '../components/onboarding/BusinessQuestionnaireStep';
 
 // ============================================================================
 // STEP COMPONENTS - UPDATED FOR MULTI-CHAIN
@@ -211,6 +212,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
 
 const OnboardingPage = () => {
   const [step, setStep] = useState('welcome');
+  const [questionnaireData, setQuestionnaireData] = useState<any>(null);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [showBVNModal, setShowBVNModal] = useState(false);
   const { completeOnboarding, userProfile, refreshProfile } = useAuth();
@@ -222,7 +224,44 @@ const OnboardingPage = () => {
     }
   }, [userProfile, navigate]);
 
-  const handleWelcomeComplete = () => setStep('identity');
+  const handleWelcomeComplete = () => setStep('questionnaire');
+
+  // Handle questionnaire completion
+  const handleQuestionnaireComplete = async (data: any) => {
+    const toastId = toast.loading('Saving your profile...');
+    
+    try {
+      // Save questionnaire data to backend
+      await apiClient.put('/api/v1/user/profile', {
+        account_type: data.accountType,
+        business_type: data.businessType,
+        company_size: data.companySize,
+        business_sector: data.sector,
+        intent: data.intent,
+        tokenization_details: data.tokenizationDetails,
+        capital_raising_details: data.capitalRaisingDetails,
+        has_corporate_docs: data.hasCorporateDocs,
+        questionnaire_completed: true,
+        questionnaire_completed_at: new Date().toISOString()
+      });
+
+      setQuestionnaireData(data);
+      toast.success('Profile saved!', { id: toastId });
+      
+      // If individual, skip to wallet creation
+      // If business, proceed to KYC
+      setStep(data.accountType === 'individual' ? 'walletCreation' : 'identity');
+      
+    } catch (error: any) {
+      console.error('Questionnaire save error:', error);
+      toast.error('Failed to save profile', { id: toastId });
+    }
+  };
+
+  // Handle skipping questionnaire (for individuals)
+  const handleQuestionnaireSkip = () => {
+    setStep('walletCreation');
+  };
 
   const handleStartVerification = () => {
     setShowBVNModal(true);
@@ -295,12 +334,14 @@ const OnboardingPage = () => {
   };
 
   const progressPercentage = 
-    step === 'welcome' ? '25%' : 
-    step === 'identity' ? '50%' : 
+    step === 'welcome' ? '20%' : 
+    step === 'questionnaire' ? '40%' :
+    step === 'identity' ? '60%' : 
     step === 'walletCreation' ? '100%' : '100%';
 
   const stepTitles: { [key: string]: string } = {
     welcome: 'Welcome to Seamount',
+    questionnaire: 'Tell Us About You',
     identity: 'Identity Verification',
     walletCreation: 'Multi-Chain Wallet Setup'
   };
@@ -326,6 +367,11 @@ const OnboardingPage = () => {
         <div className="p-8">
           {step === 'welcome' ? (
             <WelcomeStep onNext={handleWelcomeComplete} />
+          ) : step === 'questionnaire' ? (
+            <BusinessQuestionnaireStep 
+              onComplete={handleQuestionnaireComplete}
+              onSkip={handleQuestionnaireSkip}
+            />
           ) : step === 'identity' ? (
             <IdentityStep 
               onVerify={handleStartVerification}

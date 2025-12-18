@@ -84,10 +84,23 @@ async def update_user_profile(
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    # ADD KYC-SPECIFIC FIELDS
+    """Update user profile - NOW INCLUDES BUSINESS QUESTIONNAIRE FIELDS"""
+    
+    # 🆕 EXPANDED: Core profile + KYC + Business questionnaire fields
     allowed_fields = [
+        # Core profile fields
         'first_name', 'last_name', 'country_code', 'phone', 
-        'date_of_birth', 'gender', 'bvn', 'id_type'  # 🆕 ADD KYC FIELDS
+        'date_of_birth', 'gender', 'kyc_status', 'kyc_level',
+        
+        # KYC-specific fields
+        'bvn', 'id_type',
+        
+        # 🆕 Business questionnaire fields
+        'account_type', 'business_type', 'company_size', 
+        'business_sector', 'intent', 'tokenization_details',
+        'capital_raising_details', 'has_corporate_docs',
+        'questionnaire_completed', 'questionnaire_completed_at',
+        'onboarding_complete'  # Track full onboarding completion
     ]
     
     """Update user profile"""
@@ -95,20 +108,50 @@ async def update_user_profile(
         data = await request.json()
         user_id = current_user.get('id')
         
+        logger.info(f"[Profile Update] User {user_id} updating fields: {list(data.keys())}")
+        
         update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
         
-        allowed_fields = ['first_name', 'last_name', 'country_code', 'phone', 'date_of_birth', 'kyc_status']
+        # ✅ Process allowed fields (snake_case)
         for field in allowed_fields:
             if field in data:
                 update_data[field] = data[field]
         
-        # Handle camelCase from frontend
-        if 'firstName' in data:
-            update_data['first_name'] = data['firstName']
-        if 'lastName' in data:
-            update_data['last_name'] = data['lastName']
-        if 'countryCode' in data:
-            update_data['country_code'] = data['countryCode'].upper()
+        # ✅ Handle camelCase from frontend (legacy support)
+        camel_to_snake_mapping = {
+            'firstName': 'first_name',
+            'lastName': 'last_name',
+            'countryCode': 'country_code',
+            'dateOfBirth': 'date_of_birth',
+            'kycStatus': 'kyc_status',
+            'kycLevel': 'kyc_level',
+            'accountType': 'account_type',
+            'businessType': 'business_type',
+            'companySize': 'company_size',
+            'businessSector': 'business_sector',
+            'tokenizationDetails': 'tokenization_details',
+            'capitalRaisingDetails': 'capital_raising_details',
+            'hasCorporateDocs': 'has_corporate_docs',
+            'questionnaireCompleted': 'questionnaire_completed',
+            'questionnaireCompletedAt': 'questionnaire_completed_at',
+            'onboardingComplete': 'onboarding_complete'
+        }
+        
+        for camel_key, snake_key in camel_to_snake_mapping.items():
+            if camel_key in data:
+                update_data[snake_key] = data[camel_key]
+        
+        # ✅ Uppercase country_code if present
+        if 'country_code' in update_data:
+            update_data['country_code'] = update_data['country_code'].upper()
+        
+        # 🆕 Log business questionnaire completion
+        if update_data.get('questionnaire_completed'):
+            logger.info(f"[Questionnaire] User {user_id} completed business questionnaire: "
+                       f"Type={update_data.get('account_type')}, "
+                       f"Business={update_data.get('business_type')}, "
+                       f"Sector={update_data.get('business_sector')}, "
+                       f"Intent={update_data.get('intent')}")
             
         update_result = supabase.from_("user_profiles").update(update_data).eq("id", user_id).execute()
         fetch_result = supabase.from_("user_profiles").select("*").eq("id", user_id).execute()
@@ -339,3 +382,89 @@ async def get_wallet_info(
     except Exception as e:
         logger.error(f"[Wallet Info] Error: {str(e)}")
         return {"success": True, "wallet_exists": False}
+    
+@router.get("/questionnaire-stats")
+async def get_questionnaire_stats(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """
+    🆕 Get aggregated business questionnaire statistics
+    Requires admin role for now - remove auth for public dashboard
+    """
+    try:
+        # Check if user is admin
+        if not current_user.get('is_admin'):
+            raise HTTPException(status_code=403, detail="Admin access required")
+        
+        # Fetch all completed questionnaires
+        result = supabase.from_("user_profiles")\
+            .select("account_type, business_type, business_sector, intent, has_corporate_docs")\
+            .eq("questionnaire_completed", True)\
+            .execute()
+        
+        if not result.data:
+            return {
+                "success": True,
+                "total_responses": 0,
+                "stats": {}
+            }
+        
+        data = result.data
+        
+        # Aggregate statistics
+        stats = {
+            "total_responses": len(data),
+            "account_types": {},
+            "business_types": {},
+            "sectors": {},
+            "intents": {},
+            "has_docs": {"yes": 0, "no": 0}
+        }
+        
+        for profile in data:
+            # Account types
+            account_type = profile.get('account_type', 'unknown')
+            stats['account_types'][account_type] = stats['account_types'].get(account_type, 0) + 1
+            
+            # Business types (only for business accounts)
+            if account_type == 'business':
+                business_type = profile.get('business_type', 'unknown')
+                stats['business_types'][business_type] = stats['business_types'].get(business_type, 0) + 1
+                
+                # Sectors
+                sector = profile.get('business_sector', 'unknown')
+                stats['sectors'][sector] = stats['sectors'].get(sector, 0) + 1
+                
+                # Intent
+                intent = profile.get('intent', 'unknown')
+                stats['intents'][intent] = stats['intents'].get(intent, 0) + 1
+                
+                # Corporate docs
+                if profile.get('has_corporate_docs'):
+                    stats['has_docs']['yes'] += 1
+                else:
+                    stats['has_docs']['no'] += 1
+        
+        # Calculate percentages
+        total = stats['total_responses']
+        stats['percentages'] = {
+            "businesses": (stats['account_types'].get('business', 0) / total * 100) if total > 0 else 0,
+            "tokenization_interest": (stats['intents'].get('tokenize_asset', 0) / total * 100) if total > 0 else 0,
+            "capital_raising_interest": (stats['intents'].get('raise_capital', 0) / total * 100) if total > 0 else 0,
+            "has_docs": (stats['has_docs']['yes'] / (stats['has_docs']['yes'] + stats['has_docs']['no']) * 100) 
+                       if (stats['has_docs']['yes'] + stats['has_docs']['no']) > 0 else 0
+        }
+        
+        logger.info(f"[Questionnaire Stats] Generated stats for {total} responses")
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Questionnaire Stats] Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch statistics")
