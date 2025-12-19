@@ -14,6 +14,7 @@ const CompliancePage = () => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'documents' | 'exemptions'>('overview');
+  const [authChecked, setAuthChecked] = useState(false); // Add this
 
   useEffect(() => {
     fetchData();
@@ -22,6 +23,9 @@ const CompliancePage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      // Add a small delay to ensure auth context is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const [subRes, checklistRes, docsRes] = await Promise.all([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
@@ -34,9 +38,12 @@ const CompliancePage = () => {
         setStats(checklistRes.data.stats);
       }
       if (docsRes.data.success) setDocuments(docsRes.data.documents);
+      
+      setAuthChecked(true); // Mark auth as checked
     } catch (error) {
       console.error('Failed to fetch compliance data:', error);
       toast.error('Failed to load data');
+      setAuthChecked(true); // Even on error, mark as checked
     } finally {
       setLoading(false);
     }
@@ -51,7 +58,7 @@ const CompliancePage = () => {
     }).format(amount);
   };
 
-  if (loading) {
+  if (loading && !authChecked) {
     return (
       <div className="flex h-screen">
         <Sidebar />
@@ -62,7 +69,8 @@ const CompliancePage = () => {
     );
   }
 
-  if (!subscription) {
+  // Only show subscription plans if we've checked and there's no subscription
+  if (authChecked && !subscription) {
     return <SubscriptionPlans formatCurrency={formatCurrencyNGN} />;
   }
 
@@ -149,11 +157,53 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
   const fetchPlans = async () => {
     try {
       const res = await apiClient.get('/api/v1/subscriptions/plans');
-      if (res.data.success) setPlans(res.data.plans);
+      if (res.data.success) {
+        // ✅ FIX: Safely parse features field
+        const parsedPlans = res.data.plans.map((plan: any) => ({
+          ...plan,
+          // Try to parse features as JSON, fallback to array or empty array
+          features: safelyParseFeatures(plan.features)
+        }));
+        setPlans(parsedPlans);
+      }
     } catch (error) {
-      toast.error('Failed to load plans');
+      console.error('Failed to load plans:', error);
+      toast.error('Failed to load subscription plans');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const safelyParseFeatures = (featuresString: any): string[] => {
+    try {
+      // If it's already an array, return it
+      if (Array.isArray(featuresString)) {
+        return featuresString;
+      }
+      
+      // If it's a string, try to parse it
+      if (typeof featuresString === 'string') {
+        // Check if it's already valid JSON
+        if (featuresString.trim().startsWith('[') || featuresString.trim().startsWith('{')) {
+          const parsed = JSON.parse(featuresString);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+        
+        // If it's a plain string (like "Document uploaded"), wrap it in an array
+        return [featuresString];
+      }
+      
+      // Default fallback
+      return [];
+    } catch (error) {
+      console.warn('Failed to parse features, using fallback:', featuresString);
+      // If it's a string but not JSON, wrap it in an array
+      if (typeof featuresString === 'string') {
+        return [featuresString];
+      }
+      return [];
     }
   };
 
@@ -182,7 +232,9 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
-              const features = JSON.parse(plan.features || '[]');
+              // ✅ FIXED: features is now safely parsed
+              const features = plan.features || [];
+              
               return (
                 <div
                   key={plan.id}
@@ -434,11 +486,13 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                   </div>
                 </div>
                 
+                {/* ✅ FIXED: Correct anchor tag */}
+                <a
                   href={doc.file_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                <a>
+                >
                   View
                 </a>
               </div>
