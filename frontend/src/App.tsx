@@ -9,6 +9,7 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import TerminalPage from './pages/TerminalPage';
+import CompliancePage from './pages/CompliancePage';
 
 // ✅ ADD THESE IMPORTS
 import { WagmiProvider } from 'wagmi';
@@ -201,11 +202,11 @@ const AppContent: React.FC = () => {
           } 
         />
 
-        {/* 🆕 Tokenization & Secondary Market Routes */}
+        {/* 🆕 Tokenization & Secondary Market Routes - BUSINESS ONLY */}
         <Route 
           path="/tokenization" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <TokenizationMarketPage />
             </ProtectedRoute>
           } 
@@ -213,7 +214,7 @@ const AppContent: React.FC = () => {
         <Route 
           path="/tokenization/convert" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <TokenizationMarketPage />
             </ProtectedRoute>
           } 
@@ -221,7 +222,7 @@ const AppContent: React.FC = () => {
         <Route 
           path="/tokenization/tokens" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <TokenizationMarketPage />
             </ProtectedRoute>
           } 
@@ -229,7 +230,7 @@ const AppContent: React.FC = () => {
         <Route 
           path="/tokenization/market" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <TokenizationMarketPage />
             </ProtectedRoute>
           } 
@@ -237,17 +238,17 @@ const AppContent: React.FC = () => {
         <Route 
           path="/tokenization/publish" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <TokenizationMarketPage />
             </ProtectedRoute>
           } 
         />
 
-        {/* 🆕 Collateral Management & Repo Trades Routes */}
+        {/* 🆕 Collateral Management & Repo Trades Routes - BUSINESS ONLY */}
         <Route 
           path="/collateral" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <CollateralPage />
             </ProtectedRoute>
           } 
@@ -255,7 +256,7 @@ const AppContent: React.FC = () => {
         <Route 
           path="/collateral/create-repo" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <CollateralPage />
             </ProtectedRoute>
           } 
@@ -263,7 +264,7 @@ const AppContent: React.FC = () => {
         <Route 
           path="/collateral/repos" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <CollateralPage />
             </ProtectedRoute>
           } 
@@ -271,11 +272,22 @@ const AppContent: React.FC = () => {
         <Route 
           path="/collateral/manage" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute businessRequired={true}>
               <CollateralPage />
             </ProtectedRoute>
           } 
         />
+
+        {/* 📊 Compliance & Audit Routes - BUSINESS ONLY */}
+        <Route 
+          path="/compliance" 
+          element={
+            <ProtectedRoute businessRequired={true}>
+              <CompliancePage />
+            </ProtectedRoute>
+          } 
+        />
+
         {/* 🆕 Market Terminal Route */}
         <Route 
           path="/terminal" 

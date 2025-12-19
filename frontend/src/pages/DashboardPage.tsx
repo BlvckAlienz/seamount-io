@@ -24,6 +24,7 @@ import { WithdrawModal } from '@/components/wallet/WithdrawModal';
 import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
+import { formatCurrencyUSD } from '@/utils/formatters';
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -273,7 +274,7 @@ const DashboardPage = () => {
           </div>
 
           {/* 🆕 COLLATERAL QUICK STATS - Replaces old cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {/* Active Positions Card */}
             <div className="bg-gradient-to-br from-orange-900/20 to-yellow-900/20 border border-orange-500/30 rounded-xl p-4 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-2">
@@ -294,8 +295,8 @@ const DashboardPage = () => {
                 </div>
                 <span className="text-xs text-green-400 font-medium">USD</span>
               </div>
-              <div className="text-2xl font-bold text-white mb-1">${collateralStats.totalValue.toFixed(2)}</div>
-              <div className="text-sm text-gray-400">Total Value</div>
+              <div className="text-2xl font-bold text-white mb-1">{formatCurrencyUSD(collateralStats.totalValue)}</div>
+              <div className="text-sm text-gray-400">Total Assets Value</div>
             </div>
 
             {/* Repo Trades Card */}
@@ -308,18 +309,6 @@ const DashboardPage = () => {
               </div>
               <div className="text-2xl font-bold text-white mb-1">{collateralStats.repoTrades}</div>
               <div className="text-sm text-gray-400">Repo Trades</div>
-            </div>
-
-            {/* DVP Settlements Card */}
-            <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <Activity className="h-5 w-5 text-purple-400 animate-pulse" />
-                </div>
-                <span className="text-xs text-purple-400 font-medium">Sub-5s</span>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">~4.2s</div>
-              <div className="text-sm text-gray-400">Avg Settlement</div>
             </div>
           </div>
 
@@ -336,8 +325,8 @@ const DashboardPage = () => {
             <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 md:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="text-xs md:text-sm text-gray-400 mb-1">Total Balance</div>
-                  <div className="text-2xl md:text-4xl font-bold text-white">${totalBalance.toFixed(2)}</div>
+                  <div className="text-xs md:text-sm text-gray-400 mb-1">Total Crypto Balance</div>
+                  <div className="text-2xl md:text-4xl font-bold text-white">{formatCurrencyUSD(totalBalance)}</div>
                 </div>
                 <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
                   <RefreshCw className="h-5 w-5" />

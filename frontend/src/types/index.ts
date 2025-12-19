@@ -20,6 +20,7 @@ export interface UserProfile {
   last_name: string;
   country_code: string;
   kyc_level: number;
+  account_type?: string;
   kyc_status: 'not_started' | 'pending' | 'in_progress' | 'under_review' | 'approved' | 'rejected' | 'skipped' | 'verified';
   is_admin: boolean;
   phone?: string;

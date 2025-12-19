@@ -11,6 +11,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { formatCurrencyUSD, formatCurrencyWithDecimals } from '@/utils/formatters';
 
 interface AssetOffer {
   id: string;
@@ -300,15 +301,6 @@ const TradingPage = () => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-
   const getPaymentNetworkLabel = (network: string) => {
     const labels: Record<string, string> = {
       'usdc_circle': 'USDC (Circle)',
@@ -413,7 +405,7 @@ const TradingPage = () => {
                 <div>
                   <div className="text-xs text-gray-400 mb-1">Market Value</div>
                   <div className="text-2xl md:text-3xl font-bold text-white">
-                    {formatCurrency(marketStats.totalValue)}
+                    {formatCurrencyUSD(marketStats.totalValue)}
                   </div>
                 </div>
                 <div className="p-2 bg-green-500/20 rounded-lg">
@@ -421,7 +413,7 @@ const TradingPage = () => {
                 </div>
               </div>
               <div className="text-xs text-green-400 mt-2">
-                Average: {formatCurrency(marketStats.averagePrice)}
+                Average: {formatCurrencyWithDecimals(marketStats.averagePrice)}
               </div>
             </div>
 
@@ -674,13 +666,13 @@ const TradingPage = () => {
                         </div>
                         <div className="bg-gray-800/30 rounded-lg p-3">
                           <div className="text-xs text-gray-400 mb-1">Price/Unit</div>
-                          <div className="text-base font-bold text-white">{formatCurrency(offer.price_per_unit)}</div>
+                          <div className="text-base font-bold text-white">{formatCurrencyWithDecimals(offer.price_per_unit)}</div>
                         </div>
                       </div>
                       
                       <div className="bg-blue-900/10 border border-blue-500/20 rounded-lg p-3">
                         <div className="text-xs text-gray-400 mb-1">Total Value</div>
-                        <div className="text-xl font-bold text-blue-400">{formatCurrency(offer.total_value)}</div>
+                        <div className="text-xl font-bold text-blue-400">{formatCurrencyUSD(offer.total_value)}</div>
                       </div>
                     </div>
 
@@ -773,7 +765,7 @@ const TradingPage = () => {
                   <div className="bg-gray-800/50 rounded-xl p-4">
                     <div className="text-sm text-gray-400 mb-1">Price/Unit</div>
                     <div className="text-lg font-bold text-white">
-                      {formatCurrency(selectedOffer.price_per_unit)}
+                      {formatCurrencyWithDecimals(selectedOffer.price_per_unit)}
                     </div>
                   </div>
                 </div>
@@ -781,7 +773,7 @@ const TradingPage = () => {
                 <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
                   <div className="text-sm text-gray-400 mb-1">Total Cost</div>
                   <div className="text-2xl font-bold text-white">
-                    {formatCurrency(selectedOffer.total_value)}
+                    {formatCurrencyUSD(selectedOffer.total_value)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     Payment via {getPaymentNetworkLabel(selectedOffer.payment_network)}

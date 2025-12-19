@@ -8,6 +8,7 @@ import ConvertAssetModal from '@/components/modals/ConvertAssetModal';
 import PublishOfferModal from '@/components/modals/PublishOfferModal';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
+import { formatCurrencyUSD, formatCurrencyWithDecimals } from '@/utils/formatters';
 
 const TokenizationMarketPage = () => {
   const [loading, setLoading] = useState(true);
@@ -104,7 +105,7 @@ const TokenizationMarketPage = () => {
             <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-4 md:p-6 sm:col-span-2 lg:col-span-1">
               <div className="text-xs md:text-sm text-gray-400 mb-2">Total Market Value</div>
               <div className="text-3xl md:text-4xl font-bold text-white mb-2">
-                ${offers.reduce((sum, o) => sum + o.total_value, 0).toFixed(2)}
+                {formatCurrencyUSD(offers.reduce((sum, o) => sum + o.total_value, 0))}
               </div>
               <div className="text-xs md:text-sm text-purple-400">USD</div>
             </div>
@@ -161,11 +162,11 @@ const TokenizationMarketPage = () => {
                             <span className="text-green-400 font-medium">{asset.on_chain_balance}</span>
                           </td>
                           <td className="py-4 px-4 text-right">
-                            <span className="text-white">${asset.current_price_usd?.toFixed(2)}</span>
+                            <span className="text-white">{formatCurrencyWithDecimals(asset.current_price_usd || 0)}</span>
                           </td>
                           <td className="py-4 px-4 text-right">
                             <span className="text-white font-bold">
-                              ${(asset.on_chain_balance * asset.current_price_usd).toFixed(2)}
+                              {formatCurrencyUSD(asset.on_chain_balance * asset.current_price_usd)}
                             </span>
                           </td>
                           <td className="py-4 px-4 text-right">
@@ -213,12 +214,12 @@ const TokenizationMarketPage = () => {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-400">Price/Unit</span>
-                          <span className="text-white font-medium">${asset.current_price_usd?.toFixed(2)}</span>
+                          <span className="text-white font-medium">{formatCurrencyWithDecimals(asset.current_price_usd || 0)}</span>
                         </div>
                         <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
                           <span className="text-gray-400">Total Value</span>
                           <span className="text-white font-bold">
-                            ${(asset.on_chain_balance * asset.current_price_usd).toFixed(2)}
+                            {formatCurrencyUSD(asset.on_chain_balance * asset.current_price_usd)}
                           </span>
                         </div>
                       </div>

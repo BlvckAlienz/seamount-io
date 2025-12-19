@@ -23,6 +23,7 @@ interface NavItem {
   icon: React.ElementType;
   path: string;
   badge?: string;
+  businessOnly?: boolean;
 }
 
 const Sidebar: React.FC = () => {
@@ -32,15 +33,25 @@ const Sidebar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const navItems: NavItem[] = [
+  // 🚨 ALL NAV ITEMS (includes business-only features)
+  const allNavItems: NavItem[] = [
     { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
-    { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW' },
-    { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW' },
+    { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
+    { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW', businessOnly: true },
+    { label: 'Audit & Tax', icon: Shield, path: '/compliance', badge: 'NEW', businessOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading', badge: 'NEW' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
     { label: 'Predictions', icon: Target, path: '/predictions' },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
+
+  // 🔒 FILTER: Hide business-only tabs from individual users
+  const navItems = allNavItems.filter(item => {
+    if (item.businessOnly) {
+      return userProfile?.account_type === 'business';
+    }
+    return true;
+  });
 
   const isActive = (path: string) => location.pathname === path;
 

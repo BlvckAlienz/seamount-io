@@ -7,10 +7,12 @@ import { BUSINESS_SECTORS } from '@/data/businessSectors';
 
 interface QuestionnaireData {
   accountType: 'individual' | 'business' | '';
-  businessType: 'custodian' | 'asset_owner' | 'broker_dealer' | 'retail_investor' | '';
-  companySize: 'less_than_50' | '50_to_100' | 'more_than_100' | '';
+  businessType: 'custodian' | 'asset_owner' | 'broker_dealer' | 'retail_investor' | 'auction_house' | 'ngo' | 'other' | '';
+  legalBusinessName: string;
+  registeredCompanyNumber: string;
+  companySize: 'less_than_50' | '50_to_100' | '100_to_300' | '300_to_500' | '500_to_1000' | 'more_than_1000' | '';
   sector: string;
-  intent: 'tokenize_asset' | 'raise_capital' | 'trade_crypto' | 'multiple' | '';
+  intent: 'tokenize_asset' | 'raise_capital' | 'trade_crypto' | 'other' | '';
   tokenizationDetails: string;
   capitalRaisingDetails: string;
   hasCorporateDocs: boolean | null;
@@ -25,6 +27,8 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
   const [data, setData] = useState<QuestionnaireData>({
     accountType: '',
     businessType: '',
+    legalBusinessName: '',
+    registeredCompanyNumber: '',
     companySize: '',
     sector: '',
     intent: '',
@@ -60,6 +64,8 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
     if (data.accountType === 'business') {
       if (currentStep === 2) {
         if (!data.businessType) newErrors.businessType = 'Please select business type';
+        if (!data.legalBusinessName?.trim()) newErrors.legalBusinessName = 'Business name is required';
+        if (!data.registeredCompanyNumber?.trim()) newErrors.registeredCompanyNumber = 'Company number is required';
         if (!data.companySize) newErrors.companySize = 'Please select company size';
         if (!data.sector) newErrors.sector = 'Please select a sector';
       }
@@ -79,10 +85,11 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
   const handleNext = () => {
     if (!validateStep()) return;
 
-    // Skip to KYC if individual
+    // ✅ FIX: ALL users (individual + business) proceed to KYC
     if (data.accountType === 'individual') {
-      onSkip();
-      return;
+        // Save individual account type, then proceed to KYC
+        onComplete(data);
+        return;
     }
 
     // Move to next step for business
@@ -219,11 +226,48 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
               <option value="custodian">Custodian</option>
               <option value="broker_dealer">Broker-Dealer</option>
               <option value="retail_investor">Retail Investor</option>
+              <option value="auction_house">Auction House</option>
+              <option value="ngo">NGO</option>
+              <option value="other">Other</option>
             </select>
             {errors.businessType && (
               <p className="text-red-400 text-sm mt-1">{errors.businessType}</p>
             )}
           </div>
+
+        {/* Legal Business Name */}
+        <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+                Legal Business Name <span className="text-red-400">*</span>
+            </label>
+            <input
+                type="text"
+                value={data.legalBusinessName}
+                onChange={(e) => handleInputChange('legalBusinessName', e.target.value)}
+                placeholder="e.g., Seamount Technologies Ltd"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {errors.legalBusinessName && (
+                <p className="text-red-400 text-sm mt-1">{errors.legalBusinessName}</p>
+            )}
+        </div>
+
+        {/* Registered Company Number */}
+        <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+                Registered Company Number <span className="text-red-400">*</span>
+            </label>
+            <input
+                type="text"
+                value={data.registeredCompanyNumber}
+                onChange={(e) => handleInputChange('registeredCompanyNumber', e.target.value)}
+                placeholder="e.g., CAC/RC 1234567"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {errors.registeredCompanyNumber && (
+                <p className="text-red-400 text-sm mt-1">{errors.registeredCompanyNumber}</p>
+            )}
+        </div>
 
           {/* Company Size */}
           <div>
@@ -301,6 +345,7 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
                 { value: 'tokenize_asset', label: 'Tokenize Assets', icon: FileText },
                 { value: 'raise_capital', label: 'Raise Capital', icon: TrendingUp },
                 { value: 'trade_crypto', label: 'Trade Crypto', icon: Users },
+                { value: 'other', label: 'Other', icon: AlertCircle },
               ].map(option => (
                 <button
                   key={option.value}
@@ -348,10 +393,10 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
           )}
 
           {/* Capital Raising Details (Optional) */}
-          {(data.intent === 'raise_capital' || data.intent === 'multiple') && (
+          {(data.intent === 'raise_capital' || data.intent === 'tokenize_asset' || data.intent === 'other') && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Raising capital for equity? Details (Optional)
+                Provide more details (Optional)
               </label>
               <textarea
                 value={data.capitalRaisingDetails}

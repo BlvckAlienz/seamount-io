@@ -96,11 +96,12 @@ async def update_user_profile(
         'bvn', 'id_type',
         
         # 🆕 Business questionnaire fields
-        'account_type', 'business_type', 'company_size', 
+        'account_type', 'business_type', 'legal_business_name', 
+        'registered_company_number', 'company_size', 
         'business_sector', 'intent', 'tokenization_details',
         'capital_raising_details', 'has_corporate_docs',
         'questionnaire_completed', 'questionnaire_completed_at',
-        'onboarding_complete'  # Track full onboarding completion
+        'onboarding_complete'
     ]
     
     """Update user profile"""
@@ -127,6 +128,8 @@ async def update_user_profile(
             'kycLevel': 'kyc_level',
             'accountType': 'account_type',
             'businessType': 'business_type',
+            'legalBusinessName': 'legal_business_name',
+            'registeredCompanyNumber': 'registered_company_number',
             'companySize': 'company_size',
             'businessSector': 'business_sector',
             'tokenizationDetails': 'tokenization_details',

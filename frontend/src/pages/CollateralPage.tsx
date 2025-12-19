@@ -8,6 +8,7 @@ import CollateralManagementModal from '@/components/modals/CollateralManagementM
 import CreateRepoModal from '@/components/modals/CreateRepoModal';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
+import { formatCurrencyUSD } from '@/utils/formatters';
 
 interface CollateralPosition {
   id: string;
@@ -109,7 +110,7 @@ const CollateralPage: React.FC = () => {
             <div className="bg-gradient-to-br from-orange-900/20 to-red-900/20 border border-orange-500/30 rounded-xl p-4 md:p-6">
               <div className="text-xs md:text-sm text-gray-400 mb-2">Total Locked Value</div>
               <div className="text-3xl md:text-4xl font-bold text-white mb-2">
-                ${totalLocked.toFixed(2)}
+                {formatCurrencyUSD(totalLocked)}
               </div>
               <div className="text-xs md:text-sm text-orange-400">USD</div>
             </div>
@@ -193,7 +194,7 @@ const CollateralPage: React.FC = () => {
                             <span className="text-white font-medium">{position.locked_quantity}</span>
                           </td>
                           <td className="py-4 px-4 text-right">
-                            <span className="text-white font-bold">${position.current_value_usd.toFixed(2)}</span>
+                            <span className="text-white font-bold">{formatCurrencyUSD(position.current_value_usd)}</span>
                           </td>
                           <td className="py-4 px-4 text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -253,7 +254,7 @@ const CollateralPage: React.FC = () => {
                         </div>
                         <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
                           <span className="text-gray-400">Value</span>
-                          <span className="text-white font-bold">${position.current_value_usd.toFixed(2)}</span>
+                          <span className="text-white font-bold">{formatCurrencyUSD(position.current_value_usd)}</span>
                         </div>
                       </div>
 

@@ -8,6 +8,7 @@ interface ProtectedRouteProps {
   requiredRole?: 'tribe' | 'alien';
   allowRestricted?: boolean;
   adminRequired?: boolean; // ADD THIS PROP
+  businessRequired?: boolean;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
@@ -15,9 +16,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   minKycLevel = 0,
   requiredRole,
   allowRestricted = false,
-  adminRequired = false // ADD WITH DEFAULT
+  adminRequired = false,
+  businessRequired = false // 🆕 ADD THIS
 }) => {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, userProfile } = useAuth(); // 🆕 ADD userProfile
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -29,6 +31,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // ADD ADMIN CHECK
   if (adminRequired && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // 🆕 ADD BUSINESS CHECK
+  if (businessRequired && userProfile?.account_type !== 'business') {
     return <Navigate to="/dashboard" replace />;
   }
 

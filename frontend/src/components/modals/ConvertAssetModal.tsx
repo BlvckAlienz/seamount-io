@@ -127,6 +127,11 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
                 <option value="mock-custodian-stanbic">Stanbic IBTC (Mock)</option>
                 <option value="mock-custodian-cscs">CSCS Nigeria (Mock)</option>
                 <option value="mock-custodian-nse">NSE Direct (Mock)</option>
+                <option value="mock-custodian-broker">Broker-Dealer</option>
+                <option value="mock-custodian-developer">Real-Estate Developer</option>
+                <option value="mock-custodian-auctioner">Auction House</option>
+                <option value="mock-custodian-company">Private Company</option>
+                <option value="mock-custodian-others">Others</option>
               </select>
             </div>
 

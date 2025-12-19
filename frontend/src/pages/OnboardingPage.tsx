@@ -28,7 +28,7 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
         Welcome to Seamount
       </h3>
       <p className="text-gray-400 text-lg">
-        The future of cross-border payments is here
+        Platform for Private Asset Ownership
       </p>
     </div>
     
@@ -39,9 +39,9 @@ const WelcomeStep = ({ onNext }: { onNext: () => void }) => (
       </h4>
       <div className="space-y-3 text-gray-300">
         {[
-          "Multi-chain wallet (Bitcoin, Ethereum, Polygon, Algorand)",
-          "Lightning-fast settlement (sub-5 seconds)",
-          "Cross-border transfers at 1.2% (vs 6-8% traditional)",
+          "Multi-chain wallets (Bitcoin, Ethereum, Polygon, Algorand, Tron)",
+          "On-chain 24/7 payments with sub-5 second settlement",
+          "Launch, scale, and distribute tokenized assets",
           "Bank-grade security with Web3 freedom"
         ].map((item, idx) => (
           <div key={idx} className="flex items-start transform transition-transform hover:translate-x-2">
@@ -113,8 +113,9 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
     { id: 'bitcoin', name: 'Bitcoin', icon: Bitcoin, color: 'from-orange-500 to-yellow-600' },
     { id: 'ethereum', name: 'Ethereum', icon: Coins, color: 'from-gray-400 to-slate-600' },
     { id: 'polygon', name: 'Polygon', icon: Coins, color: 'from-purple-500 to-indigo-600' },
-    { id: 'algorand', name: 'Algorand', icon: Shield, color: 'from-blue-500 to-cyan-600' }
-  ];
+    { id: 'algorand', name: 'Algorand', icon: Shield, color: 'from-blue-500 to-cyan-600' },
+    { id: 'tron', name: 'Tron', icon: Sparkles, color: 'from-red-500 to-pink-600' }
+ ];
 
   const createMultiChainWallets = async () => {
     setCreating(true);
@@ -125,7 +126,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
 
       if (response.data.success) {
         setWallets(response.data.wallets);
-        toast.success(`Wallets created on ${response.data.total_chains} chains!`);
+        toast.success('Wallets created on 5 chains!');
         
         // Auto-complete after successful creation
         setTimeout(() => {
@@ -150,9 +151,9 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
         <p className="text-gray-400">Create your unified wallets across multiple blockchains</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {chains.map(chain => (
-          <div key={chain.id} className={`bg-gradient-to-br ${chain.color} rounded-xl p-4 text-white`}>
+          <div key={chain.id} className={`bg-gradient-to-br ${chain.color} rounded-xl p-3 text-white ${chain.id === 'tron' ? 'col-span-3' : ''}`}>
             <chain.icon className="h-8 w-8 mx-auto mb-2" />
             <div className="text-sm font-semibold">{chain.name}</div>
             <div className="text-xs opacity-80">
@@ -165,13 +166,13 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       <div className="bg-blue-900/20 rounded-xl p-4 mb-6 border border-blue-500/30 text-left">
         <h4 className="font-semibold text-white mb-2 flex items-center">
           <CheckCircle className="h-4 w-4 text-blue-400 mr-2" />
-          One Account, Multi-Chain Wallets
+          Building an Ownership Economy
         </h4>
         <ul className="text-sm text-gray-300 space-y-1">
-          <li>• Two recovery phrases for five chains</li>
-          <li>• Auto-routing to fastest/cheapest network</li>
-          <li>• Unified balance across Algorand, Bitcoin, Ethereum, Polygon, and Tron</li>
-          <li>• No blockchain complexity - we handle everything</li>
+          <li>• Access tokenized stocks, bonds, real estate & commodities</li>
+          <li>• Unlock liquidity and new capital flows</li>
+          <li>• Unified balance across 5 chains (Algorand, Bitcoin, Ethereum, Polygon, Tron)</li>
+          <li>• Give the market a stake in your opportunity</li>
         </ul>
       </div>
 
@@ -235,6 +236,8 @@ const OnboardingPage = () => {
       await apiClient.put('/api/v1/user/profile', {
         account_type: data.accountType,
         business_type: data.businessType,
+        legal_business_name: data.legalBusinessName,
+        registered_company_number: data.registeredCompanyNumber,
         company_size: data.companySize,
         business_sector: data.sector,
         intent: data.intent,
@@ -248,9 +251,8 @@ const OnboardingPage = () => {
       setQuestionnaireData(data);
       toast.success('Profile saved!', { id: toastId });
       
-      // If individual, skip to wallet creation
-      // If business, proceed to KYC
-      setStep(data.accountType === 'individual' ? 'walletCreation' : 'identity');
+      // ✅ FIX: ALL users proceed to KYC (identity verification)
+      setStep('identity');
       
     } catch (error: any) {
       console.error('Questionnaire save error:', error);
@@ -258,10 +260,10 @@ const OnboardingPage = () => {
     }
   };
 
-  // Handle skipping questionnaire (for individuals)
-  const handleQuestionnaireSkip = () => {
-    setStep('walletCreation');
-  };
+// Handle skipping questionnaire (for individuals)
+const handleQuestionnaireSkip = () => {
+  setStep('identity');
+};
 
   const handleStartVerification = () => {
     setShowBVNModal(true);

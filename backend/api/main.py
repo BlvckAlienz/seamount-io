@@ -713,6 +713,7 @@ except ImportError as e:
     logger.error(f"❌ Collateral router import error: {e}")
     routers_available['collateral'] = None
 
+
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router
@@ -721,6 +722,14 @@ try:
 except ImportError as e:
     logger.error(f"âŒ Admin routes import error: {e}")
 
+try:
+    from backend.api.routes import subscriptions, compliance
+    app.include_router(subscriptions.router, prefix="/api/v1/subscriptions", tags=["Subscriptions"])
+    app.include_router(compliance.router, prefix="/api/v1/compliance", tags=["Compliance"])
+    logger.info("✅ Compliance OS routers registered")
+except ImportError as e:
+    logger.error(f"❌ Compliance routes import error: {e}")
+    
 # ===== CORE API ENDPOINTS =====
 
 @app.get("/api/v1/health", tags=["System"])

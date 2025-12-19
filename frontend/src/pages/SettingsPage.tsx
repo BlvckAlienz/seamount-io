@@ -41,6 +41,7 @@ interface UserProfile {
   country: string;
   kyc_status: string;
   kyc_level: number;
+  account_type?: string;
   role: string;
   created_at: string;
   updated_at: string;
@@ -452,17 +453,17 @@ const SettingsPage: React.FC = () => {
                 <div className="text-xs text-gray-500 mt-1">Member since</div>
               </div>
 
-              {/* User Role */}
-              <div className={`rounded-xl p-5 border ${user?.role === 'tribe' ? 'bg-green-900/20 border-green-700/50' : 'bg-blue-900/20 border-blue-700/50'}`}>
+              {/* Account Type */}
+              <div className={`rounded-xl p-5 border ${user?.account_type === 'business' ? 'bg-purple-900/20 border-purple-700/50' : 'bg-blue-900/20 border-blue-700/50'}`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <Target className="h-4 w-4 text-blue-400" />
-                  <div className="text-sm text-gray-400">Account Tier</div>
+                  <Building className="h-4 w-4 text-blue-400" />
+                  <div className="text-sm text-gray-400">Account Type</div>
                 </div>
-                <div className={`text-xl font-bold ${user?.role === 'tribe' ? 'text-green-400' : 'text-blue-400'}`}>
-                  {user?.role === 'tribe' ? 'Verified Tribe' : 'Alien'}
+                <div className={`text-xl font-bold ${user?.account_type === 'business' ? 'text-purple-400' : 'text-blue-400'}`}>
+                  {user?.account_type === 'business' ? 'Business' : 'Individual'}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  {user?.role === 'tribe' ? 'Full access' : 'Basic features'}
+                  {user?.account_type === 'business' ? 'Corporate account' : 'Personal account'}
                 </div>
               </div>
 
