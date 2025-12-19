@@ -3,6 +3,7 @@
 
 # Core FastAPI
 fastapi==0.109.0
+python-multipart==0.0.9
 uvicorn[standard]==0.27.0
 gunicorn==21.2.0
 
@@ -13,7 +14,7 @@ sqlalchemy==2.0.23
 
 # HTTP & Async
 aiohttp==3.9.1
-httpx==0.23.3  # ✅ COMPATIBLE WITH SUPABASE 1.0.3
+httpx==0.23.3  # ✅ COMPATIBLE WITSH SUPABASE 1.0.3
 
 # Email
 fastapi-mail==1.4.1
