@@ -106,7 +106,7 @@ const CompliancePage = () => {
             <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Subscription</div>
               <div className="text-2xl font-bold text-white mb-2">{subscription?.subscription_plans?.name}</div>
-              <div className="text-sm text-purple-400">{formatCurrencyNGN(subscription?.amount)}/mo</div>
+              <div className="text-sm text-purple-400">{formatCurrencyNGN(subscription?.amount)}/yr</div>
             </div>
           </div>
 
