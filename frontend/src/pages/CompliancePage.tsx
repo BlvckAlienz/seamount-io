@@ -14,7 +14,7 @@ const CompliancePage = () => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'documents' | 'exemptions'>('overview');
-  const [authChecked, setAuthChecked] = useState(false); // Add this
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -23,7 +23,6 @@ const CompliancePage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Add a small delay to ensure auth context is ready
       await new Promise(resolve => setTimeout(resolve, 100));
       
       const [subRes, checklistRes, docsRes] = await Promise.all([
@@ -39,11 +38,11 @@ const CompliancePage = () => {
       }
       if (docsRes.data.success) setDocuments(docsRes.data.documents);
       
-      setAuthChecked(true); // Mark auth as checked
+      setAuthChecked(true);
     } catch (error) {
       console.error('Failed to fetch compliance data:', error);
       toast.error('Failed to load data');
-      setAuthChecked(true); // Even on error, mark as checked
+      setAuthChecked(true);
     } finally {
       setLoading(false);
     }
@@ -69,7 +68,6 @@ const CompliancePage = () => {
     );
   }
 
-  // Only show subscription plans if we've checked and there's no subscription
   if (authChecked && !subscription) {
     return <SubscriptionPlans formatCurrency={formatCurrencyNGN} />;
   }
@@ -80,7 +78,6 @@ const CompliancePage = () => {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6 pt-20 lg:pt-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
               <Shield className="h-8 w-8 text-blue-400" />
@@ -89,7 +86,6 @@ const CompliancePage = () => {
             <p className="text-gray-400">Your audit & taxation command center</p>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Audit Progress</div>
@@ -114,7 +110,6 @@ const CompliancePage = () => {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-2 mb-6 overflow-x-auto">
             {['overview', 'checklist', 'documents', 'exemptions'].map((tab) => (
               <button
@@ -131,7 +126,6 @@ const CompliancePage = () => {
             ))}
           </div>
 
-          {/* Tab Content */}
           {activeTab === 'overview' && <OverviewTab stats={stats} />}
           {activeTab === 'checklist' && <ChecklistTab checklist={checklist} onRefresh={fetchData} />}
           {activeTab === 'documents' && <DocumentsTab documents={documents} onRefresh={fetchData} />}
@@ -147,68 +141,60 @@ const CompliancePage = () => {
 // ============================================
 
 const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number) => string }) => {
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  const fetchPlans = async () => {
-    try {
-      const res = await apiClient.get('/api/v1/subscriptions/plans');
-      if (res.data.success) {
-        // ✅ FIX: Safely parse features field
-        const parsedPlans = res.data.plans.map((plan: any) => ({
-          ...plan,
-          // Try to parse features as JSON, fallback to array or empty array
-          features: safelyParseFeatures(plan.features)
-        }));
-        setPlans(parsedPlans);
-      }
-    } catch (error) {
-      console.error('Failed to load plans:', error);
-      toast.error('Failed to load subscription plans');
-    } finally {
-      setLoading(false);
+  // Static subscription plans with actual Paystack plan codes
+  const SUBSCRIPTION_PLANS = [
+    {
+      id: 'PLN_yp8p5obbu6azilo', // Compliance Starter
+      name: 'Compliance Essentials',
+      price: 600000,
+      jobToBeDone: 'Get my books audit-ready',
+      deliverables: [
+        'Clean bookkeeping records (trial balance)',
+        'Draft audited accounts prepared',
+        'Tax exemption analysis + savings report',
+        'CAC annual returns filed'
+      ],
+      outcome: 'Your business passes due diligence. Books are clean enough for pre-audit review.',
+      bestFor: 'Startups & micro businesses needing organized records'
+    },
+    {
+      id: 'PLN_e23vyyhc2xjg6b5', // Audit Ready
+      name: 'Audit-Ready Business',
+      price: 1800000,
+      popular: true,
+      jobToBeDone: 'Pass statutory audit, file taxes correctly',
+      deliverables: [
+        'Full statutory audit (audited financial statements)',
+        'Tax returns prepared & filed (CIT, VAT, WHT)',
+        'CAC full compliance (CO2, CO7, annual returns)',
+        'Tax optimization report (maximize exemptions)',
+        'Auditor opinion letter for banks/investors'
+      ],
+      outcome: "You're fully compliant. No FIRS penalties. Investors trust your numbers.",
+      bestFor: 'SMEs seeking bank loans or investor funding'
+    },
+    {
+      id: 'PLN_le0r9qjpjwe0dnk', // Tokenization Ready
+      name: 'Tokenization-Ready',
+      price: 3600000,
+      jobToBeDone: 'Raise capital by tokenizing my business',
+      deliverables: [
+        'Full statutory audit + investor-grade statements',
+        'Tax returns filed + optimization strategy',
+        'Tokenization feasibility report',
+        'Investor data room (organized docs)',
+        'CFO advisory (quarterly strategy calls)'
+      ],
+      outcome: "You're capital-ready. Investors can verify your business is legitimate and scalable.",
+      bestFor: 'Growth businesses seeking serious capital (₦50M+)'
     }
-  };
-
-  const safelyParseFeatures = (featuresString: any): string[] => {
-    try {
-      // If it's already an array, return it
-      if (Array.isArray(featuresString)) {
-        return featuresString;
-      }
-      
-      // If it's a string, try to parse it
-      if (typeof featuresString === 'string') {
-        // Check if it's already valid JSON
-        if (featuresString.trim().startsWith('[') || featuresString.trim().startsWith('{')) {
-          const parsed = JSON.parse(featuresString);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          }
-        }
-        
-        // If it's a plain string (like "Document uploaded"), wrap it in an array
-        return [featuresString];
-      }
-      
-      // Default fallback
-      return [];
-    } catch (error) {
-      console.warn('Failed to parse features, using fallback:', featuresString);
-      // If it's a string but not JSON, wrap it in an array
-      if (typeof featuresString === 'string') {
-        return [featuresString];
-      }
-      return [];
-    }
-  };
+  ];
 
   const handleSubscribe = async (planCode: string) => {
     try {
+      setLoading(true);
       const res = await apiClient.post('/api/v1/subscriptions/initialize', { plan_code: planCode });
       if (res.data.success && res.data.payment_link) {
         window.location.href = res.data.payment_link;
@@ -217,10 +203,19 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
       }
     } catch (error) {
       toast.error('Subscription failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) return <div>Loading plans...</div>;
+  if (loading) return (
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Sidebar />
+      <div className="flex-1 overflow-y-auto p-6 pt-20 lg:pt-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -231,46 +226,71 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
           <p className="text-gray-400 mb-8">Get audit-ready and unlock tax exemptions</p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan) => {
-              // ✅ FIXED: features is now safely parsed
-              const features = plan.features || [];
-              
-              return (
-                <div
-                  key={plan.id}
-                  className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6"
-                >
-                  <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
-                  <div className="text-3xl font-bold text-blue-400 mb-4">
-                    {formatCurrency(plan.amount)}
-                    <span className="text-sm text-gray-400">/month</span>
-                  </div>
-                  <p className="text-gray-400 text-sm mb-6">{plan.description}</p>
+            {SUBSCRIPTION_PLANS.map((plan) => (
+              <div
+                key={plan.id}
+                className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 border rounded-2xl p-6 relative ${
+                  plan.popular ? 'border-blue-500/50' : 'border-gray-700/50'
+                }`}
+              >
+                {plan.popular && (
+                  <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg">
+                    MOST POPULAR
+                  </span>
+                )}
 
-                  <ul className="space-y-3 mb-6">
-                    {features.map((feature: string, idx: number) => (
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                  <p className="text-blue-400 text-sm italic">"{plan.jobToBeDone}"</p>
+                </div>
+
+                <div className="mb-6">
+                  <div className="text-4xl font-bold text-white">
+                    {formatCurrency(plan.price)}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">
+                    Annual subscription • One-time payment
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-400 uppercase mb-3">What You Get:</h4>
+                  <ul className="space-y-2">
+                    {plan.deliverables.map((item, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
                         <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
-                        <span>{feature}</span>
+                        <span>{item}</span>
                       </li>
                     ))}
                   </ul>
-
-                  <button
-                    onClick={() => handleSubscribe(plan.plan_code)}
-                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Subscribe Now
-                  </button>
                 </div>
-              );
-            })}
+
+                <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                  <h4 className="text-xs font-semibold text-green-400 uppercase mb-1">Outcome:</h4>
+                  <p className="text-sm text-gray-300">{plan.outcome}</p>
+                </div>
+
+                <div className="mb-6 text-xs text-gray-500">
+                  <strong>Best for:</strong> {plan.bestFor}
+                </div>
+
+                <button
+                  onClick={() => handleSubscribe(plan.id)}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  Get Started
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+// [Rest of the components remain exactly the same...]
+// OverviewTab, ChecklistTab, DocumentsTab, ExemptionsTab components unchanged
 
 const OverviewTab = ({ stats }: any) => (
   <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
@@ -411,7 +431,6 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
 
   return (
     <div className="space-y-6">
-      {/* Upload Section */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Upload Document</h3>
         
@@ -465,7 +484,6 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
         </label>
       </div>
 
-      {/* Documents List */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Uploaded Documents ({documents.length})</h3>
         
@@ -486,7 +504,6 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                   </div>
                 </div>
                 
-                {/* ✅ FIXED: Correct anchor tag */}
                 <a
                   href={doc.file_url}
                   target="_blank"
@@ -532,7 +549,6 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
 
   return (
     <div className="space-y-6">
-      {/* Form */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Check Your Eligibility</h3>
         
@@ -608,7 +624,6 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
         </div>
       </div>
 
-      {/* Results */}
       {result && (
         <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-6">
           <h3 className="text-lg font-bold text-white mb-2">You Qualify For:</h3>
