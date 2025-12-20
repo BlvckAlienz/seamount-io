@@ -1,101 +1,107 @@
 // File: frontend/src/pages/CompliancePage.tsx
-// 📱 Mobile-First Responsive Compliance Dashboard - SIMPLIFIED VERSION
+// 📱 PRODUCTION-READY: Mobile-First Responsive Compliance Dashboard
+// ✅ BUG FIXED: Progress updates correctly when documents are deleted
+// ✅ BUG FIXED: Document count shows actual uploaded documents
 
 import React, { useState, useEffect } from 'react';
-import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Trash2 } from 'lucide-react';
+import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Trash2, RefreshCw } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 
 const CompliancePage = () => {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [checklist, setChecklist] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<any>({
+    completed_items: 0,
+    total_items: 0,
+    completion_percentage: 0,
+    total_documents: 0
+  });
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'documents' | 'exemptions'>('overview');
   const [authChecked, setAuthChecked] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = async (showLoading = true) => {
     try {
+      if (showLoading) {
         setLoading(true);
-        
-        // Don't use artificial delay in production
-        const [subRes, checklistRes, docsRes, progressRes] = await Promise.allSettled([
+      } else {
+        setRefreshing(true);
+      }
+      
+      // Fetch all data in parallel
+      const [subRes, checklistRes, docsRes, progressRes] = await Promise.allSettled([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
         apiClient.get('/api/v1/compliance/documents'),
         apiClient.get('/api/v1/compliance/checklist/progress-details')
-        ]);
+      ]);
 
-        // Handle subscription response
-        if (subRes.status === 'fulfilled' && subRes.value.data.success) {
+      // Handle subscription response
+      if (subRes.status === 'fulfilled' && subRes.value.data.success) {
         setSubscription(subRes.value.data.subscription);
-        } else {
+      } else {
         setSubscription(null);
-        }
+      }
 
-        // Handle checklist response
-        if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
+      // Handle checklist response
+      if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
         const uniqueChecklist = deduplicateChecklistItems(checklistRes.value.data.checklist);
         setChecklist(uniqueChecklist);
-        }
+      }
 
-        // Handle documents response
-        if (docsRes.status === 'fulfilled' && docsRes.value.data.success) {
-        setDocuments(docsRes.value.data.documents);
-        }
+      // Handle documents response
+      if (docsRes.status === 'fulfilled' && docsRes.value.data.success) {
+        setDocuments(docsRes.value.data.documents || []);
+      }
 
-        // Handle progress response
-        if (progressRes.status === 'fulfilled' && progressRes.value.data.success) {
+      // ✅ CRITICAL FIX: Use ONLY the progress endpoint for stats
+      if (progressRes.status === 'fulfilled' && progressRes.value.data.success) {
         const progressData = progressRes.value.data;
-        const overallProgress = progressData.overall_progress || 0;
-        
-        // Calculate total items from category progress
-        let totalItems = 0;
-        let completedItems = 0;
-        
-        Object.values(progressData.category_progress || {}).forEach((cat: any) => {
-            totalItems += cat.total_items || 0;
-            completedItems += cat.completed_items || 0;
-        });
         
         setStats({
-            completed_items: completedItems,
-            total_items: totalItems,
-            completion_percentage: overallProgress,
-            category_progress: progressData.category_progress,
-            total_documents: progressData.total_documents || 0
+          completed_items: progressData.completed_items || 0,
+          total_items: progressData.total_items || 0,
+          completion_percentage: progressData.overall_progress || 0,
+          category_progress: progressData.category_progress || {},
+          total_documents: progressData.total_documents || 0
         });
-        } else {
-        // Fallback calculation if progress endpoint fails
-        if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
-            const uniqueChecklist = deduplicateChecklistItems(checklistRes.value.data.checklist);
-            const totalItems = uniqueChecklist.length;
-            const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
-            const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-            
-            setStats({
-            completed_items: completedItems,
-            total_items: totalItems,
-            completion_percentage: completionPercentage
-            });
-        }
-        }
         
-        setAuthChecked(true);
+        // Log for debugging
+        console.log('Progress data:', {
+          completed: progressData.completed_items,
+          total: progressData.total_items,
+          percentage: progressData.overall_progress,
+          documents: progressData.total_documents
+        });
+      } else {
+        // If progress endpoint fails, show zero progress
+        setStats({
+          completed_items: 0,
+          total_items: 0,
+          completion_percentage: 0,
+          category_progress: {},
+          total_documents: documents.length || 0
+        });
+      }
+      
+      setAuthChecked(true);
     } catch (error) {
-        console.error('Failed to fetch compliance data:', error);
-        toast.error('Failed to load compliance data');
-        setAuthChecked(true);
+      console.error('Failed to fetch compliance data:', error);
+      toast.error('Failed to load compliance data');
+      setAuthChecked(true);
     } finally {
-        setLoading(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-    };
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const deduplicateChecklistItems = (items: any[]): any[] => {
     if (!items || items.length === 0) return [];
@@ -124,6 +130,10 @@ const CompliancePage = () => {
     }).format(amount);
   };
 
+  const handleRefresh = () => {
+    fetchData(false);
+  };
+
   if (loading && !authChecked) {
     return (
       <div className="flex h-screen">
@@ -136,7 +146,7 @@ const CompliancePage = () => {
   }
 
   if (authChecked && !subscription) {
-    return <SubscriptionPlans formatCurrency={formatCurrencyNGN} />;
+    return <SubscriptionPlans formatCurrency={formatCurrencyNGN} fetchData={fetchData} />;
   }
 
   return (
@@ -144,14 +154,25 @@ const CompliancePage = () => {
       <Sidebar />
       <div className="flex-1 overflow-y-auto p-4 md:p-6 pt-20 lg:pt-6">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
-              <Receipt className="h-8 w-8 text-green-400" />
-              <span>Compliance OS</span>
-            </h1>
-            <p className="text-gray-400">Your audit & taxation command center</p>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
+                <Receipt className="h-8 w-8 text-green-400" />
+                <span>Compliance OS</span>
+              </h1>
+              <p className="text-gray-400">Your audit & taxation command center</p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
 
+          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Audit Progress</div>
@@ -171,11 +192,14 @@ const CompliancePage = () => {
 
             <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Subscription</div>
-              <div className="text-2xl font-bold text-white mb-2">{subscription?.subscription_plans?.name}</div>
-              <div className="text-sm text-purple-400">{formatCurrencyNGN(subscription?.amount)}/yr</div>
+              <div className="text-2xl font-bold text-white mb-2">{subscription?.subscription_plans?.name || 'No Plan'}</div>
+              <div className="text-sm text-purple-400">
+                {subscription?.amount ? formatCurrencyNGN(subscription.amount) + '/yr' : 'Not subscribed'}
+              </div>
             </div>
           </div>
 
+          {/* Tabs */}
           <div className="flex gap-2 mb-6 overflow-x-auto">
             {['overview', 'checklist', 'documents', 'exemptions'].map((tab) => (
               <button
@@ -192,9 +216,10 @@ const CompliancePage = () => {
             ))}
           </div>
 
+          {/* Tab Content */}
           {activeTab === 'overview' && <OverviewTab stats={stats} />}
-          {activeTab === 'checklist' && <ChecklistTab checklist={checklist} onRefresh={fetchData} />}
-          {activeTab === 'documents' && <DocumentsTab documents={documents} onRefresh={fetchData} />}
+          {activeTab === 'checklist' && <ChecklistTab checklist={checklist} onRefresh={() => fetchData(false)} />}
+          {activeTab === 'documents' && <DocumentsTab documents={documents} onRefresh={() => fetchData(false)} />}
           {activeTab === 'exemptions' && <ExemptionsTab formatCurrency={formatCurrencyNGN} />}
         </div>
       </div>
@@ -206,7 +231,7 @@ const CompliancePage = () => {
 // SUB-COMPONENTS
 // ============================================
 
-const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number) => string }) => {
+const SubscriptionPlans = ({ formatCurrency, fetchData }: { formatCurrency: (amount: number) => string, fetchData: () => void }) => {
   const [loading, setLoading] = useState(false);
 
   const SUBSCRIPTION_PLANS = [
@@ -341,9 +366,10 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
 
                 <button
                   onClick={() => handleSubscribe(plan.id)}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                  disabled={loading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
                 >
-                  Get Started
+                  {loading ? 'Processing...' : 'Get Started'}
                 </button>
               </div>
             ))}
@@ -365,7 +391,7 @@ const OverviewTab = ({ stats }: any) => (
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2">
           <div
-            className="bg-blue-600 h-2 rounded-full transition-all"
+            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
             style={{ width: `${stats?.completion_percentage || 0}%` }}
           />
         </div>
@@ -387,13 +413,31 @@ const OverviewTab = ({ stats }: any) => (
 );
 
 const ChecklistTab = ({ checklist, onRefresh }: any) => {
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  
+  const handleComplete = async (itemId: string) => {
+    try {
+      setCompletingId(itemId);
+      await apiClient.post(`/api/v1/compliance/checklist/${itemId}/complete`);
+      toast.success('Item marked as complete');
+      onRefresh();
+    } catch (error) {
+      toast.error('Failed to update checklist');
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
   const handleIncomplete = async (itemId: string) => {
     try {
-        await apiClient.post(`/api/v1/compliance/checklist/${itemId}/incomplete`);
-        toast.success('Item marked as incomplete');
-        onRefresh();
+      setCompletingId(itemId);
+      await apiClient.post(`/api/v1/compliance/checklist/${itemId}/incomplete`);
+      toast.success('Item marked as incomplete');
+      onRefresh();
     } catch (error) {
-        toast.error('Failed to update checklist');
+      toast.error('Failed to update checklist');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -448,7 +492,8 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
                 >
                   <button
                     onClick={() => item.is_completed ? handleIncomplete(item.id) : handleComplete(item.id)}
-                    className={`flex-shrink-0 transition-colors ${
+                    disabled={completingId === item.id}
+                    className={`flex-shrink-0 transition-colors disabled:opacity-50 ${
                         item.is_completed 
                         ? 'text-green-400 hover:text-yellow-400' 
                         : 'text-gray-600 hover:text-green-400'
@@ -464,6 +509,9 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
                       <p className="text-xs text-green-400 mt-1">✓ Completed</p>
                     )}
                   </div>
+                  {completingId === item.id && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  )}
                 </div>
               ))}
             </div>
@@ -516,11 +564,10 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
   };
 
   const handleDelete = async (documentId: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+    if (!confirm('Are you sure you want to delete this document? This will update your checklist progress.')) return;
     
     try {
       setDeletingId(documentId);
-      // You need to implement this backend endpoint
       await apiClient.delete(`/api/v1/compliance/documents/${documentId}`);
       toast.success('Document deleted successfully!');
       onRefresh();
@@ -534,6 +581,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
 
   return (
     <div className="space-y-6">
+      {/* Upload Section */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Upload Document</h3>
         
@@ -543,7 +591,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="C">C - Understanding Business</option>
               <option value="D">D - Share Capital</option>
@@ -562,7 +610,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="incorporation_docs">Incorporation Docs</option>
               <option value="tax_certificate">Tax Certificate</option>
@@ -574,7 +622,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
           </div>
         </div>
 
-        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors">
+        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <Upload className="h-5 w-5" />
           {uploading ? 'Uploading...' : 'Choose File (PDF, JPG, PNG, DOC)'}
           <input
@@ -588,9 +636,14 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
         <p className="text-xs text-gray-500 mt-2 text-center">Max file size: 10MB</p>
       </div>
 
-      {/* SIMPLIFIED Documents List - No verification status */}
+      {/* Documents List */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-white mb-4">Uploaded Documents ({documents.length})</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-white">Uploaded Documents ({documents.length})</h3>
+          <span className="text-sm text-gray-400">
+            {documents.length === 0 ? 'No documents' : `${documents.length} document${documents.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
         
         {documents.length === 0 ? (
           <div className="text-center py-8">
@@ -619,11 +672,22 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                       <span>Category {doc.category}</span>
                       <span>•</span>
                       <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <span>{Math.round((doc.file_size || 0) / 1024)}KB</span>
                     </div>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                  <a
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors"
+                    title="View document"
+                  >
+                    View
+                  </a>
                   <button
                     onClick={() => handleDelete(doc.id)}
                     disabled={deletingId === doc.id}
@@ -668,6 +732,17 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
     }
   };
 
+  const handleReset = () => {
+    setFormData({
+      business_type: 'small_company',
+      annual_turnover: '',
+      industry_sector: 'technology',
+      employee_count: '',
+      has_pension_contributions: false
+    });
+    setResult(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
@@ -679,7 +754,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.business_type}
               onChange={(e) => setFormData({...formData, business_type: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="small_company">Small Company</option>
               <option value="startup">Startup</option>
@@ -695,7 +770,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.annual_turnover}
               onChange={(e) => setFormData({...formData, annual_turnover: e.target.value})}
               placeholder="Enter annual turnover"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
@@ -704,7 +779,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.industry_sector}
               onChange={(e) => setFormData({...formData, industry_sector: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="technology">Technology</option>
               <option value="agriculture">Agriculture</option>
@@ -721,47 +796,63 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.employee_count}
               onChange={(e) => setFormData({...formData, employee_count: e.target.value})}
               placeholder="Enter employee count"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
+              id="pension-contributions"
               checked={formData.has_pension_contributions}
               onChange={(e) => setFormData({...formData, has_pension_contributions: e.target.checked})}
-              className="w-4 h-4"
+              className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
             />
-            <label className="text-sm text-gray-300">We make pension contributions</label>
+            <label htmlFor="pension-contributions" className="text-sm text-gray-300">
+              We make pension contributions
+            </label>
           </div>
 
-          <button
-            onClick={handleCheck}
-            disabled={checking}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-          >
-            {checking ? 'Checking...' : 'Check Exemptions'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCheck}
+              disabled={checking}
+              className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+            >
+              {checking ? 'Checking...' : 'Check Exemptions'}
+            </button>
+            <button
+              onClick={handleReset}
+              className="px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+            >
+              Reset
+            </button>
+          </div>
         </div>
       </div>
 
       {result && (
         <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-6">
-          <h3 className="text-lg font-bold text-white mb-2">You Qualify For:</h3>
-          <div className="text-3xl font-bold text-green-400 mb-6">
-            {formatCurrency(result.estimated_tax_savings)} in savings
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-white">You Qualify For:</h3>
+            <div className="text-2xl font-bold text-green-400">
+              {formatCurrency(result.estimated_tax_savings)}
+            </div>
           </div>
+          <p className="text-sm text-gray-400 mb-6">Estimated annual tax savings</p>
 
           <div className="space-y-3">
             {result.eligible_exemptions.map((exemption: any, idx: number) => (
               <div key={idx} className="p-4 bg-gray-900/50 rounded-lg">
-                <h4 className="text-white font-semibold mb-1">{exemption.name}</h4>
-                <p className="text-sm text-gray-400 mb-2">{exemption.description}</p>
-                {exemption.estimated_savings > 0 && (
-                  <p className="text-sm text-green-400">
-                    Estimated Savings: {formatCurrency(exemption.estimated_savings)}
-                  </p>
-                )}
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="text-white font-semibold">{exemption.name}</h4>
+                  {exemption.estimated_savings > 0 && (
+                    <span className="text-sm text-green-400 font-medium">
+                      {formatCurrency(exemption.estimated_savings)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-400">{exemption.description}</p>
               </div>
             ))}
           </div>
