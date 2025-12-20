@@ -23,25 +23,36 @@ const CompliancePage = () => {
   const fetchData = async () => {
     try {
         setLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 100));
         
-        const [subRes, checklistRes, docsRes, progressRes] = await Promise.all([
+        // Don't use artificial delay in production
+        const [subRes, checklistRes, docsRes, progressRes] = await Promise.allSettled([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
         apiClient.get('/api/v1/compliance/documents'),
-        apiClient.get('/api/v1/compliance/checklist/progress-details') // New endpoint
+        apiClient.get('/api/v1/compliance/checklist/progress-details')
         ]);
 
-        if (subRes.data.success) setSubscription(subRes.data.subscription);
-        if (checklistRes.data.success) {
-        const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
+        // Handle subscription response
+        if (subRes.status === 'fulfilled' && subRes.value.data.success) {
+        setSubscription(subRes.value.data.subscription);
+        } else {
+        setSubscription(null);
+        }
+
+        // Handle checklist response
+        if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
+        const uniqueChecklist = deduplicateChecklistItems(checklistRes.value.data.checklist);
         setChecklist(uniqueChecklist);
         }
-        if (docsRes.data.success) setDocuments(docsRes.data.documents);
-        
-        // Use the new progress calculation
-        if (progressRes.data.success) {
-        const progressData = progressRes.data;
+
+        // Handle documents response
+        if (docsRes.status === 'fulfilled' && docsRes.value.data.success) {
+        setDocuments(docsRes.value.data.documents);
+        }
+
+        // Handle progress response
+        if (progressRes.status === 'fulfilled' && progressRes.value.data.success) {
+        const progressData = progressRes.value.data;
         const overallProgress = progressData.overall_progress || 0;
         
         // Calculate total items from category progress
@@ -57,26 +68,29 @@ const CompliancePage = () => {
             completed_items: completedItems,
             total_items: totalItems,
             completion_percentage: overallProgress,
-            category_progress: progressData.category_progress
+            category_progress: progressData.category_progress,
+            total_documents: progressData.total_documents || 0
         });
         } else {
-        // Fallback to old calculation
-        const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
-        const totalItems = uniqueChecklist.length;
-        const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
-        const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-        
-        setStats({
+        // Fallback calculation if progress endpoint fails
+        if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
+            const uniqueChecklist = deduplicateChecklistItems(checklistRes.value.data.checklist);
+            const totalItems = uniqueChecklist.length;
+            const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
+            const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+            
+            setStats({
             completed_items: completedItems,
             total_items: totalItems,
             completion_percentage: completionPercentage
-        });
+            });
+        }
         }
         
         setAuthChecked(true);
     } catch (error) {
         console.error('Failed to fetch compliance data:', error);
-        toast.error('Failed to load data');
+        toast.error('Failed to load compliance data');
         setAuthChecked(true);
     } finally {
         setLoading(false);
@@ -205,10 +219,10 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
         'Clean bookkeeping records (trial balance)',
         'Draft audited accounts prepared',
         'Tax exemption analysis + savings report',
-        'CAC annual returns filed'
+        'Tax returns prepared & filed (CIT, VAT, WHT)'
       ],
-      outcome: 'Your business passes due diligence. Books are clean enough for pre-audit review.',
-      bestFor: 'Startups & micro businesses needing organized records'
+      outcome: 'Your business passes due diligence. Books are clean enough for compliance.',
+      bestFor: 'Startups & micro businesses needing organized records for compliance'
     },
     {
       id: 'PLN_e23vyyhc2xjg6b5',
@@ -418,10 +432,10 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
                   {completedCount}/{items.length}
                 </span>
                 <div className="w-24 bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(completedCount/items.length)*100}%` }}
-                  />
+                    <div 
+                        className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${items.length > 0 ? (completedCount/items.length)*100 : 0}%` }}
+                    />
                 </div>
               </div>
             </div>
