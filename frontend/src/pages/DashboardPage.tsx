@@ -8,7 +8,7 @@ import {
   Activity,
   RefreshCw,
   Shield,
-  Briefcase,
+  Wallet,
   Coins,
   Target,
   ArrowUpRight,
@@ -228,10 +228,10 @@ const DashboardPage = () => {
           {/* Header */}
           <div className="mb-4 md:mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3 mb-2">
-              <Briefcase className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
-              <span>Portfolio Overview</span>
+              <Wallet className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
+              <span>Smart Wallets</span>
             </h1>
-            <p className="text-sm md:text-base text-gray-400">Manage your tokenized securities & digital assets</p>
+            <p className="text-sm md:text-base text-gray-400">Fund with local currency. Trade and earn in USD</p>
           </div>
 
           {/* Quick Action Buttons */}
@@ -275,45 +275,6 @@ const DashboardPage = () => {
               <ArrowDownToLine className="h-4 w-4" />
               <span className="hidden sm:inline">Withdraw</span>
             </button>
-          </div>
-
-          {/* 🆕 COLLATERAL QUICK STATS - Replaces old cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {/* Active Positions Card */}
-            <div className="bg-gradient-to-br from-orange-900/20 to-yellow-900/20 border border-orange-500/30 rounded-xl p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Shield className="h-5 w-5 text-orange-400" />
-                </div>
-                <span className="text-xs text-orange-400 font-medium">Live</span>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">{collateralStats.activePositions}</div>
-              <div className="text-sm text-gray-400">Active Positions</div>
-            </div>
-
-            {/* Total Value Card */}
-            <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <Coins className="h-5 w-5 text-green-400" />
-                </div>
-                <span className="text-xs text-green-400 font-medium">USD</span>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">{formatCurrencyUSD(collateralStats.totalValue)}</div>
-              <div className="text-sm text-gray-400">Total Assets Value</div>
-            </div>
-
-            {/* Repo Trades Card */}
-            <div className="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 border border-blue-500/30 rounded-xl p-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Target className="h-5 w-5 text-blue-400" />
-                </div>
-                <span className="text-xs text-blue-400 font-medium">Active</span>
-              </div>
-              <div className="text-2xl font-bold text-white mb-1">{collateralStats.repoTrades}</div>
-              <div className="text-sm text-gray-400">Repo Trades</div>
-            </div>
           </div>
 
           {/* KYC Banner */}

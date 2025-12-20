@@ -17,6 +17,7 @@ import {
   X,
   Lock,
   Receipt,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -38,7 +39,7 @@ const Sidebar: React.FC = () => {
 
   // 🚨 ALL NAV ITEMS (includes business-only features)
   const allNavItems: NavItem[] = [
-    { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
+    { label: 'Wallets', icon: Wallet, path: '/dashboard' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
     { label: 'Collateral', icon: Lock, path: '/collateral', badge: 'NEW', businessOnly: true },
     { label: 'Audit & Tax', icon: Receipt, path: '/compliance', badge: 'NEW', businessOnly: true },

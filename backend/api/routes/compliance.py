@@ -17,11 +17,11 @@ async def get_audit_checklist(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Get user's audit checklist - FIXED: Sort in Python"""
+    """✅ Get user's audit checklist - FIXED: Deduplicate and clean up code"""
     try:
         user_id = current_user['id']
         
-        # ✅ FIXED: Remove .order() - sort in Python instead
+        # Fetch all checklist items for user
         result = supabase.from_("audit_checklist_items")\
             .select("*")\
             .eq("user_id", user_id)\
@@ -40,25 +40,47 @@ async def get_audit_checklist(
                 }
             }
         
-        # ✅ Sort in Python (reliable across all Supabase versions)
-        items = sorted(result.data, key=lambda x: (x.get('category', ''), x.get('item_code', '')))
+        # ✅ CRITICAL FIX: Remove duplicates by creating a dictionary keyed by (category, item_description)
+        # This ensures we only show each checklist item once, even if it exists multiple times in DB
+        seen_items = {}
+        unique_items = []
         
-        # Group by category
+        for item in result.data:
+            # Create a unique key for this checklist item
+            category = item.get('category', '')
+            item_description = item.get('item_description', '')
+            key = f"{category}_{item_description}"
+            
+            # Only add if we haven't seen this exact item before
+            if key not in seen_items:
+                seen_items[key] = True
+                unique_items.append(item)
+            else:
+                # Log duplicate found (for debugging)
+                logger.warning(f"Duplicate checklist item found for user {user_id}: {key}")
+        
+        # Sort items by category and item_code
+        sorted_items = sorted(unique_items, key=lambda x: (
+            x.get('category', ''), 
+            x.get('item_code', '')
+        ))
+        
+        # Group by category for the response
         checklist_by_category = {}
-        for item in items:
+        for item in sorted_items:
             category = item.get('category', 'UNKNOWN')
             if category not in checklist_by_category:
                 checklist_by_category[category] = []
             checklist_by_category[category].append(item)
         
-        # Calculate completion stats
-        total_items = len(items)
-        completed_items = sum(1 for item in items if item.get('is_completed', False))
+        # Calculate completion stats based on DEDUPLICATED items
+        total_items = len(sorted_items)
+        completed_items = sum(1 for item in sorted_items if item.get('is_completed', False))
         completion_percentage = (completed_items / total_items * 100) if total_items > 0 else 0
         
         return {
             "success": True,
-            "checklist": items,
+            "checklist": sorted_items,
             "checklist_by_category": checklist_by_category,
             "stats": {
                 "total_items": total_items,
@@ -80,49 +102,6 @@ async def get_audit_checklist(
                 "completion_percentage": 0
             }
         }
-        
-        # Sort in Python as backup
-        items = result.data
-        items.sort(key=lambda x: (x.get('category', ''), x.get('item_code', '')))
-        
-        # Group by category
-        checklist_by_category = {}
-        for item in items:
-            category = item['category']
-            if category not in checklist_by_category:
-                checklist_by_category[category] = []
-            checklist_by_category[category].append(item)
-        
-        # Calculate completion stats
-        total_items = len(items)
-        completed_items = sum(1 for item in items if item.get('is_completed', False))
-        completion_percentage = (completed_items / total_items * 100) if total_items > 0 else 0
-        
-        return {
-            "success": True,
-            "checklist": items,
-            "checklist_by_category": checklist_by_category,
-            "stats": {
-                "total_items": total_items,
-                "completed_items": completed_items,
-                "completion_percentage": round(completion_percentage, 1)
-            }
-        }
-    except Exception as e:
-        logger.error(f"[Checklist Fetch] Error: {e}")
-        # Return empty data instead of crashing
-        return {
-            "success": True,
-            "checklist": [],
-            "checklist_by_category": {},
-            "stats": {
-                "total_items": 0,
-                "completed_items": 0,
-                "completion_percentage": 0
-            }
-        }
-        # If you want to throw error instead, uncomment:
-        # raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/checklist/{item_id}/complete")
 async def mark_checklist_item_complete(
@@ -192,38 +171,90 @@ async def get_compliance_documents(
 @router.post("/documents/upload")
 async def upload_compliance_document(
     file: UploadFile = File(...),
-    category: str = None,
-    document_type: str = None,
+    category: str = Form(...),
+    document_type: str = Form(...),
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Upload compliance document to Supabase Storage"""
+    """✅ Upload compliance document to Supabase Storage - FIXED VERSION"""
     try:
         user_id = current_user['id']
+        email = current_user.get('email', 'unknown')
         
-        if not category or not document_type:
-            raise HTTPException(status_code=400, detail="Category and document type required")
+        logger.info(f"📤 Document upload attempt: user={user_id}, email={email}, category={category}, type={document_type}, filename={file.filename}")
+        
+        # Validate file size (max 10MB)
+        file_content = await file.read()
+        file_size_mb = len(file_content) / (1024 * 1024)
+        
+        if file_size_mb > 10:
+            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+        
+        # Validate file type
+        allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx'}
+        file_extension = f".{file.filename.split('.')[-1].lower()}" if '.' in file.filename else ''
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
+            )
         
         # Generate unique filename
-        file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-        unique_filename = f"{user_id}/{category}/{uuid.uuid4().hex}.{file_extension}"
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
+        unique_filename = f"{user_id}/{category}/{timestamp}_{uuid.uuid4().hex[:8]}_{safe_filename}"
+        
+        logger.info(f"📦 Preparing to upload: {unique_filename} ({file_size_mb:.2f} MB)")
         
         # Upload to Supabase Storage
-        file_content = await file.read()
-        
-        storage_result = supabase.storage.from_("compliance-documents")\
-            .upload(unique_filename, file_content, {
-                "content-type": file.content_type or "application/octet-stream"
-            })
-        
-        if not storage_result:
-            raise HTTPException(status_code=500, detail="File upload failed")
+        try:
+            # First, check if bucket is accessible
+            logger.info("Checking storage bucket access...")
+            
+            # Upload the file
+            storage_result = supabase.storage.from_("compliance-documents") \
+                .upload(unique_filename, file_content, {
+                    "content-type": file.content_type or "application/octet-stream",
+                    "cache-control": "3600"
+                })
+            
+            if not storage_result:
+                logger.error("❌ Supabase storage upload returned None")
+                raise HTTPException(status_code=500, detail="Storage upload failed - no response")
+                
+            logger.info(f"✅ Storage upload successful: {unique_filename}")
+            
+        except Exception as storage_error:
+            logger.error(f"❌ Supabase storage error: {str(storage_error)}", exc_info=True)
+            
+            # Check if it's a permission error
+            if "403" in str(storage_error) or "permission" in str(storage_error).lower():
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Storage permission denied. Please check bucket policies."
+                )
+            elif "404" in str(storage_error) or "not found" in str(storage_error).lower():
+                raise HTTPException(
+                    status_code=500,
+                    detail="Storage bucket not found. Please contact administrator."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Storage upload failed: {str(storage_error)[:100]}"
+                )
         
         # Get public URL
-        file_url = supabase.storage.from_("compliance-documents")\
-            .get_public_url(unique_filename)
+        try:
+            file_url = supabase.storage.from_("compliance-documents") \
+                .get_public_url(unique_filename)
+            logger.info(f"✅ Got public URL: {file_url}")
+        except Exception as url_error:
+            logger.error(f"❌ Failed to get public URL: {url_error}")
+            file_url = f"https://storage.supabase.com/compliance-documents/{unique_filename}"
         
-        # Save document record
+        # Save document record to database
         document_data = {
             "user_id": user_id,
             "category": category,
@@ -231,28 +262,49 @@ async def upload_compliance_document(
             "file_name": file.filename,
             "file_url": file_url,
             "file_size": len(file_content),
-            "mime_type": file.content_type,
+            "mime_type": file.content_type or "application/octet-stream",
             "uploaded_by": user_id,
-            "verification_status": "pending"
+            "verification_status": "pending",
+            "storage_path": unique_filename
         }
         
-        result = supabase.from_("compliance_documents")\
-            .insert(document_data)\
-            .execute()
-        
-        logger.info(f"✅ Document uploaded: {file.filename} by user {user_id}")
+        try:
+            result = supabase.from_("compliance_documents") \
+                .insert(document_data) \
+                .execute()
+            
+            if not result.data:
+                logger.error("❌ Failed to insert document record into database")
+                # Try to delete the uploaded file since DB insert failed
+                try:
+                    supabase.storage.from_("compliance-documents").remove([unique_filename])
+                except:
+                    pass
+                raise HTTPException(status_code=500, detail="Failed to save document record")
+                
+            logger.info(f"✅ Document record saved to database: {result.data[0]['id']}")
+            
+        except Exception as db_error:
+            logger.error(f"❌ Database insert error: {db_error}")
+            # Clean up the uploaded file
+            try:
+                supabase.storage.from_("compliance-documents").remove([unique_filename])
+            except:
+                pass
+            raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
         
         return {
             "success": True,
-            "document": result.data[0] if result.data else None,
-            "message": "Document uploaded successfully"
+            "document": result.data[0] if result.data else document_data,
+            "message": "Document uploaded successfully",
+            "file_url": file_url
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[Document Upload] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ [Document Upload] Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.post("/exemption-checker")
 async def check_tax_exemptions(

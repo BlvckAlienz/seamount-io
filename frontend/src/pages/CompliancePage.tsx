@@ -22,44 +22,66 @@ const CompliancePage = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const [subRes, checklistRes, docsRes] = await Promise.all([
+        setLoading(true);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const [subRes, checklistRes, docsRes] = await Promise.all([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
         apiClient.get('/api/v1/compliance/documents')
-      ]);
+        ]);
 
-      if (subRes.data.success) setSubscription(subRes.data.subscription);
-      if (checklistRes.data.success) {
-        // Deduplicate checklist items by ID to prevent multiples
-        const uniqueChecklist = removeDuplicateChecklistItems(checklistRes.data.checklist);
+        if (subRes.data.success) setSubscription(subRes.data.subscription);
+        if (checklistRes.data.success) {
+        // Frontend deduplication as backup (even though backend should handle it)
+        const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
         
-        // Recalculate stats based on deduplicated checklist
-        const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
+        // Calculate stats
         const totalItems = uniqueChecklist.length;
+        const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
         const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
         
         setChecklist(uniqueChecklist);
         setStats({
-          ...checklistRes.data.stats,
-          completed_items: completedItems,
-          total_items: totalItems,
-          completion_percentage: completionPercentage
+            completed_items: completedItems,
+            total_items: totalItems,
+            completion_percentage: completionPercentage
         });
-      }
-      if (docsRes.data.success) setDocuments(docsRes.data.documents);
-      
-      setAuthChecked(true);
+        }
+        if (docsRes.data.success) setDocuments(docsRes.data.documents);
+        
+        setAuthChecked(true);
     } catch (error) {
-      console.error('Failed to fetch compliance data:', error);
-      toast.error('Failed to load data');
-      setAuthChecked(true);
+        console.error('Failed to fetch compliance data:', error);
+        toast.error('Failed to load data');
+        setAuthChecked(true);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
+
+// Helper function to deduplicate checklist items
+const deduplicateChecklistItems = (items: any[]): any[] => {
+  if (!items || items.length === 0) return [];
+  
+  const seen = new Set();
+  const result: any[] = [];
+  
+  items.forEach(item => {
+    if (!item) return;
+    
+    // Create unique key from category and description
+    const key = `${item.category || 'unknown'}_${item.item_description || 'unknown'}`.toLowerCase().trim();
+    
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(item);
+    }
+  });
+  
+  console.log(`Deduplicated ${items.length} → ${result.length} items`);
+  return result;
+};
 
   // Function to remove duplicate checklist items by ID
   const removeDuplicateChecklistItems = (items: any[]): any[] => {
@@ -434,24 +456,61 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
     if (!file) return;
 
     try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('category', selectedCategory);
-      formData.append('document_type', selectedType);
+        setUploading(true);
+        
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size exceeds 10MB limit');
+        return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx'];
+        const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+        
+        if (!allowedTypes.includes(fileExtension)) {
+        toast.error(`File type not allowed. Allowed types: ${allowedTypes.join(', ')}`);
+        return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', selectedCategory);
+        formData.append('document_type', selectedType);
 
-      await apiClient.post('/api/v1/compliance/documents/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        console.log('Uploading document:', {
+        fileName: file.name,
+        category: selectedCategory,
+        type: selectedType,
+        size: file.size
+        });
 
-      toast.success('Document uploaded successfully');
-      onRefresh();
-    } catch (error) {
-      toast.error('Upload failed');
+        const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
+        headers: { 
+            'Content-Type': 'multipart/form-data'
+        }
+        });
+
+        console.log('Upload response:', response.data);
+        
+        toast.success('Document uploaded successfully!');
+        onRefresh();
+    } catch (error: any) {
+        console.error('Upload error details:', error);
+        
+        // Show detailed error message
+        const errorMessage = error.response?.data?.detail || 
+                            error.response?.data?.message || 
+                            error.message || 
+                            'Upload failed';
+        
+        toast.error(`Upload failed: ${errorMessage}`);
     } finally {
-      setUploading(false);
+        setUploading(false);
+        // Reset file input
+        if (e.target) e.target.value = '';
     }
-  };
+    };
 
   return (
     <div className="space-y-6">
