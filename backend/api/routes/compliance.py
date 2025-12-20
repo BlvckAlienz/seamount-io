@@ -233,6 +233,16 @@ async def upload_compliance_document(
 
         db_result = supabase.table("compliance_documents").insert(doc_data).execute()
         
+        # ... inside your upload function, after try:
+        logger.info(f"=== STORAGE DEBUG ===")
+        logger.info(f"Supabase client configured? {'yes' if supabase else 'no'}")
+        # List all buckets to see what's available
+        try:
+            buckets_response = supabase.storage.list_buckets()
+            logger.info(f"Available buckets from API: {buckets_response}")
+        except Exception as bucket_list_error:
+            logger.error(f"Failed to list buckets: {bucket_list_error}")
+            
         # Verify database insert
         if not db_result.data:
             logger.error("Database insert returned no data")
