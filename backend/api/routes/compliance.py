@@ -1,7 +1,8 @@
 # File Location: backend/api/routes/compliance.py
-# 🚨 PRODUCTION-READY: Compliance & audit management - COMPLETE FIXED VERSION
-# ✅ BUG FIXED: Document deletion now properly updates checklist completion
-# ✅ BUG FIXED: Progress calculation uses actual document presence
+# 🚨 PRODUCTION-READY: COMPLETE BUG FIX - FINAL VERSION
+# ✅ FIX: Checklist sync on every relevant endpoint call
+# ✅ FIX: Document deletion properly updates checklist
+# ✅ FIX: Progress calculation based on actual document existence
 
 from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form
 from typing import Dict, Any, List
@@ -19,10 +20,7 @@ router = APIRouter()
 # ============================================
 
 def map_document_to_checklist_item(document_type: str, category: str, file_name: str) -> dict:
-    """
-    Map uploaded document to specific checklist items based on document type and file name.
-    Returns the target checklist item description or key for matching.
-    """
+    """Map uploaded document to specific checklist items based on document type and file name."""
     DOCUMENT_MAPPING = {
         'incorporation_docs': {
             'keywords': ['certificate of incorporation', 'cac registration', 'memorandum', 'articles', 'form cac7'],
@@ -116,10 +114,7 @@ def auto_complete_checklist_items(user_id: str, category: str, document_type: st
                         .insert(match_data)\
                         .execute()
                     
-                    matched_items.append({
-                        'checklist_item_id': item['id'],
-                        'document_id': document_id
-                    })
+                    matched_items.append(item['id'])
                     item_matched = True
                     logger.info(f"✅ Matched and completed checklist item: {item['item_description']}")
                     break
@@ -149,10 +144,7 @@ def auto_complete_checklist_items(user_id: str, category: str, document_type: st
                             .insert(match_data)\
                             .execute()
                         
-                        matched_items.append({
-                            'checklist_item_id': item['id'],
-                            'document_id': document_id
-                        })
+                        matched_items.append(item['id'])
                         logger.info(f"✅ Matched by keyword '{keyword}': {item['item_description']}")
                         break
         
@@ -167,8 +159,139 @@ def auto_complete_checklist_items(user_id: str, category: str, document_type: st
         logger.error(f"Failed to auto-complete checklist: {e}")
         return []
 
+def get_actual_completed_items(user_id: str, supabase) -> List[str]:
+    """
+    🚨 CRITICAL: Get checklist items that ACTUALLY have supporting documents.
+    Returns list of checklist item IDs that have at least one existing document.
+    """
+    try:
+        # Get all existing document IDs
+        docs_result = supabase.from_("compliance_documents")\
+            .select("id")\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        existing_doc_ids = {doc['id'] for doc in (docs_result.data or [])}
+        
+        # Get all matches
+        matches_result = supabase.from_("checklist_document_matches")\
+            .select("checklist_item_id, document_id")\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        matches = matches_result.data or []
+        
+        # Filter to only matches with existing documents
+        valid_checklist_items = set()
+        for match in matches:
+            if match['document_id'] in existing_doc_ids:
+                valid_checklist_items.add(match['checklist_item_id'])
+        
+        logger.info(f"📊 User {user_id}: {len(valid_checklist_items)} items have supporting documents")
+        return list(valid_checklist_items)
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get actual completed items: {e}")
+        return []
+
+def sync_checklist_with_documents(user_id: str, supabase):
+    """
+    🚨 CRITICAL FIX: Ensure checklist completion status matches ACTUAL document existence.
+    This is the CORE FIX that makes everything consistent.
+    """
+    try:
+        logger.info(f"🔄 [SYNC] Starting checklist sync for user {user_id}")
+        
+        # Get checklist items that actually have documents
+        actually_completed = set(get_actual_completed_items(user_id, supabase))
+        
+        # Get all checklist items
+        all_items_result = supabase.from_("audit_checklist_items")\
+            .select("id, is_completed, item_description")\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not all_items_result.data:
+            logger.info(f"🔄 [SYNC] No checklist items found for user {user_id}")
+            return
+        
+        # Track changes for logging
+        marked_incomplete = []
+        marked_complete = []
+        
+        # Sync each item
+        for item in all_items_result.data:
+            item_id = item['id']
+            is_currently_completed = item.get('is_completed', False)
+            should_be_completed = item_id in actually_completed
+            
+            # Update if out of sync
+            if is_currently_completed != should_be_completed:
+                if should_be_completed:
+                    # Mark as complete (has supporting documents)
+                    supabase.from_("audit_checklist_items")\
+                        .update({
+                            "is_completed": True,
+                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                            "completed_by": user_id
+                        })\
+                        .eq("id", item_id)\
+                        .execute()
+                    marked_complete.append(item_id)
+                    logger.info(f"✅ [SYNC] Marked item {item_id} as complete: {item.get('item_description')[:50]}...")
+                else:
+                    # Mark as incomplete (no supporting documents)
+                    supabase.from_("audit_checklist_items")\
+                        .update({
+                            "is_completed": False,
+                            "completed_at": None,
+                            "completed_by": None
+                        })\
+                        .eq("id", item_id)\
+                        .execute()
+                    marked_incomplete.append(item_id)
+                    logger.info(f"✅ [SYNC] Marked item {item_id} as incomplete: {item.get('item_description')[:50]}...")
+        
+        # Log summary
+        logger.info(f"🔄 [SYNC] Complete for user {user_id}: "
+                   f"{len(marked_complete)} marked complete, "
+                   f"{len(marked_incomplete)} marked incomplete")
+        
+        # Double-check consistency
+        verify_checklist_consistency(user_id, supabase)
+        
+    except Exception as e:
+        logger.error(f"❌ [SYNC] Checklist sync failed: {e}", exc_info=True)
+
+def verify_checklist_consistency(user_id: str, supabase):
+    """Verify that checklist completion matches document existence"""
+    try:
+        actually_completed = set(get_actual_completed_items(user_id, supabase))
+        
+        checklist_result = supabase.from_("audit_checklist_items")\
+            .select("id, is_completed")\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not checklist_result.data:
+            return
+        
+        inconsistent = []
+        for item in checklist_result.data:
+            should_be_completed = item['id'] in actually_completed
+            if item['is_completed'] != should_be_completed:
+                inconsistent.append(item['id'])
+        
+        if inconsistent:
+            logger.warning(f"⚠️ [VERIFY] Found {len(inconsistent)} inconsistent items after sync")
+        else:
+            logger.info(f"✅ [VERIFY] All checklist items consistent with documents")
+            
+    except Exception as e:
+        logger.error(f"❌ [VERIFY] Consistency check failed: {e}")
+
 # ============================================
-# API ENDPOINTS
+# API ENDPOINTS - UPDATED WITH SYNC
 # ============================================
 
 @router.get("/checklist")
@@ -176,16 +299,21 @@ async def get_audit_checklist(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Get user's audit checklist - FIXED: Deduplicate items"""
+    """✅ Get user's audit checklist - NOW WITH SYNC BEFORE RETURNING"""
     try:
         user_id = current_user['id']
+        logger.info(f"📋 [CHECKLIST API] Fetching checklist for user {user_id}")
+        
+        # 🚨 CRITICAL: Sync checklist with actual documents BEFORE returning
+        sync_checklist_with_documents(user_id, supabase)
         
         result = supabase.from_("audit_checklist_items")\
             .select("*")\
             .eq("user_id", user_id)\
             .execute()
         
-        if not result.data or len(result.data) == 0:
+        if not result.data:
+            logger.info(f"📋 [CHECKLIST API] No checklist items for user {user_id}")
             return {
                 "success": True,
                 "checklist": [],
@@ -197,6 +325,11 @@ async def get_audit_checklist(
                 }
             }
         
+        # 🚨 LOG THE RESULTS FOR DEBUGGING
+        completed_count = sum(1 for item in result.data if item.get('is_completed', False))
+        logger.info(f"📋 [CHECKLIST API] Returning {len(result.data)} items, {completed_count} completed")
+        
+        # Deduplicate items
         seen_items = {}
         unique_items = []
         
@@ -208,9 +341,8 @@ async def get_audit_checklist(
             if key not in seen_items:
                 seen_items[key] = True
                 unique_items.append(item)
-            else:
-                logger.warning(f"Duplicate checklist item found for user {user_id}: {key}")
         
+        # Sort and categorize
         sorted_items = sorted(unique_items, key=lambda x: (
             x.get('category', ''), 
             x.get('item_code', '')
@@ -223,9 +355,12 @@ async def get_audit_checklist(
                 checklist_by_category[category] = []
             checklist_by_category[category].append(item)
         
+        # Calculate stats
         total_items = len(sorted_items)
         completed_items = sum(1 for item in sorted_items if item.get('is_completed', False))
         completion_percentage = (completed_items / total_items * 100) if total_items > 0 else 0
+        
+        logger.info(f"📋 [CHECKLIST API] Stats: {completed_items}/{total_items} ({completion_percentage}%)")
         
         return {
             "success": True,
@@ -239,7 +374,7 @@ async def get_audit_checklist(
         }
         
     except Exception as e:
-        logger.error(f"[Checklist Fetch] Error: {e}")
+        logger.error(f"❌ [CHECKLIST API] Error: {e}", exc_info=True)
         return {
             "success": True,
             "checklist": [],
@@ -363,10 +498,10 @@ async def upload_compliance_document(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Upload document - FIXED with proper error handling"""
+    """✅ Upload document with proper checklist sync"""
     try:
         user_id = current_user['id']
-        logger.info(f"Upload attempt by {user_id}, file: {file.filename}")
+        logger.info(f"📤 Upload attempt by {user_id}, file: {file.filename}")
 
         if not category or not document_type:
             raise HTTPException(400, "Category and document_type are required")
@@ -425,6 +560,9 @@ async def upload_compliance_document(
 
         # Auto-complete checklist items for this document
         auto_complete_checklist_items(user_id, category, document_type, file.filename, document_id, supabase)
+        
+        # 🚨 CRITICAL: Sync checklist after upload
+        sync_checklist_with_documents(user_id, supabase)
 
         return {
             "success": True,
@@ -445,11 +583,14 @@ async def delete_compliance_document(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ CRITICAL FIX: Delete document and properly update checklist items"""
+    """
+    🚨 CRITICAL FIX: Delete document and SYNC checklist immediately
+    """
     try:
         user_id = current_user['id']
+        logger.info(f"🗑️ [DELETE] Starting deletion of document {document_id} for user {user_id}")
         
-        # 1. Get the document and its category
+        # 1. Get the document
         doc_result = supabase.from_("compliance_documents")\
             .select("*")\
             .eq("id", document_id)\
@@ -461,161 +602,58 @@ async def delete_compliance_document(
             raise HTTPException(status_code=404, detail="Document not found")
         
         doc = doc_result.data
-        category = doc.get('category')
+        logger.info(f"🗑️ [DELETE] Document found: {doc.get('file_name')}")
         
-        # 2. Get all checklist items completed by this document
+        # 2. Get checklist items completed by this document
         matches_result = supabase.from_("checklist_document_matches")\
             .select("checklist_item_id")\
             .eq("document_id", document_id)\
             .eq("user_id", user_id)\
             .execute()
         
-        # 3. Delete from storage
+        affected_item_ids = [match['checklist_item_id'] for match in (matches_result.data or [])]
+        logger.info(f"🗑️ [DELETE] Found {len(affected_item_ids)} checklist items affected")
+        
+        # 3. Delete from storage (non-blocking failure)
         if doc.get('storage_path'):
             try:
                 supabase.storage.from_("compliance-documents")\
                     .remove([doc['storage_path']])
+                logger.info(f"✅ Deleted from storage: {doc['storage_path']}")
             except Exception as storage_error:
-                logger.warning(f"Failed to delete from storage: {storage_error}")
+                logger.warning(f"⚠️ Failed to delete from storage: {storage_error}")
         
-        # 4. Delete from tracking table first
+        # 4. Delete tracking records for THIS document
         supabase.from_("checklist_document_matches")\
             .delete()\
             .eq("document_id", document_id)\
             .eq("user_id", user_id)\
             .execute()
+        logger.info(f"✅ Deleted tracking records for document {document_id}")
         
-        # 5. Delete from documents table
+        # 5. Delete the document record
         supabase.from_("compliance_documents")\
             .delete()\
             .eq("id", document_id)\
             .eq("user_id", user_id)\
             .execute()
+        logger.info(f"✅ Deleted document record {document_id}")
         
-        # 6. For each checklist item that was completed by this document:
-        # Check if there are OTHER documents that also complete it
-        if matches_result.data:
-            for match in matches_result.data:
-                checklist_item_id = match['checklist_item_id']
-                
-                # Check if other documents still complete this item
-                other_matches = supabase.from_("checklist_document_matches")\
-                    .select("id")\
-                    .eq("checklist_item_id", checklist_item_id)\
-                    .eq("user_id", user_id)\
-                    .execute()
-                
-                # If no other documents complete this item, mark it as incomplete
-                if not other_matches.data or len(other_matches.data) == 0:
-                    supabase.from_("audit_checklist_items")\
-                        .update({
-                            "is_completed": False,
-                            "completed_at": None,
-                            "completed_by": None
-                        })\
-                        .eq("id", checklist_item_id)\
-                        .eq("user_id", user_id)\
-                        .execute()
+        # 🚨 CRITICAL: SYNC checklist immediately after deletion
+        sync_checklist_with_documents(user_id, supabase)
         
-        logger.info(f"✅ Document deleted: {document_id} by user {user_id}, checklist properly updated")
+        logger.info(f"✅ [DELETE] Document deletion complete")
         
         return {
             "success": True,
-            "message": "Document deleted successfully and checklist updated"
+            "message": "Document deleted successfully",
+            "affected_items": len(affected_item_ids)
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[Document Delete] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/exemption-checker")
-async def check_tax_exemptions(
-    request: Request,
-    current_user: Dict = Depends(get_current_user),
-    supabase=Depends(get_supabase_client)
-):
-    """✅ Tax exemption checker - rule-based system"""
-    try:
-        data = await request.json()
-        user_id = current_user['id']
-        
-        # Extract form data
-        business_type = data.get('business_type')
-        annual_turnover = float(data.get('annual_turnover', 0))
-        industry_sector = data.get('industry_sector')
-        employee_count = int(data.get('employee_count', 0))
-        
-        # Simple rule-based exemption matching
-        eligible_exemptions = []
-        estimated_savings = 0
-        
-        # Rule 1: Small company exemption (₦100M turnover)
-        if annual_turnover < 100_000_000:
-            eligible_exemptions.append({
-                "id": 20,
-                "name": "Small Company 0% Tax",
-                "description": "Companies with turnover below ₦100M pay 0% CIT",
-                "estimated_savings": annual_turnover * 0.30
-            })
-            estimated_savings += annual_turnover * 0.30
-        
-        # Rule 2: Agricultural business
-        if industry_sector == 'agriculture':
-            eligible_exemptions.append({
-                "id": 24,
-                "name": "Agricultural Business Tax Holiday",
-                "description": "5-year tax holiday for agricultural businesses",
-                "estimated_savings": 0
-            })
-        
-        # Rule 3: Minimum wage exemption
-        if employee_count > 0:
-            eligible_exemptions.append({
-                "id": 1,
-                "name": "Minimum Wage Workers Exempt",
-                "description": "Employees earning minimum wage or less are exempt from PAYE",
-                "estimated_savings": 0
-            })
-        
-        # Rule 4: Pension contributions
-        if data.get('has_pension_contributions'):
-            eligible_exemptions.append({
-                "id": 5,
-                "name": "Pension Contribution Deduction",
-                "description": "Pension contributions are tax-deductible",
-                "estimated_savings": 0
-            })
-        
-        # Save response
-        response_data = {
-            "user_id": user_id,
-            "business_type": business_type,
-            "annual_turnover": annual_turnover,
-            "industry_sector": industry_sector,
-            "employee_count": employee_count,
-            "responses": data,
-            "eligible_exemptions": eligible_exemptions,
-            "estimated_tax_savings": estimated_savings,
-            "report_generated_at": datetime.now(timezone.utc).isoformat()
-        }
-        
-        supabase.from_("tax_exemption_responses")\
-            .insert(response_data)\
-            .execute()
-        
-        logger.info(f"✅ Tax exemption check completed for user {user_id}: {len(eligible_exemptions)} exemptions found")
-        
-        return {
-            "success": True,
-            "eligible_exemptions": eligible_exemptions,
-            "estimated_tax_savings": estimated_savings,
-            "message": f"Found {len(eligible_exemptions)} exemptions you qualify for"
-        }
-        
-    except Exception as e:
-        logger.error(f"[Exemption Checker] Error: {e}")
+        logger.error(f"❌ [Document Delete] Critical error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/checklist/progress-details")
@@ -623,9 +661,16 @@ async def get_checklist_progress_details(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ CRITICAL FIX: Get REAL progress based on actual document presence"""
+    """
+    🚨 CRITICAL FIX: READ-ONLY progress calculation with SYNC.
+    Single source of truth for progress.
+    """
     try:
         user_id = current_user['id']
+        logger.info(f"📊 [PROGRESS] Calculating progress for user {user_id}")
+        
+        # 🚨 CRITICAL: Sync checklist first to ensure consistency
+        sync_checklist_with_documents(user_id, supabase)
         
         # 1. Get ALL checklist items (deduplicated)
         checklist_result = supabase.from_("audit_checklist_items")\
@@ -634,6 +679,7 @@ async def get_checklist_progress_details(
             .execute()
         
         if not checklist_result.data:
+            logger.info(f"📊 [PROGRESS] No checklist items for user {user_id}")
             return {
                 "success": True,
                 "category_progress": {},
@@ -642,6 +688,10 @@ async def get_checklist_progress_details(
                 "completed_items": 0,
                 "total_items": 0
             }
+        
+        # 🚨 LOG FOR DEBUGGING
+        completed_count = sum(1 for item in checklist_result.data if item.get('is_completed', False))
+        logger.info(f"📊 [PROGRESS] Database has {completed_count}/{len(checklist_result.data)} completed items")
         
         # Deduplicate checklist items
         seen_items = {}
@@ -654,29 +704,14 @@ async def get_checklist_progress_details(
         
         # 2. Get ALL documents
         docs_result = supabase.from_("compliance_documents")\
-            .select("*")\
+            .select("id, category")\
             .eq("user_id", user_id)\
             .execute()
         
         all_docs = docs_result.data if docs_result.data else []
+        logger.info(f"📊 [PROGRESS] User has {len(all_docs)} documents")
         
-        # 3. Get document-checklist matches to know which items are completed by documents
-        matches_result = supabase.from_("checklist_document_matches")\
-            .select("*")\
-            .eq("user_id", user_id)\
-            .execute()
-        
-        matches = matches_result.data if matches_result.data else []
-        
-        # Create a lookup: checklist_item_id -> [document_ids that complete it]
-        checklist_to_documents = {}
-        for match in matches:
-            checklist_item_id = match['checklist_item_id']
-            if checklist_item_id not in checklist_to_documents:
-                checklist_to_documents[checklist_item_id] = []
-            checklist_to_documents[checklist_item_id].append(match['document_id'])
-        
-        # 4. Calculate REAL progress
+        # 3. Calculate progress based on SYNCED checklist
         category_progress = {}
         total_items = 0
         completed_items = 0
@@ -694,42 +729,13 @@ async def get_checklist_progress_details(
             category_total = len(items)
             total_items += category_total
             
-            # Count completed items in this category
-            category_completed = 0
-            for item in items:
-                item_id = item['id']
-                
-                # Check if item is marked as completed
-                if item.get('is_completed'):
-                    # If item has document matches, check if at least one matching document exists
-                    if item_id in checklist_to_documents:
-                        # Check if at least one matching document still exists
-                        has_existing_document = False
-                        for document_id in checklist_to_documents[item_id]:
-                            if any(doc['id'] == document_id for doc in all_docs):
-                                has_existing_document = True
-                                break
-                        
-                        if has_existing_document:
-                            category_completed += 1
-                        else:
-                            # All matching documents were deleted - mark item as incomplete
-                            supabase.from_("audit_checklist_items")\
-                                .update({
-                                    "is_completed": False,
-                                    "completed_at": None,
-                                    "completed_by": None
-                                })\
-                                .eq("id", item_id)\
-                                .execute()
-                    else:
-                        # Item was manually completed (no document match) - count it
-                        category_completed += 1
-            
+            # Count completed items (now synced with actual documents)
+            category_completed = sum(1 for item in items if item.get('is_completed'))
             completed_items += category_completed
             
-            # Calculate category progress
+            # Count documents in this category
             category_docs = len([d for d in all_docs if d.get('category') == category])
+            
             category_progress[category] = {
                 'completed_items': category_completed,
                 'total_items': category_total,
@@ -740,7 +746,7 @@ async def get_checklist_progress_details(
         # Calculate overall progress
         overall_progress = round((completed_items / total_items * 100) if total_items > 0 else 0, 1)
         
-        logger.info(f"✅ Progress calculation for user {user_id}: {completed_items}/{total_items} items ({overall_progress}%), {len(all_docs)} documents")
+        logger.info(f"✅ [PROGRESS] Final: {completed_items}/{total_items} items ({overall_progress}%), {len(all_docs)} documents")
         
         return {
             "success": True,
@@ -752,7 +758,112 @@ async def get_checklist_progress_details(
         }
         
     except Exception as e:
-        logger.error(f"[Progress Details] Error: {e}")
+        logger.error(f"❌ [Progress Details] Critical error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/checklist/recalculate")
+async def recalculate_checklist_endpoint(
+    current_user: Dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """
+    🔄 Manually trigger checklist sync.
+    """
+    try:
+        user_id = current_user['id']
+        sync_checklist_with_documents(user_id, supabase)
+        
+        return {
+            "success": True,
+            "message": "Checklist synced with documents successfully"
+        }
+    except Exception as e:
+        logger.error(f"❌ [Recalculate] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================
+# OTHER ENDPOINTS (unchanged but kept for completeness)
+# ============================================
+
+@router.post("/exemption-checker")
+async def check_tax_exemptions(
+    request: Request,
+    current_user: Dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """✅ Tax exemption checker"""
+    try:
+        data = await request.json()
+        user_id = current_user['id']
+        
+        business_type = data.get('business_type')
+        annual_turnover = float(data.get('annual_turnover', 0))
+        industry_sector = data.get('industry_sector')
+        employee_count = int(data.get('employee_count', 0))
+        
+        eligible_exemptions = []
+        estimated_savings = 0
+        
+        if annual_turnover < 100_000_000:
+            eligible_exemptions.append({
+                "id": 20,
+                "name": "Small Company 0% Tax",
+                "description": "Companies with turnover below ₦100M pay 0% CIT",
+                "estimated_savings": annual_turnover * 0.30
+            })
+            estimated_savings += annual_turnover * 0.30
+        
+        if industry_sector == 'agriculture':
+            eligible_exemptions.append({
+                "id": 24,
+                "name": "Agricultural Business Tax Holiday",
+                "description": "5-year tax holiday for agricultural businesses",
+                "estimated_savings": 0
+            })
+        
+        if employee_count > 0:
+            eligible_exemptions.append({
+                "id": 1,
+                "name": "Minimum Wage Workers Exempt",
+                "description": "Employees earning minimum wage or less are exempt from PAYE",
+                "estimated_savings": 0
+            })
+        
+        if data.get('has_pension_contributions'):
+            eligible_exemptions.append({
+                "id": 5,
+                "name": "Pension Contribution Deduction",
+                "description": "Pension contributions are tax-deductible",
+                "estimated_savings": 0
+            })
+        
+        response_data = {
+            "user_id": user_id,
+            "business_type": business_type,
+            "annual_turnover": annual_turnover,
+            "industry_sector": industry_sector,
+            "employee_count": employee_count,
+            "responses": data,
+            "eligible_exemptions": eligible_exemptions,
+            "estimated_tax_savings": estimated_savings,
+            "report_generated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        supabase.from_("tax_exemption_responses")\
+            .insert(response_data)\
+            .execute()
+        
+        logger.info(f"✅ Tax exemption check completed for user {user_id}")
+        
+        return {
+            "success": True,
+            "eligible_exemptions": eligible_exemptions,
+            "estimated_tax_savings": estimated_savings,
+            "message": f"Found {len(eligible_exemptions)} exemptions"
+        }
+        
+    except Exception as e:
+        logger.error(f"[Exemption Checker] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/auditor-access/grant")
@@ -761,7 +872,7 @@ async def grant_auditor_access(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Grant auditor access to user's documents"""
+    """✅ Grant auditor access"""
     try:
         data = await request.json()
         user_id = current_user['id']
@@ -772,7 +883,6 @@ async def grant_auditor_access(
         if not auditor_email:
             raise HTTPException(status_code=400, detail="Auditor email required")
         
-        # Grant access
         access_data = {
             "user_id": user_id,
             "auditor_email": auditor_email,
@@ -784,7 +894,7 @@ async def grant_auditor_access(
             .insert(access_data)\
             .execute()
         
-        logger.info(f"✅ Auditor access granted: {auditor_email} for user {user_id}")
+        logger.info(f"✅ Auditor access granted: {auditor_email}")
         
         return {
             "success": True,

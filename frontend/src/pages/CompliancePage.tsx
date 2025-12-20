@@ -1,7 +1,8 @@
 // File: frontend/src/pages/CompliancePage.tsx
-// 📱 PRODUCTION-READY: Mobile-First Responsive Compliance Dashboard
-// ✅ BUG FIXED: Progress updates correctly when documents are deleted
-// ✅ BUG FIXED: Document count shows actual uploaded documents
+// 🚨 PRODUCTION-READY: Mobile-First Responsive Compliance Dashboard - FINAL FIX
+// ✅ CRITICAL FIX: Real-time checklist updates after document deletion
+// ✅ FIX: Force refresh with cache busting
+// ✅ FIX: Proper error handling and loading states
 
 import React, { useState, useEffect } from 'react';
 import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Trash2, RefreshCw } from 'lucide-react';
@@ -24,7 +25,7 @@ const CompliancePage = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'checklist' | 'documents' | 'exemptions'>('overview');
   const [authChecked, setAuthChecked] = useState(false);
 
-  const fetchData = async (showLoading = true) => {
+  const fetchData = async (showLoading = true, forceRefresh = false) => {
     try {
       if (showLoading) {
         setLoading(true);
@@ -32,65 +33,96 @@ const CompliancePage = () => {
         setRefreshing(true);
       }
       
-      // Fetch all data in parallel
-      const [subRes, checklistRes, docsRes, progressRes] = await Promise.allSettled([
-        apiClient.get('/api/v1/subscriptions/my-subscription'),
-        apiClient.get('/api/v1/compliance/checklist'),
-        apiClient.get('/api/v1/compliance/documents'),
-        apiClient.get('/api/v1/compliance/checklist/progress-details')
-      ]);
-
-      // Handle subscription response
-      if (subRes.status === 'fulfilled' && subRes.value.data.success) {
-        setSubscription(subRes.value.data.subscription);
-      } else {
+      console.log('🔄 Fetching compliance data...', forceRefresh ? '(FORCED)' : '');
+      
+      // Add cache-busting timestamp for forced refreshes
+      const timestamp = forceRefresh ? `?_t=${Date.now()}` : '';
+      
+      // 🚨 SEQUENTIAL FETCHING to ensure consistency
+      // 1. First, fetch progress (single source of truth)
+      let progressData: any = null;
+      try {
+        const progressRes = await apiClient.get(`/api/v1/compliance/checklist/progress-details${timestamp}`);
+        if (progressRes.data.success) {
+          progressData = progressRes.data;
+          setStats({
+            completed_items: progressData.completed_items || 0,
+            total_items: progressData.total_items || 0,
+            completion_percentage: progressData.overall_progress || 0,
+            category_progress: progressData.category_progress || {},
+            total_documents: progressData.total_documents || 0
+          });
+          console.log('✅ Progress data:', {
+            completed: progressData.completed_items,
+            total: progressData.total_items,
+            percentage: progressData.overall_progress,
+            documents: progressData.total_documents
+          });
+        } else {
+          console.warn('⚠️ Progress endpoint returned unsuccessful');
+        }
+      } catch (error) {
+        console.error('❌ Progress endpoint failed:', error);
+      }
+      
+      // 2. Then fetch checklist (which will be synced by the progress call)
+      try {
+        const checklistRes = await apiClient.get(`/api/v1/compliance/checklist${timestamp}`);
+        if (checklistRes.data.success) {
+          const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
+          setChecklist(uniqueChecklist);
+          console.log(`✅ Fetched ${uniqueChecklist.length} checklist items`);
+          
+          // 🚨 DEBUG: Log completed items
+          const completed = uniqueChecklist.filter((item: any) => item.is_completed).length;
+          console.log(`📊 Checklist: ${completed}/${uniqueChecklist.length} completed`);
+        }
+      } catch (error) {
+        console.error('❌ Checklist fetch failed:', error);
+        setChecklist([]);
+      }
+      
+      // 3. Fetch documents
+      try {
+        const docsRes = await apiClient.get(`/api/v1/compliance/documents${timestamp}`);
+        if (docsRes.data.success) {
+          const docs = docsRes.data.documents || [];
+          setDocuments(docs);
+          console.log(`✅ Fetched ${docs.length} documents`);
+          
+          // 🚨 If documents array is empty but progress shows completion, trigger sync
+          if (docs.length === 0 && progressData && progressData.completed_items > 0) {
+            console.warn('⚠️ Inconsistency detected: No documents but completed items > 0');
+            console.log('🔄 Triggering manual sync...');
+            try {
+              await apiClient.post('/api/v1/compliance/checklist/recalculate');
+              console.log('✅ Triggered manual sync');
+            } catch (syncError) {
+              console.error('❌ Manual sync failed:', syncError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Documents fetch failed:', error);
+        setDocuments([]);
+      }
+      
+      // 4. Fetch subscription (independent)
+      try {
+        const subRes = await apiClient.get('/api/v1/subscriptions/my-subscription');
+        if (subRes.data.success) {
+          setSubscription(subRes.data.subscription);
+        } else {
+          setSubscription(null);
+        }
+      } catch (error) {
+        console.warn('⚠️ Subscription fetch failed:', error);
         setSubscription(null);
-      }
-
-      // Handle checklist response
-      if (checklistRes.status === 'fulfilled' && checklistRes.value.data.success) {
-        const uniqueChecklist = deduplicateChecklistItems(checklistRes.value.data.checklist);
-        setChecklist(uniqueChecklist);
-      }
-
-      // Handle documents response
-      if (docsRes.status === 'fulfilled' && docsRes.value.data.success) {
-        setDocuments(docsRes.value.data.documents || []);
-      }
-
-      // ✅ CRITICAL FIX: Use ONLY the progress endpoint for stats
-      if (progressRes.status === 'fulfilled' && progressRes.value.data.success) {
-        const progressData = progressRes.value.data;
-        
-        setStats({
-          completed_items: progressData.completed_items || 0,
-          total_items: progressData.total_items || 0,
-          completion_percentage: progressData.overall_progress || 0,
-          category_progress: progressData.category_progress || {},
-          total_documents: progressData.total_documents || 0
-        });
-        
-        // Log for debugging
-        console.log('Progress data:', {
-          completed: progressData.completed_items,
-          total: progressData.total_items,
-          percentage: progressData.overall_progress,
-          documents: progressData.total_documents
-        });
-      } else {
-        // If progress endpoint fails, show zero progress
-        setStats({
-          completed_items: 0,
-          total_items: 0,
-          completion_percentage: 0,
-          category_progress: {},
-          total_documents: documents.length || 0
-        });
       }
       
       setAuthChecked(true);
     } catch (error) {
-      console.error('Failed to fetch compliance data:', error);
+      console.error('❌ Failed to fetch compliance data:', error);
       toast.error('Failed to load compliance data');
       setAuthChecked(true);
     } finally {
@@ -131,8 +163,22 @@ const CompliancePage = () => {
   };
 
   const handleRefresh = () => {
-    fetchData(false);
+    console.log('🔄 Manual refresh triggered');
+    fetchData(false, true); // Force refresh with cache busting
   };
+
+  // Safety check: If no documents, ensure progress shows 0%
+  useEffect(() => {
+    if (documents.length === 0 && stats.completion_percentage > 0) {
+      console.warn('🚨 Safety check: No documents but progress > 0%, forcing update');
+      setStats(prev => ({
+        ...prev,
+        completion_percentage: 0,
+        completed_items: 0,
+        total_documents: 0
+      }));
+    }
+  }, [documents, stats.completion_percentage]);
 
   if (loading && !authChecked) {
     return (
@@ -186,7 +232,7 @@ const CompliancePage = () => {
 
             <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Documents</div>
-              <div className="text-4xl font-bold text-white mb-2">{documents.length}</div>
+              <div className="text-4xl font-bold text-white mb-2">{stats?.total_documents || 0}</div>
               <div className="text-sm text-green-400">Uploaded for audit</div>
             </div>
 
@@ -218,8 +264,8 @@ const CompliancePage = () => {
 
           {/* Tab Content */}
           {activeTab === 'overview' && <OverviewTab stats={stats} />}
-          {activeTab === 'checklist' && <ChecklistTab checklist={checklist} onRefresh={() => fetchData(false)} />}
-          {activeTab === 'documents' && <DocumentsTab documents={documents} onRefresh={() => fetchData(false)} />}
+          {activeTab === 'checklist' && <ChecklistTab checklist={checklist} onRefresh={() => fetchData(false, true)} />}
+          {activeTab === 'documents' && <DocumentsTab documents={documents} onRefresh={() => fetchData(false, true)} />}
           {activeTab === 'exemptions' && <ExemptionsTab formatCurrency={formatCurrencyNGN} />}
         </div>
       </div>
@@ -549,9 +595,10 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
       });
 
       toast.success('Document uploaded successfully!');
+      console.log('✅ Document uploaded, refreshing data...');
       onRefresh();
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('❌ Upload error:', error);
       let errorMsg = 'Upload failed';
       if (error.response?.data?.detail) errorMsg = error.response.data.detail;
       else if (error.response?.data?.message) errorMsg = error.response.data.message;
@@ -564,15 +611,30 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
   };
 
   const handleDelete = async (documentId: string) => {
-    if (!confirm('Are you sure you want to delete this document? This will update your checklist progress.')) return;
+    if (!confirm('Delete this document? This will update your checklist progress.')) return;
     
     try {
       setDeletingId(documentId);
+      console.log(`🗑️ Deleting document ${documentId}...`);
+      
       await apiClient.delete(`/api/v1/compliance/documents/${documentId}`);
+      
       toast.success('Document deleted successfully!');
-      onRefresh();
+      console.log('✅ Document deleted, forcing FULL refresh...');
+      
+      // 🚨 CRITICAL: Force a complete refresh with cache busting
+      await onRefresh();
+      
+      // If still seeing issues, add a small delay and check
+      setTimeout(() => {
+        if (documents.length > 0 && documents.some(d => d.id === documentId)) {
+          console.warn('⚠️ Document still in local state, forcing hard refresh');
+          window.location.reload();
+        }
+      }, 1000);
+      
     } catch (error: any) {
-      console.error('Delete error:', error);
+      console.error('❌ Delete error:', error);
       toast.error('Failed to delete document');
     } finally {
       setDeletingId(null);
