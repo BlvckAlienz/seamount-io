@@ -458,56 +458,52 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
     try {
         setUploading(true);
         
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-        toast.error('File size exceeds 10MB limit');
-        return;
-        }
-        
-        // Validate file type
-        const allowedTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx'];
-        const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-        
-        if (!allowedTypes.includes(fileExtension)) {
-        toast.error(`File type not allowed. Allowed types: ${allowedTypes.join(', ')}`);
-        return;
-        }
+        // Log file info
+        console.log('📤 Uploading file:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        category: selectedCategory,
+        document_type: selectedType
+        });
         
         const formData = new FormData();
         formData.append('file', file);
         formData.append('category', selectedCategory);
         formData.append('document_type', selectedType);
-
-        console.log('Uploading document:', {
-        fileName: file.name,
-        category: selectedCategory,
-        type: selectedType,
-        size: file.size
-        });
-
+        
+        // Log FormData contents
+        console.log('📦 FormData entries:');
+        for (let pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+        }
+        
         const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
         headers: { 
             'Content-Type': 'multipart/form-data'
         }
         });
 
-        console.log('Upload response:', response.data);
-        
+        console.log('✅ Upload response:', response.data);
         toast.success('Document uploaded successfully!');
         onRefresh();
     } catch (error: any) {
-        console.error('Upload error details:', error);
+        console.error('❌ Upload error:', error);
+        console.error('❌ Error response:', error.response);
         
-        // Show detailed error message
-        const errorMessage = error.response?.data?.detail || 
-                            error.response?.data?.message || 
-                            error.message || 
-                            'Upload failed';
+        // Detailed error message
+        let errorMsg = 'Upload failed';
+        if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+        } else if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+        } else if (error.message) {
+        errorMsg = error.message;
+        }
         
-        toast.error(`Upload failed: ${errorMessage}`);
+        toast.error(`Upload failed: ${errorMsg}`);
     } finally {
         setUploading(false);
-        // Reset file input
         if (e.target) e.target.value = '';
     }
     };

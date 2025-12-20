@@ -1,7 +1,7 @@
 # File Location: backend/api/routes/compliance.py
 # 🚨 MISSION CRITICAL: Compliance & audit management - FIXED VERSION
 
-from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, Request, UploadFile, File, Form  # ✅ Added Form import
 from typing import Dict, Any, List
 import logging
 from datetime import datetime, timezone
@@ -17,11 +17,11 @@ async def get_audit_checklist(
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Get user's audit checklist - FIXED: Deduplicate and clean up code"""
+    """✅ Get user's audit checklist - FIXED: Deduplicate items"""
     try:
         user_id = current_user['id']
         
-        # Fetch all checklist items for user
+        # Fetch all checklist items
         result = supabase.from_("audit_checklist_items")\
             .select("*")\
             .eq("user_id", user_id)\
@@ -40,8 +40,7 @@ async def get_audit_checklist(
                 }
             }
         
-        # ✅ CRITICAL FIX: Remove duplicates by creating a dictionary keyed by (category, item_description)
-        # This ensures we only show each checklist item once, even if it exists multiple times in DB
+        # ✅ DEDUPLICATION: Remove duplicates by creating a dictionary keyed by (category, item_description)
         seen_items = {}
         unique_items = []
         
@@ -171,140 +170,76 @@ async def get_compliance_documents(
 @router.post("/documents/upload")
 async def upload_compliance_document(
     file: UploadFile = File(...),
-    category: str = Form(...),
-    document_type: str = Form(...),
+    category: str = Form(None),  # Make optional for debugging
+    document_type: str = Form(None),  # Make optional for debugging
     current_user: Dict = Depends(get_current_user),
     supabase=Depends(get_supabase_client)
 ):
-    """✅ Upload compliance document to Supabase Storage - FIXED VERSION"""
+    """✅ Upload compliance document - DEBUG VERSION"""
     try:
+        logger.info(f"📥 Upload endpoint called")
+        logger.info(f"📤 File: {file.filename}, Category: {category}, Type: {document_type}")
+        
+        if not category or not document_type:
+            logger.error(f"❌ Missing form data: category={category}, type={document_type}")
+            raise HTTPException(status_code=400, detail="Category and document type are required")
+        
         user_id = current_user['id']
-        email = current_user.get('email', 'unknown')
         
-        logger.info(f"📤 Document upload attempt: user={user_id}, email={email}, category={category}, type={document_type}, filename={file.filename}")
+        # Generate filename
+        unique_filename = f"{user_id}/{category}/{uuid.uuid4().hex}_{file.filename}"
         
-        # Validate file size (max 10MB)
-        file_content = await file.read()
-        file_size_mb = len(file_content) / (1024 * 1024)
+        # Read file
+        content = await file.read()
+        logger.info(f"📦 Read {len(content)} bytes")
         
-        if file_size_mb > 10:
-            raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
-        
-        # Validate file type
-        allowed_extensions = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx'}
-        file_extension = f".{file.filename.split('.')[-1].lower()}" if '.' in file.filename else ''
-        
-        if file_extension not in allowed_extensions:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"File type not allowed. Allowed types: {', '.join(allowed_extensions)}"
-            )
-        
-        # Generate unique filename
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        safe_filename = file.filename.replace(" ", "_").replace("/", "_").replace("\\", "_")
-        unique_filename = f"{user_id}/{category}/{timestamp}_{uuid.uuid4().hex[:8]}_{safe_filename}"
-        
-        logger.info(f"📦 Preparing to upload: {unique_filename} ({file_size_mb:.2f} MB)")
-        
-        # Upload to Supabase Storage
+        # Try simple upload
         try:
-            # First, check if bucket is accessible
-            logger.info("Checking storage bucket access...")
+            result = supabase.storage.from_("compliance-documents") \
+                .upload(unique_filename, content)
             
-            # Upload the file
-            storage_result = supabase.storage.from_("compliance-documents") \
-                .upload(unique_filename, file_content, {
-                    "content-type": file.content_type or "application/octet-stream",
-                    "cache-control": "3600"
-                })
-            
-            if not storage_result:
-                logger.error("❌ Supabase storage upload returned None")
-                raise HTTPException(status_code=500, detail="Storage upload failed - no response")
+            if not result:
+                raise Exception("Upload returned None")
                 
-            logger.info(f"✅ Storage upload successful: {unique_filename}")
-            
-        except Exception as storage_error:
-            logger.error(f"❌ Supabase storage error: {str(storage_error)}", exc_info=True)
-            
-            # Check if it's a permission error
-            if "403" in str(storage_error) or "permission" in str(storage_error).lower():
-                raise HTTPException(
-                    status_code=403, 
-                    detail="Storage permission denied. Please check bucket policies."
-                )
-            elif "404" in str(storage_error) or "not found" in str(storage_error).lower():
-                raise HTTPException(
-                    status_code=500,
-                    detail="Storage bucket not found. Please contact administrator."
-                )
-            else:
-                raise HTTPException(
-                    status_code=500, 
-                    detail=f"Storage upload failed: {str(storage_error)[:100]}"
-                )
+        except Exception as e:
+            logger.error(f"❌ Storage upload failed: {e}")
+            # Try to list buckets to debug
+            try:
+                buckets = supabase.storage.list_buckets()
+                logger.info(f"📊 Available buckets: {buckets}")
+            except:
+                logger.error("❌ Cannot list buckets")
+            raise HTTPException(status_code=500, detail=f"Storage error: {str(e)}")
         
-        # Get public URL
-        try:
-            file_url = supabase.storage.from_("compliance-documents") \
-                .get_public_url(unique_filename)
-            logger.info(f"✅ Got public URL: {file_url}")
-        except Exception as url_error:
-            logger.error(f"❌ Failed to get public URL: {url_error}")
-            file_url = f"https://storage.supabase.com/compliance-documents/{unique_filename}"
+        # Get URL
+        file_url = supabase.storage.from_("compliance-documents") \
+            .get_public_url(unique_filename)
         
-        # Save document record to database
-        document_data = {
+        # Save to database
+        doc_data = {
             "user_id": user_id,
             "category": category,
             "document_type": document_type,
             "file_name": file.filename,
             "file_url": file_url,
-            "file_size": len(file_content),
-            "mime_type": file.content_type or "application/octet-stream",
-            "uploaded_by": user_id,
-            "verification_status": "pending",
-            "storage_path": unique_filename
+            "file_size": len(content),
+            "uploaded_by": user_id
         }
         
-        try:
-            result = supabase.from_("compliance_documents") \
-                .insert(document_data) \
-                .execute()
-            
-            if not result.data:
-                logger.error("❌ Failed to insert document record into database")
-                # Try to delete the uploaded file since DB insert failed
-                try:
-                    supabase.storage.from_("compliance-documents").remove([unique_filename])
-                except:
-                    pass
-                raise HTTPException(status_code=500, detail="Failed to save document record")
-                
-            logger.info(f"✅ Document record saved to database: {result.data[0]['id']}")
-            
-        except Exception as db_error:
-            logger.error(f"❌ Database insert error: {db_error}")
-            # Clean up the uploaded file
-            try:
-                supabase.storage.from_("compliance-documents").remove([unique_filename])
-            except:
-                pass
-            raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+        db_result = supabase.from_("compliance_documents") \
+            .insert(doc_data) \
+            .execute()
         
         return {
             "success": True,
-            "document": result.data[0] if result.data else document_data,
-            "message": "Document uploaded successfully",
-            "file_url": file_url
+            "message": "Upload successful"
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ [Document Upload] Unexpected error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        logger.error(f"❌ Upload error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/exemption-checker")
 async def check_tax_exemptions(
