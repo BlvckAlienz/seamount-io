@@ -2,7 +2,7 @@
 // 📱 Mobile-First Responsive Compliance Dashboard - SIMPLIFIED VERSION
 
 import React, { useState, useEffect } from 'react';
-import { Shield, FileText, CheckCircle, Upload, TrendingUp, Trash2 } from 'lucide-react';
+import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Trash2 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
@@ -22,40 +22,66 @@ const CompliancePage = () => {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const [subRes, checklistRes, docsRes] = await Promise.all([
+        setLoading(true);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const [subRes, checklistRes, docsRes, progressRes] = await Promise.all([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
-        apiClient.get('/api/v1/compliance/documents')
-      ]);
+        apiClient.get('/api/v1/compliance/documents'),
+        apiClient.get('/api/v1/compliance/checklist/progress-details') // New endpoint
+        ]);
 
-      if (subRes.data.success) setSubscription(subRes.data.subscription);
-      if (checklistRes.data.success) {
+        if (subRes.data.success) setSubscription(subRes.data.subscription);
+        if (checklistRes.data.success) {
+        const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
+        setChecklist(uniqueChecklist);
+        }
+        if (docsRes.data.success) setDocuments(docsRes.data.documents);
+        
+        // Use the new progress calculation
+        if (progressRes.data.success) {
+        const progressData = progressRes.data;
+        const overallProgress = progressData.overall_progress || 0;
+        
+        // Calculate total items from category progress
+        let totalItems = 0;
+        let completedItems = 0;
+        
+        Object.values(progressData.category_progress || {}).forEach((cat: any) => {
+            totalItems += cat.total_items || 0;
+            completedItems += cat.completed_items || 0;
+        });
+        
+        setStats({
+            completed_items: completedItems,
+            total_items: totalItems,
+            completion_percentage: overallProgress,
+            category_progress: progressData.category_progress
+        });
+        } else {
+        // Fallback to old calculation
         const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
         const totalItems = uniqueChecklist.length;
         const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
         const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
         
-        setChecklist(uniqueChecklist);
         setStats({
-          completed_items: completedItems,
-          total_items: totalItems,
-          completion_percentage: completionPercentage
+            completed_items: completedItems,
+            total_items: totalItems,
+            completion_percentage: completionPercentage
         });
-      }
-      if (docsRes.data.success) setDocuments(docsRes.data.documents);
-      
-      setAuthChecked(true);
+        }
+        
+        setAuthChecked(true);
     } catch (error) {
-      console.error('Failed to fetch compliance data:', error);
-      toast.error('Failed to load data');
-      setAuthChecked(true);
+        console.error('Failed to fetch compliance data:', error);
+        toast.error('Failed to load data');
+        setAuthChecked(true);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   const deduplicateChecklistItems = (items: any[]): any[] => {
     if (!items || items.length === 0) return [];
@@ -106,7 +132,7 @@ const CompliancePage = () => {
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
-              <Shield className="h-8 w-8 text-blue-400" />
+              <Receipt className="h-8 w-8 text-green-400" />
               <span>Compliance OS</span>
             </h1>
             <p className="text-gray-400">Your audit & taxation command center</p>
@@ -173,7 +199,7 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
     {
       id: 'PLN_yp8p5obbu6azilo',
       name: 'Compliance Essentials',
-      price: 600000,
+      price: 900000,
       jobToBeDone: 'Get my books audit-ready',
       deliverables: [
         'Clean bookkeeping records (trial balance)',
@@ -583,15 +609,6 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                 </div>
                 
                 <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                  <a
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                    title="View document"
-                  >
-                    View
-                  </a>
                   <button
                     onClick={() => handleDelete(doc.id)}
                     disabled={deletingId === doc.id}

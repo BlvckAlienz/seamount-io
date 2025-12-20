@@ -12,6 +12,66 @@ from backend.dependencies import get_supabase_client, get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+def map_document_to_checklist_item(document_type: str, category: str, file_name: str) -> dict:
+    """
+    Map uploaded document to specific checklist items based on document type and file name.
+    Returns the target checklist item description or key for matching.
+    """
+    # Define mapping rules for different document types
+    DOCUMENT_MAPPING = {
+        # Incorporation Documents
+        'incorporation_docs': {
+            'keywords': ['certificate of incorporation', 'cac registration', 'memorandum', 'articles', 'form cac7'],
+            'target_items': ['Upload Certificate of Incorporation', 'CAC Registration Documents']
+        },
+        # Tax Documents
+        'tax_certificate': {
+            'keywords': ['tax clearance', 'firs certificate', 'tax certificate'],
+            'target_items': ['Tax Clearance Certificate', 'FIRS Tax Certificate']
+        },
+        # Financial Statements
+        'audited_accounts': {
+            'keywords': ['audited accounts', 'financial statement', 'balance sheet', 'profit loss'],
+            'target_items': ['Audited Financial Statements', 'Balance Sheet', 'Profit & Loss Statement']
+        },
+        # Bank Documents
+        'bank_statement': {
+            'keywords': ['bank statement', 'bank account', 'bank confirmation'],
+            'target_items': ['Bank Statements', 'Bank Confirmation Letter']
+        },
+        # Licenses
+        'license': {
+            'keywords': ['business license', 'operating license', 'permit'],
+            'target_items': ['Business License', 'Operating Permits']
+        }
+    }
+    
+    # Default mapping based on document type
+    if document_type in DOCUMENT_MAPPING:
+        return {
+            'document_type': document_type,
+            'target_items': DOCUMENT_MAPPING[document_type]['target_items'],
+            'keywords': DOCUMENT_MAPPING[document_type]['keywords']
+        }
+    
+    # Fallback: try to match based on file name keywords
+    file_name_lower = file_name.lower()
+    for doc_type, info in DOCUMENT_MAPPING.items():
+        for keyword in info['keywords']:
+            if keyword in file_name_lower:
+                return {
+                    'document_type': doc_type,
+                    'target_items': info['target_items'],
+                    'keywords': [keyword]
+                }
+    
+    # If no match found, use category-based fallback
+    return {
+        'document_type': document_type,
+        'target_items': [f"Upload {document_type.replace('_', ' ').title()}"],
+        'keywords': []
+    }
+
 @router.get("/checklist")
 async def get_audit_checklist(
     current_user: Dict = Depends(get_current_user),
@@ -257,7 +317,7 @@ async def upload_compliance_document(
 
         # In your upload_compliance_document function, after successful database insert:
         # Auto-complete checklist items for this category
-        auto_complete_checklist_items(user_id, category, supabase)
+        auto_complete_checklist_items(user_id, category, document_type, file.filename, supabase)
 
         return {
             "success": True,
@@ -403,9 +463,12 @@ async def grant_auditor_access(
         raise HTTPException(status_code=500, detail=str(e))
     
 # Add this function to your compliance.py backend
-def auto_complete_checklist_items(user_id: str, category: str, supabase):
-    """Auto-complete checklist items when documents are uploaded"""
+def auto_complete_checklist_items(user_id: str, category: str, document_type: str, file_name: str, supabase):
+    """Auto-complete SPECIFIC checklist items when documents are uploaded"""
     try:
+        # Get the mapping for this document
+        mapping = map_document_to_checklist_item(document_type, category, file_name)
+        
         # Find checklist items for this user and category that aren't completed
         result = supabase.from_("audit_checklist_items")\
             .select("*")\
@@ -414,18 +477,56 @@ def auto_complete_checklist_items(user_id: str, category: str, supabase):
             .eq("is_completed", False)\
             .execute()
         
-        # Mark all found items as complete
-        for item in (result.data or []):
-            supabase.from_("audit_checklist_items")\
-                .update({
-                    "is_completed": True,
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
-                    "completed_by": user_id
-                })\
-                .eq("id", item['id'])\
-                .execute()
+        if not result.data:
+            return
         
-        logger.info(f"✅ Auto-completed checklist items for user {user_id}, category {category}")
+        # Track if we found any matches
+        matched_items = []
+        
+        # Try to match based on target items first
+        for item in result.data:
+            item_description = item.get('item_description', '').lower()
+            
+            # Check if this item matches any of our target items
+            for target_item in mapping['target_items']:
+                if target_item.lower() in item_description:
+                    # Mark this SPECIFIC item as complete
+                    supabase.from_("audit_checklist_items")\
+                        .update({
+                            "is_completed": True,
+                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                            "completed_by": user_id
+                        })\
+                        .eq("id", item['id'])\
+                        .execute()
+                    
+                    matched_items.append(item['id'])
+                    logger.info(f"✅ Matched and completed checklist item: {item['item_description']}")
+                    break
+            
+            # If no direct match, try keyword matching
+            if item['id'] not in matched_items and mapping['keywords']:
+                for keyword in mapping['keywords']:
+                    if keyword in item_description:
+                        # Mark this item as complete
+                        supabase.from_("audit_checklist_items")\
+                            .update({
+                                "is_completed": True,
+                                "completed_at": datetime.now(timezone.utc).isoformat(),
+                                "completed_by": user_id
+                            })\
+                            .eq("id", item['id'])\
+                            .execute()
+                        
+                        matched_items.append(item['id'])
+                        logger.info(f"✅ Matched by keyword '{keyword}': {item['item_description']}")
+                        break
+        
+        # Log if no matches were found
+        if not matched_items:
+            logger.warning(f"⚠️ No matching checklist items found for document: {file_name} (type: {document_type})")
+        else:
+            logger.info(f"✅ Auto-completed {len(matched_items)} checklist items for user {user_id}")
         
     except Exception as e:
         logger.error(f"Failed to auto-complete checklist: {e}")
@@ -480,4 +581,111 @@ async def delete_compliance_document(
         raise
     except Exception as e:
         logger.error(f"[Document Delete] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# Add this new endpoint to get detailed progress breakdown
+@router.get("/checklist/progress-details")
+async def get_checklist_progress_details(
+    current_user: Dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Get detailed progress breakdown by category with partial completion support"""
+    try:
+        user_id = current_user['id']
+        
+        # Fetch all checklist items
+        result = supabase.from_("audit_checklist_items")\
+            .select("*")\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not result.data:
+            return {
+                "success": True,
+                "category_progress": {},
+                "overall_progress": 0
+            }
+        
+        # Deduplicate items
+        seen_items = {}
+        unique_items = []
+        
+        for item in result.data:
+            key = f"{item.get('category', '')}_{item.get('item_description', '')}"
+            if key not in seen_items:
+                seen_items[key] = True
+                unique_items.append(item)
+        
+        # Group by category and calculate progress
+        category_progress = {}
+        total_weight = 0
+        total_score = 0
+        
+        # Define category weights (each category contributes equally to overall progress)
+        category_weights = {
+            'C': 1.0,  # Understanding Business
+            'D': 1.0,  # Share Capital
+            'E': 1.0,  # Fixed Assets
+            'F': 1.0,  # Inventory
+            'G': 1.0,  # Debtors
+            'H': 1.0,  # Cash & Bank
+            'J': 1.0,  # Creditors
+            'K': 1.0,  # Sales & Income
+            'L': 1.0   # Expenses
+        }
+        
+        for category, weight in category_weights.items():
+            category_items = [item for item in unique_items if item.get('category') == category]
+            
+            if not category_items:
+                continue
+            
+            # Count documents uploaded for this category
+            doc_result = supabase.from_("compliance_documents")\
+                .select("id")\
+                .eq("user_id", user_id)\
+                .eq("category", category)\
+                .execute()
+            
+            doc_count = len(doc_result.data) if doc_result.data else 0
+            
+            # Calculate progress for this category
+            # Each checklist item contributes equally within the category
+            completed_items = sum(1 for item in category_items if item.get('is_completed', False))
+            total_items = len(category_items)
+            
+            # If we have documents but not all items are marked, give partial credit
+            # Example: If 2 out of 4 items required and user uploaded 1 document, that's 25% of the category
+            if doc_count > 0 and completed_items < total_items:
+                # Each document might complete multiple items, but we'll be conservative
+                # Give credit proportional to documents uploaded vs expected items
+                expected_docs_per_category = total_items  # Usually 1 doc per item
+                partial_credit = min(doc_count / expected_docs_per_category, 1.0)
+                category_completion = max(completed_items / total_items, partial_credit)
+            else:
+                category_completion = completed_items / total_items if total_items > 0 else 0
+            
+            category_progress[category] = {
+                'completed_items': completed_items,
+                'total_items': total_items,
+                'documents_uploaded': doc_count,
+                'completion_rate': round(category_completion * 100, 1),
+                'weight': weight,
+                'contribution': round(category_completion * weight * 100, 1)
+            }
+            
+            total_weight += weight
+            total_score += category_completion * weight
+        
+        # Calculate overall progress
+        overall_progress = (total_score / total_weight * 100) if total_weight > 0 else 0
+        
+        return {
+            "success": True,
+            "category_progress": category_progress,
+            "overall_progress": round(overall_progress, 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"[Progress Details] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
