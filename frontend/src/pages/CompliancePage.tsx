@@ -387,13 +387,13 @@ const OverviewTab = ({ stats }: any) => (
 );
 
 const ChecklistTab = ({ checklist, onRefresh }: any) => {
-  const handleComplete = async (itemId: string) => {
+  const handleIncomplete = async (itemId: string) => {
     try {
-      await apiClient.post(`/api/v1/compliance/checklist/${itemId}/complete`);
-      toast.success('Item marked as complete');
-      onRefresh();
+        await apiClient.post(`/api/v1/compliance/checklist/${itemId}/incomplete`);
+        toast.success('Item marked as incomplete');
+        onRefresh();
     } catch (error) {
-      toast.error('Failed to update checklist');
+        toast.error('Failed to update checklist');
     }
   };
 
@@ -447,12 +447,13 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
                   className="flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg hover:bg-gray-900/70 transition-colors"
                 >
                   <button
-                    onClick={() => !item.is_completed && handleComplete(item.id)}
-                    disabled={item.is_completed}
+                    onClick={() => item.is_completed ? handleIncomplete(item.id) : handleComplete(item.id)}
                     className={`flex-shrink-0 transition-colors ${
-                      item.is_completed ? 'text-green-400 cursor-default' : 'text-gray-600 hover:text-green-400'
+                        item.is_completed 
+                        ? 'text-green-400 hover:text-yellow-400' 
+                        : 'text-gray-600 hover:text-green-400'
                     }`}
-                  >
+                    >
                     <CheckCircle className="h-5 w-5" />
                   </button>
                   <div className="flex-1">
