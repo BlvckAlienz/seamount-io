@@ -64,7 +64,7 @@ const TokenizationMarketPage = () => {
           {/* Header */}
           <div className="mb-4 md:mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3 mb-2">
-              <TrendingUp className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
+              <Coins className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
               <span>Tokenization Market</span>
             </h1>
             <p className="text-sm md:text-base text-gray-400">Tokenize traditional assets. Sell to retail investors</p>

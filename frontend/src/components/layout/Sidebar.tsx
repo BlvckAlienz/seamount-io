@@ -15,6 +15,8 @@ import {
   LogOut,
   Menu,
   X,
+  Lock,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +26,7 @@ interface NavItem {
   path: string;
   badge?: string;
   businessOnly?: boolean;
+  individualOnly?: boolean;
 }
 
 const Sidebar: React.FC = () => {
@@ -37,19 +40,26 @@ const Sidebar: React.FC = () => {
   const allNavItems: NavItem[] = [
     { label: 'Portfolio', icon: Briefcase, path: '/dashboard' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
-    { label: 'Collateral', icon: Shield, path: '/collateral', badge: 'NEW', businessOnly: true },
-    { label: 'Audit & Tax', icon: Shield, path: '/compliance', badge: 'NEW', businessOnly: true },
+    { label: 'Collateral', icon: Lock, path: '/collateral', badge: 'NEW', businessOnly: true },
+    { label: 'Audit & Tax', icon: Receipt, path: '/compliance', badge: 'NEW', businessOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading', badge: 'NEW' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
-    { label: 'Predictions', icon: Target, path: '/predictions' },
+    { label: 'Predictions', icon: Target, path: '/predictions', individualOnly: true },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
   // 🔒 FILTER: Hide business-only tabs from individual users
   const navItems = allNavItems.filter(item => {
+    // Business-only tabs (hide from individuals)
     if (item.businessOnly) {
       return userProfile?.account_type === 'business';
     }
+    
+    // Individual-only tabs (hide from businesses)
+    if (item.individualOnly) {
+      return userProfile?.account_type !== 'business';
+    }
+    
     return true;
   });
 

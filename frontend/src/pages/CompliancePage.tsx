@@ -2,7 +2,7 @@
 // 📱 Mobile-First Responsive Compliance Dashboard
 
 import React, { useState, useEffect } from 'react';
-import { Shield, FileText, CheckCircle, Upload, TrendingUp } from 'lucide-react';
+import { Receipt, FileText, CheckCircle, Upload, TrendingUp } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
@@ -80,7 +80,7 @@ const CompliancePage = () => {
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
-              <Shield className="h-8 w-8 text-blue-400" />
+              <Receipt className="h-8 w-8 text-blue-400" />
               <span>Compliance OS</span>
             </h1>
             <p className="text-gray-400">Your audit & taxation command center</p>

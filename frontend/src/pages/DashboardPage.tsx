@@ -8,6 +8,7 @@ import {
   Activity,
   RefreshCw,
   Shield,
+  Briefcase,
   Coins,
   Target,
   ArrowUpRight,
@@ -226,7 +227,10 @@ const DashboardPage = () => {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-4 md:mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Portfolio Overview</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3 mb-2">
+              <Briefcase className="h-6 w-6 md:h-8 md:w-8 text-green-400" />
+              <span>Portfolio Overview</span>
+            </h1>
             <p className="text-sm md:text-base text-gray-400">Manage your tokenized securities & digital assets</p>
           </div>
 

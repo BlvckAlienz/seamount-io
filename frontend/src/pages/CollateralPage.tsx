@@ -2,7 +2,7 @@
 // 📱 MOBILE-FIRST RESPONSIVE DESIGN - Platform Standard Format
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, TrendingUp, Target, RefreshCw } from 'lucide-react';
+import { Shield, Plus, TrendingUp, Target, RefreshCw, Lock } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import CollateralManagementModal from '@/components/modals/CollateralManagementModal';
 import CreateRepoModal from '@/components/modals/CreateRepoModal';
@@ -88,7 +88,7 @@ const CollateralPage: React.FC = () => {
           <div className="mb-4 md:mb-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
               <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 md:gap-3">
-                <Shield className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
+                <Lock className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
                 <span>Collateral Management</span>
               </h1>
               <button
