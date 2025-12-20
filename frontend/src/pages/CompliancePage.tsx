@@ -444,12 +444,156 @@ const CompliancePage = () => {
 };
 
 // ============================================
-// SUB-COMPONENTS (Updated for synchronization)
+// SUB-COMPONENTS (REMAIN UNCHANGED)
 // ============================================
 
-const SubscriptionPlans = ({ formatCurrency, fetchData }: any) => {
-  // ... (keep existing subscription plans component)
-  return <div>Subscription Plans Component</div>;
+const SubscriptionPlans = ({ formatCurrency, fetchData }: { formatCurrency: (amount: number) => string, fetchData: () => void }) => {
+  const [loading, setLoading] = useState(false);
+
+  const SUBSCRIPTION_PLANS = [
+    {
+      id: 'PLN_yp8p5obbu6azilo',
+      name: 'Compliance Essentials',
+      price: 900000,
+      jobToBeDone: 'Get my books audit-ready',
+      deliverables: [
+        'Clean bookkeeping records (trial balance)',
+        'Draft audited accounts prepared',
+        'Tax exemption analysis + savings report',
+        'Tax returns prepared & filed (CIT, VAT, WHT)'
+      ],
+      outcome: 'Your business passes due diligence. Books are clean enough for compliance.',
+      bestFor: 'Startups & micro businesses needing organized records for compliance'
+    },
+    {
+      id: 'PLN_e23vyyhc2xjg6b5',
+      name: 'Audit-Ready Business',
+      price: 1800000,
+      popular: true,
+      jobToBeDone: 'Pass statutory audit, file taxes correctly',
+      deliverables: [
+        'Full statutory audit (audited financial statements)',
+        'Tax returns prepared & filed (CIT, VAT, WHT)',
+        'CAC full compliance (CO2, CO7, annual returns)',
+        'Tax optimization report (maximize exemptions)',
+        'Auditor opinion letter for banks/investors'
+      ],
+      outcome: "You're fully compliant. No FIRS penalties. Investors trust your numbers.",
+      bestFor: 'SMEs seeking bank loans or investor funding'
+    },
+    {
+      id: 'PLN_le0r9qjpjwe0dnk',
+      name: 'Tokenization-Ready',
+      price: 3600000,
+      jobToBeDone: 'Raise capital by tokenizing my business',
+      deliverables: [
+        'Full statutory audit + investor-grade statements',
+        'Tax returns filed + optimization strategy',
+        'Tokenization feasibility report',
+        'Investor data room (organized docs)',
+        'CFO advisory (quarterly strategy calls)'
+      ],
+      outcome: "You're capital-ready. Investors can verify your business is legitimate and scalable.",
+      bestFor: 'Growth businesses seeking serious capital (₦50M+)'
+    }
+  ];
+
+  const handleSubscribe = async (planCode: string) => {
+    try {
+      setLoading(true);
+      const res = await apiClient.post('/api/v1/subscriptions/initialize', { plan_code: planCode });
+      if (res.data.success && res.data.payment_link) {
+        window.location.href = res.data.payment_link;
+      } else {
+        toast.error('Failed to initialize subscription');
+      }
+    } catch (error) {
+      toast.error('Subscription failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Sidebar />
+      <div className="flex-1 overflow-y-auto p-6 pt-20 lg:pt-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Sidebar />
+      <div className="flex-1 overflow-y-auto p-6 pt-20 lg:pt-6">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-white mb-2">Choose Your Plan</h1>
+          <p className="text-gray-400 mb-8">Get audit-ready and unlock tax exemptions</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {SUBSCRIPTION_PLANS.map((plan) => (
+              <div
+                key={plan.id}
+                className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 border rounded-2xl p-6 relative ${
+                  plan.popular ? 'border-blue-500/50' : 'border-gray-700/50'
+                }`}
+              >
+                {plan.popular && (
+                  <span className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-bl-lg">
+                    MOST POPULAR
+                  </span>
+                )}
+
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                  <p className="text-blue-400 text-sm italic">"{plan.jobToBeDone}"</p>
+                </div>
+
+                <div className="mb-6">
+                  <div className="text-4xl font-bold text-white">
+                    {formatCurrency(plan.price)}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">
+                    Annual subscription • One-time payment
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-400 uppercase mb-3">What You Get:</h4>
+                  <ul className="space-y-2">
+                    {plan.deliverables.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
+                        <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mb-6 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                  <h4 className="text-xs font-semibold text-green-400 uppercase mb-1">Outcome:</h4>
+                  <p className="text-sm text-gray-300">{plan.outcome}</p>
+                </div>
+
+                <div className="mb-6 text-xs text-gray-500">
+                  <strong>Best for:</strong> {plan.bestFor}
+                </div>
+
+                <button
+                  onClick={() => handleSubscribe(plan.id)}
+                  disabled={loading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Processing...' : 'Get Started'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const OverviewTab = ({ metrics }: any) => (

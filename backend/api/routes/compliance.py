@@ -42,6 +42,9 @@ def get_user_metrics(user_id: str, supabase) -> Dict[str, Any]:
         
         total_items = checklist_result.count if hasattr(checklist_result, 'count') else len(checklist_result.data or [])
         
+        # 🚨 CRITICAL: Initialize completed_items BEFORE conditional
+        completed_items = 0
+        
         if checklist_result.data:
             # Count completed items that ACTUALLY have supporting documents
             completed_items = 0
