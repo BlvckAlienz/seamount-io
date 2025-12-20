@@ -242,7 +242,7 @@ async def upload_compliance_document(
             logger.info(f"Available buckets from API: {buckets_response}")
         except Exception as bucket_list_error:
             logger.error(f"Failed to list buckets: {bucket_list_error}")
-            
+
         # Verify database insert
         if not db_result.data:
             logger.error("Database insert returned no data")
@@ -255,6 +255,10 @@ async def upload_compliance_document(
 
         logger.info(f"✅ SUCCESS: User {user_id} uploaded {file.filename}, record ID: {db_result.data[0]['id']}")
 
+        # In your upload_compliance_document function, after successful database insert:
+        # Auto-complete checklist items for this category
+        auto_complete_checklist_items(user_id, category, supabase)
+        
         return {
             "success": True,
             "document_id": db_result.data[0]['id'],
@@ -397,3 +401,31 @@ async def grant_auditor_access(
     except Exception as e:
         logger.error(f"[Auditor Access] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Add this function to your compliance.py backend
+def auto_complete_checklist_items(user_id: str, category: str, supabase):
+    """Auto-complete checklist items when documents are uploaded"""
+    try:
+        # Find checklist items for this user and category that aren't completed
+        result = supabase.from_("audit_checklist_items")\
+            .select("*")\
+            .eq("user_id", user_id)\
+            .eq("category", category)\
+            .eq("is_completed", False)\
+            .execute()
+        
+        # Mark all found items as complete
+        for item in (result.data or []):
+            supabase.from_("audit_checklist_items")\
+                .update({
+                    "is_completed": True,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "completed_by": user_id
+                })\
+                .eq("id", item['id'])\
+                .execute()
+        
+        logger.info(f"✅ Auto-completed checklist items for user {user_id}, category {category}")
+        
+    except Exception as e:
+        logger.error(f"Failed to auto-complete checklist: {e}")

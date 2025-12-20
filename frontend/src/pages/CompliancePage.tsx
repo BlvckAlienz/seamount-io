@@ -2,7 +2,7 @@
 // 📱 Mobile-First Responsive Compliance Dashboard
 
 import React, { useState, useEffect } from 'react';
-import { Receipt, FileText, CheckCircle, Upload, TrendingUp } from 'lucide-react';
+import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Shield } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
@@ -22,18 +22,18 @@ const CompliancePage = () => {
 
   const fetchData = async () => {
     try {
-        setLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const [subRes, checklistRes, docsRes] = await Promise.all([
+      setLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const [subRes, checklistRes, docsRes] = await Promise.all([
         apiClient.get('/api/v1/subscriptions/my-subscription'),
         apiClient.get('/api/v1/compliance/checklist'),
         apiClient.get('/api/v1/compliance/documents')
-        ]);
+      ]);
 
-        if (subRes.data.success) setSubscription(subRes.data.subscription);
-        if (checklistRes.data.success) {
-        // Frontend deduplication as backup (even though backend should handle it)
+      if (subRes.data.success) setSubscription(subRes.data.subscription);
+      if (checklistRes.data.success) {
+        // Frontend deduplication - CRITICAL FIX for duplicate checklist items
         const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
         
         // Calculate stats
@@ -43,58 +43,46 @@ const CompliancePage = () => {
         
         setChecklist(uniqueChecklist);
         setStats({
-            completed_items: completedItems,
-            total_items: totalItems,
-            completion_percentage: completionPercentage
+          completed_items: completedItems,
+          total_items: totalItems,
+          completion_percentage: completionPercentage
         });
-        }
-        if (docsRes.data.success) setDocuments(docsRes.data.documents);
-        
-        setAuthChecked(true);
-    } catch (error) {
-        console.error('Failed to fetch compliance data:', error);
-        toast.error('Failed to load data');
-        setAuthChecked(true);
-    } finally {
-        setLoading(false);
-    }
-    };
-
-// Helper function to deduplicate checklist items
-const deduplicateChecklistItems = (items: any[]): any[] => {
-  if (!items || items.length === 0) return [];
-  
-  const seen = new Set();
-  const result: any[] = [];
-  
-  items.forEach(item => {
-    if (!item) return;
-    
-    // Create unique key from category and description
-    const key = `${item.category || 'unknown'}_${item.item_description || 'unknown'}`.toLowerCase().trim();
-    
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(item);
-    }
-  });
-  
-  console.log(`Deduplicated ${items.length} → ${result.length} items`);
-  return result;
-};
-
-  // Function to remove duplicate checklist items by ID
-  const removeDuplicateChecklistItems = (items: any[]): any[] => {
-    const seenIds = new Set();
-    return items.filter(item => {
-      if (!item.id) return true; // Keep items without IDs
-      if (seenIds.has(item.id)) {
-        console.warn(`Duplicate checklist item found: ${item.id} - ${item.item_description}`);
-        return false;
       }
-      seenIds.add(item.id);
-      return true;
+      if (docsRes.data.success) setDocuments(docsRes.data.documents);
+      
+      setAuthChecked(true);
+    } catch (error) {
+      console.error('Failed to fetch compliance data:', error);
+      toast.error('Failed to load data');
+      setAuthChecked(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to deduplicate checklist items - FIXED VERSION
+  const deduplicateChecklistItems = (items: any[]): any[] => {
+    if (!items || items.length === 0) return [];
+    
+    const seen = new Map();
+    const result: any[] = [];
+    
+    items.forEach(item => {
+      if (!item) return;
+      
+      // Create a unique composite key using ALL identifying fields
+      const compositeKey = `${item.category}_${item.item_description}_${item.item_code || ''}`.toLowerCase().trim();
+      
+      // If we haven't seen this exact checklist item before, add it
+      if (!seen.has(compositeKey)) {
+        seen.set(compositeKey, true);
+        result.push(item);
+      } else {
+        console.log(`Removed duplicate: ${item.category} - ${item.item_description}`);
+      }
     });
+    
+    return result;
   };
 
   const formatCurrencyNGN = (amount: number): string => {
@@ -129,7 +117,7 @@ const deduplicateChecklistItems = (items: any[]): any[] => {
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3 mb-2">
-              <Receipt className="h-8 w-8 text-blue-400" />
+              <Shield className="h-8 w-8 text-blue-400" />
               <span>Compliance OS</span>
             </h1>
             <p className="text-gray-400">Your audit & taxation command center</p>
@@ -192,10 +180,9 @@ const deduplicateChecklistItems = (items: any[]): any[] => {
 const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number) => string }) => {
   const [loading, setLoading] = useState(false);
 
-  // Static subscription plans with actual Paystack plan codes
   const SUBSCRIPTION_PLANS = [
     {
-      id: 'PLN_yp8p5obbu6azilo', // Compliance Starter
+      id: 'PLN_yp8p5obbu6azilo',
       name: 'Compliance Essentials',
       price: 600000,
       jobToBeDone: 'Get my books audit-ready',
@@ -209,7 +196,7 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
       bestFor: 'Startups & micro businesses needing organized records'
     },
     {
-      id: 'PLN_e23vyyhc2xjg6b5', // Audit Ready
+      id: 'PLN_e23vyyhc2xjg6b5',
       name: 'Audit-Ready Business',
       price: 1800000,
       popular: true,
@@ -225,7 +212,7 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
       bestFor: 'SMEs seeking bank loans or investor funding'
     },
     {
-      id: 'PLN_le0r9qjpjwe0dnk', // Tokenization Ready
+      id: 'PLN_le0r9qjpjwe0dnk',
       name: 'Tokenization-Ready',
       price: 3600000,
       jobToBeDone: 'Raise capital by tokenizing my business',
@@ -411,30 +398,43 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
               <h3 className="text-lg font-bold text-white">
                 {code}. {name}
               </h3>
-              <span className="text-sm text-gray-400">
-                {completedCount}/{items.length} completed
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">
+                  {completedCount}/{items.length}
+                </span>
+                <div className="w-24 bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${(completedCount/items.length)*100}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
               {items.map((item: any) => (
                 <div
                   key={item.id}
-                  className="flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg"
+                  className="flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg hover:bg-gray-900/70 transition-colors"
                 >
                   <button
                     onClick={() => !item.is_completed && handleComplete(item.id)}
                     disabled={item.is_completed}
-                    className={`flex-shrink-0 ${
-                      item.is_completed ? 'text-green-400' : 'text-gray-600 hover:text-gray-400'
+                    className={`flex-shrink-0 transition-colors ${
+                      item.is_completed ? 'text-green-400 cursor-default' : 'text-gray-600 hover:text-green-400'
                     }`}
                   >
                     <CheckCircle className="h-5 w-5" />
                   </button>
                   <div className="flex-1">
-                    <p className={`text-sm ${item.is_completed ? 'text-gray-500 line-through' : 'text-gray-300'}`}>
+                    <p className={`text-sm ${item.is_completed ? 'text-gray-400 line-through' : 'text-gray-300'}`}>
                       {item.item_description}
                     </p>
+                    {item.is_completed && (
+                      <p className="text-xs text-green-400 mt-1">
+                        ✓ Completed
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -456,60 +456,49 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
     if (!file) return;
 
     try {
-        setUploading(true);
-        
-        // Log file info
-        console.log('📤 Uploading file:', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        category: selectedCategory,
-        document_type: selectedType
-        });
-        
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('category', selectedCategory);
-        formData.append('document_type', selectedType);
-        
-        // Log FormData contents
-        console.log('📦 FormData entries:');
-        for (let pair of formData.entries()) {
-        console.log(pair[0], pair[1]);
-        }
-        
-        const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
-        headers: { 
-            'Content-Type': 'multipart/form-data'
-        }
-        });
+      setUploading(true);
+      
+      // Validate file size
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size exceeds 10MB limit');
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', selectedCategory);
+      formData.append('document_type', selectedType);
 
-        console.log('✅ Upload response:', response.data);
-        toast.success('Document uploaded successfully!');
-        onRefresh();
-    } catch (error: any) {
-        console.error('❌ Upload error:', error);
-        console.error('❌ Error response:', error.response);
-        
-        // Detailed error message
-        let errorMsg = 'Upload failed';
-        if (error.response?.data?.detail) {
-        errorMsg = error.response.data.detail;
-        } else if (error.response?.data?.message) {
-        errorMsg = error.response.data.message;
-        } else if (error.message) {
-        errorMsg = error.message;
+      const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data'
         }
-        
-        toast.error(`Upload failed: ${errorMsg}`);
+      });
+
+      toast.success('Document uploaded successfully!');
+      onRefresh();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      
+      let errorMsg = 'Upload failed';
+      if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      toast.error(`Upload failed: ${errorMsg}`);
     } finally {
-        setUploading(false);
-        if (e.target) e.target.value = '';
+      setUploading(false);
+      if (e.target) e.target.value = '';
     }
-    };
+  };
 
   return (
     <div className="space-y-6">
+      {/* Upload Section */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Upload Document</h3>
         
@@ -519,17 +508,17 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="C">Understanding Business</option>
-              <option value="D">Share Capital</option>
-              <option value="E">Fixed Assets</option>
-              <option value="F">Inventory</option>
-              <option value="G">Debtors</option>
-              <option value="H">Cash & Bank</option>
-              <option value="J">Creditors</option>
-              <option value="K">Sales & Income</option>
-              <option value="L">Expenses</option>
+              <option value="C">C - Understanding Business</option>
+              <option value="D">D - Share Capital</option>
+              <option value="E">E - Fixed Assets</option>
+              <option value="F">F - Inventory</option>
+              <option value="G">G - Debtors</option>
+              <option value="H">H - Cash & Bank</option>
+              <option value="J">J - Creditors</option>
+              <option value="K">K - Sales & Income</option>
+              <option value="L">L - Expenses</option>
             </select>
           </div>
 
@@ -538,7 +527,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="incorporation_docs">Incorporation Docs</option>
               <option value="tax_certificate">Tax Certificate</option>
@@ -550,9 +539,9 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
           </div>
         </div>
 
-        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors">
+        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <Upload className="h-5 w-5" />
-          {uploading ? 'Uploading...' : 'Choose File'}
+          {uploading ? 'Uploading...' : 'Choose File (PDF, JPG, PNG, DOC)'}
           <input
             type="file"
             onChange={handleUpload}
@@ -561,36 +550,104 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
           />
         </label>
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          Max file size: 10MB. Files are stored securely and privately.
+        </p>
       </div>
 
+      {/* Documents List */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-white mb-4">Uploaded Documents ({documents.length})</h3>
-        
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-white">
+            Uploaded Documents ({documents.length})
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-3 py-1 rounded-full bg-green-900/50 text-green-300">
+              {documents.filter(d => d.verification_status === 'verified').length} ✓
+            </span>
+            <span className="text-xs px-3 py-1 rounded-full bg-yellow-900/50 text-yellow-300">
+              {documents.filter(d => d.verification_status === 'pending').length} ⏳
+            </span>
+          </div>
+        </div>
+    
         {documents.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">No documents uploaded yet</p>
+            <p className="text-gray-500 text-sm mt-2">Upload a file to begin your audit checklist</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {documents.map((doc: any) => (
-              <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-blue-400" />
-                  <div>
-                    <p className="text-white font-medium">{doc.file_name}</p>
-                    <p className="text-xs text-gray-400">{doc.document_type} • {doc.category}</p>
+          <div className="space-y-3">
+            {documents.map((doc) => (
+              <div 
+                key={doc.id} 
+                className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg hover:bg-gray-900 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`
+                    p-2 rounded-lg flex-shrink-0
+                    ${doc.verification_status === 'verified' 
+                      ? 'bg-green-900/30 text-green-400' 
+                      : doc.verification_status === 'rejected'
+                      ? 'bg-red-900/30 text-red-400'
+                      : 'bg-yellow-900/30 text-yellow-400'
+                    }
+                  `}>
+                    <FileText className="h-5 w-5" />
+                  </div>
+                
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium truncate" title={doc.file_name}>
+                      {doc.file_name}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mt-1">
+                      <span className="bg-gray-800 px-2 py-0.5 rounded">
+                        {doc.document_type?.replace('_', ' ') || 'Other'}
+                      </span>
+                      <span>•</span>
+                      <span>Category {doc.category}</span>
+                      <span>•</span>
+                      <span className={`
+                        ${doc.verification_status === 'verified' ? 'text-green-400' : 
+                          doc.verification_status === 'rejected' ? 'text-red-400' : 
+                          'text-yellow-400'}
+                      `}>
+                        {doc.verification_status || 'pending'} 
+                        {doc.verification_status === 'pending' && ' (Under Review)'}
+                      </span>
+                      <span>•</span>
+                      <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                    </div>
                   </div>
                 </div>
-                
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                >
-                  View
-                </a>
+            
+                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                  {doc.verification_status === 'verified' && doc.file_url ? (
+                    <a
+                      href={doc.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                      title="View verified document"
+                    >
+                      View
+                    </a>
+                  ) : doc.verification_status === 'pending' ? (
+                    <span className="px-3 py-1.5 bg-gray-700 text-gray-300 text-sm rounded cursor-default"
+                          title="Document is under review">
+                      ⏳ Pending
+                    </span>
+                  ) : doc.verification_status === 'rejected' ? (
+                    <button 
+                      className="px-3 py-1.5 bg-red-900/50 text-red-300 text-sm rounded cursor-default hover:bg-red-800/50 transition-colors"
+                      title="Document was rejected - please upload a new version"
+                      onClick={() => toast.info('Please upload a corrected version of this document')}
+                    >
+                      ✗ Re-upload
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -637,7 +694,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.business_type}
               onChange={(e) => setFormData({...formData, business_type: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="small_company">Small Company</option>
               <option value="startup">Startup</option>
@@ -653,7 +710,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.annual_turnover}
               onChange={(e) => setFormData({...formData, annual_turnover: e.target.value})}
               placeholder="Enter annual turnover"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
@@ -662,7 +719,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.industry_sector}
               onChange={(e) => setFormData({...formData, industry_sector: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="technology">Technology</option>
               <option value="agriculture">Agriculture</option>
@@ -679,24 +736,27 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.employee_count}
               onChange={(e) => setFormData({...formData, employee_count: e.target.value})}
               placeholder="Enter employee count"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
+              id="pension-contributions"
               checked={formData.has_pension_contributions}
               onChange={(e) => setFormData({...formData, has_pension_contributions: e.target.checked})}
-              className="w-4 h-4"
+              className="w-4 h-4 rounded bg-gray-900 border-gray-700 text-green-500 focus:ring-green-500"
             />
-            <label className="text-sm text-gray-300">We make pension contributions</label>
+            <label htmlFor="pension-contributions" className="text-sm text-gray-300">
+              We make pension contributions
+            </label>
           </div>
 
           <button
             onClick={handleCheck}
             disabled={checking}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {checking ? 'Checking...' : 'Check Exemptions'}
           </button>
