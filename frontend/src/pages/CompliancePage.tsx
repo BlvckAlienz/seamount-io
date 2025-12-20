@@ -1,8 +1,8 @@
 // File: frontend/src/pages/CompliancePage.tsx
-// 📱 Mobile-First Responsive Compliance Dashboard
+// 📱 Mobile-First Responsive Compliance Dashboard - SIMPLIFIED VERSION
 
 import React, { useState, useEffect } from 'react';
-import { Receipt, FileText, CheckCircle, Upload, TrendingUp, Shield } from 'lucide-react';
+import { Shield, FileText, CheckCircle, Upload, TrendingUp, Trash2 } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
@@ -33,10 +33,7 @@ const CompliancePage = () => {
 
       if (subRes.data.success) setSubscription(subRes.data.subscription);
       if (checklistRes.data.success) {
-        // Frontend deduplication - CRITICAL FIX for duplicate checklist items
         const uniqueChecklist = deduplicateChecklistItems(checklistRes.data.checklist);
-        
-        // Calculate stats
         const totalItems = uniqueChecklist.length;
         const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
         const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
@@ -60,7 +57,6 @@ const CompliancePage = () => {
     }
   };
 
-  // Helper function to deduplicate checklist items - FIXED VERSION
   const deduplicateChecklistItems = (items: any[]): any[] => {
     if (!items || items.length === 0) return [];
     
@@ -69,16 +65,10 @@ const CompliancePage = () => {
     
     items.forEach(item => {
       if (!item) return;
-      
-      // Create a unique composite key using ALL identifying fields
-      const compositeKey = `${item.category}_${item.item_description}_${item.item_code || ''}`.toLowerCase().trim();
-      
-      // If we haven't seen this exact checklist item before, add it
-      if (!seen.has(compositeKey)) {
-        seen.set(compositeKey, true);
+      const key = `${item.category}_${item.item_description}_${item.item_code || ''}`.toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.set(key, true);
         result.push(item);
-      } else {
-        console.log(`Removed duplicate: ${item.category} - ${item.item_description}`);
       }
     });
     
@@ -112,7 +102,6 @@ const CompliancePage = () => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Sidebar />
-
       <div className="flex-1 overflow-y-auto p-4 md:p-6 pt-20 lg:pt-6">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
@@ -137,7 +126,7 @@ const CompliancePage = () => {
             <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/30 rounded-xl p-6">
               <div className="text-sm text-gray-400 mb-2">Documents</div>
               <div className="text-4xl font-bold text-white mb-2">{documents.length}</div>
-              <div className="text-sm text-green-400">Uploaded & verified</div>
+              <div className="text-sm text-green-400">Uploaded for audit</div>
             </div>
 
             <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 border border-purple-500/30 rounded-xl p-6">
@@ -431,9 +420,7 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
                       {item.item_description}
                     </p>
                     {item.is_completed && (
-                      <p className="text-xs text-green-400 mt-1">
-                        ✓ Completed
-                      </p>
+                      <p className="text-xs text-green-400 mt-1">✓ Completed</p>
                     )}
                   </div>
                 </div>
@@ -448,6 +435,7 @@ const ChecklistTab = ({ checklist, onRefresh }: any) => {
 
 const DocumentsTab = ({ documents, onRefresh }: any) => {
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('C');
   const [selectedType, setSelectedType] = useState('incorporation_docs');
 
@@ -457,8 +445,6 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
 
     try {
       setUploading(true);
-      
-      // Validate file size
       if (file.size > 10 * 1024 * 1024) {
         toast.error('File size exceeds 10MB limit');
         return;
@@ -469,26 +455,18 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
       formData.append('category', selectedCategory);
       formData.append('document_type', selectedType);
 
-      const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data'
-        }
+      await apiClient.post('/api/v1/compliance/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       toast.success('Document uploaded successfully!');
       onRefresh();
     } catch (error: any) {
       console.error('Upload error:', error);
-      
       let errorMsg = 'Upload failed';
-      if (error.response?.data?.detail) {
-        errorMsg = error.response.data.detail;
-      } else if (error.response?.data?.message) {
-        errorMsg = error.response.data.message;
-      } else if (error.message) {
-        errorMsg = error.message;
-      }
-      
+      if (error.response?.data?.detail) errorMsg = error.response.data.detail;
+      else if (error.response?.data?.message) errorMsg = error.response.data.message;
+      else if (error.message) errorMsg = error.message;
       toast.error(`Upload failed: ${errorMsg}`);
     } finally {
       setUploading(false);
@@ -496,9 +474,25 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
     }
   };
 
+  const handleDelete = async (documentId: string) => {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+    
+    try {
+      setDeletingId(documentId);
+      // You need to implement this backend endpoint
+      await apiClient.delete(`/api/v1/compliance/documents/${documentId}`);
+      toast.success('Document deleted successfully!');
+      onRefresh();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete document');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Upload Section */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4">Upload Document</h3>
         
@@ -508,7 +502,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             >
               <option value="C">C - Understanding Business</option>
               <option value="D">D - Share Capital</option>
@@ -527,7 +521,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             >
               <option value="incorporation_docs">Incorporation Docs</option>
               <option value="tax_certificate">Tax Certificate</option>
@@ -539,7 +533,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
           </div>
         </div>
 
-        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        <label className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg cursor-pointer transition-colors">
           <Upload className="h-5 w-5" />
           {uploading ? 'Uploading...' : 'Choose File (PDF, JPG, PNG, DOC)'}
           <input
@@ -550,32 +544,18 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
           />
         </label>
-        <p className="text-xs text-gray-500 mt-2 text-center">
-          Max file size: 10MB. Files are stored securely and privately.
-        </p>
+        <p className="text-xs text-gray-500 mt-2 text-center">Max file size: 10MB</p>
       </div>
 
-      {/* Documents List */}
+      {/* SIMPLIFIED Documents List - No verification status */}
       <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-white">
-            Uploaded Documents ({documents.length})
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-3 py-1 rounded-full bg-green-900/50 text-green-300">
-              {documents.filter(d => d.verification_status === 'verified').length} ✓
-            </span>
-            <span className="text-xs px-3 py-1 rounded-full bg-yellow-900/50 text-yellow-300">
-              {documents.filter(d => d.verification_status === 'pending').length} ⏳
-            </span>
-          </div>
-        </div>
-    
+        <h3 className="text-lg font-bold text-white mb-4">Uploaded Documents ({documents.length})</h3>
+        
         {documents.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-12 w-12 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400">No documents uploaded yet</p>
-            <p className="text-gray-500 text-sm mt-2">Upload a file to begin your audit checklist</p>
+            <p className="text-gray-500 text-sm mt-2">Upload a file to update your audit checklist</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -585,18 +565,7 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                 className="flex items-center justify-between p-4 bg-gray-900/50 rounded-lg hover:bg-gray-900 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`
-                    p-2 rounded-lg flex-shrink-0
-                    ${doc.verification_status === 'verified' 
-                      ? 'bg-green-900/30 text-green-400' 
-                      : doc.verification_status === 'rejected'
-                      ? 'bg-red-900/30 text-red-400'
-                      : 'bg-yellow-900/30 text-yellow-400'
-                    }
-                  `}>
-                    <FileText className="h-5 w-5" />
-                  </div>
-                
+                  <FileText className="h-5 w-5 text-blue-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-medium truncate" title={doc.file_name}>
                       {doc.file_name}
@@ -608,45 +577,29 @@ const DocumentsTab = ({ documents, onRefresh }: any) => {
                       <span>•</span>
                       <span>Category {doc.category}</span>
                       <span>•</span>
-                      <span className={`
-                        ${doc.verification_status === 'verified' ? 'text-green-400' : 
-                          doc.verification_status === 'rejected' ? 'text-red-400' : 
-                          'text-yellow-400'}
-                      `}>
-                        {doc.verification_status || 'pending'} 
-                        {doc.verification_status === 'pending' && ' (Under Review)'}
-                      </span>
-                      <span>•</span>
                       <span>{new Date(doc.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
-            
+                
                 <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                  {doc.verification_status === 'verified' && doc.file_url ? (
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                      title="View verified document"
-                    >
-                      View
-                    </a>
-                  ) : doc.verification_status === 'pending' ? (
-                    <span className="px-3 py-1.5 bg-gray-700 text-gray-300 text-sm rounded cursor-default"
-                          title="Document is under review">
-                      ⏳ Pending
-                    </span>
-                  ) : doc.verification_status === 'rejected' ? (
-                    <button 
-                      className="px-3 py-1.5 bg-red-900/50 text-red-300 text-sm rounded cursor-default hover:bg-red-800/50 transition-colors"
-                      title="Document was rejected - please upload a new version"
-                      onClick={() => toast.info('Please upload a corrected version of this document')}
-                    >
-                      ✗ Re-upload
-                    </button>
-                  ) : null}
+                  <a
+                    href={doc.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                    title="View document"
+                  >
+                    View
+                  </a>
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    disabled={deletingId === doc.id}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors disabled:opacity-50"
+                    title="Delete document"
+                  >
+                    {deletingId === doc.id ? 'Deleting...' : <Trash2 className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
             ))}
@@ -694,7 +647,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.business_type}
               onChange={(e) => setFormData({...formData, business_type: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             >
               <option value="small_company">Small Company</option>
               <option value="startup">Startup</option>
@@ -710,7 +663,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.annual_turnover}
               onChange={(e) => setFormData({...formData, annual_turnover: e.target.value})}
               placeholder="Enter annual turnover"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             />
           </div>
 
@@ -719,7 +672,7 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
             <select
               value={formData.industry_sector}
               onChange={(e) => setFormData({...formData, industry_sector: e.target.value})}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             >
               <option value="technology">Technology</option>
               <option value="agriculture">Agriculture</option>
@@ -736,27 +689,24 @@ const ExemptionsTab = ({ formatCurrency }: { formatCurrency: (amount: number) =>
               value={formData.employee_count}
               onChange={(e) => setFormData({...formData, employee_count: e.target.value})}
               placeholder="Enter employee count"
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
             />
           </div>
 
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="pension-contributions"
               checked={formData.has_pension_contributions}
               onChange={(e) => setFormData({...formData, has_pension_contributions: e.target.checked})}
-              className="w-4 h-4 rounded bg-gray-900 border-gray-700 text-green-500 focus:ring-green-500"
+              className="w-4 h-4"
             />
-            <label htmlFor="pension-contributions" className="text-sm text-gray-300">
-              We make pension contributions
-            </label>
+            <label className="text-sm text-gray-300">We make pension contributions</label>
           </div>
 
           <button
             onClick={handleCheck}
             disabled={checking}
-            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
           >
             {checking ? 'Checking...' : 'Check Exemptions'}
           </button>

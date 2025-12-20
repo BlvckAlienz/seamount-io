@@ -258,7 +258,7 @@ async def upload_compliance_document(
         # In your upload_compliance_document function, after successful database insert:
         # Auto-complete checklist items for this category
         auto_complete_checklist_items(user_id, category, supabase)
-        
+
         return {
             "success": True,
             "document_id": db_result.data[0]['id'],
@@ -429,3 +429,55 @@ def auto_complete_checklist_items(user_id: str, category: str, supabase):
         
     except Exception as e:
         logger.error(f"Failed to auto-complete checklist: {e}")
+
+@router.delete("/documents/{document_id}")
+async def delete_compliance_document(
+    document_id: str,
+    current_user: Dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Delete a compliance document from storage and database"""
+    try:
+        user_id = current_user['id']
+        
+        # 1. Get the document to find storage_path
+        doc_result = supabase.from_("compliance_documents")\
+            .select("storage_path, category")\
+            .eq("id", document_id)\
+            .eq("user_id", user_id)\
+            .single()\
+            .execute()
+        
+        if not doc_result.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        doc = doc_result.data
+        
+        # 2. Delete from storage (if storage_path exists)
+        if doc.get('storage_path'):
+            try:
+                supabase.storage.from_("compliance-documents")\
+                    .remove([doc['storage_path']])
+            except Exception as storage_error:
+                logger.warning(f"Failed to delete from storage: {storage_error}")
+                # Continue anyway to delete the database record
+        
+        # 3. Delete from database
+        supabase.from_("compliance_documents")\
+            .delete()\
+            .eq("id", document_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        logger.info(f"✅ Document deleted: {document_id} by user {user_id}")
+        
+        return {
+            "success": True,
+            "message": "Document deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Document Delete] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
