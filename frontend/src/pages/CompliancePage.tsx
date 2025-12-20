@@ -33,8 +33,21 @@ const CompliancePage = () => {
 
       if (subRes.data.success) setSubscription(subRes.data.subscription);
       if (checklistRes.data.success) {
-        setChecklist(checklistRes.data.checklist);
-        setStats(checklistRes.data.stats);
+        // Deduplicate checklist items by ID to prevent multiples
+        const uniqueChecklist = removeDuplicateChecklistItems(checklistRes.data.checklist);
+        
+        // Recalculate stats based on deduplicated checklist
+        const completedItems = uniqueChecklist.filter(item => item.is_completed).length;
+        const totalItems = uniqueChecklist.length;
+        const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+        
+        setChecklist(uniqueChecklist);
+        setStats({
+          ...checklistRes.data.stats,
+          completed_items: completedItems,
+          total_items: totalItems,
+          completion_percentage: completionPercentage
+        });
       }
       if (docsRes.data.success) setDocuments(docsRes.data.documents);
       
@@ -46,6 +59,20 @@ const CompliancePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to remove duplicate checklist items by ID
+  const removeDuplicateChecklistItems = (items: any[]): any[] => {
+    const seenIds = new Set();
+    return items.filter(item => {
+      if (!item.id) return true; // Keep items without IDs
+      if (seenIds.has(item.id)) {
+        console.warn(`Duplicate checklist item found: ${item.id} - ${item.item_description}`);
+        return false;
+      }
+      seenIds.add(item.id);
+      return true;
+    });
   };
 
   const formatCurrencyNGN = (amount: number): string => {
@@ -288,9 +315,6 @@ const SubscriptionPlans = ({ formatCurrency }: { formatCurrency: (amount: number
     </div>
   );
 };
-
-// [Rest of the components remain exactly the same...]
-// OverviewTab, ChecklistTab, DocumentsTab, ExemptionsTab components unchanged
 
 const OverviewTab = ({ stats }: any) => (
   <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
