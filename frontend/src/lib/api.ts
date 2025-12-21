@@ -7,7 +7,7 @@ const getBaseURL = () => {
     return ''; // Empty string = relative to current origin (localhost:5173)
   }
   // Use environment variable in production
-  return import.meta.env.VITE_API_URL || 'https://seamount-io-pr8a.onrender.com';
+  return import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
 };
 
 const BASE_URL = getBaseURL();

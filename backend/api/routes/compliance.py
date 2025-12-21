@@ -398,7 +398,11 @@ async def upload_compliance_document(
             file_url = supabase.storage.from_("compliance-documents").get_public_url(file_path)
         except Exception as url_error:
             logger.error(f"Failed to get URL: {url_error}")
-            project_ref = "YOUR_PROJECT_REF"
+            # Get project ref from Supabase client config
+            try:
+                project_ref = supabase.url.split('//')[1].split('.')[0]
+            except:
+                project_ref = "unknown"
             file_url = f"https://{project_ref}.supabase.co/storage/v1/object/public/compliance-documents/{file_path}"
 
         # Save to database

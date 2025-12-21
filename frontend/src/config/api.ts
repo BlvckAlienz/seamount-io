@@ -5,7 +5,7 @@ import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
 // FIXED: Single source of truth for API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://seamount-io-pr8a.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://seamount-api.onrender.com";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

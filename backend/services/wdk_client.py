@@ -98,7 +98,7 @@ class WDKClient:
         # ✅ CRITICAL FIX: FORCE use of environment variable with fallback
         self.base_url = self.settings.WDK_SERVICE_URL
         if not self.base_url or "localhost" in str(self.base_url):
-            self.base_url = "https://seamount-wdk-ne5i.onrender.com"  # Hardcode as fallback
+            self.base_url = "https://seamount-wdk.onrender.com"  # Hardcode as fallback
             logger.warning("⚠️ Using fallback WDK URL - ENV variable not set properly")
         
         logger.info(f"🎯 WDK Service URL configured: {self.base_url}")
