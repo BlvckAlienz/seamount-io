@@ -925,13 +925,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
       {/* Navigation Header */}
       <header className="fixed top-0 left-0 right-0 glass-card z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 py-2 sm:py-4 flex justify-between items-center gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-3">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur opacity-30"></div>
-              <img src="/seamount-logo.jpeg" alt="Seamount" className="relative w-10 h-10 object-contain rounded-lg" />
+              <img src="/seamount-logo.jpeg" alt="Seamount" className="relative w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-lg" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Seamount</span>
+            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Seamount</span>
           </div>
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
@@ -941,16 +941,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <a href="#business" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Business</a>
           </nav>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1.5 sm:space-x-3">
             <button 
               onClick={() => onOpenAuth('login')} 
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-all"
+              className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 hover:text-blue-600 transition-all"
             >
               Sign In
             </button>
             <button 
               onClick={() => onOpenAuth('register')} 
-              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-xl hover:scale-105 transition-all"
+              className="px-3 sm:px-6 py-1.5 sm:py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs sm:text-base font-semibold rounded-lg hover:shadow-xl hover:scale-105 transition-all whitespace-nowrap"
             >
               Get Started
             </button>
@@ -959,7 +959,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </header>
 
       {/* Hero Section */}
-      <section ref={heroRef} className="pt-24 pb-20 px-4 sm:px-6 relative overflow-hidden">
+      <section ref={heroRef} className="pt-20 sm:pt-24 pb-12 sm:pb-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={12} section="hero" />
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 opacity-50"></div>
         <div className="max-w-7xl mx-auto relative z-10">
@@ -974,26 +974,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full text-sm font-medium mb-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-gray-700">Powered by Algorand + Tether + Circle + CAMP</span>
+                <span className="text-gray-700">Powered by Algorand + Tether + Circle</span>
               </div>
             </div>
             
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
               <span className="block">Own your Share of</span>
               <span className="gradient-text">Private Markets</span>
             </h1>
             
-            <p className="text-lg sm:text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
               Tokenize real assets. Unlock capital. Move value 24/7.{' '}
               <span className="font-semibold text-gray-900">
                 Infrastructure for Africa's capital markets.
               </span>
             </p>
             
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 px-4">
               <motion.button 
                 onClick={() => onOpenAuth('register')} 
-                className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl transition-all duration-300"
+                className="group px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base font-semibold rounded-xl transition-all duration-300"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 animate={{ 
@@ -1014,7 +1014,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               
               <motion.button 
                 onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })} 
-                className="px-8 py-4 glass-card text-gray-900 font-semibold rounded-xl transition-all"
+                className="px-6 sm:px-8 py-3 sm:py-4 glass-card text-gray-900 text-sm sm:text-base font-semibold rounded-xl transition-all"
                 whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1088,11 +1088,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* Services Section WITH IMAGES */}
-      <section id="services" ref={servicesRef} className="py-20 px-4 sm:px-6 bg-gray-50 relative overflow-hidden">
+      <section id="services" ref={servicesRef} className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={10} section="services" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
               Complete <span className="gradient-text">Web3 Infrastructure</span>
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
@@ -1100,12 +1100,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 max-w-4xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-12 max-w-4xl mx-auto px-2">
             {Object.entries(services).map(([key, service]) => (
               <motion.button
                 key={key}
-                onClick={() => setActiveService(key as any)}
-                className={`p-4 rounded-xl transition-all ${activeService === key ? 'glass-card shadow-lg scale-105' : 'hover:bg-white/50'}`}
+                onClick={() => setActiveService(activeService === key ? '' : key as any)}
+                className={`p-3 sm:p-4 rounded-xl transition-all ${activeService === key ? 'glass-card shadow-lg scale-105' : 'hover:bg-white/50'}`}
                 whileHover={{ scale: 1.05, y: -5 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1127,49 +1127,53 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             ))}
           </div>
           
-          <motion.div 
-            key={activeService}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-5xl mx-auto"
-          >
-            <div className="glass-card rounded-2xl p-8 shadow-xl">
-              <div className="flex flex-col md:flex-row items-start gap-8">
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold mb-2 text-gray-900">{services[activeService].title}</h3>
-                  <p className="text-gray-600 mb-6">{services[activeService].description}</p>
-                  
-                  <div className="space-y-3">
-                    {services[activeService].features.map((feature, idx) => (
-                      <div key={idx} className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-700">{feature}</span>
-                      </div>
-                    ))}
+          {activeService && (
+            <motion.div 
+              key={activeService}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-5xl mx-auto px-2"
+            >
+              <div className="glass-card rounded-2xl p-4 sm:p-8 shadow-xl">
+                <div className="flex flex-col md:flex-row items-start gap-6 sm:gap-8">
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold mb-2 text-gray-900">{services[activeService].title}</h3>
+                    <p className="text-gray-600 mb-6">{services[activeService].description}</p>
+                    
+                    <div className="space-y-3">
+                      {services[activeService].features.map((feature, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span className="text-gray-700">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button 
+                      onClick={() => onOpenAuth('register')} 
+                      className="mt-8 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
+                    >
+                      Get Started
+                    </button>
                   </div>
                   
-                  <button 
-                    onClick={() => onOpenAuth('register')} 
-                    className="mt-8 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
-                  >
-                    Get Started
-                  </button>
+                  {/* 📍 SERVICE IMAGE DISPLAY */}
+                  <div className="hidden sm:block">
+                    <ServiceImage serviceKey={services[activeService].imageKey} />
+                  </div>
                 </div>
-                
-                {/* 📍 SERVICE IMAGE DISPLAY */}
-                <ServiceImage serviceKey={services[activeService].imageKey} />
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
         </div>
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="py-20 px-4 sm:px-6 relative overflow-hidden">
+      <section id="features" className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={8} section="features" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
               Why <span className="gradient-text">Seamount</span> Stands Out
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
@@ -1177,7 +1181,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-2">
             {features.map((feature, idx) => (
               <motion.div
                 key={idx}
@@ -1201,19 +1205,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* 📍 COMPLETE CALCULATOR SECTION (from old version) */}
-      <section id="calculator" className="py-20 px-4 sm:px-6 bg-gray-50 relative overflow-hidden">
+      <section id="calculator" className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={8} section="calculator" />
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900">Calculate Your Returns</h2>
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">Calculate Your Returns</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
               See how much your crypto can earn. Prime (5.25% net, instant) and Alpha (8.20% net, quarterly) tiers available now via Seamount. All fees included.
             </p>
           </div>
           
-          <div className="grid lg:grid-cols-2 gap-8">
+          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Left Calculator Panel */}
-            <div className="glass-card rounded-2xl p-8 shadow-sm">
+            <div className="glass-card rounded-2xl p-4 sm:p-8 shadow-sm">
               <h3 className="text-2xl font-bold mb-6 flex items-center text-gray-900">
                 <DollarSign className="h-6 w-6 text-green-500 mr-2" />
                 Your Investment
@@ -1333,7 +1337,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             {/* Right Results Panel */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8 border-2 border-blue-200 shadow-sm">
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-4 sm:p-8 border-2 border-blue-200 shadow-sm">
               <h3 className="text-2xl font-bold mb-6 flex items-center text-gray-900">
                 <TrendingUp className="h-6 w-6 text-green-500 mr-2" />
                 Estimated Returns
@@ -1465,11 +1469,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* Business Section WITH FORM */}
-      <section id="business" className="py-20 px-4 sm:px-6 relative overflow-hidden">
+      <section id="business" className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={10} section="business" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
               For <span className="gradient-text">Business</span> & Institutions
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
@@ -1477,10 +1481,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </p>
           </div>
           
-          <div className="grid lg:grid-cols-2 gap-12">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-12">
             {/* Business Solutions */}
             <div>
-              <div className="glass-card rounded-2xl p-8 mb-8">
+              <div className="glass-card rounded-2xl p-4 sm:p-8 mb-6 sm:mb-8">
                 <Briefcase className="h-12 w-12 text-blue-600 mb-6" />
                 <h3 className="text-2xl font-bold mb-6 text-gray-900">Business Solutions</h3>
                 
@@ -1519,7 +1523,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
               
               {/* Contact Info */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="glass-card rounded-xl p-4 text-center">
                   <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
                     <MapPin className="h-6 w-6 text-blue-600" />
@@ -1547,7 +1551,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             {/* Contact Form */}
-            <div className="glass-card rounded-2xl p-8 shadow-sm">
+            <div className="glass-card rounded-2xl p-4 sm:p-8 shadow-sm">
               <h3 className="text-2xl font-bold mb-6 text-gray-900">Get in Touch</h3>
               <div className="space-y-4">
                 <div>
@@ -1608,10 +1612,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 px-4 sm:px-6 bg-gray-50">
+      <section className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-gray-900">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
               Frequently Asked Questions
             </h2>
             <p className="text-lg text-gray-600">
@@ -1646,13 +1650,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 px-4 sm:px-6 relative overflow-hidden">
+      <section className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={15} section="cta" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-30"></div>
-            <div className="relative glass-card rounded-3xl p-12">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 text-gray-900">
+            <div className="relative glass-card rounded-3xl p-6 sm:p-12">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 text-gray-900 px-2">
                 Building an <span className="gradient-text">Ownership</span> Economy
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
