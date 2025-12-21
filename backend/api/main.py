@@ -225,14 +225,6 @@ except ImportError as e:
     routers_available['offramp'] = None
 
 try:
-    from backend.api.routes.wallet_connect import router as wallet_connect_router
-    routers_available['wallet_connect'] = wallet_connect_router
-    logger.info("âœ… Wallet connect router imported")
-except ImportError as e:
-    logger.error(f"âŒ Wallet connect router import error: {e}")
-    routers_available['wallet_connect'] = None
-
-try:
     from backend.api.routes.swap_routes import router as swap_router
     routers_available['swap'] = swap_router
     logger.info("Ã¢Å“â€¦ Swap router imported")
@@ -672,10 +664,6 @@ if routers_available.get('offramp'):
 if routers_available.get('bank_verification'):
     app.include_router(routers_available['bank_verification'].router, prefix="/api/v1", tags=["Bank Verification"])
     logger.info("Bank verification router registered at /api/v1/bank")
-    
-if routers_available.get('wallet_connect'):
-    app.include_router(routers_available['wallet_connect'], prefix="/api/v1", tags=["Wallet Connect"])
-    logger.info("Wallet connect router registered at /api/v1")
 
 if routers_available.get('swap'):
     app.include_router(routers_available['swap'], prefix="/api/v1", tags=["Swap"])
@@ -721,7 +709,7 @@ try:
     logger.info("✅ Compliance OS routers registered")
 except ImportError as e:
     logger.error(f"❌ Compliance routes import error: {e}")
-    
+
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router
