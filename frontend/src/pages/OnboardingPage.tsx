@@ -228,7 +228,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       icon: Database, 
       color: 'from-blue-500 to-cyan-500',
       gradient: 'bg-gradient-to-br from-blue-600 to-cyan-600',
-      emoji: '⚫',
+      emoji: '🔷',
       description: 'Enterprise Blockchain',
       index: 1
     },
@@ -248,7 +248,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       icon: Coins, 
       color: 'from-gray-400 to-slate-500',
       gradient: 'bg-gradient-to-br from-gray-600 to-slate-600',
-      emoji: '🔷',
+      emoji: '⚫',
       description: 'Smart Contracts',
       index: 3
     },

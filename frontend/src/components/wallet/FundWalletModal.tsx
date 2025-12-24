@@ -404,12 +404,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                           <div className="flex items-center gap-2">
                             <span className="text-xl">{a.icon}</span>
                             <span className="font-medium">{a.label}</span>
-                            {/* 🆕 PRETIUM BADGE FOR TRON ASSETS */}
-                            {a.backend_key === 'USDT_TRON' && (
-                              <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-green-500 text-white rounded">
-                                Pretium ⚡
-                              </span>
-                            )}
                           </div>
                           <span className="text-xs text-gray-600 dark:text-gray-400">{a.description}</span>
                         </div>
@@ -440,8 +434,8 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 />
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 font-medium flex items-center gap-1">
-                <span className="text-blue-600">⚡</span>
-                Required for instant Pretium settlement (mobile money)
+                <span className="text-blue-600">📱</span>
+                Required for mobile money payment
               </p>
             </div>
           )}
@@ -545,9 +539,8 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         </DialogFooter>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 text-center px-2 pb-2 font-medium">
-          ⚡ Crypto credited <strong>
-            {asset === 'USDT_TRON' ? 'instantly to 30 seconds (Pretium)' : 'instantly to 30 seconds'}
-          </strong> after payment confirmation.
+          ⚡ Crypto credited <strong>instantly to 30 seconds</strong> after payment confirmation.
+          {currency === 'NGN' && <span className="block text-blue-600 mt-1">🔵 Powered by Quidax (Best rates for NGN)</span>}
         </p>
       </DialogContent>
     </Dialog>

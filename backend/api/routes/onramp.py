@@ -97,21 +97,191 @@ async def initialize_onramp(
             )
         
         # ===================================================================
-        # STEP 3: SMART ROUTING - NOW crypto_asset is defined!
+        # STEP 3: SMART ROUTING - QUIDAX-FIRST FOR NGN
         # ===================================================================
         provider = None
         payment_result = None
         checkout_url = None
         
-        # 🎯 TIER 1: PRETIUM (Tron USDT exclusive)
-        if crypto_asset == "USDT_TRON":  # ← NOW THIS WORKS!
+        # 🥇 TIER 1: QUIDAX (PRIMARY FOR NGN - ALL CRYPTO)
+        if currency == "NGN" and payment_method in ["auto", "quidax"]:
             try:
-                logger.info(f"🔵 Routing to Pretium for Tron: {amount} {currency}")
+                logger.info(f"🔵 TIER 1: Routing to Quidax for {amount} {currency} → {crypto_asset}")
+                
+                from backend.services.quidax_service import QuidaxService
+                quidax = QuidaxService(db_service.supabase)
+                
+                # Map Seamount asset to Quidax market
+                quidax_markets = {
+                    "USDT_ALGO": "usdtngn",
+                    "USDT": "usdtngn",
+                    "BTC": "btcngn",
+                    "ETH": "ethngn",
+                    "ALGO": "algongn",
+                    "MATIC": "maticngn",
+                    # Add more as Quidax supports them
+                }
+                
+                quidax_market = quidax_markets.get(crypto_asset)
+                
+                if quidax_market:
+                    # Step 1: Get quote
+                    quote_result = await quidax.get_quote(
+                        user_id=current_user["id"],
+                        market=quidax_market,
+                        quote_type="buy",
+                        amount=float(amount),
+                        amount_type="fiat"
+                    )
+                    
+                    if not quote_result.get("success"):
+                        raise Exception(f"Quidax quote failed: {quote_result.get('error')}")
+                    
+                    logger.info(f"✅ Quidax quote: {quote_result['quote_reference']}")
+                    
+                    # Step 2: Create instant order
+                    order_result = await quidax.create_instant_order(
+                        user_id=current_user["id"],
+                        quote_reference=quote_result["quote_reference"]
+                    )
+                    
+                    if order_result.get("success") and order_result.get("payment_url"):
+                        provider = "quidax"
+                        checkout_url = order_result["payment_url"]
+                        
+                        # Store transaction in database
+                        tx_id = f"ONRAMP_QUIDAX_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                        
+                        tx_data = {
+                            "id": tx_id,
+                            "user_id": current_user["id"],
+                            "type": "onramp",
+                            "status": "pending_payment",
+                            "provider": "quidax",
+                            "provider_name": "Quidax (Instant Buy)",
+                            "currency": currency,
+                            "crypto_asset": crypto_asset,
+                            "blockchain": asset_config["blockchain"],
+                            "amount_fiat": float(amount),
+                            "crypto_amount": quote_result.get("crypto_amount", 0),
+                            "seamount_fee": 0,  # Quidax includes fees
+                            "quidax_order_id": order_result.get("order_id"),
+                            "wallet_address": wallet_address,
+                            "checkout_url": checkout_url,
+                            "user_email": current_user["email"],
+                            "user_country": user_country,
+                            "quote_data": quote_result,
+                            "estimated_settlement": "Instant",
+                            "created_at": datetime.now().isoformat()
+                        }
+                        
+                        db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+                        logger.info(f"✅ Quidax (TIER 1) order created: {order_result['order_id']}")
+                        
+                        # Return immediately - skip other providers
+                        return {
+                            "success": True,
+                            "transaction_id": tx_id,
+                            "checkout_url": checkout_url,
+                            "provider": "quidax",
+                            "amount_fiat": float(amount),
+                            "currency": currency,
+                            "crypto_asset": crypto_asset,
+                            "estimated_crypto_amount": quote_result.get("crypto_amount", 0),
+                            "estimated_settlement": "Instant"
+                        }
+                    else:
+                        raise Exception("Quidax order creation failed")
+                else:
+                    logger.info(f"⚠️ Quidax doesn't support {crypto_asset}, falling back")
+                    
+            except Exception as quidax_error:
+                logger.warning(f"⚠️ Quidax (TIER 1) failed: {quidax_error}")
+                # Fall through to Paystack
+        
+        # 🥈 TIER 2: PAYSTACK (NGN FALLBACK - BANK TRANSFER)
+        if not provider and currency == "NGN" and payment_method in ["auto", "paystack"]:
+            try:
+                logger.info(f"🔵 TIER 2: Attempting Paystack on-ramp: {amount} {currency}")
+                paystack = PaystackProvider(settings)
+                
+                our_fee = amount * Decimal("0.005")  # 0.5% Seamount margin
+                provider_amount = amount
+                
+                payment_result = await paystack.initialize_payment(
+                    amount=float(provider_amount),
+                    currency="NGN",
+                    email=current_user["email"],
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                    phone=current_user.get("phone"),
+                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
+                )
+                
+                if payment_result and payment_result.get("status") == "success":
+                    checkout_url = (
+                        payment_result.get("authorization_url") or 
+                        payment_result.get("payment_link") or
+                        payment_result.get("access_url")
+                    )
+                    
+                    if checkout_url:
+                        provider = "paystack"
+                        logger.info(f"✅ Paystack (TIER 2) checkout URL: {checkout_url}")
+                    else:
+                        logger.warning(f"⚠️ Paystack returned success but no URL")
+                else:
+                    logger.warning(f"⚠️ Paystack returned invalid response")
+                    
+            except Exception as paystack_error:
+                logger.warning(f"⚠️ Paystack (TIER 2) failed: {paystack_error}")
+                # Fall through to Flutterwave
+        
+        # 🥉 TIER 3: FLUTTERWAVE (INTERNATIONAL + NGN BACKUP)
+        if not checkout_url and payment_method in ["auto", "flutterwave"]:
+            try:
+                logger.info(f"🌍 TIER 3: Attempting Flutterwave: {amount} {currency}")
+                flutterwave = FlutterwaveProvider(settings)
+                
+                our_fee = amount * Decimal("0.005")
+                provider_amount = amount
+                
+                payment_result = await flutterwave.initialize_payment(
+                    amount=float(provider_amount),
+                    currency=currency,
+                    email=current_user["email"],
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                    phone=current_user.get("phone"),
+                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
+                )
+                
+                if payment_result and payment_result.get("status") == "success":
+                    checkout_url = (
+                        payment_result.get("link") or 
+                        payment_result.get("payment_link") or
+                        payment_result.get("data", {}).get("link")
+                    )
+                    
+                    if checkout_url:
+                        provider = "flutterwave"
+                        logger.info(f"✅ Flutterwave (TIER 3) checkout URL: {checkout_url}")
+                    else:
+                        logger.warning(f"⚠️ Flutterwave returned success but no URL")
+                else:
+                    logger.warning(f"⚠️ Flutterwave returned invalid response")
+                    
+            except Exception as flutterwave_error:
+                logger.warning(f"⚠️ Flutterwave (TIER 3) failed: {flutterwave_error}")
+                # Fall through to Pretium
+        
+        # 🏅 TIER 4: PRETIUM (MOBILE MONEY LAST RESORT - TRON ONLY)
+        if not provider and crypto_asset == "USDT_TRON" and payment_method in ["auto", "pretium"]:
+            try:
+                logger.info(f"📱 TIER 4: Attempting Pretium (mobile money): {amount} {currency}")
                 
                 from backend.services.payment_providers.pretium import PretiumProvider
                 pretium = PretiumProvider(settings)
                 
-                # Get user's Tron wallet address
+                # Get Tron wallet
                 tron_wallet_result = db_service.supabase.from_('multi_chain_addresses')\
                     .select('address')\
                     .eq('user_id', current_user["id"])\
@@ -119,35 +289,31 @@ async def initialize_onramp(
                     .limit(1)\
                     .execute()
                 
-                if not tron_wallet_result.data or len(tron_wallet_result.data) == 0:
-                    raise Exception("No Tron wallet found. Please create wallet first.")
+                if not tron_wallet_result.data:
+                    raise Exception("No Tron wallet found")
                 
                 tron_address = tron_wallet_result.data[0]["address"]
+                user_phone = data.get("phone_number") or current_user.get("phone")
                 
-                # ✅ FIXED: Use phone_number from payload
-                user_phone = phone_number or current_user.get("phone")
                 if not user_phone:
-                    raise Exception("Phone number required for Pretium on-ramp")
+                    raise Exception("Phone number required for Pretium")
                 
-                # ✅ VALIDATION: Clean and format phone number
                 user_phone = user_phone.strip().replace(' ', '').replace('-', '')
                 if len(user_phone) < 10:
                     raise Exception(f"Invalid phone number: {user_phone}")
                 
-                # Initialize Pretium on-ramp
                 pretium_result = await pretium.initialize_onramp(
                     user_id=current_user["id"],
                     amount=float(amount),
                     currency=currency,
                     wallet_address=tron_address,
                     phone_number=user_phone,
-                    mobile_network=mobile_network
+                    mobile_network=data.get("mobile_network", "Safaricom")
                 )
                 
                 if pretium_result.get('success'):
                     provider = "pretium"
                     
-                    # Pretium uses polling-based status (no checkout URL)
                     tx_id = f"ONRAMP_PRETIUM_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
                     
                     tx_data = {
@@ -156,7 +322,7 @@ async def initialize_onramp(
                         "type": "onramp",
                         "status": "pending_payment",
                         "provider": "pretium",
-                        "provider_name": "Pretium Africa",
+                        "provider_name": "Pretium Mobile Money",
                         "currency": currency,
                         "crypto_asset": crypto_asset,
                         "amount_fiat": float(amount),
@@ -176,7 +342,7 @@ async def initialize_onramp(
                     }
                     
                     db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
-                    logger.info(f"✅ Pretium on-ramp initiated: {tx_id}")
+                    logger.info(f"✅ Pretium (TIER 4) initiated: {tx_id}")
                     
                     return {
                         "success": True,
@@ -197,133 +363,13 @@ async def initialize_onramp(
                         }
                     }
                 else:
-                    raise Exception(pretium_result.get('error', 'Pretium on-ramp failed'))
+                    raise Exception("Pretium initialization failed")
                     
             except Exception as pretium_error:
-                logger.warning(f"⚠️ Pretium failed, falling back: {pretium_error}")
-                # Fall through to existing providers
-        
-        # ========================================================================
-        # TIER 1B: QUIDAX (Instant Crypto Buy for NGN - Bank Transfer)
-        # (Runs in parallel with Pretium for mobile money)
-        # ========================================================================
-        if not provider and currency == "NGN" and payment_method in ["auto", "quidax"]:
-            try:
-                logger.info(f"🔵 Routing to Quidax instant buy: {amount} {currency}")
-                
-                from backend.services.quidax_service import QuidaxService
-                quidax = QuidaxService(db_service.supabase)
-                
-                # Step 1: Get quote
-                quote_result = await quidax.get_quote(
-                    user_id=current_user["id"],
-                    market="usdtngn",
-                    quote_type="buy",
-                    amount=float(amount),
-                    amount_type="fiat"
-                )
-                
-                if not quote_result.get("success"):
-                    raise Exception(f"Quidax quote failed: {quote_result.get('error')}")
-                
-                # Step 2: Create instant order
-                order_result = await quidax.create_instant_order(
-                    user_id=current_user["id"],
-                    quote_reference=quote_result["quote_reference"]
-                )
-                
-                if order_result.get("success"):
-                    checkout_url = order_result.get("payment_url")
-                    
-                    if checkout_url:
-                        provider = "quidax"
-                        logger.info(f"✅ Quidax instant order created: {order_result['order_id']}")
-                    else:
-                        logger.warning("Quidax returned success but no payment URL")
-                else:
-                    raise Exception(order_result.get("error", "Quidax order creation failed"))
-                    
-            except Exception as quidax_error:
-                logger.warning(f"⚠️ Quidax failed, falling back to Paystack: {quidax_error}")
-                # Fall through to Paystack
-
-        # 🎯 TIER 2: PAYSTACK (Most reliable for NGN, existing logic)
-        if not provider and currency == "NGN" and payment_method in ["auto", "paystack"]:
-            try:
-                logger.info(f"🔵 Attempting Paystack on-ramp (TIER 2): {amount} {currency}")
-                paystack = PaystackProvider(settings)
-                
-                # Paystack fee: 2.5% (0.5% Seamount + 2.0% Paystack)
-                our_fee = amount * Decimal("0.005")  # 0.5% Seamount margin
-                provider_amount = amount  # User pays full amount requested
-                
-                payment_result = await paystack.initialize_payment(
-                    amount=float(provider_amount),  # Full amount to Paystack
-                    currency="NGN",
-                    email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
-                    phone=current_user.get("phone"),
-                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
-                )
-                
-                if payment_result and payment_result.get("status") == "success":
-                    checkout_url = (
-                        payment_result.get("authorization_url") or 
-                        payment_result.get("payment_link") or
-                        payment_result.get("access_url")
-                    )
-                    
-                    if checkout_url:
-                        provider = "paystack"
-                        logger.info(f"Paystack (PRIMARY) checkout URL: {checkout_url}")
-                    else:
-                        logger.warning(f"Paystack returned success but no URL: {payment_result}")
-                else:
-                    logger.warning(f"Paystack returned invalid response: {payment_result}")
-                    
-            except Exception as paystack_error:
-                logger.warning(f"Paystack (PRIMARY) failed: {paystack_error}")
-                # Fall through to Flutterwave
-        
-        # TIER 3: FLUTTERWAVE (International + NGN backup, 2.5% fee)
-        if not checkout_url and payment_method in ["auto", "flutterwave"]:
-            try:
-                logger.info(f"Attempting Flutterwave on-ramp (SECONDARY): {amount} {currency}")
-                flutterwave = FlutterwaveProvider(settings)
-                
-                # Flutterwave fee: 2.5-4.0% (0.5% Seamount + provider cost)
-                our_fee = amount * Decimal("0.005")  # 0.5% Seamount margin
-                provider_amount = amount  # Full amount to Flutterwave
-                
-                payment_result = await flutterwave.initialize_payment(
-                    amount=float(provider_amount),  # Full amount to Flutterwave
-                    currency=currency,
-                    email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
-                    phone=current_user.get("phone"),
-                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
-                )
-                
-                if payment_result and payment_result.get("status") == "success":
-                    checkout_url = (
-                        payment_result.get("link") or 
-                        payment_result.get("payment_link") or
-                        payment_result.get("data", {}).get("link")
-                    )
-                    
-                    if checkout_url:
-                        provider = "flutterwave"
-                        logger.info(f"Flutterwave (SECONDARY) checkout URL: {checkout_url}")
-                    else:
-                        logger.warning(f"Flutterwave returned success but no URL: {payment_result}")
-                else:
-                    logger.warning(f"Flutterwave returned invalid response: {payment_result}")
-                    
-            except Exception as flutterwave_error:
-                logger.warning(f"Flutterwave (SECONDARY) failed: {flutterwave_error}")
+                logger.warning(f"⚠️ Pretium (TIER 4) failed: {pretium_error}")
                 # Fall through to Cashramp
         
-        # TIER 4: CASHRAMP (P2P, currently under maintenance)
+        # TIER 5: CASHRAMP (P2P, currently under maintenance)
         if not checkout_url and payment_method in ["auto", "cashramp"]:
             try:
                 logger.info(f"Attempting Cashramp on-ramp (TERTIARY): {amount} {currency}")

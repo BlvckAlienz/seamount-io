@@ -289,10 +289,33 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
             <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 md:p-6 backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
-                <div>
+                <div className="flex-1">
                   <div className="text-xs md:text-sm text-gray-400 mb-1">Total Crypto Balance</div>
                   <div className="text-2xl md:text-4xl font-bold text-white">{formatCurrencyUSD(totalBalance)}</div>
+                  
+                  {/* ✅ BETTER EMPTY STATE */}
+                  {totalBalance === 0 && createdChains > 0 && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        {createdChains} {createdChains === 1 ? 'wallet' : 'wallets'} ready
+                      </div>
+                      <button
+                        onClick={() => setShowFundModal(true)}
+                        className="text-xs text-blue-400 hover:text-blue-300 underline font-medium"
+                      >
+                        Fund to get started →
+                      </button>
+                    </div>
+                  )}
+                  
+                  {totalBalance === 0 && createdChains === 0 && (
+                    <div className="mt-2 text-xs text-gray-400">
+                      Create wallets to start trading
+                    </div>
+                  )}
                 </div>
+                
                 <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
                   <RefreshCw className="h-5 w-5" />
                 </button>
