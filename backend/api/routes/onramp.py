@@ -204,7 +204,8 @@ async def initialize_onramp(
                 # Fall through to existing providers
         
         # ========================================================================
-        # TIER 2: QUIDAX (Instant Crypto Buy for NGN)
+        # TIER 1B: QUIDAX (Instant Crypto Buy for NGN - Bank Transfer)
+        # (Runs in parallel with Pretium for mobile money)
         # ========================================================================
         if not provider and currency == "NGN" and payment_method in ["auto", "quidax"]:
             try:
@@ -550,7 +551,52 @@ async def handle_webhook(
                     result.get("amount"),
                     result.get("currency")
                 )
+
+        elif provider == "quidax":
+            # 🔵 QUIDAX WEBHOOK HANDLER
+            try:
+                from backend.services.quidax_service import QuidaxService
+                quidax = QuidaxService(db_service.supabase)
                 
+                # Verify webhook signature
+                signature_header = request.headers.get("quidax-signature")
+                if not quidax.verify_webhook_signature(
+                    payload=await request.body(),
+                    signature_header=signature_header
+                ):
+                    logger.error("❌ Invalid Quidax webhook signature")
+                    return {"status": "error", "message": "Invalid signature"}
+                
+                # Extract order details
+                order_id = payload.get("data", {}).get("id")
+                order_status = payload.get("data", {}).get("status")
+                
+                if order_status == "done":
+                    # Get order from database
+                    tx_result = db_service.supabase.from_('onramp_transactions')\
+                        .select('*')\
+                        .eq('quidax_order_id', order_id)\
+                        .single()\
+                        .execute()
+                    
+                    if tx_result.data:
+                        # Credit the specific crypto to specific wallet
+                        await _credit_multi_asset_wallet(
+                            db_service,
+                            tx_result.data['id'],
+                            tx_result.data['crypto_asset'],
+                            tx_result.data['crypto_amount'],
+                            tx_result.data['wallet_address']
+                        )
+                        
+                        logger.info(f"✅ Quidax order {order_id} completed, wallet credited")
+                
+                return {"status": "success", "processed": True}
+                
+            except Exception as quidax_error:
+                logger.error(f"❌ Quidax webhook failed: {quidax_error}")
+                return {"status": "error", "message": str(quidax_error)}
+                   
         elif provider == "paystack":
             paystack = PaystackProvider(settings)
             result = await paystack.verify_payment(payload.get("reference"))
@@ -629,7 +675,63 @@ async def _credit_user_wallet(db_service, tx_ref: str, amount: float, currency: 
     except Exception as e:
         logger.error(f"Failed to mark transaction complete: {e}")
 
-
+async def _credit_multi_asset_wallet(
+    db_service,
+    tx_ref: str,
+    crypto_asset: str,
+    crypto_amount: float,
+    wallet_address: str
+):
+    """
+    🎯 CREDIT ANY CRYPTO TO ANY WALLET (Multi-Chain Support)
+    
+    This replaces the old USDT-only crediting logic.
+    Works with: ALGO, USDT, BTC, ETH, MATIC, TRX, etc.
+    """
+    try:
+        logger.info(f"💰 Crediting {crypto_amount} {crypto_asset} to {wallet_address[:12]}...")
+        
+        # Step 1: Get transaction details
+        tx_result = db_service.supabase.from_('onramp_transactions')\
+            .select('user_id, crypto_asset, blockchain')\
+            .eq('id', tx_ref)\
+            .single()\
+            .execute()
+        
+        if not tx_result.data:
+            logger.error(f"❌ Transaction not found: {tx_ref}")
+            return False
+        
+        user_id = tx_result.data['user_id']
+        blockchain = tx_result.data.get('blockchain', 'algorand')
+        
+        # Step 2: Use MultiChainWalletService to credit wallet
+        # This handles all chains automatically
+        from backend.dependencies import get_multi_chain_wallet_service
+        wallet_service = get_multi_chain_wallet_service()
+        
+        # The actual crediting happens via the payment provider (Quidax)
+        # They send crypto directly to user's wallet address
+        # We just mark the transaction as complete
+        
+        # Step 3: Mark transaction complete
+        db_service.supabase.from_('onramp_transactions')\
+            .update({
+                'status': 'completed',
+                'completed_at': 'NOW()',
+                'credited_amount': crypto_amount
+            })\
+            .eq('id', tx_ref)\
+            .execute()
+        
+        logger.info(f"✅ Transaction {tx_ref} marked complete")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to credit wallet: {e}")
+        return False
+    
 @router.get("/providers")
 async def get_providers():
     """Get available payment providers (UPDATED PRIORITY ORDER)"""

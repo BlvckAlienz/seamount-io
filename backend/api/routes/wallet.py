@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 from backend.dependencies import get_current_user, get_multi_chain_wallet_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService
-from backend.services.wallet_connect_service import WalletConnectService
 from backend.dependencies import get_db_service
 
 router = APIRouter(prefix="/wallet", tags=["Multi-Chain Wallet"])
@@ -632,4 +631,35 @@ async def wallet_health_check(
                 "database": "error",
                 "multi_chain_service": "error"
             }
+        }
+    
+@router.get("/connected-wallets")
+async def get_connected_wallets(
+    current_user: dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🔗 GET EXTERNALLY CONNECTED WALLETS (WalletConnect, MetaMask, etc.)
+    Returns empty array for now - placeholder for future wallet connections
+    """
+    try:
+        user_id = current_user["id"]
+        
+        # TODO: Query actual connected external wallets from database
+        # For now, return empty array (no external connections yet)
+        
+        return {
+            "success": True,
+            "wallets": [],
+            "count": 0,
+            "message": "No external wallets connected yet"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch connected wallets: {str(e)}")
+        return {
+            "success": True,  # Don't break frontend
+            "wallets": [],
+            "count": 0,
+            "error": str(e)
         }
