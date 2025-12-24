@@ -42,6 +42,10 @@ class QuidaxService:
         if not self.secret_key:
             logger.error("❌ QUIDAX_SECRET_KEY not configured")
             raise ValueError("QUIDAX_SECRET_KEY not found in environment")
+        
+        # ✅ ADDED: Warn if webhook secret missing (won't break API calls, but webhooks will fail)
+        if not self.webhook_secret:
+            logger.warning("⚠️ QUIDAX_WEBHOOK_SECRET not configured - webhook signature verification will fail!")
     
     # ========================================================================
     # AUTHENTICATION
@@ -81,21 +85,29 @@ class QuidaxService:
             market: Market pair (e.g., 'usdtngn', 'btcngn')
         """
         try:
+            # ✅ Quidax API uses /markets/tickers/{market_id} (plural 'tickers')
             response = requests.get(
-                f"{self.BASE_URL}/markets/{market}/ticker",
+                f"{self.BASE_URL}/markets/tickers/{market}",
                 headers=self._get_headers(),
                 timeout=10
             )
             response.raise_for_status()
-            data = response.json()
+            raw_data = response.json()
             
+            # 🚨 CRITICAL: Quidax wraps ticker in "data" object
+            ticker_data = raw_data.get("data", {}).get("ticker", {})
+            
+            # 🚨 CRITICAL: Quidax uses "buy"/"sell" (not "bid"/"ask")
             return {
                 "success": True,
                 "market": market,
-                "bid": float(data.get("ticker", {}).get("bid", 0)),
-                "ask": float(data.get("ticker", {}).get("ask", 0)),
-                "last": float(data.get("ticker", {}).get("last", 0)),
-                "volume": float(data.get("ticker", {}).get("volume", 0))
+                "bid": float(ticker_data.get("buy", 0)),      # buy = bid price
+                "ask": float(ticker_data.get("sell", 0)),     # sell = ask price
+                "last": float(ticker_data.get("last", 0)),
+                "volume": float(ticker_data.get("vol", 0)),   # "vol" not "volume"
+                "high": float(ticker_data.get("high", 0)),
+                "low": float(ticker_data.get("low", 0)),
+                "open": float(ticker_data.get("open", 0))
             }
         except Exception as e:
             logger.error(f"❌ Failed to fetch ticker for {market}: {e}")
@@ -244,7 +256,17 @@ class QuidaxService:
             quote = quote_result.data
             
             # Check if quote expired
-            if datetime.fromisoformat(quote["expires_at"]) < datetime.utcnow():
+            from datetime import timezone
+            expires_at = datetime.fromisoformat(quote["expires_at"])
+            now = datetime.now(timezone.utc)
+
+            # Make both timezone-aware for comparison
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=timezone.utc)
+
+            if expires_at < now:
                 return {"success": False, "error": "Quote has expired"}
             
             # Check if quote already used
@@ -431,6 +453,7 @@ class QuidaxService:
         Verify Quidax webhook signature
         
         Signature format: "t=timestamp,v1=signature"
+        Algorithm: HMAC-SHA256(timestamp.payload, webhook_secret)
         
         Args:
             payload: Raw request body (JSON string)
@@ -444,41 +467,76 @@ class QuidaxService:
                 logger.error("❌ QUIDAX_WEBHOOK_SECRET not configured")
                 return False
             
-            # Parse signature header
-            parts = signature_header.split(',')
-            timestamp = None
-            signature = None
-            
-            for part in parts:
-                if part.startswith('t='):
-                    timestamp = part[2:]
-                elif part.startswith('v1='):
-                    signature = part[3:]
-            
-            if not timestamp or not signature:
-                logger.error("❌ Invalid signature header format")
+            # ✅ IMPROVED: Parse signature header into dict for easier access
+            # 🔍 DEBUG: Log what we're receiving
+            logger.debug(f"📋 Raw signature header: {signature_header}")
+
+            try:
+                parts = dict(item.split('=', 1) for item in signature_header.split(','))
+                timestamp = parts.get('t')
+                provided_signature = parts.get('v1')
+
+                # 🔍 DEBUG: Log parsed values
+                logger.info(f"📋 Parsed - t={timestamp}, v1={provided_signature}")
+
+            except (ValueError, AttributeError) as parse_error:
+                logger.error(f"❌ Failed to parse signature header: {parse_error}")
+                logger.debug(f"Raw signature header: {signature_header}")
                 return False
             
-            # Construct signed payload
+            if not timestamp or not provided_signature:
+                logger.error("❌ Missing timestamp or signature in header")
+                logger.debug(f"Parsed parts: t={timestamp}, v1={provided_signature}")
+                return False
+            
+            # ✅ ADDED: Timestamp validation (prevent replay attacks)
+            try:
+                timestamp_int = int(timestamp)
+                current_time = int(datetime.utcnow().timestamp())
+                time_diff = abs(current_time - timestamp_int)
+                
+                # Allow 5 minutes tolerance
+                if time_diff > 300:
+                    logger.warning(f"⚠️ Webhook timestamp too old: {time_diff}s difference")
+                    # Don't reject in dev mode, but log for production awareness
+                    if os.getenv("ENVIRONMENT") == "production":
+                        return False
+            except ValueError:
+                logger.error(f"❌ Invalid timestamp format: {timestamp}")
+                return False
+            
+            # Construct signed payload (Quidax format: timestamp.payload)
             signed_payload = f"{timestamp}.{payload}"
             
-            # Compute expected signature
-            expected_signature = hmac.new(
-                self.webhook_secret.encode('utf-8'),
-                signed_payload.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
+            # ✅ IMPROVED: Calculate expected signature with better error handling
+            try:
+                expected_signature = hmac.new(
+                    self.webhook_secret.encode('utf-8'),
+                    signed_payload.encode('utf-8'),
+                    hashlib.sha256
+                ).hexdigest()
+            except Exception as hmac_error:
+                logger.error(f"❌ HMAC calculation failed: {hmac_error}")
+                return False
             
-            # Verify
-            is_valid = hmac.compare_digest(signature, expected_signature)
+            # ✅ SECURE: Use constant-time comparison
+            is_valid = hmac.compare_digest(expected_signature, provided_signature)
             
             if not is_valid:
                 logger.warning("❌ Webhook signature verification failed")
+                logger.debug(f"Expected signature: {expected_signature}")
+                logger.debug(f"Provided signature: {provided_signature}")
+                logger.debug(f"Signed payload: {signed_payload[:100]}...")  # First 100 chars only
+                logger.debug(f"Webhook secret length: {len(self.webhook_secret)} chars")
+            else:
+                logger.info("✅ Webhook signature verified successfully")
             
             return is_valid
             
         except Exception as e:
             logger.error(f"❌ Signature verification error: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return False
     
     # ========================================================================

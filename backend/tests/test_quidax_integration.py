@@ -10,6 +10,12 @@ from pathlib import Path
 # Add project root to path (go up 2 levels from tests/ to seamount-io/)
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+# 🚨 CRITICAL: Load .env before importing services
+from dotenv import load_dotenv
+env_path = Path(__file__).resolve().parents[2] / "backend" / ".env"
+load_dotenv(env_path)
+print(f"✅ Loaded .env from: {env_path}")
+
 import asyncio
 import os
 from decimal import Decimal
@@ -20,12 +26,19 @@ from backend.services.quidax_service import QuidaxService
 # TEST DATA
 # ============================================================================
 
+# ✅ Updated to match real Quidax API structure
 MOCK_TICKER_RESPONSE = {
-    "ticker": {
-        "bid": "1650.50",
-        "ask": "1652.00",
-        "last": "1651.25",
-        "volume": "125000.50"
+    "status": "success",
+    "data": {
+        "ticker": {
+            "buy": "1458.76",      # Quidax uses "buy" not "bid"
+            "sell": "1466.82",     # Quidax uses "sell" not "ask"
+            "last": "1458.76",
+            "vol": "299442.90",    # Quidax uses "vol" not "volume"
+            "high": "1469.34",
+            "low": "1447.23",
+            "open": "1461.0"
+        }
     }
 }
 

@@ -185,9 +185,9 @@ try:
     routers_available['portfolio'] = portfolio
     routers_available['investor'] = investor
     routers_available['consent'] = consent
-    logger.info("âœ… Additional routers imported (webhooks, portfolio, investor, consent)")
+    logger.info("Additional routers imported (webhooks, portfolio, investor, consent)")
 except ImportError as e:
-    logger.error(f"âŒ Additional routers import error: {e}")
+    logger.error(f"Additional routers import error: {e}")
     routers_available.update({
         'webhooks': None,
         'portfolio': None,
@@ -638,8 +638,8 @@ if routers_available.get('licensing'):
     logger.info("Licensing router registered at /api/v1")
 
 if routers_available.get('webhooks') and hasattr(routers_available['webhooks'], 'router'):
-    app.include_router(routers_available['webhooks'].router, prefix="/webhooks", tags=["Webhooks"])
-    logger.info("Webhooks router registered at /webhooks")
+    app.include_router(routers_available['webhooks'].router, prefix="/api/v1/webhooks", tags=["Webhooks"])  # ✅ FIXED
+    logger.info("Webhooks router registered at /api/v1/webhooks")  # ✅ FIXED
 
 if routers_available.get('portfolio') and hasattr(routers_available['portfolio'], 'router'):
     app.include_router(routers_available['portfolio'].router, prefix="/api/v1", tags=["portfolio"])

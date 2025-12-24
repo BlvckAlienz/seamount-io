@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # PAYSTACK WEBHOOK HANDLER (PRIMARY FOR NGN PAYMENTS)
 # =============================================================================
 
-@router.post("/webhooks/paystack")
+@router.post("/paystack")
 async def paystack_webhook(request: Request):
     """Handle Paystack webhook events with robust error handling"""
     try:
@@ -166,7 +166,7 @@ async def handle_paystack_charge_failed(event_data):
 # FLUTTERWAVE WEBHOOK HANDLER (FALLBACK PROVIDER)
 # =============================================================================
 
-@router.post("/webhooks/flutterwave")
+@router.post("/flutterwave")
 async def flutterwave_webhook(request: Request):
     """Handle Flutterwave webhook events (fallback provider)"""
     try:
@@ -393,7 +393,7 @@ async def regfyl_screening_webhook(
         logger.error(f"Regfyl screening webhook failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
-@router.post("/webhooks/regfyl/id-verification")
+@router.post("/regfyl/id-verification")
 async def regfyl_id_verification_webhook(request: Request):
     """Handle Regfyl ID verification callbacks"""
     try:
@@ -462,7 +462,7 @@ async def regfyl_id_verification_webhook(request: Request):
         logger.error(f"Regfyl ID verification webhook failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
-@router.post("/webhooks/regfyl/transaction-monitoring")
+@router.post("/regfyl/transaction-monitoring")
 async def regfyl_transaction_monitoring_webhook(request: Request):
     """Handle Regfyl transaction monitoring callbacks"""
     try:
@@ -530,7 +530,7 @@ async def regfyl_transaction_monitoring_webhook(request: Request):
         logger.error(f"Regfyl transaction monitoring webhook failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Webhook processing failed")
 
-@router.post("/webhooks/regfyl/business-screening")
+@router.post("/regfyl/business-screening")
 async def regfyl_business_screening_webhook(request: Request):
     """Handle Regfyl business screening callbacks"""
     try:
@@ -587,7 +587,7 @@ async def regfyl_business_screening_webhook(request: Request):
 # PRETIUM WEBHOOK HANDLER (Tron USDT Transactions)
 # ============================================================================
 
-@router.post("/webhooks/pretium")
+@router.post("/pretium")
 async def pretium_webhook(
     request: Request,
 ):
@@ -778,7 +778,7 @@ async def _refund_tron_balance(
 # QUIDAX WEBHOOK HANDLER
 # ============================================================================
 
-@router.post("/webhooks/quidax")
+@router.post("/quidax")  # ✅ CORRECT - router already has /webhooks prefix
 async def quidax_webhook(request: Request):
     """
     Handle Quidax webhook events
@@ -806,14 +806,16 @@ async def quidax_webhook(request: Request):
         quidax = QuidaxService(get_supabase_client())
         
         if signature:
+            # ✅ More explicit control
+            ALLOW_TEST_WEBHOOKS = os.getenv("ALLOW_TEST_WEBHOOKS", "false").lower() == "true"
+
             is_valid = quidax.verify_webhook_signature(payload_str, signature)
-            if not is_valid:
-                # Check if we're in development mode
-                if os.getenv("ENVIRONMENT") == "development":
-                    logger.warning("⚠️ Invalid signature but allowing in DEV mode")
-                else:
-                    logger.error("❌ Invalid Quidax webhook signature - REJECTING")
-                    raise HTTPException(status_code=401, detail="Invalid signature")
+
+            if not is_valid and not ALLOW_TEST_WEBHOOKS:
+                logger.error("❌ Invalid Quidax webhook signature - REJECTING")
+                raise HTTPException(status_code=401, detail="Invalid signature")
+            elif not is_valid:
+                logger.warning("⚠️ Invalid signature but ALLOW_TEST_WEBHOOKS=true")
         else:
             logger.warning("⚠️ No signature header - webhook accepted without verification")
         
@@ -874,21 +876,38 @@ async def handle_quidax_order_completed(event_data: dict, supabase: Client):
         order_id = data.get("id")
         order_type = data.get("type")  # 'buy' or 'sell'
         
-        # Find transaction in database
+        logger.info(f"🔍 Processing Quidax order: {order_id}")
+        
+        # 🚨 DEFENSIVE: Use .limit(1) instead of .single() to avoid exceptions
         tx_result = supabase.table("onramp_transactions")\
             .select("*")\
             .eq("quidax_order_id", order_id)\
-            .single()\
+            .limit(1)\
             .execute()
         
-        if not tx_result.data:
-            logger.error(f"❌ Transaction not found for Quidax order {order_id}")
-            return
+        # ✅ CHECK: Does transaction exist?
+        if not tx_result.data or len(tx_result.data) == 0:
+            logger.warning(f"⚠️ No transaction found for Quidax order {order_id} - possibly test webhook or external order")
+            
+            # 📊 Update webhook record using EXISTING columns
+            try:
+                supabase.table("quidax_webhook_events").update({
+                    "processed": True,  # ✅ Mark as handled
+                    "processing_error": "No matching transaction - test webhook or external order",
+                    "processed_at": datetime.utcnow().isoformat()
+                }).eq("event_id", event_data.get("id")).execute()
+            except Exception as update_err:
+                logger.warning(f"Could not update webhook record: {update_err}")
+            
+            return  # Exit gracefully
         
-        tx = tx_result.data
+        # ✅ GET TRANSACTION DATA (only once, no duplicate logic)
+        tx = tx_result.data[0]
         user_id = tx["user_id"]
-        crypto_amount = tx["crypto_amount"]
-        crypto_currency = tx["crypto_currency"]
+        crypto_amount = float(tx["net_to_user"])
+        crypto_currency = tx["crypto_asset"]
+        
+        logger.info(f"✅ Found transaction for user {user_id[:8]}... - {crypto_amount} {crypto_currency}")
         
         # Verify order status from Quidax API (always re-query)
         from backend.services.quidax_service import QuidaxService
@@ -913,17 +932,28 @@ async def handle_quidax_order_completed(event_data: dict, supabase: Client):
             })
         }).eq("quidax_order_id", order_id).execute()
         
+        logger.info(f"✅ Transaction {order_id} marked as completed")
+        
+        # 📊 Mark webhook as successfully processed
+        try:
+            supabase.table("quidax_webhook_events").update({
+                "processed": True,
+                "processed_at": datetime.utcnow().isoformat()
+            }).eq("event_id", event_data.get("id")).execute()
+        except Exception as update_err:
+            logger.warning(f"Could not update webhook record: {update_err}")
+        
         # 🚨 AUTO-WITHDRAWAL LOGIC
         # Get user's WDK wallet address for this crypto
         wallet_result = supabase.table("multi_chain_addresses")\
             .select("address")\
             .eq("user_id", user_id)\
             .eq("chain", _map_crypto_to_chain(crypto_currency))\
-            .single()\
+            .limit(1)\
             .execute()
         
-        if wallet_result.data and wallet_result.data.get("address"):
-            destination_address = wallet_result.data["address"]
+        if wallet_result.data and len(wallet_result.data) > 0 and wallet_result.data[0].get("address"):
+            destination_address = wallet_result.data[0]["address"]
             
             # Initiate withdrawal to user's wallet
             logger.info(f"🔄 Auto-withdrawing {crypto_amount} {crypto_currency} to {destination_address[:8]}...")
@@ -945,6 +975,28 @@ async def handle_quidax_order_completed(event_data: dict, supabase: Client):
         
     except Exception as e:
         logger.error(f"❌ Failed to handle Quidax order completion: {e}")
+        
+        # 📊 Log the failure in webhook record
+        try:
+            # ✅ Get current retry count first
+            webhook_record = supabase.table("quidax_webhook_events")\
+                .select("retry_count")\
+                .eq("event_id", event_data.get("id"))\
+                .limit(1)\
+                .execute()
+            
+            current_retries = 0
+            if webhook_record.data and len(webhook_record.data) > 0:
+                current_retries = webhook_record.data[0].get("retry_count", 0)
+            
+            # ✅ Update with incremented count
+            supabase.table("quidax_webhook_events").update({
+                "processed": False,
+                "processing_error": str(e),
+                "retry_count": current_retries + 1
+            }).eq("event_id", event_data.get("id")).execute()
+        except Exception as update_err:
+            logger.warning(f"Could not log webhook error: {update_err}")
 
 
 async def handle_quidax_order_cancelled(event_data: dict, supabase: Client):
