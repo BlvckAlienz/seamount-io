@@ -9,12 +9,15 @@ import hmac
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Optional, Tuple
 from uuid import uuid4
 
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from supabase import Client
 
 logger = logging.getLogger(__name__)
@@ -46,6 +49,31 @@ class QuidaxService:
         # ✅ ADDED: Warn if webhook secret missing (won't break API calls, but webhooks will fail)
         if not self.webhook_secret:
             logger.warning("⚠️ QUIDAX_WEBHOOK_SECRET not configured - webhook signature verification will fail!")
+        
+        # ✅ ADDED: Configure retry session with exponential backoff
+        self.session = self._create_retry_session()
+        
+        # ✅ ADDED: Simple in-memory cache for ticker data (5 min TTL)
+        self._ticker_cache = {}
+        self._cache_ttl = 300  # 5 minutes
+    
+    def _create_retry_session(self) -> requests.Session:
+        """Create requests session with retry logic for 503/429/500 errors"""
+        session = requests.Session()
+        
+        # Retry on 429 (rate limit), 500, 502, 503, 504 (server errors)
+        retry_strategy = Retry(
+            total=3,  # Max 3 retries
+            backoff_factor=2,  # Wait 2^retry seconds (2s, 4s, 8s)
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]  # Retry safe methods only
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
     
     # ========================================================================
     # AUTHENTICATION
@@ -66,7 +94,7 @@ class QuidaxService:
     async def get_markets(self) -> Dict:
         """Get list of all available markets"""
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.BASE_URL}/markets",
                 headers=self._get_headers(),
                 timeout=10
@@ -79,14 +107,22 @@ class QuidaxService:
     
     async def get_ticker(self, market: str) -> Dict:
         """
-        Get current ticker for a market
+        Get current ticker for a market (with caching to reduce API calls)
         
         Args:
             market: Market pair (e.g., 'usdtngn', 'btcngn')
         """
         try:
-            # ✅ Quidax API uses /markets/tickers/{market_id} (plural 'tickers')
-            response = requests.get(
+            # ✅ CHECK CACHE FIRST
+            cache_key = f"ticker_{market}"
+            cached = self._ticker_cache.get(cache_key)
+            
+            if cached and (time.time() - cached["timestamp"]) < self._cache_ttl:
+                logger.info(f"🔵 Using cached ticker for {market} (age: {int(time.time() - cached['timestamp'])}s)")
+                return cached["data"]
+            
+            # ✅ USE RETRY SESSION (handles 503 automatically)
+            response = self.session.get(
                 f"{self.BASE_URL}/markets/tickers/{market}",
                 headers=self._get_headers(),
                 timeout=10
@@ -98,7 +134,7 @@ class QuidaxService:
             ticker_data = raw_data.get("data", {}).get("ticker", {})
             
             # 🚨 CRITICAL: Quidax uses "buy"/"sell" (not "bid"/"ask")
-            return {
+            result = {
                 "success": True,
                 "market": market,
                 "bid": float(ticker_data.get("buy", 0)),      # buy = bid price
@@ -109,9 +145,38 @@ class QuidaxService:
                 "low": float(ticker_data.get("low", 0)),
                 "open": float(ticker_data.get("open", 0))
             }
+            
+            # ✅ CACHE THE RESULT
+            self._ticker_cache[cache_key] = {
+                "data": result,
+                "timestamp": time.time()
+            }
+            
+            logger.info(f"✅ Fetched fresh ticker for {market}: bid={result['bid']}, ask={result['ask']}")
+            return result
+            
+        except requests.exceptions.RetryError as e:
+            logger.error(f"❌ Quidax API still unavailable after 3 retries for {market}: {e}")
+            return {
+                "success": False, 
+                "error": "Quidax API temporarily unavailable. Please try again in a few minutes.",
+                "error_type": "service_unavailable"
+            }
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if hasattr(e.response, 'status_code') else 'unknown'
+            logger.error(f"❌ Quidax API error {status_code} for {market}: {e}")
+            return {
+                "success": False, 
+                "error": f"Quidax API error ({status_code}). Please try again.",
+                "error_type": "api_error"
+            }
         except Exception as e:
             logger.error(f"❌ Failed to fetch ticker for {market}: {e}")
-            return {"success": False, "error": str(e)}
+            return {
+                "success": False, 
+                "error": str(e),
+                "error_type": "unknown"
+            }
     
     # ========================================================================
     # QUOTES & PRICING
@@ -308,7 +373,7 @@ class QuidaxService:
             
             logger.info(f"🔵 Quidax order payload: {payload}")
             
-            response = requests.post(
+            response = self.session.post(
                 f"{self.BASE_URL}/users/me/instant_orders",
                 headers=self._get_headers(),
                 json=payload,
@@ -329,7 +394,7 @@ class QuidaxService:
             logger.info(f"✅ Created instant order: {instant_order_id}")
             
             # 🚨 STEP 2: CONFIRM THE INSTANT ORDER
-            confirm_response = requests.post(
+            confirm_response = self.session.post(
                 f"{self.BASE_URL}/users/me/instant_orders/{instant_order_id}/confirm",
                 headers=self._get_headers(),
                 timeout=30
@@ -417,7 +482,7 @@ class QuidaxService:
         Always verify order status from API before crediting user
         """
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.BASE_URL}/users/me/instant_orders/{order_id}",
                 headers=self._get_headers(),
                 timeout=10
@@ -475,7 +540,7 @@ class QuidaxService:
             logger.info(f"🔵 Headers: Authorization=Bearer ***{self.secret_key[-8:]}")
             logger.info(f"🔵 Payload: {json.dumps(payload, indent=2)}")
             
-            response = requests.post(
+            response = self.session.post(
                 endpoint,
                 headers=headers,
                 json=payload,
@@ -493,7 +558,10 @@ class QuidaxService:
                 raise Exception(f"Quidax API returned {response.status_code}: {error_data}")
             
             response.raise_for_status()
-            create_response = response.json()
+            withdrawal_data = response.json()
+            
+            withdrawal = withdrawal_data.get("data", {})
+            withdrawal_id = withdrawal.get("id")
             
             logger.info(f"✅ Initiated withdrawal {withdrawal_id} for {amount} {currency.upper()}")
             
@@ -621,7 +689,7 @@ class QuidaxService:
     async def get_wallets(self) -> Dict:
         """Get all Quidax sub-account wallets"""
         try:
-            response = requests.get(
+            response = self.session.get(
                 f"{self.BASE_URL}/users/me/wallets",
                 headers=self._get_headers(),
                 timeout=10
@@ -635,7 +703,7 @@ class QuidaxService:
     async def generate_deposit_address(self, currency: str) -> Dict:
         """Generate deposit address for a currency"""
         try:
-            response = requests.post(
+            response = self.session.post(
                 f"{self.BASE_URL}/users/me/wallets/{currency.lower()}/addresses",
                 headers=self._get_headers(),
                 timeout=15
@@ -680,7 +748,7 @@ class QuidaxService:
                 "currency": currency.upper()
             }
             
-            recipient_response = requests.post(
+            recipient_response = self.session.post(
                 f"{self.BASE_URL}/users/me/recipients",
                 headers=self._get_headers(),
                 json=recipient_payload,
@@ -692,7 +760,7 @@ class QuidaxService:
                 recipient_code = recipient_data.get("recipient_code")
             elif recipient_response.status_code == 422:
                 # Recipient already exists, get from list
-                recipients_response = requests.get(
+                recipients_response = self.session.get(
                     f"{self.BASE_URL}/users/me/recipients",
                     headers=self._get_headers(),
                     timeout=10
@@ -717,7 +785,7 @@ class QuidaxService:
                 "narration": f"Seamount withdrawal - {user_id[:8]}"
             }
             
-            transfer_response = requests.post(
+            transfer_response = self.session.post(
                 f"{self.BASE_URL}/users/me/transfers",
                 headers=self._get_headers(),
                 json=transfer_payload,
