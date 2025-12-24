@@ -95,13 +95,26 @@ class WDKClient:
     def __init__(self):
         self.settings = get_settings()
         
-        # ✅ CRITICAL FIX: FORCE use of environment variable with fallback
+        # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
+        CORRECT_URL = "https://seamount-wdk.onrender.com"
+        WRONG_URL_PATTERN = "seamount-wdk-ne5i"
+        
         self.base_url = self.settings.WDK_SERVICE_URL
+        
+        # Detect and fix common misconfigurations
         if not self.base_url or "localhost" in str(self.base_url):
-            self.base_url = "https://seamount-wdk.onrender.com"  # Hardcode as fallback
+            self.base_url = CORRECT_URL
             logger.warning("⚠️ Using fallback WDK URL - ENV variable not set properly")
+        elif WRONG_URL_PATTERN in str(self.base_url):
+            # 🚨 NUCLEAR OPTION: Override wrong URL from environment
+            logger.error(f"❌ WRONG URL DETECTED: {self.base_url}")
+            logger.error(f"   This is the OLD Render service URL!")
+            self.base_url = CORRECT_URL
+            logger.warning(f"✅ AUTO-CORRECTED to: {self.base_url}")
+            logger.warning("   UPDATE YOUR .env FILE: WDK_SERVICE_URL=https://seamount-wdk.onrender.com")
         
         logger.info(f"🎯 WDK Service URL configured: {self.base_url}")
+
         
         # ✅ CRITICAL: Get API key from environment (no fallback)
         if not self.settings.WDK_API_KEY:
