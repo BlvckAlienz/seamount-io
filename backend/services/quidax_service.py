@@ -277,14 +277,28 @@ class QuidaxService:
             market = quote["market"]
             quote_type = quote["quote_type"]
             
-            # Quidax instant order payload
-            payload = {
-                "market": market,
-                "bid": quote["crypto_amount"] if quote_type == "buy" else quote["fiat_amount"],
-                "type": quote_type,
-                # Callback URL for webhook
-                "callback_url": f"https://seamount-api.onrender.com/api/v1/webhooks/quidax"
-            }
+            # 🚨 CRITICAL FIX: Quidax instant order payload
+            # For BUY: send "volume" (amount in NGN)
+            # For SELL: send "unit" (amount in crypto)
+            
+            if quote_type == "buy":
+                # User pays NGN, receives crypto
+                payload = {
+                    "market": market,
+                    "volume": str(quote["fiat_amount"]),  # Amount in NGN (must be string)
+                    "type": "buy",
+                    "callback_url": f"https://seamount-api.onrender.com/api/v1/webhooks/quidax"
+                }
+            else:  # sell
+                # User sells crypto, receives NGN
+                payload = {
+                    "market": market,
+                    "unit": str(quote["crypto_amount"]),  # Amount in crypto (must be string)
+                    "type": "sell",
+                    "callback_url": f"https://seamount-api.onrender.com/api/v1/webhooks/quidax"
+                }
+            
+            logger.info(f"🔵 Quidax order payload: {payload}")
             
             response = requests.post(
                 f"{self.BASE_URL}/users/me/instant_orders",
