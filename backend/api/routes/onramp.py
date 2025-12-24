@@ -96,7 +96,7 @@ async def initialize_onramp(
                 detail=f"Database error: {str(e)}"
             )
         
-        # ===================================================================
+        #  ===================================================================
         # STEP 3: SMART ROUTING - QUIDAX-FIRST FOR NGN
         # ===================================================================
         provider = None
@@ -119,7 +119,6 @@ async def initialize_onramp(
                     "ETH": "ethngn",
                     "ALGO": "algongn",
                     "MATIC": "maticngn",
-                    # Add more as Quidax supports them
                 }
                 
                 quidax_market = quidax_markets.get(crypto_asset)
@@ -178,7 +177,7 @@ async def initialize_onramp(
                         db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
                         logger.info(f"✅ Quidax (TIER 1) order created: {order_result['order_id']}")
                         
-                        # Return immediately - skip other providers
+                        # 🚨 RETURN IMMEDIATELY - SKIP OTHER PROVIDERS
                         return {
                             "success": True,
                             "transaction_id": tx_id,
@@ -196,7 +195,9 @@ async def initialize_onramp(
                     logger.info(f"⚠️ Quidax doesn't support {crypto_asset}, falling back")
                     
             except Exception as quidax_error:
-                logger.warning(f"⚠️ Quidax (TIER 1) failed: {quidax_error}")
+                logger.error(f"❌ QUIDAX (TIER 1) FAILED: {quidax_error}", exc_info=True)
+                logger.error(f"   Error type: {type(quidax_error).__name__}")
+                logger.error(f"   Falling back to Paystack (TIER 2)")
                 # Fall through to Paystack
         
         # 🥈 TIER 2: PAYSTACK (NGN FALLBACK - BANK TRANSFER)
@@ -381,7 +382,7 @@ async def initialize_onramp(
                 
                 payment_result = await cashramp.create_ngn_onramp(
                     user_id=current_user["id"],
-                    asset=crypro_asset,
+                    asset=crypto_asset,
                     amount_ngn=amount,
                     payment_method="p2p"
                 )
