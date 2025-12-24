@@ -774,6 +774,272 @@ async def _refund_tron_balance(
     except Exception as e:
         logger.error(f"❌ Failed to refund Tron balance: {e}")
 
+# ============================================================================
+# QUIDAX WEBHOOK HANDLER
+# ============================================================================
+
+@router.post("/webhooks/quidax")
+async def quidax_webhook(request: Request):
+    """
+    Handle Quidax webhook events
+    
+    Events:
+    - instant_order.done: Order completed
+    - instant_order.cancelled: Order cancelled
+    - deposit.successful: Deposit confirmed
+    - withdraw.successful: Withdrawal completed
+    - withdraw.rejected: Withdrawal rejected
+    """
+    try:
+        # Get signature from headers
+        signature = request.headers.get("quidax-signature")
+        if not signature:
+            logger.warning("❌ Missing Quidax webhook signature")
+            raise HTTPException(status_code=400, detail="Missing signature")
+        
+        # Get raw body
+        body = await request.body()
+        payload_str = body.decode('utf-8')
+        
+        # Verify signature
+        from backend.services.quidax_service import QuidaxService
+        quidax = QuidaxService(get_supabase_client())
+        
+        if signature:
+            is_valid = quidax.verify_webhook_signature(payload_str, signature)
+            if not is_valid:
+                # Check if we're in development mode
+                if os.getenv("ENVIRONMENT") == "development":
+                    logger.warning("⚠️ Invalid signature but allowing in DEV mode")
+                else:
+                    logger.error("❌ Invalid Quidax webhook signature - REJECTING")
+                    raise HTTPException(status_code=401, detail="Invalid signature")
+        else:
+            logger.warning("⚠️ No signature header - webhook accepted without verification")
+        
+        # Parse event data
+        event_data = json.loads(payload_str)
+        event_type = event_data.get("event")
+        
+        logger.info(f"📨 Quidax webhook received: {event_type}")
+        
+        # Log webhook event
+        supabase = get_supabase_client()
+        webhook_log = {
+            "event_type": event_type,
+            "event_id": event_data.get("id"),
+            "raw_payload": event_data,
+            "signature": signature,
+            "received_at": datetime.utcnow().isoformat()
+        }
+        
+        supabase.table("quidax_webhook_events").insert(webhook_log).execute()
+        
+        # Route to appropriate handler
+        handlers = {
+            "instant_order.done": handle_quidax_order_completed,
+            "instant_order.cancelled": handle_quidax_order_cancelled,
+            "deposit.successful": handle_quidax_deposit_successful,
+            "withdraw.successful": handle_quidax_withdraw_successful,
+            "withdraw.rejected": handle_quidax_withdraw_rejected,
+            "wallet.updated": handle_quidax_wallet_updated
+        }
+        
+        if event_type in handlers:
+            await handlers[event_type](event_data, supabase)
+        else:
+            logger.info(f"ℹ️ Unhandled Quidax event: {event_type}")
+        
+        return {"status": "success", "message": "Webhook processed"}
+        
+    except json.JSONDecodeError:
+        logger.error("❌ Invalid JSON in Quidax webhook payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    except Exception as e:
+        logger.error(f"❌ Quidax webhook processing failed: {e}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+
+async def handle_quidax_order_completed(event_data: dict, supabase: Client):
+    """
+    Handle completed instant order
+    
+    Flow:
+    1. Verify order status from Quidax API
+    2. Update onramp_transaction to 'completed'
+    3. Initiate auto-withdrawal to user's WDK wallet
+    """
+    try:
+        data = event_data.get("data", {})
+        order_id = data.get("id")
+        order_type = data.get("type")  # 'buy' or 'sell'
+        
+        # Find transaction in database
+        tx_result = supabase.table("onramp_transactions")\
+            .select("*")\
+            .eq("quidax_order_id", order_id)\
+            .single()\
+            .execute()
+        
+        if not tx_result.data:
+            logger.error(f"❌ Transaction not found for Quidax order {order_id}")
+            return
+        
+        tx = tx_result.data
+        user_id = tx["user_id"]
+        crypto_amount = tx["crypto_amount"]
+        crypto_currency = tx["crypto_currency"]
+        
+        # Verify order status from Quidax API (always re-query)
+        from backend.services.quidax_service import QuidaxService
+        quidax = QuidaxService(supabase)
+        
+        order_status = await quidax.get_order_status(order_id)
+        
+        if not order_status.get("success") or order_status.get("status") != "done":
+            logger.warning(f"⚠️ Order {order_id} verification failed: {order_status.get('status')}")
+            return
+        
+        logger.info(f"✅ Quidax order {order_id} verified as complete")
+        
+        # Update transaction status
+        supabase.table("onramp_transactions").update({
+            "status": "completed",
+            "completed_at": datetime.utcnow().isoformat(),
+            "webhook_received_at": datetime.utcnow().isoformat(),
+            "metadata": json.dumps({
+                **json.loads(tx.get("metadata", "{}")),
+                "quidax_completed_event": data
+            })
+        }).eq("quidax_order_id", order_id).execute()
+        
+        # 🚨 AUTO-WITHDRAWAL LOGIC
+        # Get user's WDK wallet address for this crypto
+        wallet_result = supabase.table("multi_chain_addresses")\
+            .select("address")\
+            .eq("user_id", user_id)\
+            .eq("chain", _map_crypto_to_chain(crypto_currency))\
+            .single()\
+            .execute()
+        
+        if wallet_result.data and wallet_result.data.get("address"):
+            destination_address = wallet_result.data["address"]
+            
+            # Initiate withdrawal to user's wallet
+            logger.info(f"🔄 Auto-withdrawing {crypto_amount} {crypto_currency} to {destination_address[:8]}...")
+            
+            withdrawal_result = await quidax.withdraw_crypto(
+                user_id=user_id,
+                currency=crypto_currency.lower(),
+                amount=float(crypto_amount),
+                destination_address=destination_address,
+                network="trc20" if crypto_currency.upper() == "USDT" else None
+            )
+            
+            if withdrawal_result.get("success"):
+                logger.info(f"✅ Auto-withdrawal initiated: {withdrawal_result.get('withdrawal_id')}")
+            else:
+                logger.error(f"❌ Auto-withdrawal failed: {withdrawal_result.get('error')}")
+        else:
+            logger.warning(f"⚠️ No WDK wallet found for user {user_id[:8]}... - manual withdrawal required")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax order completion: {e}")
+
+
+async def handle_quidax_order_cancelled(event_data: dict, supabase: Client):
+    """Handle cancelled instant order"""
+    try:
+        data = event_data.get("data", {})
+        order_id = data.get("id")
+        
+        supabase.table("onramp_transactions").update({
+            "status": "cancelled",
+            "metadata": json.dumps({
+                "cancellation_reason": data.get("cancel_reason", "User cancelled"),
+                "quidax_cancelled_event": data
+            })
+        }).eq("quidax_order_id", order_id).execute()
+        
+        logger.info(f"⚠️ Quidax order {order_id} cancelled")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax order cancellation: {e}")
+
+
+async def handle_quidax_deposit_successful(event_data: dict, supabase: Client):
+    """Handle successful crypto deposit to Quidax wallet"""
+    try:
+        data = event_data.get("data", {})
+        
+        logger.info(f"💰 Quidax deposit successful: {data.get('currency')} - {data.get('amount')}")
+        
+        # Store deposit record
+        # This would be used if we're holding crypto in Quidax long-term
+        # For now, just log it
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax deposit: {e}")
+
+
+async def handle_quidax_withdraw_successful(event_data: dict, supabase: Client):
+    """
+    Handle successful withdrawal
+    
+    This confirms crypto was sent to user's external wallet
+    """
+    try:
+        data = event_data.get("data", {})
+        withdrawal_id = data.get("id")
+        
+        # Find the corresponding onramp transaction
+        # Update it to show withdrawal completed
+        
+        logger.info(f"✅ Quidax withdrawal {withdrawal_id} completed")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax withdrawal success: {e}")
+
+
+async def handle_quidax_withdraw_rejected(event_data: dict, supabase: Client):
+    """Handle rejected withdrawal"""
+    try:
+        data = event_data.get("data", {})
+        withdrawal_id = data.get("id")
+        
+        logger.warning(f"⚠️ Quidax withdrawal {withdrawal_id} rejected: {data.get('reject_reason')}")
+        
+        # TODO: Notify user about rejection
+        # May need to credit their Seamount balance instead
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax withdrawal rejection: {e}")
+
+
+async def handle_quidax_wallet_updated(event_data: dict, supabase: Client):
+    """Handle wallet balance update"""
+    try:
+        data = event_data.get("data", {})
+        
+        logger.info(f"💼 Quidax wallet updated: {data.get('currency')} - {data.get('balance')}")
+        
+        # Could sync Quidax balances to our database here if needed
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to handle Quidax wallet update: {e}")
+
+
+def _map_crypto_to_chain(crypto: str) -> str:
+    """Map crypto symbol to blockchain name"""
+    mapping = {
+        "USDT": "tron",
+        "BTC": "bitcoin",
+        "ETH": "ethereum",
+        "ALGO": "algorand",
+        "MATIC": "polygon"
+    }
+    return mapping.get(crypto.upper(), "tron")
+
 # ADD THIS HELPER METHOD after the other webhook handlers:
 
 async def handle_paystack_transfer_success(event_data):

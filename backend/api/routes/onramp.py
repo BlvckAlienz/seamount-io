@@ -203,6 +203,49 @@ async def initialize_onramp(
                 logger.warning(f"⚠️ Pretium failed, falling back: {pretium_error}")
                 # Fall through to existing providers
         
+        # ========================================================================
+        # TIER 2: QUIDAX (Instant Crypto Buy for NGN)
+        # ========================================================================
+        if not provider and currency == "NGN" and payment_method in ["auto", "quidax"]:
+            try:
+                logger.info(f"🔵 Routing to Quidax instant buy: {amount} {currency}")
+                
+                from backend.services.quidax_service import QuidaxService
+                quidax = QuidaxService(db_service.supabase)
+                
+                # Step 1: Get quote
+                quote_result = await quidax.get_quote(
+                    user_id=current_user["id"],
+                    market="usdtngn",
+                    quote_type="buy",
+                    amount=float(amount),
+                    amount_type="fiat"
+                )
+                
+                if not quote_result.get("success"):
+                    raise Exception(f"Quidax quote failed: {quote_result.get('error')}")
+                
+                # Step 2: Create instant order
+                order_result = await quidax.create_instant_order(
+                    user_id=current_user["id"],
+                    quote_reference=quote_result["quote_reference"]
+                )
+                
+                if order_result.get("success"):
+                    checkout_url = order_result.get("payment_url")
+                    
+                    if checkout_url:
+                        provider = "quidax"
+                        logger.info(f"✅ Quidax instant order created: {order_result['order_id']}")
+                    else:
+                        logger.warning("Quidax returned success but no payment URL")
+                else:
+                    raise Exception(order_result.get("error", "Quidax order creation failed"))
+                    
+            except Exception as quidax_error:
+                logger.warning(f"⚠️ Quidax failed, falling back to Paystack: {quidax_error}")
+                # Fall through to Paystack
+
         # 🎯 TIER 2: PAYSTACK (Most reliable for NGN, existing logic)
         if not provider and currency == "NGN" and payment_method in ["auto", "paystack"]:
             try:

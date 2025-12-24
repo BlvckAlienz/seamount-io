@@ -116,6 +116,14 @@ from backend.api.routes import onramp, offramp, bank_verification
 
 # ===== IMPORT ROUTERS WITH COMPREHENSIVE ERROR HANDLING =====
 try:
+    from backend.api.routes import quidax
+    routers_available['quidax'] = quidax
+    logger.info("✅ Quidax router imported")
+except ImportError as e:
+    logger.error(f"❌ Quidax router import error: {e}")
+    routers_available['quidax'] = None
+
+try:
     from backend.api.routes import bank_verification
     routers_available['bank_verification'] = bank_verification
     logger.info("âœ… Bank verification router imported")
@@ -660,6 +668,10 @@ if routers_available.get('onramp'):
 if routers_available.get('offramp'):
     app.include_router(routers_available['offramp'], prefix="/api/v1", tags=["Off-Ramp"])
     logger.info("Off-ramp router registered at /api/v1")
+
+if routers_available.get('quidax'):
+    app.include_router(routers_available['quidax'].router, prefix="/api/v1", tags=["Quidax"])                                            
+    logger.info("Quidax router registered at /api/v1/quidax")
 
 if routers_available.get('bank_verification'):
     app.include_router(routers_available['bank_verification'].router, prefix="/api/v1", tags=["Bank Verification"])
