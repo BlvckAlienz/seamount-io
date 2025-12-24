@@ -277,25 +277,33 @@ class QuidaxService:
             market = quote["market"]
             quote_type = quote["quote_type"]
             
-            # 🚨 CRITICAL FIX: Quidax instant order payload
-            # For BUY: send "volume" (amount in NGN)
-            # For SELL: send "unit" (amount in crypto)
+            # 🚨 VALIDATED AGAINST QUIDAX DOCS
+            # Payload format: bid/ask/type/total/unit (NOT volume/market)
+            
+            # Extract currencies from market (e.g., "usdtngn" → ask=usdt, bid=ngn)
+            if market.endswith("ngn"):
+                crypto_currency = market[:-3]  # "usdtngn" → "usdt"
+                fiat_currency = "ngn"
+            else:
+                raise Exception(f"Unsupported market format: {market}")
             
             if quote_type == "buy":
                 # User pays NGN, receives crypto
                 payload = {
-                    "market": market,
-                    "volume": str(quote["fiat_amount"]),  # Amount in NGN (must be string)
+                    "bid": fiat_currency,           # What we're paying with (ngn)
+                    "ask": crypto_currency,         # What we want (usdt)
                     "type": "buy",
-                    "callback_url": f"https://seamount-api.onrender.com/api/v1/webhooks/quidax"
+                    "total": str(quote["fiat_amount"]),  # Amount to spend (10000)
+                    "unit": fiat_currency           # Unit of total (ngn)
                 }
             else:  # sell
                 # User sells crypto, receives NGN
                 payload = {
-                    "market": market,
-                    "unit": str(quote["crypto_amount"]),  # Amount in crypto (must be string)
+                    "bid": crypto_currency,         # What we're selling (usdt)
+                    "ask": fiat_currency,           # What we want (ngn)
                     "type": "sell",
-                    "callback_url": f"https://seamount-api.onrender.com/api/v1/webhooks/quidax"
+                    "total": str(quote["crypto_amount"]),  # Amount to sell
+                    "unit": crypto_currency         # Unit of total (usdt)
                 }
             
             logger.info(f"🔵 Quidax order payload: {payload}")
@@ -307,12 +315,41 @@ class QuidaxService:
                 timeout=30
             )
             response.raise_for_status()
-            order_data = response.json()
+            create_response = response.json()
             
-            # Extract order details
-            order = order_data.get("data", {})
-            order_id = order.get("id")
-            payment_url = order.get("payment_url")
+            logger.info(f"🔵 Quidax create response: {create_response}")
+            
+            # Extract instant_order_id from create response
+            instant_order_data = create_response.get("data", {})
+            instant_order_id = instant_order_data.get("id")
+            
+            if not instant_order_id:
+                raise Exception(f"No instant_order_id in response: {create_response}")
+            
+            logger.info(f"✅ Created instant order: {instant_order_id}")
+            
+            # 🚨 STEP 2: CONFIRM THE INSTANT ORDER
+            confirm_response = requests.post(
+                f"{self.BASE_URL}/users/me/instant_orders/{instant_order_id}/confirm",
+                headers=self._get_headers(),
+                timeout=30
+            )
+            confirm_response.raise_for_status()
+            confirm_data = confirm_response.json()
+            
+            logger.info(f"✅ Confirmed instant order: {confirm_data}")
+            
+            # Extract order details from confirmed response
+            order = confirm_data.get("data", {})
+            order_id = order.get("id") or instant_order_id
+            
+            # Quidax returns payment_url in different fields
+            payment_url = (
+                order.get("payment_url") or 
+                order.get("checkout_url") or
+                instant_order_data.get("payment_url") or
+                f"https://www.quidax.com/instant-orders/{order_id}"  # Fallback
+            )
             
             # Store in onramp_transactions
             onramp_data = {
