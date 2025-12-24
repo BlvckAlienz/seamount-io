@@ -460,16 +460,33 @@ class QuidaxService:
             if currency.upper() in ["USDT", "USDC"]:
                 payload["network"] = network
             
+            # 🚨 ADD DIAGNOSTIC LOGGING
+            endpoint = f"{self.BASE_URL}/users/me/instant_orders"
+            headers = self._get_headers()
+            
+            logger.info(f"🔵 POST {endpoint}")
+            logger.info(f"🔵 Headers: Authorization=Bearer ***{self.secret_key[-8:]}")
+            logger.info(f"🔵 Payload: {json.dumps(payload, indent=2)}")
+            
             response = requests.post(
-                f"{self.BASE_URL}/users/me/withdraws",
-                headers=self._get_headers(),
+                endpoint,
+                headers=headers,
                 json=payload,
                 timeout=30
             )
-            response.raise_for_status()
-            withdrawal = response.json().get("data", {})
             
-            withdrawal_id = withdrawal.get("id")
+            # 🚨 LOG FULL RESPONSE BEFORE ERROR CHECK
+            logger.info(f"🔵 Quidax HTTP Status: {response.status_code}")
+            logger.info(f"🔵 Quidax Raw Response: {response.text}")
+            
+            # Now check for errors
+            if response.status_code != 200:
+                error_data = response.json() if response.text else {}
+                logger.error(f"❌ Quidax API Error Response: {json.dumps(error_data, indent=2)}")
+                raise Exception(f"Quidax API returned {response.status_code}: {error_data}")
+            
+            response.raise_for_status()
+            create_response = response.json()
             
             logger.info(f"✅ Initiated withdrawal {withdrawal_id} for {amount} {currency.upper()}")
             
