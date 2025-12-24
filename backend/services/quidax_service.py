@@ -32,7 +32,7 @@ class QuidaxService:
     - Verify webhook signatures
     """
     
-    BASE_URL = "https://app.quidax.io/api/v1"
+    BASE_URL = "https://www.quidax.com/api/v1"  # Updated from docs example
     
     def __init__(self, supabase: Client):
         self.supabase = supabase
@@ -282,10 +282,10 @@ class QuidaxService:
             
             # Extract currencies from market (e.g., "usdtngn" → ask=usdt, bid=ngn)
             if market.endswith("ngn"):
-                crypto_currency = market[:-3]  # "usdtngn" → "usdt"
+                crypto_currency = market[:-3].lower()  # "usdtngn" → "usdt" (lowercase)
                 fiat_currency = "ngn"
-            else:
-                raise Exception(f"Unsupported market format: {market}")
+            
+            logger.info(f"🔵 Extracted: bid={fiat_currency}, ask={crypto_currency}")
             
             if quote_type == "buy":
                 # User pays NGN, receives crypto
@@ -392,8 +392,15 @@ class QuidaxService:
             }
             
         except requests.exceptions.HTTPError as e:
-            error_msg = e.response.json().get("message", str(e))
-            logger.error(f"❌ Quidax API error: {error_msg}")
+            try:
+                error_response = e.response.json()
+                error_msg = error_response.get("message", str(e))
+                logger.error(f"❌ Quidax HTTP {e.response.status_code}: {error_msg}")
+                logger.error(f"   Full response: {json.dumps(error_response, indent=2)}")
+            except:
+                error_msg = str(e)
+                logger.error(f"❌ Quidax API error: {error_msg}")
+                logger.error(f"   Response text: {e.response.text if hasattr(e.response, 'text') else 'N/A'}")
             return {"success": False, "error": error_msg}
         except Exception as e:
             logger.error(f"❌ Failed to create instant order: {e}")
