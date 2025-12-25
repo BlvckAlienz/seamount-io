@@ -10,6 +10,8 @@ import { MAPPricingCard } from '@/components/meter-xpress/MAPPricingCard';
 import { DocumentUpload } from '@/components/meter-xpress/DocumentUpload';
 import { ActivationGuidelinesModal } from '@/components/meter-xpress/ActivationGuidelinesModal';
 import { PaymentStep } from '@/components/meter-xpress/PaymentStep';
+import { ReplacementForm } from '@/components/meter-xpress/ReplacementForm';
+import { ConversionForm } from '@/components/meter-xpress/ConversionForm';
 
 type Step = 'questionnaire' | 'form' | 'documents' | 'payment' | 'complete';
 type ApplicationType = 'new_service' | 'replacement' | 'conversion' | 'upgrade' | 'downgrade';
@@ -115,16 +117,22 @@ const MeterXpressPage = () => {
           {/* Step Content */}
           <div className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6">
             {currentStep === 'questionnaire' && (
-              <QuestionnaireStep onComplete={handleQuestionnaireComplete} />
+                <QuestionnaireStep onComplete={handleQuestionnaireComplete} />
             )}
             
             {currentStep === 'form' && applicationType === 'new_service' && (
-              <NewServiceForm onComplete={handleFormComplete} />
+                <NewServiceForm onComplete={handleFormComplete} />
             )}
             
-            {currentStep === 'documents' && applicationId && (
-              <DocumentUpload applicationId={applicationId} onComplete={handleDocumentsComplete} />
+            {currentStep === 'form' && applicationType === 'replacement' && (
+                <ReplacementForm onComplete={handleFormComplete} />
             )}
+            {currentStep === 'form' && applicationType === 'conversion' && (
+                <ConversionForm onComplete={handleFormComplete} />
+)}
+            {currentStep === 'documents' && applicationId && (
+                <DocumentUpload applicationId={applicationId} applicationType={applicationType!} onComplete={handleDocumentsComplete} />
+            )} 
             
             {currentStep === 'payment' && applicationId && (
               <PaymentStep applicationId={applicationId} />

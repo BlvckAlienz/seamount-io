@@ -82,41 +82,101 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
     });
   };
 
+  const validateCustomerSection = () => {
+    // ✅ NAME VALIDATION
+    if (!formData.first_name.trim()) {
+        toast.error('First name is required');
+        return false;
+    }
+    if (!formData.surname.trim()) {
+        toast.error('Surname is required');
+        return false;
+    }
+
+    // ✅ EMAIL VALIDATION
+    if (!formData.primary_email.trim()) {
+        toast.error('Email address is required');
+        return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.primary_email)) {
+        toast.error('Please enter a valid email address');
+        return false;
+    }
+
+    // ✅ PHONE VALIDATION
+    if (!formData.mobile_number.trim()) {
+        toast.error('Mobile number is required');
+        return false;
+    }
+    const phoneRegex = /^0\d{10}$/; // Nigerian phone format
+    if (!phoneRegex.test(formData.mobile_number.replace(/\s/g, ''))) {
+        toast.error('Please enter a valid 11-digit Nigerian phone number');
+        return false;
+    }
+
+    // ✅ DATE OF BIRTH VALIDATION
+    if (!formData.date_of_birth) {
+        toast.error('Date of birth is required');
+        return false;
+    }
+
+    return true;
+    };
+
+    const validateServiceSection = () => {
+    // ✅ DISTRICT VALIDATION
+    if (!formData.district) {
+        toast.error('Please select a district');
+        return false;
+    }
+
+    // ✅ LANDMARK VALIDATION
+    if (!formData.landmark.trim()) {
+        toast.error('Landmark/address is required');
+        return false;
+    }
+    if (formData.landmark.trim().length < 10) {
+        toast.error('Please provide a more detailed landmark description');
+        return false;
+    }
+
+    // ✅ PREMISE CATEGORY VALIDATION
+    if (!formData.premise_category) {
+        toast.error('Please select a premise category');
+        return false;
+    }
+
+    return true;
+    };
+
   const handleSubmit = async () => {
     try {
-      setLoading(true);
+        setLoading(true);
 
-      // Validation
-      if (!formData.first_name || !formData.surname) {
-        toast.error('Please fill in your name');
-        setCurrentSection('customer');
-        return;
-      }
+        // ✅ COMPREHENSIVE VALIDATION
+        if (!validateCustomerSection()) {
+          setCurrentSection('customer');
+          return;
+        }
 
-      if (!formData.primary_email || !formData.mobile_number) {
-        toast.error('Please provide email and phone number');
-        setCurrentSection('customer');
-        return;
-      }
+        if (!validateServiceSection()) {
+          setCurrentSection('service');
+          return;
+        }
 
-      if (!formData.district || !formData.landmark) {
-        toast.error('Please provide location details');
-        setCurrentSection('service');
-        return;
-      }
+        if (!formData.map_vendor) {
+          toast.error('Please select a MAP vendor');
+          setCurrentSection('pricing');
+          return;
+        }
 
-      if (!formData.map_vendor) {
-        toast.error('Please select a MAP vendor');
-        setCurrentSection('pricing');
-        return;
-      }
+        const response = await apiClient.post('/api/v1/meter-xpress/applications/new-service', formData);
 
-      const response = await apiClient.post('/api/v1/meter-xpress/applications/new-service', formData);
-
-      if (response.data.success) {
-        toast.success('Application created successfully!');
-        onComplete(response.data.application_id, formData);
-      }
+        if (response.data.success) {
+          toast.success('Application created successfully!');
+          onComplete(response.data.application_id, formData);
+        }
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to create application');
     } finally {
@@ -297,9 +357,13 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
           </div>
 
           <button
-            onClick={() => setCurrentSection('service')}
+            onClick={() => {
+                if (validateCustomerSection()) {
+                  setCurrentSection('service');
+                }
+            }}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
+            >
             Continue to Service Point
             <ArrowRight className="h-5 w-5" />
           </button>
@@ -396,7 +460,11 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
               ← Back
             </button>
             <button
-              onClick={() => setCurrentSection('pricing')}
+              onClick={() => {
+                if (validateServiceSection()) {
+                  setCurrentSection('pricing');
+                }
+              }}
               className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               Continue to Pricing

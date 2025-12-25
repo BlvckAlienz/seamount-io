@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 interface DocumentUploadProps {
   applicationId: string;
+  applicationType: 'new_service' | 'replacement' | 'conversion';
   onComplete: () => void;
 }
 
@@ -23,11 +24,27 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ applicationId, o
   const [selectedType, setSelectedType] = useState('passport_photo');
   const [loading, setLoading] = useState(true);
 
-  const requiredDocs = [
-    { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
-    { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
-    { type: 'lecan_cert', label: 'Licensed Electrical Contractor Certificate', format: 'PDF (Max 2MB)' }
-  ];
+  const getRequiredDocs = (appType: string) => {
+    if (appType === 'new_service') {
+        return [
+        { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
+        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
+        { type: 'lecan_cert', label: 'Licensed Electrical Contractor Certificate', format: 'PDF (Max 2MB)' }
+        ];
+    } else if (appType === 'replacement') {
+        return [
+        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
+        { type: 'meter_photo', label: 'Photo of the Faulty Meter', format: 'JPG/JPEG (Max 1MB)' }
+        ];
+    } else if (appType === 'conversion') {
+        return [
+        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+        ];
+    }
+    return [];
+    };
+
+    const requiredDocs = getRequiredDocs(applicationType);
 
   useEffect(() => {
     fetchDocuments();
@@ -63,12 +80,12 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ applicationId, o
       }
 
       // Validate file type
-      const allowedTypes = selectedType === 'passport_photo' 
+      const allowedTypes = ['passport_photo', 'meter_photo'].includes(selectedType)
         ? ['image/jpeg', 'image/jpg']
         : ['application/pdf'];
-      
+
       if (!allowedTypes.includes(file.type)) {
-        toast.error(`Invalid file type. Please upload ${selectedType === 'passport_photo' ? 'JPG/JPEG' : 'PDF'}`);
+        toast.error(`Invalid file type. Please upload ${['passport_photo', 'meter_photo'].includes(selectedType) ? 'JPG/JPEG' : 'PDF'}`);
         return;
       }
 

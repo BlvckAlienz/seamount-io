@@ -93,8 +93,8 @@ class ConversionFormRequest(BaseModel):
 # ============================================
 
 def calculate_service_fee(base_price: Decimal, phase_type: str) -> Dict[str, Decimal]:
-    """Calculate service fees with 60%/50% premium markup"""
-    markup_rate = Decimal("0.60") if phase_type == "1phase" else Decimal("0.50")
+    """Calculate service fees with 45%/40% markup"""
+    markup_rate = Decimal("0.45") if phase_type == "1phase" else Decimal("0.40")  # ✅ UPDATED
     
     service_fee = base_price * markup_rate
     total_amount = base_price + service_fee
@@ -239,7 +239,180 @@ async def create_new_service_application(
         logger.error(f"❌ New service application failed: {e}")
         raise HTTPException(500, str(e))
 
+@router.post("/applications/replacement")
+async def create_replacement_application(
+    form_data: ReplacementFormRequest,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    📝 Create meter replacement application
+    """
+    try:
+        user_id = current_user['id']
+        supabase = db_service.supabase
+        
+        # Get MAP pricing
+        phase_type = "1phase" if form_data.phase == "1 Phase" else "3phase"
+        
+        map_result = supabase.from_("map_pricing")\
+            .select("*")\
+            .eq("vendor_name", form_data.map_vendor)\
+            .eq("is_active", True)\
+            .single()\
+            .execute()
+        
+        if not map_result.data:
+            raise HTTPException(404, f"MAP vendor '{form_data.map_vendor}' not found")
+        
+        base_price = Decimal(str(
+            map_result.data['single_phase_price'] if phase_type == "1phase" 
+            else map_result.data['three_phase_price']
+        ))
+        
+        # Calculate fees
+        pricing = calculate_service_fee(base_price, phase_type)
+        
+        # Create application
+        app_data = {
+            "user_id": user_id,
+            "application_type": "replacement",
+            "status": "draft",
+            "form_data": form_data.dict(),
+            "phase_type": phase_type,
+            "voltage_level": form_data.voltage_level,
+            "map_vendor": form_data.map_vendor,
+            "map_base_price": float(pricing['base_price']),
+            "service_fee": float(pricing['service_fee']),
+            "total_amount": float(pricing['total_amount']),
+            "metadata": {
+                "account_number": form_data.account_number,
+                "state_of_building": form_data.state_of_building,
+                "applicant_capacity": form_data.applicant_capacity
+            }
+        }
+        
+        result = supabase.from_("meter_applications").insert(app_data).execute()
+        
+        if not result.data:
+            raise HTTPException(500, "Failed to create application")
+        
+        application_id = result.data[0]['id']
+        
+        logger.info(f"✅ Replacement application created: {application_id}")
+        
+        return {
+            "success": True,
+            "application_id": application_id,
+            "pricing": {
+                "base_price": float(pricing['base_price']),
+                "service_fee": float(pricing['service_fee']),
+                "total_amount": float(pricing['total_amount']),
+                "markup_percentage": float(pricing['markup_percentage'])
+            },
+            "next_step": "document_upload"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Replacement application failed: {e}")
+        raise HTTPException(500, str(e))
 
+
+@router.post("/applications/conversion")
+async def create_conversion_application(
+    form_data: ConversionFormRequest,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🔄 Create meter conversion application
+    """
+    try:
+        user_id = current_user['id']
+        supabase = db_service.supabase
+        
+        # Determine if new meter is needed
+        needs_meter = any([
+            'prepaid_metered' in form_data.conversion_to.lower(),
+            'postpaid_metered' in form_data.conversion_to.lower()
+        ])
+        
+        pricing = None
+        if needs_meter:
+            if not form_data.map_vendor:
+                raise HTTPException(400, "MAP vendor required for metered conversion")
+            
+            # Get MAP pricing
+            phase_type = "1phase" if form_data.phase == "1 Phase" else "3phase"
+            
+            map_result = supabase.from_("map_pricing")\
+                .select("*")\
+                .eq("vendor_name", form_data.map_vendor)\
+                .eq("is_active", True)\
+                .single()\
+                .execute()
+            
+            if not map_result.data:
+                raise HTTPException(404, f"MAP vendor '{form_data.map_vendor}' not found")
+            
+            base_price = Decimal(str(
+                map_result.data['single_phase_price'] if phase_type == "1phase" 
+                else map_result.data['three_phase_price']
+            ))
+            
+            pricing = calculate_service_fee(base_price, phase_type)
+        
+        # Create application
+        app_data = {
+            "user_id": user_id,
+            "application_type": "conversion",
+            "status": "draft",
+            "form_data": form_data.dict(),
+            "phase_type": form_data.phase if needs_meter else None,
+            "voltage_level": form_data.voltage_level if needs_meter else None,
+            "map_vendor": form_data.map_vendor if needs_meter else None,
+            "map_base_price": float(pricing['base_price']) if pricing else 0,
+            "service_fee": float(pricing['service_fee']) if pricing else 0,
+            "total_amount": float(pricing['total_amount']) if pricing else 0,
+            "metadata": {
+                "account_number": form_data.account_number,
+                "meter_number": form_data.meter_number,
+                "conversion_from": form_data.conversion_from,
+                "conversion_to": form_data.conversion_to,
+                "needs_meter": needs_meter
+            }
+        }
+        
+        result = supabase.from_("meter_applications").insert(app_data).execute()
+        
+        if not result.data:
+            raise HTTPException(500, "Failed to create application")
+        
+        application_id = result.data[0]['id']
+        
+        logger.info(f"✅ Conversion application created: {application_id}")
+        
+        return {
+            "success": True,
+            "application_id": application_id,
+            "needs_meter": needs_meter,
+            "pricing": {
+                "base_price": float(pricing['base_price']),
+                "service_fee": float(pricing['service_fee']),
+                "total_amount": float(pricing['total_amount']),
+                "markup_percentage": float(pricing['markup_percentage'])
+            } if pricing else None,
+            "next_step": "document_upload" if needs_meter else "submission"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Conversion application failed: {e}")
+        raise HTTPException(500, str(e))
+    
 @router.post("/applications/{application_id}/documents/upload")
 async def upload_application_document(
     application_id: str,
