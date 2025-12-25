@@ -65,7 +65,7 @@ def get_user_metrics(user_id: str, supabase) -> Dict[str, Any]:
         documents_count = docs_result.count if hasattr(docs_result, 'count') else len(docs_result.data or [])
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             logger.warning(f"⚠️ No active plan for user {user_id}, returning zero metrics")
@@ -162,7 +162,7 @@ def sync_all_user_data(user_id: str, supabase) -> Dict[str, Any]:
         existing_doc_ids = {doc['id'] for doc in (docs_result.data or [])}
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             logger.info(f"📄 [ATOMIC SYNC] No active plan for user {user_id}")
@@ -246,7 +246,7 @@ def verify_data_consistency(user_id: str, supabase) -> bool:
         metrics = get_user_metrics(user_id, supabase)
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             logger.info(f"🔍 [VERIFY] No active plan for user {user_id}")
@@ -321,7 +321,7 @@ async def get_audit_checklist(
         sync_result = sync_all_user_data(user_id, supabase)
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             return {
@@ -675,7 +675,7 @@ async def get_checklist_progress_details(
         metrics = get_user_metrics(user_id, supabase)
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             return {
@@ -752,7 +752,7 @@ async def get_system_status(
         user_id = current_user['id']
         
         # 🚨 CRITICAL: Get user's active plan first
-        plan_id = get_active_plan_code(user_id, supabase)
+        plan_code = get_active_plan_code(user_id, supabase)
 
         if not plan_code:
             return {
