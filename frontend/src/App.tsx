@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import TerminalPage from './pages/TerminalPage';
 import CompliancePage from './pages/CompliancePage';
+import MeterXpressPage from '@/pages/MeterXpressPage';
 
 // ✅ ADD THESE IMPORTS
 import { WagmiProvider } from 'wagmi';
@@ -164,6 +165,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <PaymentsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/meter-xpress" 
+          element={
+            <ProtectedRoute>
+              <MeterXpressPage />
             </ProtectedRoute>
           } 
         />

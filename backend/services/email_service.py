@@ -91,3 +91,43 @@ class EmailService:
             # Fallback to logging (non-critical failure)
             logger.info(f"📧 [FALLBACK LOG] To: {to_emails}, Subject: {subject}")
             return False
+    
+    async def send_meter_application_confirmation(
+    self,
+    to_email: str,
+    customer_name: str,
+    application_id: str,
+    application_type: str,
+    map_vendor: str,
+    phase_type: str,
+    district: str,
+    total_amount: float
+):
+    """Send meter application confirmation email"""
+    try:
+        # Load template
+        template_path = Path(__file__).parent.parent / "templates" / "emails" / "meter_application_received.html"
+        
+        with open(template_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Replace placeholders
+        html_content = html_content.replace('{{ customer_name }}', customer_name)
+        html_content = html_content.replace('{{ application_id }}', application_id)
+        html_content = html_content.replace('{{ application_type }}', application_type.replace('_', ' ').title())
+        html_content = html_content.replace('{{ map_vendor }}', map_vendor)
+        html_content = html_content.replace('{{ phase_type }}', 'Single Phase' if phase_type == '1phase' else 'Three Phase')
+        html_content = html_content.replace('{{ district }}', district)
+        html_content = html_content.replace('{{ total_amount }}', f"{total_amount:,.0f}")
+        
+        # Send email
+        await self.send_email(
+            to_email=to_email,
+            subject="⚡ Your Meter Application Has Been Received - Seamount",
+            html_content=html_content
+        )
+        
+        logger.info(f"✅ Meter application confirmation sent to {to_email}")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to send meter confirmation email: {e}")

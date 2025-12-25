@@ -1,0 +1,75 @@
+<!-- File: backend/templates/emails/meter_application_received.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meter Application Received</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="color: white; margin: 0;">⚡ Meter Application Received</h1>
+    </div>
+    
+    <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+        <p style="font-size: 16px;">Dear <strong>{{ customer_name }}</strong>,</p>
+        
+        <p>Thank you for choosing Seamount Meter Xpress! Your meter application has been successfully submitted and payment confirmed.</p>
+        
+        <div style="background: white; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 5px;">
+            <h3 style="margin-top: 0; color: #667eea;">Application Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; color: #666;">Application ID:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{{ application_id }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;">Application Type:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{{ application_type }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;">MAP Vendor:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{{ map_vendor }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;">Phase Type:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{{ phase_type }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #666;">District:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{{ district }}</td>
+                </tr>
+                <tr style="border-top: 2px solid #eee;">
+                    <td style="padding: 12px 0; color: #666; font-size: 18px;">Total Paid:</td>
+                    <td style="padding: 12px 0; font-weight: bold; font-size: 18px; color: #22c55e;">₦{{ total_amount }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <h3 style="color: #667eea;">📋 Next Steps</h3>
+        <ol style="padding-left: 20px;">
+            <li style="margin-bottom: 10px;">Our team will review your application within <strong>48 hours</strong></li>
+            <li style="margin-bottom: 10px;">A licensed LECAN contractor will be assigned to your location</li>
+            <li style="margin-bottom: 10px;">You'll receive installation schedule confirmation via email</li>
+            <li style="margin-bottom: 10px;">Installation will be completed within <strong>7 business days</strong></li>
+            <li style="margin-bottom: 10px;">Post-installation support available for 6 months</li>
+        </ol>
+        
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px;">
+            <p style="margin: 0; color: #92400e;"><strong>⏰ Estimated Timeline:</strong> Your meter should be installed within 7-14 business days from approval.</p>
+        </div>
+        
+        <h3 style="color: #667eea;">📞 Need Help?</h3>
+        <p>Contact our support team:</p>
+        <ul style="list-style: none; padding: 0;">
+            <li style="margin-bottom: 8px;">📧 Email: <a href="mailto:support@seamount.io" style="color: #667eea; text-decoration: none;">support@seamount.io</a></li>
+            <li style="margin-bottom: 8px;">💬 WhatsApp: +234 XXX XXX XXXX</li>
+        </ul>
+        
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <p style="color: #999; font-size: 12px;">This is an automated email from Seamount Meter Xpress</p>
+            <p style="color: #999; font-size: 12px;">&copy; 2024 Seamount.io - Simplifying Meter Applications</p>
+        </div>
+    </div>
+</body>
+</html>
