@@ -17,6 +17,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ============================================
+# HELPER: Get User's Active Plan
+# ============================================
+
+def get_active_plan_id(user_id: str, supabase) -> str | None:
+    """
+    Get user's active subscription plan_id.
+    Returns None if no active subscription.
+    """
+    try:
+        result = supabase.from_("subscriptions")\
+            .select("plan_id")\
+            .eq("user_id", user_id)\
+            .eq("status", "active")\
+            .order("created_at", desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if result.data and len(result.data) > 0:
+            plan_id = result.data[0].get('plan_id')
+            logger.info(f"📋 User {user_id} active plan: {plan_id}")
+            return plan_id
+        
+        logger.warning(f"⚠️ No active subscription for user {user_id}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get active plan: {e}")
+        return None
+    
+# ============================================
 # CORE SYNC FUNCTIONS - SINGLE SOURCE OF TRUTH
 # ============================================
 
@@ -34,10 +64,24 @@ def get_user_metrics(user_id: str, supabase) -> Dict[str, Any]:
         
         documents_count = docs_result.count if hasattr(docs_result, 'count') else len(docs_result.data or [])
         
-        # Get checklist stats
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            logger.warning(f"⚠️ No active plan for user {user_id}, returning zero metrics")
+            return {
+                "documents_count": 0,
+                "total_items": 0,
+                "completed_items": 0,
+                "progress_percentage": 0,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+
+        # Get checklist stats - FILTERED BY PLAN
         checklist_result = supabase.from_("audit_checklist_items")\
             .select("id, is_completed", count="exact")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .execute()
         
         total_items = checklist_result.count if hasattr(checklist_result, 'count') else len(checklist_result.data or [])
@@ -117,10 +161,18 @@ def sync_all_user_data(user_id: str, supabase) -> Dict[str, Any]:
         
         existing_doc_ids = {doc['id'] for doc in (docs_result.data or [])}
         
-        # Get all checklist items
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            logger.info(f"📄 [ATOMIC SYNC] No active plan for user {user_id}")
+            return {"documents": 0, "updated_items": 0, "status": "no_plan"}
+
+        # Get all checklist items - FILTERED BY PLAN
         checklist_result = supabase.from_("audit_checklist_items")\
             .select("id, is_completed, item_description")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .execute()
         
         if not checklist_result.data:
@@ -193,10 +245,18 @@ def verify_data_consistency(user_id: str, supabase) -> bool:
         # Get metrics
         metrics = get_user_metrics(user_id, supabase)
         
-        # Get checklist items marked as completed
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            logger.info(f"🔍 [VERIFY] No active plan for user {user_id}")
+            return True  # No plan = nothing to verify = consistent
+
+        # Get checklist items marked as completed - FILTERED BY PLAN
         completed_items_result = supabase.from_("audit_checklist_items")\
             .select("id")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .eq("is_completed", True)\
             .execute()
         
@@ -260,10 +320,26 @@ async def get_audit_checklist(
         # Sync data first
         sync_result = sync_all_user_data(user_id, supabase)
         
-        # Get checklist items
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            return {
+                "success": True,
+                "checklist": [],
+                "checklist_by_category": {},
+                "metrics": {
+                    "total_items": 0,
+                    "completed_items": 0,
+                    "progress_percentage": 0
+                }
+            }
+
+        # Get checklist items - FILTERED BY PLAN
         result = supabase.from_("audit_checklist_items")\
             .select("*")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .execute()
         
         if not result.data:
@@ -598,10 +674,31 @@ async def get_checklist_progress_details(
         # Get metrics
         metrics = get_user_metrics(user_id, supabase)
         
-        # Get checklist for categorization
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            return {
+                "success": True,
+                "overall_progress": 0,
+                "total_documents": 0,
+                "completed_items": 0,
+                "total_items": 0,
+                "category_progress": {},
+                "metrics": {
+                    "documents_count": 0,
+                    "total_items": 0,
+                    "completed_items": 0,
+                    "progress_percentage": 0,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            }
+
+        # Get checklist for categorization - FILTERED BY PLAN
         checklist_result = supabase.from_("audit_checklist_items")\
             .select("*")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .execute()
         
         category_progress = {}
@@ -654,10 +751,28 @@ async def get_system_status(
     try:
         user_id = current_user['id']
         
-        # Get all data
+        # 🚨 CRITICAL: Get user's active plan first
+        plan_id = get_active_plan_id(user_id, supabase)
+
+        if not plan_id:
+            return {
+                "success": True,
+                "status": {
+                    "documents": 0,
+                    "checklist_items": 0,
+                    "completed_items": 0,
+                    "progress_percentage": 0,
+                    "data_consistent": True,
+                    "matches_count": 0,
+                    "verified_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+
+        # Get all data - FILTERED BY PLAN
         checklist_result = supabase.from_("audit_checklist_items")\
             .select("id, is_completed, category")\
             .eq("user_id", user_id)\
+            .eq("plan_id", plan_id)\
             .execute()
         
         docs_result = supabase.from_("compliance_documents")\

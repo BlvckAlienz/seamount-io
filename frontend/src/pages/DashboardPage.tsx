@@ -286,60 +286,6 @@ const DashboardPage = () => {
           />
 
           {/* Balance Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-            <div className="lg:col-span-2 bg-gradient-to-br from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl md:rounded-2xl p-4 md:p-6 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex-1">
-                  <div className="text-xs md:text-sm text-gray-400 mb-1">Total Crypto Balance</div>
-                  <div className="text-2xl md:text-4xl font-bold text-white">{formatCurrencyUSD(totalBalance)}</div>
-                  
-                  {/* ✅ BETTER EMPTY STATE */}
-                  {totalBalance === 0 && createdChains > 0 && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                        {createdChains} {createdChains === 1 ? 'wallet' : 'wallets'} ready
-                      </div>
-                      <button
-                        onClick={() => setShowFundModal(true)}
-                        className="text-xs text-blue-400 hover:text-blue-300 underline font-medium"
-                      >
-                        Fund to get started →
-                      </button>
-                    </div>
-                  )}
-                  
-                  {totalBalance === 0 && createdChains === 0 && (
-                    <div className="mt-2 text-xs text-gray-400">
-                      Create wallets to start trading
-                    </div>
-                  )}
-                </div>
-                
-                <button onClick={fetchPortfolioData} className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
-                  <RefreshCw className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Activity className="h-4 w-4 text-green-400 animate-pulse" />
-                <span className="text-green-400">Live Multi-Chain Balances</span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="text-sm text-gray-400 mb-2">Networks</div>
-              <div className="text-2xl font-bold text-white mb-4">{createdChains} / 5 Active</div>
-              <div className="space-y-2">
-                {AUTO_CREATED_CHAINS.map(chain => (
-                  <div key={chain.id} className="flex items-center gap-2 text-xs text-gray-400">
-                    <div className={`w-2 h-2 rounded-full ${multiChainWallets[chain.id]?.address ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
-                    {chain.name}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Multi-Chain Wallets */}
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-4 md:p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
