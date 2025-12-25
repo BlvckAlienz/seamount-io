@@ -1,4 +1,6 @@
-// File: frontend/src/components/meter-xpress/QuestionnaireStep.tsx
+// 📍 FIND the entire file content
+// 🔄 REPLACE with this FIXED version:
+
 import React, { useState } from 'react';
 import { HelpCircle, ArrowRight } from 'lucide-react';
 import { apiClient } from '@/config/api';
@@ -10,14 +12,14 @@ interface QuestionnaireStepProps {
 
 export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
-  const [answers, setAnswers] = useState({
-    has_existing_account: false,
-    has_working_meter: false,
-    desired_action: ''
-  });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  // ✅ FIX: Direct API call instead of using state
+  const classifyApplication = async (answers: {
+    has_existing_account: boolean;
+    has_working_meter?: boolean;
+    desired_action?: string;
+  }) => {
     try {
       setLoading(true);
       
@@ -57,20 +59,16 @@ export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, has_existing_account: true });
-                  setStep(2);
-                }}
-                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold"
+                onClick={() => setStep(2)}
+                disabled={loading}
+                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold disabled:opacity-50"
               >
                 ✅ Yes, I have an account
               </button>
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, has_existing_account: false });
-                  handleSubmit();
-                }}
-                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold"
+                onClick={() => classifyApplication({ has_existing_account: false })}
+                disabled={loading}
+                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold disabled:opacity-50"
               >
                 ❌ No, this is my first time
               </button>
@@ -85,6 +83,7 @@ export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete
           <button
             onClick={() => setStep(1)}
             className="text-blue-400 hover:text-blue-300 mb-4"
+            disabled={loading}
           >
             ← Back
           </button>
@@ -94,20 +93,19 @@ export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, has_working_meter: true });
-                  setStep(3);
-                }}
-                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold"
+                onClick={() => setStep(3)}
+                disabled={loading}
+                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold disabled:opacity-50"
               >
                 ✅ Yes, meter is working
               </button>
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, has_working_meter: false });
-                  handleSubmit();
-                }}
-                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold"
+                onClick={() => classifyApplication({ 
+                  has_existing_account: true, 
+                  has_working_meter: false 
+                })}
+                disabled={loading}
+                className="p-6 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold disabled:opacity-50"
               >
                 ❌ No, meter is faulty
               </button>
@@ -122,6 +120,7 @@ export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete
           <button
             onClick={() => setStep(2)}
             className="text-blue-400 hover:text-blue-300 mb-4"
+            disabled={loading}
           >
             ← Back
           </button>
@@ -131,29 +130,35 @@ export const QuestionnaireStep: React.FC<QuestionnaireStepProps> = ({ onComplete
             </h3>
             <div className="space-y-3">
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, desired_action: 'convert' });
-                  handleSubmit();
-                }}
-                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left"
+                onClick={() => classifyApplication({
+                  has_existing_account: true,
+                  has_working_meter: true,
+                  desired_action: 'convert'
+                })}
+                disabled={loading}
+                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left disabled:opacity-50"
               >
                 🔄 Convert meter type (prepaid ↔ postpaid)
               </button>
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, desired_action: 'upgrade' });
-                  handleSubmit();
-                }}
-                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left"
+                onClick={() => classifyApplication({
+                  has_existing_account: true,
+                  has_working_meter: true,
+                  desired_action: 'upgrade'
+                })}
+                disabled={loading}
+                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left disabled:opacity-50"
               >
                 ⬆️ Upgrade meter capacity
               </button>
               <button
-                onClick={() => {
-                  setAnswers({ ...answers, desired_action: 'downgrade' });
-                  handleSubmit();
-                }}
-                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left"
+                onClick={() => classifyApplication({
+                  has_existing_account: true,
+                  has_working_meter: true,
+                  desired_action: 'downgrade'
+                })}
+                disabled={loading}
+                className="w-full p-4 bg-gray-700/50 hover:bg-blue-600 border-2 border-gray-600 hover:border-blue-500 rounded-xl transition-all text-white font-semibold text-left disabled:opacity-50"
               >
                 ⬇️ Downgrade meter capacity
               </button>

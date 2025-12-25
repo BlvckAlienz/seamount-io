@@ -32,6 +32,23 @@ const MeterXpressPage = () => {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
+  useEffect(() => {
+    // ✅ FIX: Fetch application type if we have applicationId but no applicationType
+    if (applicationId && !applicationType && currentStep === 'documents') {
+        const fetchApplicationType = async () => {
+        try {
+            const response = await apiClient.get(`/api/v1/meter-xpress/applications/${applicationId}`);
+            if (response.data.success && response.data.application) {
+            setApplicationType(response.data.application.application_type);
+            }
+        } catch (error) {
+            console.error('Failed to fetch application type:', error);
+        }
+        };
+        fetchApplicationType();
+    }
+    }, [applicationId, applicationType, currentStep]);
+
   const handleQuestionnaireComplete = (type: ApplicationType) => {
     setApplicationType(type);
     
@@ -46,8 +63,33 @@ const MeterXpressPage = () => {
   const handleFormComplete = (appId: string, data: any) => {
     setApplicationId(appId);
     setFormData(data);
-    setCurrentStep('documents');
-  };
+    
+    // ✅ FIX: Check if conversion needs documents
+    if (applicationType === 'conversion') {
+        // Check if conversion requires meter (from backend response)
+        apiClient.get(`/api/v1/meter-xpress/applications/${appId}`)
+        .then(response => {
+            if (response.data.success) {
+            const needsMeter = response.data.application?.metadata?.needs_meter;
+            
+            if (needsMeter) {
+                setCurrentStep('documents');
+            } else {
+                // Skip to payment for non-metered conversions
+                setCurrentStep('payment');
+            }
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check conversion requirements:', error);
+            // Default to documents step to be safe
+            setCurrentStep('documents');
+        });
+    } else {
+        // All other types go to documents
+        setCurrentStep('documents');
+    }
+    };
 
   const handleDocumentsComplete = () => {
     setCurrentStep('payment');

@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 interface DocumentUploadProps {
   applicationId: string;
-  applicationType: 'new_service' | 'replacement' | 'conversion';
+  applicationType?: 'new_service' | 'replacement' | 'conversion'; // ✅ OPTIONAL
   onComplete: () => void;
 }
 
@@ -18,33 +18,46 @@ interface UploadedDocument {
   uploaded_at: string;
 }
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({ applicationId, onComplete }) => {
+// ✅ HELPER FUNCTION OUTSIDE COMPONENT
+const getRequiredDocs = (appType?: string) => {
+  if (!appType) {
+    return [
+      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+    ];
+  }
+  
+  if (appType === 'new_service') {
+    return [
+      { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
+      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
+      { type: 'lecan_cert', label: 'Licensed Electrical Contractor Certificate', format: 'PDF (Max 2MB)' }
+    ];
+  } else if (appType === 'replacement') {
+    return [
+      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
+      { type: 'meter_photo', label: 'Photo of the Faulty Meter', format: 'JPG/JPEG (Max 1MB)' }
+    ];
+  } else if (appType === 'conversion') {
+    return [
+      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+    ];
+  }
+  return [];
+};
+
+// ✅ COMPONENT STARTS HERE
+export const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
+  applicationId, 
+  applicationType,  // ✅ Destructure from props
+  onComplete 
+}) => {
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState('passport_photo');
   const [loading, setLoading] = useState(true);
 
-  const getRequiredDocs = (appType: string) => {
-    if (appType === 'new_service') {
-        return [
-        { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
-        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
-        { type: 'lecan_cert', label: 'Licensed Electrical Contractor Certificate', format: 'PDF (Max 2MB)' }
-        ];
-    } else if (appType === 'replacement') {
-        return [
-        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
-        { type: 'meter_photo', label: 'Photo of the Faulty Meter', format: 'JPG/JPEG (Max 1MB)' }
-        ];
-    } else if (appType === 'conversion') {
-        return [
-        { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
-        ];
-    }
-    return [];
-    };
-
-    const requiredDocs = getRequiredDocs(applicationType);
+  // ✅ NOW applicationType is in scope - call the function HERE
+  const requiredDocs = getRequiredDocs(applicationType);
 
   useEffect(() => {
     fetchDocuments();
