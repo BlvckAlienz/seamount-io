@@ -233,6 +233,14 @@ except ImportError as e:
     routers_available['offramp'] = None
 
 try:
+    from backend.api.routes.meter_xpress import router as meter_xpress_router
+    routers_available['meter_xpress'] = meter_xpress_router
+    logger.info("✅ Meter Xpress router imported")
+except ImportError as e:
+    logger.error(f"❌ Meter Xpress router import error: {e}")
+    routers_available['meter_xpress'] = None
+
+try:
     from backend.api.routes.swap_routes import router as swap_router
     routers_available['swap'] = swap_router
     logger.info("Ã¢Å“â€¦ Swap router imported")
@@ -668,6 +676,10 @@ if routers_available.get('onramp'):
 if routers_available.get('offramp'):
     app.include_router(routers_available['offramp'], prefix="/api/v1", tags=["Off-Ramp"])
     logger.info("Off-ramp router registered at /api/v1")
+
+if routers_available.get('meter_xpress'):
+    app.include_router(routers_available['meter_xpress'], prefix="/api/v1", tags=["Meter Xpress"])
+    logger.info("✅ Meter Xpress router registered at /api/v1/meter-xpress")
 
 if routers_available.get('quidax'):
     app.include_router(routers_available['quidax'].router, prefix="/api/v1", tags=["Quidax"])                                            
