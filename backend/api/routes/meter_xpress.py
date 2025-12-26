@@ -285,8 +285,9 @@ async def create_replacement_application(
             "map_base_price": float(pricing['base_price']),
             "service_fee": float(pricing['service_fee']),
             "total_amount": float(pricing['total_amount']),
+            # ✅ FIX: Changed from account_number to meter_number
             "metadata": {
-                "account_number": form_data.account_number,
+                "meter_number": form_data.meter_number,  # THIS IS THE FIX
                 "state_of_building": form_data.state_of_building,
                 "applicant_capacity": form_data.applicant_capacity
             }
