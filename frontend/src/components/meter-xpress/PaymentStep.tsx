@@ -164,7 +164,7 @@ export const PaymentStep: React.FC<PaymentStepProps> = ({ applicationId }) => {
             <span className="text-gray-300">
               Seamount Service Fee
               <span className="text-xs text-gray-500 ml-2">
-                ({application.phase_type === '1phase' ? '45%' : '40%'} markup)
+                ({application.phase_type === '1phase' ? '60%' : '50%'} markup)
               </span>
             </span>
             <span className="text-white font-medium">
