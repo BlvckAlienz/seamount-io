@@ -182,16 +182,17 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   };
 
   const handleDelete = async (documentId: string) => {
-    if (!confirm('Delete this document?')) return;
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
 
     try {
-      await apiClient.delete(`/api/v1/meter-xpress/applications/${applicationId}/documents/${documentId}`);
-      toast.success('Document deleted');
-      fetchDocuments();
-    } catch (error) {
-      toast.error('Failed to delete document');
+        // This will call the new DELETE endpoint we created
+        await apiClient.delete(`/api/v1/meter-xpress/applications/${applicationId}/documents/${documentId}`);
+        toast.success('Document deleted successfully');
+        fetchDocuments(); // Refresh the list
+    } catch (error: any) {
+        toast.error(error.response?.data?.detail || 'Failed to delete document');
     }
-  };
+    };
 
   const isRequiredDocUploaded = (docType: string) => {
     return documents.some(d => d.document_type === docType);

@@ -91,30 +91,40 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
 
   const handleSubmit = async () => {
     if (!validateAccountSection() || !validateDetailsSection()) {
-      toast.error('Please complete all required fields');
-      return;
+        toast.error('Please complete all required fields');
+        return;
     }
 
     if (!formData.map_vendor) {
-      toast.error('Please select a MAP vendor');
-      return;
+        toast.error('Please select a MAP vendor');
+        return;
     }
 
     try {
-      setLoading(true);
+        setLoading(true);
 
-      const response = await apiClient.post('/api/v1/meter-xpress/applications/replacement', formData);
+        // ✅ CORRECT PAYLOAD: Backend now expects meter_number instead of account_number
+        const payload = {
+        meter_number: formData.meter_number,
+        state_of_building: formData.state_of_building,
+        applicant_capacity: formData.applicant_capacity,
+        phase: formData.phase,
+        voltage_level: formData.voltage_level,
+        map_vendor: formData.map_vendor
+        };
 
-      if (response.data.success) {
+        const response = await apiClient.post('/api/v1/meter-xpress/applications/replacement', payload);
+
+        if (response.data.success) {
         toast.success('Replacement application created!');
         onComplete(response.data.application_id, formData);
-      }
+        }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to create application');
+        toast.error(error.response?.data?.detail || 'Failed to create application');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   return (
     <div className="space-y-6">

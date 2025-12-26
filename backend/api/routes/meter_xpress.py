@@ -412,7 +412,84 @@ async def create_conversion_application(
     except Exception as e:
         logger.error(f"❌ Conversion application failed: {e}")
         raise HTTPException(500, str(e))
-    
+
+@router.delete("/applications/{application_id}/documents/{document_id}")
+async def delete_application_document(
+    application_id: str,
+    document_id: str,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🗑️ STEP 3A: Delete uploaded document from storage and database
+    """
+    try:
+        user_id = current_user['id']
+        supabase = db_service.supabase
+        
+        # 1. Verify document belongs to user and application
+        doc_result = supabase.from_("meter_documents")\
+            .select("*")\
+            .eq("id", document_id)\
+            .eq("application_id", application_id)\
+            .eq("user_id", user_id)\
+            .single()\
+            .execute()
+        
+        if not doc_result.data:
+            raise HTTPException(404, "Document not found or access denied")
+        
+        document = doc_result.data
+        
+        # 2. Verify application is still in draft state
+        app_result = supabase.from_("meter_applications")\
+            .select("status")\
+            .eq("id", application_id)\
+            .eq("user_id", user_id)\
+            .single()\
+            .execute()
+        
+        if not app_result.data:
+            raise HTTPException(404, "Application not found")
+        
+        if app_result.data['status'] not in ['draft', 'pending_payment']:
+            raise HTTPException(400, "Cannot delete documents from submitted application")
+        
+        # 3. Delete from Supabase Storage
+        if document.get('storage_path'):
+            try:
+                supabase.storage.from_("meter-documents").remove([document['storage_path']])
+                logger.info(f"🗑️ Storage deleted: {document['storage_path']}")
+            except Exception as storage_error:
+                logger.warning(f"⚠️ Storage deletion warning: {storage_error}")
+                # Continue with DB deletion even if storage fails
+        
+        # 4. Delete from database
+        delete_result = supabase.from_("meter_documents")\
+            .delete()\
+            .eq("id", document_id)\
+            .execute()
+        
+        if not delete_result.data:
+            raise HTTPException(500, "Failed to delete document record")
+        
+        logger.info(f"✅ Document deleted: {document['file_name']} from app {application_id}")
+        
+        return {
+            "success": True,
+            "message": "Document deleted successfully",
+            "deleted_document": {
+                "id": document_id,
+                "file_name": document['file_name']
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Document deletion failed: {e}")
+        raise HTTPException(500, str(e))
+       
 @router.post("/applications/{application_id}/documents/upload")
 async def upload_application_document(
     application_id: str,
@@ -497,7 +574,75 @@ async def upload_application_document(
         logger.error(f"❌ Document upload failed: {e}")
         raise HTTPException(500, str(e))
 
-
+@router.delete("/applications/{application_id}/cancel")
+async def cancel_draft_application(
+    application_id: str,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🚫 Cancel a draft application and clean up associated documents
+    """
+    try:
+        user_id = current_user['id']
+        supabase = db_service.supabase
+        
+        # 1. Get application
+        app_result = supabase.from_("meter_applications")\
+            .select("id, status")\
+            .eq("id", application_id)\
+            .eq("user_id", user_id)\
+            .single()\
+            .execute()
+        
+        if not app_result.data:
+            raise HTTPException(404, "Application not found")
+        
+        if app_result.data['status'] not in ['draft', 'pending_payment']:
+            raise HTTPException(400, "Only draft applications can be cancelled")
+        
+        # 2. Get all documents for this application
+        docs_result = supabase.from_("meter_documents")\
+            .select("id, storage_path")\
+            .eq("application_id", application_id)\
+            .execute()
+        
+        # 3. Delete documents from storage
+        if docs_result.data:
+            storage_paths = [doc['storage_path'] for doc in docs_result.data if doc.get('storage_path')]
+            if storage_paths:
+                try:
+                    supabase.storage.from_("meter-documents").remove(storage_paths)
+                    logger.info(f"🗑️ Deleted {len(storage_paths)} files from storage")
+                except Exception as storage_error:
+                    logger.warning(f"⚠️ Storage cleanup warning: {storage_error}")
+        
+        # 4. Delete document records
+        supabase.from_("meter_documents")\
+            .delete()\
+            .eq("application_id", application_id)\
+            .execute()
+        
+        # 5. Delete application record
+        delete_result = supabase.from_("meter_applications")\
+            .delete()\
+            .eq("id", application_id)\
+            .execute()
+        
+        logger.info(f"✅ Draft application cancelled: {application_id}")
+        
+        return {
+            "success": True,
+            "message": "Draft application cancelled and cleaned up",
+            "cancelled_application": application_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Application cancellation failed: {e}")
+        raise HTTPException(500, str(e))
+    
 @router.get("/applications/{application_id}")
 async def get_application_details(
     application_id: str,
@@ -824,3 +969,57 @@ async def handle_paystack_webhook(
     except Exception as e:
         logger.error(f"❌ Webhook processing failed: {e}")
         return {"status": "error", "message": str(e)}
+    
+@router.delete("/applications/{application_id}/documents/{document_id}")
+async def delete_application_document(
+    application_id: str,
+    document_id: str,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """
+    🗑️ Delete an uploaded document (from both database and storage)
+    """
+    try:
+        user_id = current_user['id']
+        supabase = db_service.supabase
+        
+        # First, get the document to retrieve storage path
+        doc_result = supabase.from_("meter_documents")\
+            .select("*")\
+            .eq("id", document_id)\
+            .eq("application_id", application_id)\
+            .eq("user_id", user_id)\
+            .single()\
+            .execute()
+        
+        if not doc_result.data:
+            raise HTTPException(404, "Document not found")
+        
+        document = doc_result.data
+        
+        # Delete from Supabase storage first
+        if document.get('storage_path'):
+            try:
+                supabase.storage.from_("meter-documents").remove([document['storage_path']])
+            except Exception as storage_error:
+                logger.warning(f"Storage deletion failed (file might not exist): {storage_error}")
+        
+        # Then delete the database record
+        delete_result = supabase.from_("meter_documents")\
+            .delete()\
+            .eq("id", document_id)\
+            .execute()
+        
+        logger.info(f"✅ Document deleted: {document['file_name']} for application {application_id}")
+        
+        return {
+            "success": True,
+            "message": "Document deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Document deletion failed: {e}")
+        raise HTTPException(500, str(e))
