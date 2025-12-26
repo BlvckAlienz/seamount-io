@@ -95,7 +95,8 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
         return;
     }
 
-    if (!formData.map_vendor) {
+    // ✅ NEW: Only require MAP vendor if MAP scheme is selected
+    if (meteringScheme === 'MAP' && !formData.map_vendor) {
         toast.error('Please select a MAP vendor');
         return;
     }
@@ -103,14 +104,17 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
     try {
         setLoading(true);
 
-        // Prepare payload matching backend expectations
         const payload = {
-        account_number: formData.meter_number, // Using meter_number as account_number for replacement
+        account_number: formData.meter_number,
         state_of_building: formData.state_of_building,
         applicant_capacity: formData.applicant_capacity,
         phase: formData.phase,
         voltage_level: formData.voltage_level,
-        map_vendor: formData.map_vendor
+        metering_scheme: meteringScheme,
+        // Only include vendor if MAP scheme
+        ...(meteringScheme === 'MAP' && {
+            map_vendor: formData.map_vendor
+        })
         };
 
         const response = await apiClient.post('/api/v1/meter-xpress/applications/replacement', payload);

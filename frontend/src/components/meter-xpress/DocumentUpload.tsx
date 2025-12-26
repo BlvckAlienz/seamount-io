@@ -18,28 +18,63 @@ interface UploadedDocument {
   uploaded_at: string;
 }
 
-// ✅ UPDATED: Removed LECAN certificate requirement - Seamount provides this service
+// ✅ UPDATED: Uniform document requirements with strict validation
 const getRequiredDocs = (appType?: string) => {
   if (!appType) {
     return [
-      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+      { 
+        type: 'id_card', 
+        label: 'Means of Identification', 
+        format: 'PDF Only', 
+        allowedTypes: ['application/pdf'],
+        maxSizeMB: 1 
+      }
     ];
   }
   
   if (appType === 'new_service') {
     return [
-      { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
-      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
-      // ✅ LECAN CERTIFICATE REMOVED: We handle contractor coordination
+      { 
+        type: 'passport_photo', 
+        label: 'Passport Photograph', 
+        format: 'JPG/JPEG Only', 
+        allowedTypes: ['image/jpeg', 'image/jpg'],
+        maxSizeMB: 1 
+      },
+      { 
+        type: 'id_card', 
+        label: 'Means of Identification', 
+        format: 'PDF Only', 
+        allowedTypes: ['application/pdf'],
+        maxSizeMB: 1 
+      }
     ];
   } else if (appType === 'replacement') {
     return [
-      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
-      { type: 'meter_photo', label: 'Photo of the Faulty Meter', format: 'JPG/JPEG (Max 1MB)' }
+      { 
+        type: 'id_card', 
+        label: 'Means of Identification', 
+        format: 'PDF Only', 
+        allowedTypes: ['application/pdf'],
+        maxSizeMB: 1 
+      },
+      { 
+        type: 'meter_photo', 
+        label: 'Photo of Faulty Meter', 
+        format: 'JPG/JPEG Only', 
+        allowedTypes: ['image/jpeg', 'image/jpg'],
+        maxSizeMB: 1 
+      }
     ];
   } else if (appType === 'conversion') {
     return [
-      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+      { 
+        type: 'id_card', 
+        label: 'Means of Identification', 
+        format: 'PDF Only', 
+        allowedTypes: ['application/pdf'],
+        maxSizeMB: 1 
+      }
     ];
   }
   return [];
@@ -56,6 +91,13 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [loading, setLoading] = useState(true);
 
   const requiredDocs = getRequiredDocs(applicationType);
+  
+  // ✅ Set initial selectedType based on first available document type
+  useEffect(() => {
+    if (requiredDocs.length > 0 && !requiredDocs.find(d => d.type === selectedType)) {
+      setSelectedType(requiredDocs[0].type);
+    }
+  }, [requiredDocs]);
 
   useEffect(() => {
     fetchDocuments();
@@ -82,21 +124,36 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
     try {
       setUploading(true);
-
-      // ✅ UPDATED: All documents now have 1MB limit (LECAN cert was 2MB)
-      const maxSize = 1; // MB
-      if (file.size > maxSize * 1024 * 1024) {
-        toast.error(`File size exceeds ${maxSize}MB limit`);
+      
+      const selectedDoc = requiredDocs.find(d => d.type === selectedType);
+      if (!selectedDoc) {
+        toast.error('Invalid document type selected');
         return;
       }
 
-      // Validate file type
-      const allowedTypes = ['passport_photo', 'meter_photo'].includes(selectedType)
-        ? ['image/jpeg', 'image/jpg']
-        : ['application/pdf'];
+      // ✅ Validate file size
+      if (file.size > selectedDoc.maxSizeMB * 1024 * 1024) {
+        toast.error(`File size exceeds ${selectedDoc.maxSizeMB}MB limit`);
+        return;
+      }
 
-      if (!allowedTypes.includes(file.type)) {
-        toast.error(`Invalid file type. Please upload ${['passport_photo', 'meter_photo'].includes(selectedType) ? 'JPG/JPEG' : 'PDF'}`);
+      // ✅ Validate file type
+      if (!selectedDoc.allowedTypes.includes(file.type)) {
+        const allowedFormats = selectedDoc.allowedTypes.includes('application/pdf') 
+          ? 'PDF' 
+          : 'JPG/JPEG';
+        toast.error(`Invalid file type. Please upload ${allowedFormats} format`);
+        return;
+      }
+
+      // ✅ Validate file extension
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      const allowedExtensions = selectedDoc.allowedTypes.includes('application/pdf') 
+        ? ['pdf'] 
+        : ['jpg', 'jpeg', 'jfif'];
+      
+      if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+        toast.error(`Invalid file extension. Allowed: ${allowedExtensions.join(', ').toUpperCase()}`);
         return;
       }
 
@@ -154,7 +211,11 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     <div className="space-y-6">
       <div>
         <h3 className="text-xl font-bold text-white mb-2">Upload Required Documents</h3>
-        <p className="text-gray-400">All documents are required to proceed with your application</p>
+        <p className="text-gray-400">
+          {applicationType === 'conversion' 
+            ? 'Upload your identification document to proceed' 
+            : 'All documents are required to proceed with your application'}
+        </p>
       </div>
 
       {/* Required Documents Checklist */}
@@ -180,7 +241,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     <div className={`font-medium ${uploaded ? 'text-green-400' : 'text-white'}`}>
                       {doc.label}
                     </div>
-                    <div className="text-xs text-gray-400">{doc.format}</div>
+                    <div className="text-xs text-gray-400">{doc.format} • Max {doc.maxSizeMB}MB</div>
                   </div>
                 </div>
                 {uploaded && (
@@ -219,7 +280,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 {uploading ? 'Uploading...' : 'Click to choose file'}
               </span>
               <p className="text-sm text-gray-400 mt-1">
-                {requiredDocs.find(d => d.type === selectedType)?.format}
+                {requiredDocs.find(d => d.type === selectedType)?.format} • Max {requiredDocs.find(d => d.type === selectedType)?.maxSizeMB}MB
               </p>
             </div>
             <input
@@ -227,9 +288,22 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               onChange={handleUpload}
               disabled={uploading}
               className="hidden"
-              accept={selectedType === 'passport_photo' || selectedType === 'meter_photo' ? '.jpg,.jpeg' : '.pdf'}
+              accept={requiredDocs.find(d => d.type === selectedType)?.allowedTypes.includes('application/pdf') 
+                ? '.pdf' 
+                : '.jpg,.jpeg,.jfif'
+              }
             />
           </label>
+          
+          {/* ✅ Format Guidelines */}
+          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-xs text-yellow-200">
+              📋 <strong>Format Guidelines:</strong><br/>
+              • <strong>Identification Documents:</strong> PDF format only (Max 1MB)<br/>
+              • <strong>Passport/Meter Photos:</strong> JPG/JPEG format only (Max 1MB)<br/>
+              • Ensure documents are clear and readable
+            </p>
+          </div>
         </div>
       </div>
 
@@ -252,7 +326,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
                         {requiredDocs.find(d => d.type === doc.document_type)?.label}
                       </span>
                       <span>•</span>
-                      <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                      <span>Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
@@ -277,7 +351,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         {allRequiredDocsUploaded ? (
           <>
             <CheckCircle className="h-5 w-5" />
-            Continue to Payment
+            Continue to {applicationType === 'conversion' ? 'Submit Application' : 'Payment'}
           </>
         ) : (
           <>
