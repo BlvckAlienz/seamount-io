@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     
     <!-- Professional SEO & Branding Meta Tags -->
     <title>Meter Xpress - Fast, Expert-Guided Meter Installation for EKEDC Customers</title>
@@ -41,6 +41,25 @@
             --ekedc-yellow: #f59e0b;
         }
         
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        /* Touch-friendly minimum sizes */
+        button, a, .clickable {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
         .ekedc-bg-blue { background-color: var(--ekedc-blue); }
         .ekedc-text-blue { color: var(--ekedc-blue); }
         .ekedc-border-blue { border-color: var(--ekedc-blue); }
@@ -49,25 +68,151 @@
             background: linear-gradient(45deg, #f59e0b, #fbbf24);
             color: #7c2d12;
             font-weight: 600;
-            font-size: 0.75rem;
-            padding: 0.25rem 0.75rem;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
             border-radius: 1rem;
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
         }
         
-        .trust-badge {
-            background: linear-gradient(135deg, #10b981, #34d399);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+        /* Floating Action Button - Expert Profile */
+        .fab-expert {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            z-index: 999;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         
+        .fab-expert.expanded {
+            bottom: 50%;
+            right: 50%;
+            transform: translate(50%, 50%);
+        }
+        
+        .fab-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--ekedc-blue), var(--ekedc-light-blue));
+            box-shadow: 0 4px 20px rgba(30, 58, 138, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            position: relative;
+            animation: pulse-badge 2s infinite;
+        }
+        
+        .fab-button::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 16px;
+            height: 16px;
+            background: #ef4444;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        
+        .fab-button.viewed::after {
+            display: none;
+        }
+        
+        @keyframes pulse-badge {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); box-shadow: 0 6px 30px rgba(30, 58, 138, 0.6); }
+        }
+        
+        .fab-card {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+            z-index: 1000;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        .fab-card.active {
+            display: block;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -40%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        .fab-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+            backdrop-filter: blur(2px);
+        }
+        
+        .fab-overlay.active {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .profile-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--ekedc-light-blue);
+        }
+        
+        /* Sticky CTA on Mobile */
+        .sticky-cta {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .sticky-cta {
+                display: block;
+            }
+            
+            .fab-expert {
+                bottom: 140px;
+            }
+        }
+        
+        /* Scheme Cards */
         .scheme-card {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             border-top: 4px solid;
@@ -80,7 +225,7 @@
         
         .step-card {
             position: relative;
-            padding-left: 2rem;
+            padding-left: 2.5rem;
         }
         
         .step-card::before {
@@ -88,8 +233,8 @@
             position: absolute;
             left: 0;
             top: 0;
-            width: 1.5rem;
-            height: 1.5rem;
+            width: 2rem;
+            height: 2rem;
             background-color: var(--ekedc-light-blue);
             color: white;
             border-radius: 50%;
@@ -100,15 +245,35 @@
             font-size: 0.875rem;
         }
         
-        .profile-img {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid var(--ekedc-light-blue);
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            h1 { font-size: 1.5rem; }
+            h2 { font-size: 1.75rem; }
+            h3 { font-size: 1.25rem; }
+            
+            .container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            
+            .pilot-badge {
+                font-size: 0.65rem;
+                padding: 0.2rem 0.4rem;
+            }
         }
         
-        /* Animation for trust elements */
+        /* Helpful link hover */
+        .helpful-link {
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .helpful-link:hover {
+            border-left-color: var(--ekedc-light-blue);
+            background-color: #f0f9ff;
+        }
+        
+        /* Animation utilities */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
@@ -123,41 +288,6 @@
         .animate-fade-in-up {
             animation: fadeInUp 0.6s ease-out forwards;
         }
-        
-        /* Hover effect for links */
-        .helpful-link {
-            transition: all 0.2s ease;
-            border-left: 3px solid transparent;
-        }
-        
-        .helpful-link:hover {
-            border-left-color: var(--ekedc-light-blue);
-            background-color: #f0f9ff;
-        }
-        
-        /* Modal styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        }
     </style>
     
     <!-- Enhanced Tailwind Configuration -->
@@ -170,13 +300,6 @@
                         'ekedc-light-blue': '#3b82f6',
                         'ekedc-green': '#10b981',
                         'ekedc-yellow': '#f59e0b',
-                    },
-                    fontFamily: {
-                        'sans': ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                    },
-                    animation: {
-                        'pulse-slow': 'pulse 3s infinite',
-                        'bounce-slow': 'bounce 2s infinite',
                     }
                 }
             }
@@ -189,128 +312,140 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body class="font-sans bg-gray-50">
-    <!-- Trust Badge & Promoter Profile - Fixed Top Right -->
-    <div class="fixed top-6 right-6 z-50 hidden md:block animate-fade-in-up">
-        <div class="bg-white rounded-xl shadow-xl p-4 max-w-xs border border-gray-200">
-            <div class="flex items-start gap-3">
-                <img src="profile-dp.jpeg" alt="Teddy Ighodalo - Metering Expert" class="profile-img">
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <h3 class="font-bold text-gray-800">Teddy Ighodalo</h3>
-                        <span class="text-xs bg-blue-100 text-ekedc-blue px-2 py-0.5 rounded-full">Expert</span>
-                    </div>
-                    <p class="text-sm text-gray-600 mb-2">
-                        <span class="font-medium">Fmr. Data Analyst, Metering Dept. EKEDC</span><br>
-                        <span class="text-gray-500">Now: Director, Frontwater-Tech</span>
-                    </p>
-                    <p class="text-xs text-gray-700 italic border-l-2 border-ekedc-light-blue pl-2">
-                        "Helping customers navigate the meter acquisition journey"
-                    </p>
+    
+    <!-- Floating Expert Profile - Works on All Devices -->
+    <div id="fabExpert" class="fab-expert">
+        <div class="fab-button" id="fabButton">
+            <i class="fas fa-user-tie"></i>
+        </div>
+    </div>
+    
+    <!-- Expert Profile Card Overlay -->
+    <div id="fabOverlay" class="fab-overlay"></div>
+    <div id="fabCard" class="fab-card">
+        <button id="closeFab" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+        </button>
+        <div class="flex items-start gap-4 mt-2">
+            <img src="profile-dp.jpeg" alt="Teddy Ighodalo - Metering Expert" class="profile-img">
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <h3 class="font-bold text-gray-800 text-lg">Teddy Ighodalo</h3>
+                    <span class="text-xs bg-blue-100 text-ekedc-blue px-2 py-1 rounded-full font-semibold">Expert</span>
                 </div>
+                <p class="text-sm text-gray-600 mb-3">
+                    <span class="font-semibold">Fmr. Data Analyst</span><br>
+                    <span class="text-gray-500">Metering Dept. EKEDC</span><br>
+                    <span class="text-gray-500">Now: Director, Frontwater-Tech</span>
+                </p>
+                <p class="text-xs text-gray-700 italic border-l-3 border-ekedc-light-blue pl-3 py-2 bg-blue-50 rounded">
+                    "Helping customers navigate the meter acquisition journey with insider knowledge"
+                </p>
             </div>
         </div>
     </div>
     
-    <!-- Header with Pilot Badge -->
-    <header class="ekedc-bg-blue text-white">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="flex items-center gap-4 mb-4 md:mb-0">
-                    <div>
-                        <h1 class="text-2xl font-bold flex items-center gap-2">
-                            <i class="fas fa-bolt"></i>
-                            <span>Meter Xpress</span>
-                            <span class="pilot-badge">
-                                <i class="fas fa-vial"></i> EKEDC PILOT
-                            </span>
-                        </h1>
-                        <p class="text-blue-200 text-sm">Simplified meter application & installation</p>
-                    </div>
+    <!-- Header -->
+    <header class="ekedc-bg-blue text-white sticky top-0 z-40 shadow-lg">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2 flex-wrap">
+                        <i class="fas fa-bolt"></i>
+                        <span>Meter Xpress</span>
+                        <span class="pilot-badge">
+                            <i class="fas fa-vial"></i> EKEDC PILOT
+                        </span>
+                    </h1>
                 </div>
                 
-                <div class="flex items-center gap-4">
-                    <div class="hidden md:block text-right">
-                        <div class="trust-badge">
-                            <i class="fas fa-shield-alt"></i>
-                            <span>Secure & Trusted Platform</span>
-                        </div>
-                    </div>
-                    <button 
-                        id="headerApplyButton"
-                        class="bg-white text-ekedc-blue font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-lg flex items-center gap-2"
-                    >
-                        <i class="fas fa-play-circle"></i>
-                        Apply for Meter Now
-                    </button>
-                </div>
+                <button 
+                    id="headerApplyButton"
+                    class="hidden sm:flex bg-white text-ekedc-blue font-bold py-2 px-6 rounded-lg hover:bg-gray-100 transition shadow-lg items-center gap-2"
+                >
+                    <i class="fas fa-play-circle"></i>
+                    Apply Now
+                </button>
             </div>
         </div>
     </header>
     
+    <!-- Sticky Mobile CTA -->
+    <div class="sticky-cta">
+        <button 
+            id="mobileStickyButton"
+            class="w-full bg-ekedc-blue text-white font-bold py-3 rounded-lg hover:bg-blue-800 transition shadow-lg flex items-center justify-center gap-2"
+        >
+            <i class="fas fa-bolt"></i>
+            Apply for Meter Now
+        </button>
+    </div>
+    
     <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
+    <main class="container mx-auto px-4 py-6 sm:py-8 pb-24 sm:pb-8">
+        
         <!-- Hero Section -->
-        <section class="mb-16">
-            <div class="grid md:grid-cols-2 gap-12 items-center">
+        <section class="mb-12 sm:mb-16">
+            <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                 <div class="animate-fade-in-up">
-                    <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                    <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                         Get Your Prepaid Meter Installed <span class="text-ekedc-blue">Fast & Hassle-Free</span>
                     </h2>
-                    <p class="text-xl text-gray-600 mb-8">
+                    <p class="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8">
                         Expert-guided meter application for EKEDC customers. We help you navigate all available schemes to get your meter installed quickly.
                     </p>
                     
-                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-8">
-                        <div class="flex items-start">
-                            <i class="fas fa-exclamation-circle text-yellow-500 mt-1 mr-3"></i>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6 sm:mb-8 rounded-r-lg">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-yellow-500 mt-1 text-lg flex-shrink-0"></i>
                             <div>
-                                <p class="font-semibold text-gray-800">Pilot Program Notice</p>
-                                <p class="text-gray-700">
-                                    This service is currently available <strong>only to EKEDC customers</strong> as part of our pilot program. 
-                                    We'll expand to other DISCOs in subsequent phases.
+                                <p class="font-semibold text-gray-800 mb-1">Pilot Program Notice</p>
+                                <p class="text-gray-700 text-sm sm:text-base">
+                                    Currently available <strong>only to EKEDC customers</strong>. 
+                                    We'll expand to other DISCOs soon.
                                 </p>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex flex-col sm:flex-row gap-3 sm:gap-4">
                         <button 
                             id="heroApplyButton"
-                            class="bg-ekedc-blue text-white font-bold py-4 px-8 rounded-lg hover:bg-blue-800 transition text-center shadow-lg"
+                            class="bg-ekedc-blue text-white font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-lg hover:bg-blue-800 transition text-center shadow-lg"
                         >
                             <i class="fas fa-bolt mr-2"></i>
                             Start Application Now
                         </button>
                         <a 
                             href="#schemes" 
-                            class="bg-white text-ekedc-blue font-bold py-4 px-8 rounded-lg border-2 border-ekedc-blue hover:bg-blue-50 transition text-center"
+                            class="bg-white text-ekedc-blue font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-lg border-2 border-ekedc-blue hover:bg-blue-50 transition text-center"
                         >
                             <i class="fas fa-info-circle mr-2"></i>
-                            Learn About Metering Schemes
+                            Learn More
                         </a>
                     </div>
                 </div>
                 
-                <div class="animate-fade-in-up" style="animation-delay: 0.2s">
-                    <div class="bg-white rounded-2xl shadow-2xl p-2 border border-gray-200">
-                        <div class="bg-gradient-to-r from-ekedc-blue to-blue-600 rounded-xl p-6 text-white">
-                            <h3 class="text-2xl font-bold mb-4">Meter Application Journey</h3>
-                            <div class="space-y-6">
+                <div class="animate-fade-in-up lg:block" style="animation-delay: 0.2s">
+                    <div class="bg-white rounded-2xl shadow-2xl p-1 border border-gray-200">
+                        <div class="bg-gradient-to-r from-ekedc-blue to-blue-600 rounded-xl p-5 sm:p-6 text-white">
+                            <h3 class="text-xl sm:text-2xl font-bold mb-4">Application Journey</h3>
+                            <div class="space-y-5 sm:space-y-6">
                                 <div class="step-card" data-step="1">
-                                    <h4 class="font-bold text-lg mb-1">Get Started</h4>
-                                    <p class="text-blue-100">Sign up on www.seamount.io as an individual user</p>
+                                    <h4 class="font-bold text-base sm:text-lg mb-1">Get Started</h4>
+                                    <p class="text-blue-100 text-sm sm:text-base">Sign up on seamount.io as individual user</p>
                                 </div>
                                 <div class="step-card" data-step="2">
-                                    <h4 class="font-bold text-lg mb-1">Application Start</h4>
-                                    <p class="text-blue-100">Navigate to the side panel and click 'Meter Xpress' tab</p>
+                                    <h4 class="font-bold text-base sm:text-lg mb-1">Navigate</h4>
+                                    <p class="text-blue-100 text-sm sm:text-base">Click 'Meter Xpress' in side panel</p>
                                 </div>
                                 <div class="step-card" data-step="3">
-                                    <h4 class="font-bold text-lg mb-1">Complete Application</h4>
-                                    <p class="text-blue-100">Fill application form. We guide you on required documents</p>
+                                    <h4 class="font-bold text-base sm:text-lg mb-1">Apply</h4>
+                                    <p class="text-blue-100 text-sm sm:text-base">Fill form with required documents</p>
                                 </div>
                                 <div class="step-card" data-step="4">
-                                    <h4 class="font-bold text-lg mb-1">Installation Coordination</h4>
-                                    <p class="text-blue-100">We handle scheduling with certified installers</p>
+                                    <h4 class="font-bold text-base sm:text-lg mb-1">Install</h4>
+                                    <p class="text-blue-100 text-sm sm:text-base">We schedule with certified installers</p>
                                 </div>
                             </div>
                         </div>
@@ -320,472 +455,335 @@
         </section>
         
         <!-- Trust Indicators -->
-        <section class="mb-16">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 text-center">
-                    <div class="text-ekedc-green text-4xl mb-4">
+        <section class="mb-12 sm:mb-16">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div class="bg-white p-5 sm:p-6 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-ekedc-green text-3xl sm:text-4xl mb-3 sm:mb-4">
                         <i class="fas fa-user-shield"></i>
                     </div>
-                    <h3 class="font-bold text-xl mb-2">Former EKEDC Insider</h3>
-                    <p class="text-gray-600">Our expert previously worked in EKEDC's metering department, understanding both customer pain points and utility processes.</p>
+                    <h3 class="font-bold text-lg sm:text-xl mb-2">Former EKEDC Insider</h3>
+                    <p class="text-gray-600 text-sm sm:text-base">Expert from EKEDC's metering department with insider knowledge.</p>
                 </div>
                 
-                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 text-center">
-                    <div class="text-ekedc-blue text-4xl mb-4">
+                <div class="bg-white p-5 sm:p-6 rounded-xl shadow-md border border-gray-200 text-center">
+                    <div class="text-ekedc-blue text-3xl sm:text-4xl mb-3 sm:mb-4">
                         <i class="fas fa-handshake"></i>
                     </div>
-                    <h3 class="font-bold text-xl mb-2">Licensed Partners</h3>
-                    <p class="text-gray-600">We work with certified Meter Asset Providers (MAPs) and Licensed Electrical Contractors (LECANs) for quality installations.</p>
+                    <h3 class="font-bold text-lg sm:text-xl mb-2">Licensed Partners</h3>
+                    <p class="text-gray-600 text-sm sm:text-base">We work with certified MAPs and LECANs for quality installations.</p>
                 </div>
                 
-                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 text-center">
-                    <div class="text-ekedc-yellow text-4xl mb-4">
+                <div class="bg-white p-5 sm:p-6 rounded-xl shadow-md border border-gray-200 text-center sm:col-span-2 lg:col-span-1">
+                    <div class="text-ekedc-yellow text-3xl sm:text-4xl mb-3 sm:mb-4">
                         <i class="fas fa-lock"></i>
                     </div>
-                    <h3 class="font-bold text-xl mb-2">Secure Payments</h3>
-                    <p class="text-gray-600">All payments processed securely through Paystack. Your financial data is protected with bank-level security.</p>
+                    <h3 class="font-bold text-lg sm:text-xl mb-2">Secure Payments</h3>
+                    <p class="text-gray-600 text-sm sm:text-base">All payments via Paystack with bank-level security.</p>
                 </div>
             </div>
         </section>
         
         <!-- Metering Schemes Section -->
-        <section id="schemes" class="mb-16">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Understanding Your Metering Options</h2>
-                <p class="text-gray-600 max-w-3xl mx-auto">
-                    There are three main ways to get a prepaid meter in EKEDC's network. We help you navigate all options to find the best fit for your situation.
+        <section id="schemes" class="mb-12 sm:mb-16">
+            <div class="text-center mb-8 sm:mb-12">
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Your Metering Options</h2>
+                <p class="text-gray-600 max-w-3xl mx-auto text-sm sm:text-base px-4">
+                    Three main ways to get a prepaid meter. We help you find the best fit.
                 </p>
             </div>
             
-            <div class="grid md:grid-cols-3 gap-8">
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 <!-- DISREP Scheme -->
-                <div class="scheme-card bg-white rounded-xl shadow-lg p-6 border-t-4 border-green-500">
+                <div class="scheme-card bg-white rounded-xl shadow-lg p-5 sm:p-6 border-t-4 border-green-500">
                     <div class="mb-4">
-                        <span class="bg-green-100 text-green-800 font-bold py-1 px-3 rounded-full text-sm">
+                        <span class="bg-green-100 text-green-800 font-bold py-1 px-3 rounded-full text-xs sm:text-sm">
                             <i class="fas fa-check-circle mr-1"></i> FREE
                         </span>
-                        <h3 class="text-xl font-bold mt-3 mb-2">DISREP</h3>
-                        <p class="text-gray-600 mb-4">
-                            Nigeria Distribution Sector Recovery Program sponsored by The World Bank.
+                        <h3 class="text-lg sm:text-xl font-bold mt-3 mb-2">DISREP</h3>
+                        <p class="text-gray-600 mb-4 text-sm sm:text-base">
+                            World Bank-funded distribution recovery program.
                         </p>
                     </div>
-                    <ul class="space-y-2 mb-6">
+                    <ul class="space-y-2 mb-6 text-sm sm:text-base">
                         <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
+                            <i class="fas fa-check text-green-500 mt-1 mr-2 flex-shrink-0"></i>
                             <span>Completely free meter & installation</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>World Bank funded program</span>
+                            <i class="fas fa-check text-green-500 mt-1 mr-2 flex-shrink-0"></i>
+                            <span>World Bank funded</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-check text-green-500 mt-1 mr-2"></i>
-                            <span>Specific eligibility criteria apply</span>
+                            <i class="fas fa-check text-green-500 mt-1 mr-2 flex-shrink-0"></i>
+                            <span>Specific eligibility criteria</span>
                         </li>
                     </ul>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-xs sm:text-sm text-gray-500">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Limited availability, subject to program guidelines
+                        Limited availability
                     </div>
                 </div>
                 
                 <!-- MAF Scheme -->
-                <div class="scheme-card bg-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
+                <div class="scheme-card bg-white rounded-xl shadow-lg p-5 sm:p-6 border-t-4 border-blue-500">
                     <div class="mb-4">
-                        <span class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-full text-sm">
+                        <span class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-full text-xs sm:text-sm">
                             <i class="fas fa-check-circle mr-1"></i> FREE
                         </span>
-                        <h3 class="text-xl font-bold mt-3 mb-2">MAF</h3>
-                        <p class="text-gray-600 mb-4">
-                            Meter Acquisition Fund funded by the Federal Government.
+                        <h3 class="text-lg sm:text-xl font-bold mt-3 mb-2">MAF</h3>
+                        <p class="text-gray-600 mb-4 text-sm sm:text-base">
+                            Meter Acquisition Fund by Federal Government.
                         </p>
                     </div>
-                    <ul class="space-y-2 mb-6">
+                    <ul class="space-y-2 mb-6 text-sm sm:text-base">
                         <li class="flex items-start">
-                            <i class="fas fa-check text-blue-500 mt-1 mr-2"></i>
-                            <span>Free meter, supply cable & installation</span>
+                            <i class="fas fa-check text-blue-500 mt-1 mr-2 flex-shrink-0"></i>
+                            <span>Free meter, cable & installation</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-check text-blue-500 mt-1 mr-2"></i>
+                            <i class="fas fa-check text-blue-500 mt-1 mr-2 flex-shrink-0"></i>
                             <span>For Band A & B customers</span>
                         </li>
                     </ul>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-xs sm:text-sm text-gray-500">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Limited availability, subject to program guidelines
+                        Limited availability
                     </div>
                 </div>
                 
                 <!-- MAP Scheme -->
-                <div class="scheme-card bg-white rounded-xl shadow-lg p-6 border-t-4 border-purple-500">
+                <div class="scheme-card bg-white rounded-xl shadow-lg p-5 sm:p-6 border-t-4 border-purple-500 sm:col-span-2 lg:col-span-1">
                     <div class="mb-4">
-                        <span class="bg-purple-100 text-purple-800 font-bold py-1 px-3 rounded-full text-sm">
-                            <i class="fas fa-bolt mr-1"></i> PAID - FAST TRACK
+                        <span class="bg-purple-100 text-purple-800 font-bold py-1 px-3 rounded-full text-xs sm:text-sm">
+                            <i class="fas fa-bolt mr-1"></i> PAID - FAST
                         </span>
-                        <h3 class="text-xl font-bold mt-3 mb-2">MAP</h3>
-                        <p class="text-gray-600 mb-4">
-                            Meter Asset Provider - Customer-funded option for faster installation.
+                        <h3 class="text-lg sm:text-xl font-bold mt-3 mb-2">MAP</h3>
+                        <p class="text-gray-600 mb-4 text-sm sm:text-base">
+                            Customer-funded for faster installation.
                         </p>
                     </div>
-                    <ul class="space-y-2 mb-6">
+                    <ul class="space-y-2 mb-6 text-sm sm:text-base">
                         <li class="flex items-start">
-                            <i class="fas fa-check text-purple-500 mt-1 mr-2"></i>
+                            <i class="fas fa-check text-purple-500 mt-1 mr-2 flex-shrink-0"></i>
                             <span>Faster installation timeline</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-check text-purple-500 mt-1 mr-2"></i>
+                            <i class="fas fa-check text-purple-500 mt-1 mr-2 flex-shrink-0"></i>
                             <span>Pay for meter & installation</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-check text-purple-500 mt-1 mr-2"></i>
+                            <i class="fas fa-check text-purple-500 mt-1 mr-2 flex-shrink-0"></i>
                             <span>Available to all customers</span>
                         </li>
                     </ul>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-xs sm:text-sm text-gray-500">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Get installed in days, not months
+                        Get installed in days
                     </div>
                 </div>
             </div>
             
-            <div class="mt-8 text-center">
-                <p class="text-gray-700">
-                    <strong>Not sure which scheme is right for you?</strong> Our experts will assess your eligibility and recommend the best option during the application process.
+            <div class="mt-6 sm:mt-8 text-center px-4">
+                <p class="text-gray-700 text-sm sm:text-base">
+                    <strong>Not sure which is right?</strong> Our experts will recommend the best option during application.
                 </p>
             </div>
         </section>
         
-        <!-- Why Choose Meter Xpress -->
-        <section class="mb-16 bg-gradient-to-r from-blue-50 to-white p-8 rounded-2xl">
-            <div class="text-center mb-10">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Why Choose Meter Xpress?</h2>
-                <p class="text-gray-600 max-w-3xl mx-auto">
-                    We simplify the entire process, saving you time, money, and frustration.
+        <!-- Why Choose Section -->
+        <section class="mb-12 sm:mb-16 bg-gradient-to-r from-blue-50 to-white p-6 sm:p-8 rounded-2xl">
+            <div class="text-center mb-8 sm:mb-10">
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Why Choose Meter Xpress?</h2>
+                <p class="text-gray-600 max-w-3xl mx-auto text-sm sm:text-base">
+                    We simplify the entire process, saving you time and frustration.
                 </p>
             </div>
             
-            <div class="grid md:grid-cols-2 gap-8">
-                <div>
-                    <div class="flex items-start mb-6">
-                        <div class="bg-ekedc-blue text-white p-3 rounded-lg mr-4">
-                            <i class="fas fa-clock text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-xl mb-2">Save Time & Effort</h3>
-                            <p class="text-gray-600">
-                                No more endless visits to EKEDC offices or confusion about requirements. We handle the complexity for you.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-start mb-6">
-                        <div class="bg-ekedc-green text-white p-3 rounded-lg mr-4">
-                            <i class="fas fa-graduation-cap text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-xl mb-2">Expert Guidance</h3>
-                            <p class="text-gray-600">
-                                Leverage insider knowledge from former EKEDC metering department staff who understand the system.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div>
-                    <div class="flex items-start mb-6">
-                        <div class="bg-ekedc-yellow text-white p-3 rounded-lg mr-4">
-                            <i class="fas fa-sitemap text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-xl mb-2">Navigate All Options</h3>
-                            <p class="text-gray-600">
-                                We help you explore DISREP, MAF, and MAP schemes to find the best fit, potentially saving you money.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-start mb-6">
-                        <div class="bg-red-500 text-white p-3 rounded-lg mr-4">
-                            <i class="fas fa-user-friends text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-xl mb-2">Hassle-Free Coordination</h3>
-                            <p class="text-gray-600">
-                                We coordinate with MAPs, installers, and EKEDC on your behalf, providing a single point of contact.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Application Section -->
-        <section id="apply" class="mb-16">
-            <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
-                <div class="md:flex">
-                    <div class="md:w-1/2 bg-gradient-to-br from-ekedc-blue to-blue-800 p-8 text-white">
-                        <h2 class="text-3xl font-bold mb-6">Ready to Get Your Meter?</h2>
-                        <p class="text-blue-100 mb-6">
-                            Start your MAP application now. It only takes a few minutes to begin the process.
-                        </p>
-                        
-                        <div class="space-y-4 mb-8">
-                            <div class="flex items-center">
-                                <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">1</div>
-                                <span>Create individual account on Seamount.io and navigate to 'Meter Xpress'</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">2</div>
-                                <span>Answer a few quick questions</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">3</div>
-                                <span>Upload required documents</span>
-                            </div>
-                            <div class="flex items-center">
-                                <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">4</div>
-                                <span>Schedule installation</span>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-blue-900 bg-opacity-50 p-4 rounded-lg">
-                            <p class="text-sm">
-                                <i class="fas fa-exclamation-triangle mr-2"></i>
-                                Remember: Applications for <strong>DISREP or MAF</strong> meters are completely FREE. Beware of anyone requesting payment for MAF applications.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="md:w-1/2 p-8">
-                        <div class="mb-6">
-                            <h3 class="text-2xl font-bold text-gray-800 mb-2">Let's Find Your Application Type</h3>
-                            <p class="text-gray-600">Answer a few quick questions to get started</p>
-                        </div>
-                        
-                        <div class="mb-8">
-                            <p class="font-medium text-gray-700 mb-4">Do you have an existing EKEDC account number?</p>
-                            <div class="space-y-4">
-                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition application-option">
-                                    <div class="w-6 h-6 rounded-full border-2 border-gray-400 mr-4 flex items-center justify-center">
-                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden option-indicator"></div>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium">Yes, I have an account</p>
-                                        <p class="text-sm text-gray-500">I'm an existing EKEDC customer</p>
-                                    </div>
-                                </div>
-                                
-                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition application-option">
-                                    <div class="w-6 h-6 rounded-full border-2 border-gray-400 mr-4 flex items-center justify-center">
-                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden option-indicator"></div>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium">No, this is my first time</p>
-                                        <p class="text-sm text-gray-500">I'm applying for a new connection</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <button id="continueApplication" class="w-full bg-ekedc-blue text-white font-bold py-4 px-6 rounded-lg hover:bg-blue-800 transition flex items-center justify-center">
-                            <i class="fas fa-arrow-right mr-2"></i>
-                            Continue Application
-                        </button>
-                        
-                        <div class="mt-6 text-center text-sm text-gray-500">
-                            <p>By proceeding, you agree to our <a href="#" class="text-ekedc-blue hover:underline">Terms of Service</a> and <a href="#" class="text-ekedc-blue hover:underline">Privacy Policy</a></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Pilot Program Explanation -->
-        <section class="mb-16">
-            <div class="bg-gradient-to-r from-yellow-50 to-orange-50 p-8 rounded-2xl border border-yellow-200">
-                <div class="flex items-start">
-                    <div class="bg-yellow-100 p-4 rounded-xl mr-6">
-                        <i class="fas fa-map-signs text-3xl text-yellow-600"></i>
+            <div class="grid sm:grid-cols-2 gap-6 sm:gap-8">
+                <div class="flex items-start gap-4">
+                    <div class="bg-ekedc-blue text-white p-3 rounded-lg flex-shrink-0">
+                        <i class="fas fa-clock text-lg sm:text-xl"></i>
                     </div>
                     <div>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-4">Pilot Program: Currently Serving EKEDC Customers Only</h2>
-                        <p class="text-gray-700 mb-4">
-                            We're currently running Meter Xpress as a pilot program exclusively for EKEDC customers. This allows us to refine our processes and ensure the best possible experience before expanding to other distribution companies.
+                        <h3 class="font-bold text-lg sm:text-xl mb-2">Save Time</h3>
+                        <p class="text-gray-600 text-sm sm:text-base">
+                            No endless EKEDC office visits. We handle the complexity.
                         </p>
-                        
-                        <div class="bg-white p-4 rounded-lg border border-yellow-200">
-                            <h3 class="font-bold text-gray-800 mb-2">Roadmap for Expansion</h3>
-                            <div class="flex items-center text-gray-600">
-                                <div class="mr-4">
-                                    <div class="bg-ekedc-blue text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">1</div>
-                                    <p class="text-xs mt-1 text-center">Current</p>
-                                </div>
-                                <div class="mr-4">
-                                    <p class="font-medium">EKEDC Pilot</p>
-                                </div>
-                                <div class="mr-4">
-                                    <i class="fas fa-arrow-right text-gray-400"></i>
-                                </div>
-                                <div class="mr-4">
-                                    <div class="bg-gray-300 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center font-bold">2</div>
-                                    <p class="text-xs mt-1 text-center">Q2 2026</p>
-                                </div>
-                                <div class="mr-4">
-                                    <p class="font-medium">2 More DISCOs</p>
-                                </div>
-                                <div class="mr-4">
-                                    <i class="fas fa-arrow-right text-gray-400"></i>
-                                </div>
-                                <div>
-                                    <div class="bg-gray-300 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center font-bold">3</div>
-                                    <p class="text-xs mt-1 text-center">Q3 2026</p>
-                                </div>
-                                <div>
-                                    <p class="font-medium">Nationwide</p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-        
-        <!-- Helpful EKEDC Resources -->
-        <section class="mb-16">
-            <div class="text-center mb-10">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Helpful EKEDC Resources</h2>
-                <p class="text-gray-600 max-w-3xl mx-auto">
-                    Quick links to official EKEDC portals and resources that might be helpful during your meter application journey.
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <a href="https://ekedp.com/metering" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-blue-100 text-ekedc-blue p-3 rounded-lg mr-4">
-                            <i class="fas fa-tachometer-alt"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">Metering Information</h3>
-                            <p class="text-gray-600 text-sm">Official EKEDC metering page with guidelines and updates</p>
-                        </div>
-                    </div>
-                </a>
                 
-                <a href="https://kctcheck.ekedp.com/" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-green-100 text-green-700 p-3 rounded-lg mr-4">
-                            <i class="fas fa-key"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">STS-2 Migration Token Generator</h3>
-                            <p class="text-gray-600 text-sm">Generate tokens for meter migration to STS-2 standard</p>
-                        </div>
+                <div class="flex items-start gap-4">
+                    <div class="bg-ekedc-green text-white p-3 rounded-lg flex-shrink-0">
+                        <i class="fas fa-graduation-cap text-lg sm:text-xl"></i>
                     </div>
-                </a>
+                    <div>
+                        <h3 class="font-bold text-lg sm:text-xl mb-2">Expert Guidance</h3>
+                        <p class="text-gray-600 text-sm sm:text-base">
+                            Insider knowledge from former EKEDC metering staff.
+                        </p>
+                    </div>
+                </div>
                 
-                <a href="https://paymentchannels.ekedp.com/" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-purple-100 text-purple-700 p-3 rounded-lg mr-4">
-                            <i class="fas fa-credit-card"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">Payment Channels</h3>
-                            <p class="text-gray-600 text-sm">Official EKEDC payment portal for bills and services</p>
-                        </div>
+                <div class="flex items-start gap-4">
+                    <div class="bg-ekedc-yellow text-white p-3 rounded-lg flex-shrink-0">
+                        <i class="fas fa-sitemap text-lg sm:text-xl"></i>
                     </div>
-                </a>
+                    <div>
+                        <h3 class="font-bold text-lg sm:text-xl mb-2">All Options</h3>
+                        <p class="text-gray-600 text-sm sm:text-base">
+                            We explore DISREP, MAF, and MAP to find your best fit.
+                        </p>
+                    </div>
+                </div>
                 
-                <a href="https://ekedp.com" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-red-100 text-red-700 p-3 rounded-lg mr-4">
-                            <i class="fas fa-globe"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">EKEDC Official Website</h3>
-                            <p class="text-gray-600 text-sm">Main EKEDC website for news, contacts, and services</p>
-                        </div>
+                <div class="flex items-start gap-4">
+                    <div class="bg-red-500 text-white p-3 rounded-lg flex-shrink-0">
+                        <i class="fas fa-user-friends text-lg sm:text-xl"></i>
                     </div>
-                </a>
-                
-                <a href="https://ekedp.com/overview" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-yellow-100 text-yellow-700 p-3 rounded-lg mr-4">
-                            <i class="fas fa-phone-alt"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">Contact EKEDC</h3>
-                            <p class="text-gray-600 text-sm">Customer service contacts and office locations</p>
-                        </div>
+                    <div>
+                        <h3 class="font-bold text-lg sm:text-xl mb-2">Hassle-Free</h3>
+                        <p class="text-gray-600 text-sm sm:text-base">
+                            Single point of contact for everything meter-related.
+                        </p>
                     </div>
-                </a>
-                
-                <a href="https://ekedp.com/news" target="_blank" class="helpful-link bg-white p-5 rounded-xl shadow-md hover:shadow-lg transition">
-                    <div class="flex items-start">
-                        <div class="bg-indigo-100 text-indigo-700 p-3 rounded-lg mr-4">
-                            <i class="fas fa-newspaper"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-lg mb-1">News & Public Disclaimers</h3>
-                            <p class="text-gray-600 text-sm">Official announcements and public notices from EKEDC</p>
-                        </div>
-                    </div>
-                </a>
+                </div>
             </div>
         </section>
         
         <!-- Important Notice -->
-        <section class="mb-16">
-            <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg">
-                <div class="flex items-start">
-                    <div class="bg-red-100 p-3 rounded-lg mr-4">
-                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+        <section class="mb-12 sm:mb-16">
+            <div class="bg-red-50 border-l-4 border-red-500 p-5 sm:p-6 rounded-r-lg">
+                <div class="flex items-start gap-3 sm:gap-4">
+                    <div class="bg-red-100 p-3 rounded-lg flex-shrink-0">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-lg sm:text-xl"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-xl text-gray-900 mb-2">Important Public Disclaimer</h3>
-                        <p class="text-gray-700 mb-3">
-                            EKEDC does <strong>NOT</strong> authorize, request, or accept any form of payment for applying for or obtaining <strong>DISREP or MAF prepaid meters</strong>.
+                        <h3 class="font-bold text-lg sm:text-xl text-gray-900 mb-2">Important Disclaimer</h3>
+                        <p class="text-gray-700 mb-2 text-sm sm:text-base">
+                            EKEDC does <strong>NOT</strong> accept payment for <strong>DISREP or MAF</strong> prepaid meters.
                         </p>
-                        <p class="text-gray-700 mb-4">
-                            Applications for DISREP or MAF meters are <strong>completely FREE</strong>. Beware of anyone requesting payment for DISREP or MAF meter processing.
+                        <p class="text-gray-700 mb-3 sm:mb-4 text-sm sm:text-base">
+                            Applications are <strong>completely FREE</strong>. Report suspicious activity to <strong>fraudwatch@ekedp.com</strong>
                         </p>
-                        <div class="text-sm text-gray-600">
-                            <p>Report suspicious activity to: <strong>fraudwatch@ekedp.com</strong> or call <strong>08000033333</strong></p>
-                        </div>
                     </div>
                 </div>
             </div>
         </section>
+        
+        <!-- EKEDC Resources -->
+        <section class="mb-12 sm:mb-16">
+            <div class="text-center mb-8 sm:mb-10">
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Helpful EKEDC Resources</h2>
+                <p class="text-gray-600 max-w-3xl mx-auto text-sm sm:text-base px-4">
+                    Quick links to official EKEDC portals and resources.
+                </p>
+            </div>
+            
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <a href="https://ekedp.com/metering" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-blue-100 text-ekedc-blue p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-tachometer-alt text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">Metering Info</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Official EKEDC metering page</p>
+                        </div>
+                    </div>
+                </a>
+                
+                <a href="https://kctcheck.ekedp.com/" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-green-100 text-green-700 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-key text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">STS-2 Tokens</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Generate migration tokens</p>
+                        </div>
+                    </div>
+                </a>
+                
+                <a href="https://paymentchannels.ekedp.com/" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-purple-100 text-purple-700 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-credit-card text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">Payments</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Official payment portal</p>
+                        </div>
+                    </div>
+                </a>
+                
+                <a href="https://ekedp.com" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-red-100 text-red-700 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-globe text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">EKEDC Website</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Main EKEDC portal</p>
+                        </div>
+                    </div>
+                </a>
+                
+                <a href="https://ekedp.com/overview" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-yellow-100 text-yellow-700 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-phone-alt text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">Contact</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Customer service info</p>
+                        </div>
+                    </div>
+                </a>
+                
+                <a href="https://ekedp.com/news" target="_blank" class="helpful-link bg-white p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg transition">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-indigo-100 text-indigo-700 p-2 sm:p-3 rounded-lg flex-shrink-0">
+                            <i class="fas fa-newspaper text-sm sm:text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg mb-1">News</h3>
+                            <p class="text-gray-600 text-xs sm:text-sm">Official announcements</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </section>
+        
     </main>
     
     <!-- Footer -->
     <footer class="ekedc-bg-blue text-white">
-        <div class="container mx-auto px-4 py-8">
-            <div class="grid md:grid-cols-3 gap-8">
+        <div class="container mx-auto px-4 py-6 sm:py-8">
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-6">
                 <div>
-                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center">
                         <i class="fas fa-bolt mr-2"></i>
                         Meter Xpress
                     </h3>
-                    <p class="text-blue-200 mb-4">
-                        Expert-guided meter application and installation for EKEDC customers.
+                    <p class="text-blue-200 mb-3 sm:mb-4 text-sm sm:text-base">
+                        Expert-guided meter application for EKEDC customers.
                     </p>
                     <div class="flex space-x-4">
-                        <a href="#" class="text-blue-200 hover:text-white">
-                            <i class="fab fa-twitter text-xl"></i>
+                        <a href="#" class="text-blue-200 hover:text-white" aria-label="Twitter">
+                            <i class="fab fa-twitter text-lg sm:text-xl"></i>
                         </a>
-                        <a href="https://www.facebook.com/meterxpress" class="text-blue-200 hover:text-white">
-                            <i class="fab fa-facebook text-xl"></i>
+                        <a href="https://www.facebook.com/meterxpress" class="text-blue-200 hover:text-white" aria-label="Facebook">
+                            <i class="fab fa-facebook text-lg sm:text-xl"></i>
                         </a>
-                        <a href="#" class="text-blue-200 hover:text-white">
-                            <i class="fab fa-linkedin text-xl"></i>
+                        <a href="#" class="text-blue-200 hover:text-white" aria-label="LinkedIn">
+                            <i class="fab fa-linkedin text-lg sm:text-xl"></i>
                         </a>
                     </div>
                 </div>
                 
                 <div>
-                    <h3 class="text-xl font-bold mb-4">Quick Links</h3>
-                    <ul class="space-y-2">
+                    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Quick Links</h3>
+                    <ul class="space-y-2 text-sm sm:text-base">
                         <li><a href="https://www.seamount.io" class="text-blue-200 hover:text-white">Apply for Meter</a></li>
                         <li><a href="#schemes" class="text-blue-200 hover:text-white">Metering Schemes</a></li>
                         <li><a href="https://www.seamount.io" class="text-blue-200 hover:text-white">FAQs</a></li>
@@ -793,198 +791,112 @@
                     </ul>
                 </div>
                 
-                <div>
-                    <h3 class="text-xl font-bold mb-4">Contact Information</h3>
-                    <ul class="space-y-2 text-blue-200">
+                <div class="sm:col-span-2 lg:col-span-1">
+                    <h3 class="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Contact</h3>
+                    <ul class="space-y-2 text-blue-200 text-sm sm:text-base">
                         <li class="flex items-start">
-                            <i class="fas fa-envelope mt-1 mr-2"></i>
+                            <i class="fas fa-envelope mt-1 mr-2 flex-shrink-0"></i>
                             <span>support@seamount.io</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-exclamation-circle mt-1 mr-2"></i>
-                            <span>Report fraud: fraudwatch@ekedp.com</span>
+                            <i class="fas fa-exclamation-circle mt-1 mr-2 flex-shrink-0"></i>
+                            <span>Fraud: fraudwatch@ekedp.com</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-phone mt-1 mr-2"></i>
-                            <span>EKEDC Helpline: 08000033333</span>
+                            <i class="fas fa-phone mt-1 mr-2 flex-shrink-0"></i>
+                            <span>EKEDC: 08000033333</span>
                         </li>
                     </ul>
                 </div>
             </div>
             
-            <div class="border-t border-blue-700 mt-8 pt-6 text-center text-blue-300 text-sm">
-                <p>&copy; 2026 Meter Xpress by Seamount.io. This service is operated by Frontwater-Tech in partnership with licensed MAPs and LECANs.</p>
-                <p class="mt-2">Meter Xpress is a pilot program currently available only to EKEDC customers. We are not affiliated with EKEDC but work with their approved partners.</p>
+            <div class="border-t border-blue-700 pt-4 sm:pt-6 text-center text-blue-300 text-xs sm:text-sm">
+                <p>&copy; 2026 Meter Xpress by Seamount.io. Operated by Frontwater-Tech with licensed MAPs/LECANs.</p>
+                <p class="mt-2">Pilot program for EKEDC customers only. Not affiliated with EKEDC.</p>
             </div>
         </div>
     </footer>
     
-    <!-- Mobile Profile Button -->
-    <div class="md:hidden fixed bottom-6 right-6 z-50">
-        <button id="profileToggle" class="bg-ekedc-blue text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg">
-            <i class="fas fa-user text-xl"></i>
-        </button>
-    </div>
-    
-    <!-- Mobile Profile Modal -->
-    <div id="profileModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-lg text-gray-800">Our Expert</h3>
-                <button id="closeProfileModal" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="flex items-start gap-4">
-                <img src="profile-dp.jpeg" alt="Teddy Ighodalo" class="profile-img">
-                <div>
-                    <h4 class="font-bold text-gray-800 mb-1">Teddy Ighodalo</h4>
-                    <p class="text-sm text-gray-600 mb-2">
-                        <span class="font-medium">Fmr. Data Analyst, Metering Dept. EKEDC</span><br>
-                        <span class="text-gray-500">Now: Director, Frontwater-Tech</span>
-                    </p>
-                    <p class="text-xs text-gray-700 italic border-l-2 border-ekedc-light-blue pl-2">
-                        "Helping customers navigate the meter acquisition journey"
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Success Message Modal -->
-    <div id="successModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <div class="mb-4">
-                <div class="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-check text-2xl"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">Redirecting to Seamount.io</h3>
-                <p class="text-gray-600 mb-4">
-                    You'll be redirected to Seamount.io where you'll need to create an individual account to access Meter Xpress.
-                </p>
-                <p class="text-sm text-gray-500">
-                    Redirecting in <span id="countdown">3</span> seconds...
-                </p>
-            </div>
-            <button id="redirectNow" class="bg-ekedc-blue text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-800 transition">
-                Go Now
-            </button>
-        </div>
-    </div>
-    
     <!-- JavaScript -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Application type selection
-            const applicationOptions = document.querySelectorAll('.application-option');
-            applicationOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    // Remove selection from all options
-                    applicationOptions.forEach(opt => {
-                        opt.classList.remove('border-ekedc-blue', 'bg-blue-50');
-                        const indicator = opt.querySelector('.option-indicator');
-                        indicator.classList.add('hidden');
-                    });
-                    
-                    // Add selection to clicked option
-                    this.classList.add('border-ekedc-blue', 'bg-blue-50');
-                    const indicator = this.querySelector('.option-indicator');
-                    indicator.classList.remove('hidden');
-                });
+            
+            // ============================================
+            // FLOATING EXPERT PROFILE (FAB) SYSTEM
+            // ============================================
+            const fabExpert = document.getElementById('fabExpert');
+            const fabButton = document.getElementById('fabButton');
+            const fabCard = document.getElementById('fabCard');
+            const fabOverlay = document.getElementById('fabOverlay');
+            const closeFab = document.getElementById('closeFab');
+            
+            // Mark as viewed in localStorage
+            const FAB_VIEWED_KEY = 'meterXpressFabViewed';
+            
+            function openFabCard() {
+                fabCard.classList.add('active');
+                fabOverlay.classList.add('active');
+                fabButton.classList.add('viewed');
+                localStorage.setItem(FAB_VIEWED_KEY, 'true');
+                document.body.style.overflow = 'hidden'; // Prevent scroll
+            }
+            
+            function closeFabCard() {
+                fabCard.classList.remove('active');
+                fabOverlay.classList.remove('active');
+                document.body.style.overflow = ''; // Restore scroll
+            }
+            
+            // Check if already viewed
+            if (localStorage.getItem(FAB_VIEWED_KEY)) {
+                fabButton.classList.add('viewed');
+            }
+            
+            // Open on FAB click
+            fabButton.addEventListener('click', openFabCard);
+            
+            // Close on X button
+            closeFab.addEventListener('click', closeFabCard);
+            
+            // Close on overlay click
+            fabOverlay.addEventListener('click', closeFabCard);
+            
+            // Close on ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && fabCard.classList.contains('active')) {
+                    closeFabCard();
+                }
             });
             
-            // Function to show success message and redirect
+            
+            // ============================================
+            // REDIRECT TO SEAMOUNT.IO FUNCTIONALITY
+            // ============================================
             function redirectToSeamount() {
-                const modal = document.getElementById('successModal');
-                const countdownElement = document.getElementById('countdown');
-                const redirectNowButton = document.getElementById('redirectNow');
-                
-                // Show modal
-                modal.classList.remove('hidden');
-                
-                let countdown = 3;
-                countdownElement.textContent = countdown;
-                
-                // Start countdown
-                const countdownInterval = setInterval(() => {
-                    countdown--;
-                    countdownElement.textContent = countdown;
-                    
-                    if (countdown <= 0) {
-                        clearInterval(countdownInterval);
-                        window.location.href = 'https://www.seamount.io';
-                    }
-                }, 1000);
-                
-                // Handle immediate redirect button
-                redirectNowButton.addEventListener('click', function() {
-                    clearInterval(countdownInterval);
+                // In production, this would redirect to seamount.io
+                // For now, showing alert
+                if (confirm('You will be redirected to seamount.io to create an account and access Meter Xpress. Continue?')) {
                     window.location.href = 'https://www.seamount.io';
-                });
+                }
             }
             
-            // Header Apply Button
-            const headerApplyButton = document.getElementById('headerApplyButton');
-            if (headerApplyButton) {
-                headerApplyButton.addEventListener('click', redirectToSeamount);
-            }
+            // All CTA buttons
+            const ctaButtons = [
+                document.getElementById('headerApplyButton'),
+                document.getElementById('heroApplyButton'),
+                document.getElementById('mobileStickyButton')
+            ];
             
-            // Hero Apply Button
-            const heroApplyButton = document.getElementById('heroApplyButton');
-            if (heroApplyButton) {
-                heroApplyButton.addEventListener('click', redirectToSeamount);
-            }
-            
-            // Continue Application Button
-            const continueButton = document.getElementById('continueApplication');
-            if (continueButton) {
-                continueButton.addEventListener('click', function() {
-                    // Check if an option is selected
-                    const selected = document.querySelector('.border-ekedc-blue.bg-blue-50');
-                    if (!selected) {
-                        alert('Please select whether you have an existing EKEDC account');
-                        return;
-                    }
-                    
-                    // Show success message and redirect
-                    redirectToSeamount();
-                });
-            }
-            
-            // Mobile profile modal
-            const profileToggle = document.getElementById('profileToggle');
-            const profileModal = document.getElementById('profileModal');
-            const closeProfileModal = document.getElementById('closeProfileModal');
-            
-            if (profileToggle) {
-                profileToggle.addEventListener('click', function() {
-                    profileModal.classList.remove('hidden');
-                });
-            }
-            
-            if (closeProfileModal) {
-                closeProfileModal.addEventListener('click', function() {
-                    profileModal.classList.add('hidden');
-                });
-            }
-            
-            // Close modal when clicking outside
-            profileModal.addEventListener('click', function(e) {
-                if (e.target === profileModal) {
-                    profileModal.classList.add('hidden');
+            ctaButtons.forEach(button => {
+                if (button) {
+                    button.addEventListener('click', redirectToSeamount);
                 }
             });
             
-            // Close success modal when clicking outside
-            const successModal = document.getElementById('successModal');
-            successModal.addEventListener('click', function(e) {
-                if (e.target === successModal) {
-                    // Don't close on outside click for success modal
-                    // Let the countdown continue
-                }
-            });
             
-            // Smooth scrolling for anchor links
+            // ============================================
+            // SMOOTH SCROLLING
+            // ============================================
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function(e) {
                     const href = this.getAttribute('href');
@@ -993,24 +905,37 @@
                     e.preventDefault();
                     const targetElement = document.querySelector(href);
                     if (targetElement) {
+                        const headerOffset = 80;
+                        const elementPosition = targetElement.getBoundingClientRect().top;
+                        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                        
                         window.scrollTo({
-                            top: targetElement.offsetTop - 80,
+                            top: offsetPosition,
                             behavior: 'smooth'
                         });
                     }
                 });
             });
             
-            // Track application starts
-            const applyButtons = [headerApplyButton, heroApplyButton, continueButton];
-            applyButtons.forEach(button => {
+            
+            // ============================================
+            // ANALYTICS TRACKING (Console logs for now)
+            // ============================================
+            ctaButtons.forEach(button => {
                 if (button) {
                     button.addEventListener('click', function() {
-                        // In a real implementation, send to analytics
-                        console.log('Application started via:', this.textContent.trim());
+                        console.log('CTA clicked:', this.textContent.trim());
+                        // In production: send to analytics
                     });
                 }
             });
+            
+            // Track FAB interactions
+            fabButton.addEventListener('click', function() {
+                console.log('Expert profile viewed');
+                // In production: send to analytics
+            });
+            
         });
     </script>
 </body>
