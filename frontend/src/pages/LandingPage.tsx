@@ -979,16 +979,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="block">Own your Share of</span>
-              <span className="gradient-text">Private Markets</span>
+              <span className="block">Marketplace for</span>
+              <span className="gradient-text">Shared Ownership</span>
             </h1>
             
-            <p className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              Tokenize real assets. Unlock capital. Move value 24/7.{' '}
-              <span className="font-semibold text-gray-900">
-                Infrastructure for Africa's capital markets.
-              </span>
-            </p>
+            <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
+              <p className="mb-2">Tokenize assets. Get VAS. Send money instantly 24/7.</p>
+              <p className="font-semibold text-gray-900">
+                One Platform. Real Solutions.
+              </p>
+            </div>
             
             <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 px-4">
               <motion.button 
@@ -1008,7 +1008,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 }}
               >
                 <span className="flex items-center justify-center gap-3">
-                  List Asset <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
+                  Get Started <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform" />
                 </span>
               </motion.button>
               

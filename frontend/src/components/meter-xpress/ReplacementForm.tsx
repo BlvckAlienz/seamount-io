@@ -105,7 +105,7 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
 
       // ✅ CORRECT PAYLOAD: Backend expects meter_number
       const payload = {
-        meter_number: formData.meter_number, // ← THIS IS THE FIX
+        meter_number: formData.meter_number,
         state_of_building: formData.state_of_building,
         applicant_capacity: formData.applicant_capacity,
         phase: formData.phase,
@@ -208,6 +208,41 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
               <p className="text-xs text-gray-500 mt-1">
                 This is the meter number of the faulty meter you want to replace
               </p>
+            </div>
+
+            {/* Document Requirements */}
+            <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-blue-400 font-semibold mb-1">Required Documents</h4>
+                  <p className="text-sm text-gray-300 mb-2">
+                    In the next step, you'll need to upload the following documents:
+                  </p>
+                  <ul className="text-sm text-gray-300 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">1.</span>
+                      <div>
+                        <span className="font-medium">Means of Identification</span>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Accepted: Driver's License, Passport, National ID, or Voter's Registration Card
+                        </p>
+                        <p className="text-xs text-gray-400">PDF format • Max 1MB</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">2.</span>
+                      <div>
+                        <span className="font-medium">Photo of Faulty Meter</span>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Clear photo showing the meter number and visible damage/fault
+                        </p>
+                        <p className="text-xs text-gray-400">JPG/JPEG format • Max 1MB</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
 
             {!accountVerified ? (

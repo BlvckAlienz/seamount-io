@@ -18,13 +18,16 @@ interface UploadedDocument {
   uploaded_at: string;
 }
 
-// ✅ UPDATED: Uniform document requirements with strict validation
+// ✅ UPDATED: Uniform document requirements with clear accepted IDs
 const getRequiredDocs = (appType?: string) => {
+  const acceptedIDs = "Driver's License, Passport, National ID, Voter's Registration Card";
+  
   if (!appType) {
     return [
       { 
         type: 'id_card', 
         label: 'Means of Identification', 
+        description: `Accepted: ${acceptedIDs}`,
         format: 'PDF Only', 
         allowedTypes: ['application/pdf'],
         maxSizeMB: 1 
@@ -37,6 +40,7 @@ const getRequiredDocs = (appType?: string) => {
       { 
         type: 'passport_photo', 
         label: 'Passport Photograph', 
+        description: 'Recent passport-sized photo',
         format: 'JPG/JPEG Only', 
         allowedTypes: ['image/jpeg', 'image/jpg'],
         maxSizeMB: 1 
@@ -44,6 +48,7 @@ const getRequiredDocs = (appType?: string) => {
       { 
         type: 'id_card', 
         label: 'Means of Identification', 
+        description: `Accepted: ${acceptedIDs}`,
         format: 'PDF Only', 
         allowedTypes: ['application/pdf'],
         maxSizeMB: 1 
@@ -54,6 +59,7 @@ const getRequiredDocs = (appType?: string) => {
       { 
         type: 'id_card', 
         label: 'Means of Identification', 
+        description: `Accepted: ${acceptedIDs}`,
         format: 'PDF Only', 
         allowedTypes: ['application/pdf'],
         maxSizeMB: 1 
@@ -61,6 +67,7 @@ const getRequiredDocs = (appType?: string) => {
       { 
         type: 'meter_photo', 
         label: 'Photo of Faulty Meter', 
+        description: 'Clear photo showing the meter number',
         format: 'JPG/JPEG Only', 
         allowedTypes: ['image/jpeg', 'image/jpg'],
         maxSizeMB: 1 
@@ -71,6 +78,7 @@ const getRequiredDocs = (appType?: string) => {
       { 
         type: 'id_card', 
         label: 'Means of Identification', 
+        description: `Accepted: ${acceptedIDs}`,
         format: 'PDF Only', 
         allowedTypes: ['application/pdf'],
         maxSizeMB: 1 
@@ -210,103 +218,121 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
   return (
     <div className="space-y-6">
-      <div>
+        <div>
         <h3 className="text-xl font-bold text-white mb-2">Upload Required Documents</h3>
         <p className="text-gray-400">
-          {applicationType === 'conversion' 
+            {applicationType === 'conversion' 
             ? 'Upload your identification document to proceed' 
             : 'All documents are required to proceed with your application'}
         </p>
-      </div>
+        </div>
 
-      {/* Required Documents Checklist */}
-      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+        {/* Required Documents Checklist */}
+        <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
         <h4 className="text-sm font-semibold text-blue-400 mb-3 uppercase">Required Documents</h4>
         <div className="space-y-2">
-          {requiredDocs.map((doc) => {
+            {requiredDocs.map((doc) => {
             const uploaded = isRequiredDocUploaded(doc.type);
             return (
-              <div
+                <div
                 key={doc.type}
                 className={`flex items-center justify-between p-3 rounded-lg ${
-                  uploaded ? 'bg-green-900/20' : 'bg-gray-800/50'
+                    uploaded ? 'bg-green-900/20' : 'bg-gray-800/50'
                 }`}
-              >
+                >
                 <div className="flex items-center gap-3">
-                  {uploaded ? (
+                    {uploaded ? (
                     <CheckCircle className="h-5 w-5 text-green-400" />
-                  ) : (
+                    ) : (
                     <AlertCircle className="h-5 w-5 text-yellow-400" />
-                  )}
-                  <div>
+                    )}
+                    <div>
                     <div className={`font-medium ${uploaded ? 'text-green-400' : 'text-white'}`}>
-                      {doc.label}
+                        {doc.label}
                     </div>
-                    <div className="text-xs text-gray-400">{doc.format} • Max {doc.maxSizeMB}MB</div>
-                  </div>
+                    <div className="text-xs text-gray-400">
+                        {doc.description}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                        {doc.format} • Max {doc.maxSizeMB}MB
+                    </div>
+                    </div>
                 </div>
                 {uploaded && (
-                  <span className="text-xs text-green-400 font-semibold">✓ Uploaded</span>
+                    <span className="text-xs text-green-400 font-semibold">✓ Uploaded</span>
                 )}
-              </div>
+                </div>
             );
-          })}
+            })}
         </div>
-      </div>
+        </div>
 
-      {/* Upload Section */}
-      <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
+        {/* Upload Section */}
+        <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6">
         <h4 className="text-lg font-semibold text-white mb-4">Upload Document</h4>
 
         <div className="space-y-4">
-          <div>
+            <div>
             <label className="block text-sm text-gray-400 mb-2">Document Type</label>
             <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {requiredDocs.map(doc => (
+                {requiredDocs.map(doc => (
                 <option key={doc.type} value={doc.type}>
-                  {doc.label} {isRequiredDocUploaded(doc.type) ? '(Uploaded ✓)' : ''}
+                    {doc.label} {isRequiredDocUploaded(doc.type) ? '(Uploaded ✓)' : ''}
                 </option>
-              ))}
+                ))}
             </select>
-          </div>
+            {selectedType === 'id_card' && (
+                <p className="text-xs text-gray-400 mt-2">
+                Accepted: Driver's License, Passport, National ID, Voter's Registration Card
+                </p>
+            )}
+            </div>
 
-          <label className="flex flex-col items-center justify-center gap-3 px-6 py-8 bg-gray-900/50 border-2 border-dashed border-gray-600 hover:border-blue-500 rounded-lg cursor-pointer transition-all">
+            <label className="flex flex-col items-center justify-center gap-3 px-6 py-8 bg-gray-900/50 border-2 border-dashed border-gray-600 hover:border-blue-500 rounded-lg cursor-pointer transition-all">
             <Upload className="h-12 w-12 text-gray-400" />
             <div className="text-center">
-              <span className="text-white font-medium">
+                <span className="text-white font-medium">
                 {uploading ? 'Uploading...' : 'Click to choose file'}
-              </span>
-              <p className="text-sm text-gray-400 mt-1">
+                </span>
+                <p className="text-sm text-gray-400 mt-1">
                 {requiredDocs.find(d => d.type === selectedType)?.format} • Max {requiredDocs.find(d => d.type === selectedType)?.maxSizeMB}MB
-              </p>
+                </p>
+                {selectedType === 'id_card' && (
+                <p className="text-xs text-gray-400 mt-1">
+                    Driver's License, Passport, National ID, Voter's Card
+                </p>
+                )}
             </div>
             <input
-              type="file"
-              onChange={handleUpload}
-              disabled={uploading}
-              className="hidden"
-              accept={requiredDocs.find(d => d.type === selectedType)?.allowedTypes.includes('application/pdf') 
+                type="file"
+                onChange={handleUpload}
+                disabled={uploading}
+                className="hidden"
+                accept={requiredDocs.find(d => d.type === selectedType)?.allowedTypes.includes('application/pdf') 
                 ? '.pdf' 
                 : '.jpg,.jpeg,.jfif'
-              }
+                }
             />
-          </label>
-          
-          {/* ✅ Format Guidelines */}
-          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3">
-            <p className="text-xs text-yellow-200">
-              📋 <strong>Format Guidelines:</strong><br/>
-              • <strong>Identification Documents:</strong> PDF format only (Max 1MB)<br/>
-              • <strong>Passport/Meter Photos:</strong> JPG/JPEG format only (Max 1MB)<br/>
-              • Ensure documents are clear and readable
-            </p>
-          </div>
+            </label>
+            
+            {/* ✅ UPDATED: Format Guidelines */}
+            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+            <h5 className="text-sm font-semibold text-yellow-200 mb-2">📋 Document Guidelines</h5>
+            <ul className="text-xs text-yellow-200 space-y-1">
+                <li><strong>Means of Identification:</strong> PDF format only (Max 1MB)</li>
+                <li className="pl-4">• Driver's License, Passport, National ID, or Voter's Registration Card</li>
+                <li className="pl-4">• Document must be valid and clearly readable</li>
+                <li><strong>Passport/Meter Photos:</strong> JPG/JPEG format only (Max 1MB)</li>
+                <li className="pl-4">• Clear, recent photo with good lighting</li>
+                <li className="pl-4">• All text must be legible</li>
+            </ul>
+            </div>
         </div>
-      </div>
+        </div>
 
       {/* Uploaded Documents List */}
       {documents.length > 0 && (

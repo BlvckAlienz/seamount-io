@@ -1,6 +1,6 @@
 // File: frontend/src/components/meter-xpress/NewServiceForm.tsx
 import React, { useState } from 'react';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { ArrowRight, MapPin, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 import { MAPPricingCard } from './MAPPricingCard';
@@ -286,7 +286,10 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-2">ID Type *</label>
+              <label className="block text-sm text-gray-400 mb-2">
+                Means of Identification *
+                <span className="text-xs text-gray-500 ml-2">(Driver's License, Passport, National ID, Voter's Card)</span>
+              </label>
               <select
                 value={formData.personal_id_type}
                 onChange={(e) => setFormData({ ...formData, personal_id_type: e.target.value })}
@@ -297,6 +300,9 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
                 <option value="International Passport">International Passport</option>
                 <option value="Voter's Registration card">Voter's Card</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                You'll need to upload a PDF copy of this document in the next step
+              </p>
             </div>
 
             <div>
@@ -353,6 +359,32 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
                 <option value="Landlord">Landlord</option>
                 <option value="Tenant">Tenant</option>
               </select>
+            </div>
+          </div>
+
+          {/* Identification Requirements */}
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mt-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-blue-400 font-semibold mb-1">Document Requirements</h4>
+                <p className="text-sm text-gray-300 mb-2">
+                  In the next step, you'll need to upload the following documents:
+                </p>
+                <ul className="text-sm text-gray-300 space-y-1">
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-1">•</span>
+                    <span><strong>Passport Photograph:</strong> JPG/JPEG format (Max 1MB)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-400 mt-1">•</span>
+                    <span><strong>Means of Identification:</strong> PDF of your selected ID (Max 1MB)</span>
+                  </li>
+                  <li className="text-xs text-gray-400 mt-2 pl-4">
+                    Accepted IDs: Driver's License, Passport, National ID, or Voter's Registration Card
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 

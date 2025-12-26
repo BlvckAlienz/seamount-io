@@ -260,6 +260,36 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
               * You must provide at least one: account number OR meter number
             </p>
 
+            {/* Document Requirements */}
+            <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-blue-400 font-semibold mb-1">Document Requirements</h4>
+                  <p className="text-sm text-gray-300 mb-2">
+                    In the next step, you'll need to upload your identification document:
+                  </p>
+                  <ul className="text-sm text-gray-300 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-green-400 mt-1">•</span>
+                      <div>
+                        <span className="font-medium">Means of Identification</span>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Accepted: Driver's License, Passport, National ID, or Voter's Registration Card
+                        </p>
+                        <p className="text-xs text-gray-400">PDF format • Max 1MB</p>
+                      </div>
+                    </li>
+                    {needsMetering() && (
+                      <li className="text-xs text-gray-400 mt-2 pl-4">
+                        Note: If this conversion requires a new meter, you'll also need to select a meter vendor and make payment.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             {!accountVerified ? (
               <button
                 onClick={handleVerifyAccount}
@@ -353,6 +383,12 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
                     {needsMetering() 
                       ? 'This conversion requires a new meter. You\'ll need to select a MAP vendor and make payment.'
                       : 'This conversion doesn\'t require a new meter. You can submit for free.'
+                    }
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {needsMetering() 
+                      ? 'You\'ll also need to upload your identification document (PDF format).'
+                      : 'You\'ll need to upload your identification document (PDF format).'
                     }
                   </p>
                 </div>
