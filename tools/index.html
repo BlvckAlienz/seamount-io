@@ -134,6 +134,30 @@
             border-left-color: var(--ekedc-light-blue);
             background-color: #f0f9ff;
         }
+        
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
     </style>
     
     <!-- Enhanced Tailwind Configuration -->
@@ -211,13 +235,13 @@
                             <span>Secure & Trusted Platform</span>
                         </div>
                     </div>
-                    <a 
-                        href="#apply" 
+                    <button 
+                        id="headerApplyButton"
                         class="bg-white text-ekedc-blue font-bold py-3 px-6 rounded-lg hover:bg-gray-100 transition shadow-lg flex items-center gap-2"
                     >
                         <i class="fas fa-play-circle"></i>
                         Apply for Meter Now
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
@@ -250,13 +274,13 @@
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <a 
-                            href="#apply" 
+                        <button 
+                            id="heroApplyButton"
                             class="bg-ekedc-blue text-white font-bold py-4 px-8 rounded-lg hover:bg-blue-800 transition text-center shadow-lg"
                         >
                             <i class="fas fa-bolt mr-2"></i>
                             Start Application Now
-                        </a>
+                        </button>
                         <a 
                             href="#schemes" 
                             class="bg-white text-ekedc-blue font-bold py-4 px-8 rounded-lg border-2 border-ekedc-blue hover:bg-blue-50 transition text-center"
@@ -273,16 +297,16 @@
                             <h3 class="text-2xl font-bold mb-4">Meter Application Journey</h3>
                             <div class="space-y-6">
                                 <div class="step-card" data-step="1">
-                                    <h4 class="font-bold text-lg mb-1">Application Classification</h4>
-                                    <p class="text-blue-100">Tell us if you're a new or existing customer</p>
+                                    <h4 class="font-bold text-lg mb-1">Get Started</h4>
+                                    <p class="text-blue-100">Sign up on www.seamount.io as an individual user</p>
                                 </div>
                                 <div class="step-card" data-step="2">
-                                    <h4 class="font-bold text-lg mb-1">Document Collection</h4>
-                                    <p class="text-blue-100">We guide you on required documents</p>
+                                    <h4 class="font-bold text-lg mb-1">Application Start</h4>
+                                    <p class="text-blue-100">Navigate to the side panel and click 'Meter Xpress' tab</p>
                                 </div>
                                 <div class="step-card" data-step="3">
-                                    <h4 class="font-bold text-lg mb-1">Scheme Selection & Payment</h4>
-                                    <p class="text-blue-100">Choose DISREP, MAF (free) or MAP (paid)</p>
+                                    <h4 class="font-bold text-lg mb-1">Complete Application</h4>
+                                    <p class="text-blue-100">Fill application form. We guide you on required documents</p>
                                 </div>
                                 <div class="step-card" data-step="4">
                                     <h4 class="font-bold text-lg mb-1">Installation Coordination</h4>
@@ -371,9 +395,9 @@
                         <span class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-full text-sm">
                             <i class="fas fa-check-circle mr-1"></i> FREE
                         </span>
-                        <h3 class="text-xl font-bold mt-3 mb-2">MAF Tranche B</h3>
+                        <h3 class="text-xl font-bold mt-3 mb-2">MAF</h3>
                         <p class="text-gray-600 mb-4">
-                            Meter Acquisition Fund (Tranche B) funded by the Federal Government.
+                            Meter Acquisition Fund funded by the Federal Government.
                         </p>
                     </div>
                     <ul class="space-y-2 mb-6">
@@ -385,14 +409,10 @@
                             <i class="fas fa-check text-blue-500 mt-1 mr-2"></i>
                             <span>For Band A & B customers</span>
                         </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check text-blue-500 mt-1 mr-2"></i>
-                            <span>Apply by November 30, 2025</span>
-                        </li>
                     </ul>
                     <div class="text-sm text-gray-500">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Installation from Nov 6 - Dec 31, 2025
+                        Limited availability, subject to program guidelines
                     </div>
                 </div>
                 
@@ -506,21 +526,21 @@
                     <div class="md:w-1/2 bg-gradient-to-br from-ekedc-blue to-blue-800 p-8 text-white">
                         <h2 class="text-3xl font-bold mb-6">Ready to Get Your Meter?</h2>
                         <p class="text-blue-100 mb-6">
-                            Start your application now. It only takes a few minutes to begin the process.
+                            Start your MAP application now. It only takes a few minutes to begin the process.
                         </p>
                         
                         <div class="space-y-4 mb-8">
                             <div class="flex items-center">
                                 <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">1</div>
-                                <span>Answer a few quick questions</span>
+                                <span>Create individual account on Seamount.io and navigate to 'Meter Xpress'</span>
                             </div>
                             <div class="flex items-center">
                                 <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">2</div>
-                                <span>Upload required documents</span>
+                                <span>Answer a few quick questions</span>
                             </div>
                             <div class="flex items-center">
                                 <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">3</div>
-                                <span>Select your preferred scheme</span>
+                                <span>Upload required documents</span>
                             </div>
                             <div class="flex items-center">
                                 <div class="bg-white text-ekedc-blue rounded-full w-8 h-8 flex items-center justify-center mr-3 font-bold">4</div>
@@ -531,7 +551,7 @@
                         <div class="bg-blue-900 bg-opacity-50 p-4 rounded-lg">
                             <p class="text-sm">
                                 <i class="fas fa-exclamation-triangle mr-2"></i>
-                                Remember: Applications for <strong>MAF Tranche B</strong> meters are completely FREE. Beware of anyone requesting payment for MAF applications.
+                                Remember: Applications for <strong>DISREP or MAF</strong> meters are completely FREE. Beware of anyone requesting payment for MAF applications.
                             </p>
                         </div>
                     </div>
@@ -545,9 +565,9 @@
                         <div class="mb-8">
                             <p class="font-medium text-gray-700 mb-4">Do you have an existing EKEDC account number?</p>
                             <div class="space-y-4">
-                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition">
+                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition application-option">
                                     <div class="w-6 h-6 rounded-full border-2 border-gray-400 mr-4 flex items-center justify-center">
-                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden"></div>
+                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden option-indicator"></div>
                                     </div>
                                     <div>
                                         <p class="font-medium">Yes, I have an account</p>
@@ -555,9 +575,9 @@
                                     </div>
                                 </div>
                                 
-                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition">
+                                <div class="flex items-center p-4 border-2 border-gray-300 rounded-lg hover:border-ekedc-blue hover:bg-blue-50 cursor-pointer transition application-option">
                                     <div class="w-6 h-6 rounded-full border-2 border-gray-400 mr-4 flex items-center justify-center">
-                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden"></div>
+                                        <div class="w-3 h-3 rounded-full bg-ekedc-blue hidden option-indicator"></div>
                                     </div>
                                     <div>
                                         <p class="font-medium">No, this is my first time</p>
@@ -567,7 +587,7 @@
                             </div>
                         </div>
                         
-                        <button class="w-full bg-ekedc-blue text-white font-bold py-4 px-6 rounded-lg hover:bg-blue-800 transition flex items-center justify-center">
+                        <button id="continueApplication" class="w-full bg-ekedc-blue text-white font-bold py-4 px-6 rounded-lg hover:bg-blue-800 transition flex items-center justify-center">
                             <i class="fas fa-arrow-right mr-2"></i>
                             Continue Application
                         </button>
@@ -608,7 +628,7 @@
                                 </div>
                                 <div class="mr-4">
                                     <div class="bg-gray-300 text-gray-700 rounded-full w-10 h-10 flex items-center justify-center font-bold">2</div>
-                                    <p class="text-xs mt-1 text-center">Q1 2026</p>
+                                    <p class="text-xs mt-1 text-center">Q2 2026</p>
                                 </div>
                                 <div class="mr-4">
                                     <p class="font-medium">2 More DISCOs</p>
@@ -624,13 +644,6 @@
                                     <p class="font-medium">Nationwide</p>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="mt-6">
-                            <p class="text-gray-700">
-                                <strong>Not an EKEDC customer?</strong> 
-                                <a href="#" class="text-ekedc-blue font-medium hover:underline">Join our waitlist</a> to be notified when we launch in your DISCO.
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -731,10 +744,10 @@
                     <div>
                         <h3 class="font-bold text-xl text-gray-900 mb-2">Important Public Disclaimer</h3>
                         <p class="text-gray-700 mb-3">
-                            EKEDC does <strong>NOT</strong> authorize, request, or accept any form of payment for applying for or obtaining <strong>MAF (Tranche B) prepaid meters</strong>.
+                            EKEDC does <strong>NOT</strong> authorize, request, or accept any form of payment for applying for or obtaining <strong>DISREP or MAF prepaid meters</strong>.
                         </p>
                         <p class="text-gray-700 mb-4">
-                            Applications for MAF Tranche B meters are <strong>completely FREE</strong>. Beware of anyone requesting payment for MAF meter processing.
+                            Applications for DISREP or MAF meters are <strong>completely FREE</strong>. Beware of anyone requesting payment for DISREP or MAF meter processing.
                         </p>
                         <div class="text-sm text-gray-600">
                             <p>Report suspicious activity to: <strong>fraudwatch@ekedp.com</strong> or call <strong>08000033333</strong></p>
@@ -773,10 +786,10 @@
                 <div>
                     <h3 class="text-xl font-bold mb-4">Quick Links</h3>
                     <ul class="space-y-2">
-                        <li><a href="#apply" class="text-blue-200 hover:text-white">Apply for Meter</a></li>
+                        <li><a href="https://www.seamount.io" class="text-blue-200 hover:text-white">Apply for Meter</a></li>
                         <li><a href="#schemes" class="text-blue-200 hover:text-white">Metering Schemes</a></li>
-                        <li><a href="#" class="text-blue-200 hover:text-white">FAQs</a></li>
-                        <li><a href="#" class="text-blue-200 hover:text-white">Contact Us</a></li>
+                        <li><a href="https://www.seamount.io" class="text-blue-200 hover:text-white">FAQs</a></li>
+                        <li><a href="https://www.seamount.io" class="text-blue-200 hover:text-white">Contact Us</a></li>
                     </ul>
                 </div>
                 
@@ -785,11 +798,11 @@
                     <ul class="space-y-2 text-blue-200">
                         <li class="flex items-start">
                             <i class="fas fa-envelope mt-1 mr-2"></i>
-                            <span>support@tools.seamount.io</span>
+                            <span>support@seamount.io</span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-exclamation-circle mt-1 mr-2"></i>
-                            <span>Report MAF fraud: fraudwatch@ekedp.com</span>
+                            <span>Report fraud: fraudwatch@ekedp.com</span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-phone mt-1 mr-2"></i>
@@ -838,41 +851,105 @@
         </div>
     </div>
     
+    <!-- Success Message Modal -->
+    <div id="successModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="mb-4">
+                <div class="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-check text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Redirecting to Seamount.io</h3>
+                <p class="text-gray-600 mb-4">
+                    You'll be redirected to Seamount.io where you'll need to create an individual account to access Meter Xpress.
+                </p>
+                <p class="text-sm text-gray-500">
+                    Redirecting in <span id="countdown">3</span> seconds...
+                </p>
+            </div>
+            <button id="redirectNow" class="bg-ekedc-blue text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-800 transition">
+                Go Now
+            </button>
+        </div>
+    </div>
+    
     <!-- JavaScript -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Application type selection
-            const applicationOptions = document.querySelectorAll('.flex.items-center.p-4.border-2');
+            const applicationOptions = document.querySelectorAll('.application-option');
             applicationOptions.forEach(option => {
                 option.addEventListener('click', function() {
                     // Remove selection from all options
                     applicationOptions.forEach(opt => {
                         opt.classList.remove('border-ekedc-blue', 'bg-blue-50');
-                        const circle = opt.querySelector('.w-3');
-                        circle.classList.add('hidden');
+                        const indicator = opt.querySelector('.option-indicator');
+                        indicator.classList.add('hidden');
                     });
                     
                     // Add selection to clicked option
                     this.classList.add('border-ekedc-blue', 'bg-blue-50');
-                    const circle = this.querySelector('.w-3');
-                    circle.classList.remove('hidden');
+                    const indicator = this.querySelector('.option-indicator');
+                    indicator.classList.remove('hidden');
                 });
             });
             
-            // Continue application button
-            const continueButton = document.querySelector('button.bg-ekedc-blue.text-white');
-            continueButton.addEventListener('click', function() {
-                // Check if an option is selected
-                const selected = document.querySelector('.border-ekedc-blue.bg-blue-50');
-                if (!selected) {
-                    alert('Please select whether you have an existing EKEDC account');
-                    return;
-                }
+            // Function to show success message and redirect
+            function redirectToSeamount() {
+                const modal = document.getElementById('successModal');
+                const countdownElement = document.getElementById('countdown');
+                const redirectNowButton = document.getElementById('redirectNow');
                 
-                // In a real implementation, this would navigate to the next step
-                // For now, show a success message
-                alert('Application started! In a real implementation, you would be guided through the next steps.');
-            });
+                // Show modal
+                modal.classList.remove('hidden');
+                
+                let countdown = 3;
+                countdownElement.textContent = countdown;
+                
+                // Start countdown
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    countdownElement.textContent = countdown;
+                    
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        window.location.href = 'https://www.seamount.io';
+                    }
+                }, 1000);
+                
+                // Handle immediate redirect button
+                redirectNowButton.addEventListener('click', function() {
+                    clearInterval(countdownInterval);
+                    window.location.href = 'https://www.seamount.io';
+                });
+            }
+            
+            // Header Apply Button
+            const headerApplyButton = document.getElementById('headerApplyButton');
+            if (headerApplyButton) {
+                headerApplyButton.addEventListener('click', redirectToSeamount);
+            }
+            
+            // Hero Apply Button
+            const heroApplyButton = document.getElementById('heroApplyButton');
+            if (heroApplyButton) {
+                heroApplyButton.addEventListener('click', redirectToSeamount);
+            }
+            
+            // Continue Application Button
+            const continueButton = document.getElementById('continueApplication');
+            if (continueButton) {
+                continueButton.addEventListener('click', function() {
+                    // Check if an option is selected
+                    const selected = document.querySelector('.border-ekedc-blue.bg-blue-50');
+                    if (!selected) {
+                        alert('Please select whether you have an existing EKEDC account');
+                        return;
+                    }
+                    
+                    // Show success message and redirect
+                    redirectToSeamount();
+                });
+            }
             
             // Mobile profile modal
             const profileToggle = document.getElementById('profileToggle');
@@ -898,6 +975,15 @@
                 }
             });
             
+            // Close success modal when clicking outside
+            const successModal = document.getElementById('successModal');
+            successModal.addEventListener('click', function(e) {
+                if (e.target === successModal) {
+                    // Don't close on outside click for success modal
+                    // Let the countdown continue
+                }
+            });
+            
             // Smooth scrolling for anchor links
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function(e) {
@@ -916,12 +1002,14 @@
             });
             
             // Track application starts
-            const applyButtons = document.querySelectorAll('a[href="#apply"], button.bg-ekedc-blue');
+            const applyButtons = [headerApplyButton, heroApplyButton, continueButton];
             applyButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // In a real implementation, send to analytics
-                    console.log('Application started via:', this.textContent.trim());
-                });
+                if (button) {
+                    button.addEventListener('click', function() {
+                        // In a real implementation, send to analytics
+                        console.log('Application started via:', this.textContent.trim());
+                    });
+                }
             });
         });
     </script>
