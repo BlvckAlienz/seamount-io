@@ -4,7 +4,6 @@ import { ArrowRight, MapPin } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 import { MAPPricingCard } from './MAPPricingCard';
-import { FreeSchemeSelector } from './FreeSchemeSelector';
 
 interface NewServiceFormProps {
   onComplete: (applicationId: string, formData: any) => void;
@@ -65,8 +64,6 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
     'Terrace': ['Four Bedrooms', 'One Bedroom', 'Three Bedrooms', 'Three Bedrooms & Four Bedrooms with Boy\'s Quarters', 'Two Bedrooms']
   };
 
-  const [meteringScheme, setMeteringScheme] = useState<'MAP' | 'DISREP' | 'MAF'>('MAP');
-
   const handlePhaseChange = (phase: string) => {
     setFormData({
       ...formData,
@@ -79,11 +76,11 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
 
   const handleVendorSelect = (vendor: string, pricing: any) => {
     setFormData({
-        ...formData,
-        map_vendor: vendor,
-        selectedPricing: pricing
+      ...formData,
+      map_vendor: vendor,
+      selectedPricing: pricing
     });
-    };
+  };
 
   const validateCustomerSection = () => {
     // ✅ NAME VALIDATION
@@ -168,23 +165,6 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
           return;
         }
 
-        // ✅ NEW: Only require MAP vendor if MAP scheme is selected
-        if (meteringScheme === 'MAP' && !formData.map_vendor) {
-            toast.error('Please select a MAP vendor');
-            return;
-        }
-
-        // ✅ Add metering_scheme to payload
-        const payload = {
-            ...formData,
-            metering_scheme: meteringScheme,
-            // If not MAP, clear vendor and pricing
-            ...(meteringScheme !== 'MAP' && {
-            map_vendor: null,
-            selectedPricing: null
-            })
-        };
-
         if (!formData.map_vendor) {
           toast.error('Please select a MAP vendor');
           setCurrentSection('pricing');
@@ -202,7 +182,7 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
     } finally {
       setLoading(false);
     }
-  };
+};
 
   return (
     <div className="space-y-6">
@@ -500,51 +480,33 @@ export const NewServiceForm: React.FC<NewServiceFormProps> = ({ onComplete }) =>
           <h3 className="text-xl font-bold text-white mb-4">Metering & Pricing</h3>
 
           {/* Phase Selection */}
-          <div className="space-y-6">
-            {/* Phase Selection (keep existing) */}
-            <div>
-                <label className="block text-sm text-gray-400 mb-2">Select Phase Type *</label>
-                <div className="grid grid-cols-2 gap-4">
-                <button
-                    onClick={() => handlePhaseChange('1 Phase')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                    formData.phase === '1 Phase'
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500'
-                    }`}
-                >
-                    <div className="text-lg font-semibold mb-1">Single Phase</div>
-                    <div className="text-sm opacity-80">230V - Residential</div>
-                </button>
-                <button
-                    onClick={() => handlePhaseChange('3 Phase')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                    formData.phase === '3 Phase'
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500'
-                    }`}
-                >
-                    <div className="text-lg font-semibold mb-1">Three Phase</div>
-                    <div className="text-sm opacity-80">400V - Commercial</div>
-                </button>
-                </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Select Phase Type *</label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handlePhaseChange('1 Phase')}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.phase === '1 Phase'
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500'
+                }`}
+              >
+                <div className="text-lg font-semibold mb-1">Single Phase</div>
+                <div className="text-sm opacity-80">230V - Residential</div>
+              </button>
+              <button
+                onClick={() => handlePhaseChange('3 Phase')}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  formData.phase === '3 Phase'
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-blue-500'
+                }`}
+              >
+                <div className="text-lg font-semibold mb-1">Three Phase</div>
+                <div className="text-sm opacity-80">400V - Commercial</div>
+              </button>
             </div>
-            
-            {/* ✅ NEW: Metering Scheme Selector */}
-            <FreeSchemeSelector
-                selectedScheme={meteringScheme}
-                onSelectScheme={setMeteringScheme}
-            />
-
-            {/* Conditionally show MAP pricing only when MAP is selected */}
-            {meteringScheme === 'MAP' && (
-                <MAPPricingCard
-                selectedPhase={formData.phase === '1 Phase' ? '1phase' : '3phase'}
-                selectedVendor={formData.map_vendor}
-                onVendorSelect={handleVendorSelect}
-                />
-            )}
-            </div>
+          </div>
 
           {/* MAP Pricing Card */}
           <MAPPricingCard

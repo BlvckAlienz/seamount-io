@@ -4,7 +4,6 @@ import { ArrowRight, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 import { MAPPricingCard } from './MAPPricingCard';
-import { FreeSchemeSelector } from './FreeSchemeSelector';
 
 interface ConversionFormProps {
   onComplete: (applicationId: string, formData: any) => void;
@@ -21,7 +20,6 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
   const [currentSection, setCurrentSection] = useState<'account' | 'conversion' | 'pricing'>('account');
   const [loading, setLoading] = useState(false);
   const [accountVerified, setAccountVerified] = useState(false);
-  const [meteringScheme, setMeteringScheme] = useState<'MAP' | 'DISREP' | 'MAF'>('MAP');
   
   const [formData, setFormData] = useState({
     // Account Info
@@ -49,7 +47,7 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
 
   const needsMetering = () => {
     const selected = conversionMatrix.find(c => 
-        c.from === formData.conversion_from && c.to === formData.conversion_to
+      c.from === formData.conversion_from && c.to === formData.conversion_to
     );
     return selected?.needsMeter || false;
   };
@@ -127,32 +125,26 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
         return;
     }
 
-    const needsMeter = needsMetering();
-    
-    // ✅ NEW: Only require MAP vendor if needs meter AND MAP scheme is selected
-    if (needsMeter && meteringScheme === 'MAP' && !formData.map_vendor) {
-      toast.error('Please select a MAP vendor');
-      return;
+    if (needsMetering() && !formData.map_vendor) {
+        toast.error('Please select a MAP vendor');
+        return;
     }
 
     try {
-      setLoading(true);
+        setLoading(true);
 
+        // Prepare payload matching backend expectations
         const payload = {
-          account_number: formData.account_number,
-          meter_number: formData.meter_number,
-          conversion_from: formData.conversion_from.toLowerCase().replace(' ', '_'),
-          conversion_to: formData.conversion_to.toLowerCase().replace(' ', '_'),
-          metering_scheme: meteringScheme,
-          // Only include meter details if needed
-          ...(needsMeter && {
+        account_number: formData.account_number,
+        meter_number: formData.meter_number,
+        conversion_from: formData.conversion_from.toLowerCase().replace(' ', '_'),
+        conversion_to: formData.conversion_to.toLowerCase().replace(' ', '_'),
+        ...(needsMetering() && {
             phase: formData.phase,
             voltage_level: formData.voltage_level,
-            ...(meteringScheme === 'MAP' && {
             map_vendor: formData.map_vendor
-          })
         })
-      };
+        };
 
         const response = await apiClient.post('/api/v1/meter-xpress/applications/conversion', payload);
 
@@ -359,7 +351,7 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
                   </h4>
                   <p className="text-sm text-gray-300">
                     {needsMetering() 
-                      ? 'This conversion requires a new meter. You\'ll need to select a metering scheme.'
+                      ? 'This conversion requires a new meter. You\'ll need to select a MAP vendor and make payment.'
                       : 'This conversion doesn\'t require a new meter. You can submit for free.'
                     }
                   </p>
@@ -384,7 +376,7 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
                 }}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                Continue to Metering
+                Continue to Pricing
                 <ArrowRight className="h-5 w-5" />
               </button>
             ) : (
@@ -434,20 +426,12 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
             </div>
           </div>
 
-          {/* Free Scheme Selector */}
-          <FreeSchemeSelector
-            selectedScheme={meteringScheme}
-            onSelectScheme={setMeteringScheme}
+          {/* MAP Pricing Card */}
+          <MAPPricingCard
+            selectedPhase={formData.phase === '1 Phase' ? '1phase' : '3phase'}
+            selectedVendor={formData.map_vendor}
+            onVendorSelect={handleVendorSelect}
           />
-
-          {/* MAP Pricing Card (only shown for MAP scheme) */}
-          {meteringScheme === 'MAP' && (
-            <MAPPricingCard
-              selectedPhase={formData.phase === '1 Phase' ? '1phase' : '3phase'}
-              selectedVendor={formData.map_vendor}
-              onVendorSelect={handleVendorSelect}
-            />
-          )}
 
           <div className="flex gap-3">
             <button
@@ -458,7 +442,7 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || (meteringScheme === 'MAP' && !formData.map_vendor)}
+              disabled={loading || !formData.map_vendor}
               className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
             >
               {loading ? 'Creating Application...' : 'Create Conversion Application'}
