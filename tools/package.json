@@ -1,0 +1,15 @@
+{
+  "name": "tools-seamount-io",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "echo 'Static site - no dev server needed'",
+    "build": "echo 'Building static site' && cp index.html dist/ && cp profile-dp.jpeg dist/",
+    "start": "serve dist"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
