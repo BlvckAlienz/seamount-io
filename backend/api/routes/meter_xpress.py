@@ -93,8 +93,8 @@ class ConversionFormRequest(BaseModel):
 # ============================================
 
 def calculate_service_fee(base_price: Decimal, phase_type: str) -> Dict[str, Decimal]:
-    """Calculate service fees with 45%/40% markup"""
-    markup_rate = Decimal("0.45") if phase_type == "1phase" else Decimal("0.40")  # ✅ UPDATED
+    """Calculate service fees with 60%/50% markup"""
+    markup_rate = Decimal("0.60") if phase_type == "1phase" else Decimal("0.50")
     
     service_fee = base_price * markup_rate
     total_amount = base_price + service_fee
