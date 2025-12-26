@@ -60,36 +60,14 @@ const MeterXpressPage = () => {
     setCurrentStep('form');
   };
 
-  const handleFormComplete = (appId: string, data: any) => {
+  const handleFormComplete = async (appId: string, data: any) => {
     setApplicationId(appId);
     setFormData(data);
     
-    // ✅ FIX: Check if conversion needs documents
-    if (applicationType === 'conversion') {
-        // Check if conversion requires meter (from backend response)
-        apiClient.get(`/api/v1/meter-xpress/applications/${appId}`)
-        .then(response => {
-            if (response.data.success) {
-            const needsMeter = response.data.application?.metadata?.needs_meter;
-            
-            if (needsMeter) {
-                setCurrentStep('documents');
-            } else {
-                // Skip to payment for non-metered conversions
-                setCurrentStep('payment');
-            }
-            }
-        })
-        .catch(error => {
-            console.error('Failed to check conversion requirements:', error);
-            // Default to documents step to be safe
-            setCurrentStep('documents');
-        });
-    } else {
-        // All other types go to documents
-        setCurrentStep('documents');
-    }
-    };
+    // ✅ ALWAYS go to documents step for all application types
+    // Backend will handle which documents are required
+    setCurrentStep('documents');
+  };
 
   const handleDocumentsComplete = () => {
     setCurrentStep('payment');

@@ -54,11 +54,21 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
 
   const validateAccountSection = () => {
     if (!formData.account_number.trim() && !formData.meter_number.trim()) {
-      toast.error('Account number OR meter number is required');
-      return false;
+        toast.error('Account number OR meter number is required');
+        return false;
     }
+    
+    // ✅ VALIDATE ACCOUNT NUMBER FORMAT IF PROVIDED
+    if (formData.account_number.trim()) {
+        const accountRegex = /^\d{10}-\d{2}$/;
+        if (!accountRegex.test(formData.account_number.trim())) {
+        toast.error('Invalid account number format. Expected: 9496632093-01 (10 digits-2 digits)');
+        return false;
+        }
+    }
+    
     return true;
-  };
+    };
 
   const validateConversionSection = () => {
     if (!formData.conversion_from) {
@@ -111,30 +121,43 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
 
   const handleSubmit = async () => {
     if (!validateAccountSection() || !validateConversionSection()) {
-      toast.error('Please complete all required fields');
-      return;
+        toast.error('Please complete all required fields');
+        return;
     }
 
     if (needsMetering() && !formData.map_vendor) {
-      toast.error('Please select a MAP vendor');
-      return;
+        toast.error('Please select a MAP vendor');
+        return;
     }
 
     try {
-      setLoading(true);
+        setLoading(true);
 
-      const response = await apiClient.post('/api/v1/meter-xpress/applications/conversion', formData);
+        // Prepare payload matching backend expectations
+        const payload = {
+        account_number: formData.account_number,
+        meter_number: formData.meter_number,
+        conversion_from: formData.conversion_from.toLowerCase().replace(' ', '_'),
+        conversion_to: formData.conversion_to.toLowerCase().replace(' ', '_'),
+        ...(needsMetering() && {
+            phase: formData.phase,
+            voltage_level: formData.voltage_level,
+            map_vendor: formData.map_vendor
+        })
+        };
 
-      if (response.data.success) {
+        const response = await apiClient.post('/api/v1/meter-xpress/applications/conversion', payload);
+
+        if (response.data.success) {
         toast.success('Conversion application created!');
         onComplete(response.data.application_id, formData);
-      }
+        }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to create application');
+        toast.error(error.response?.data?.detail || 'Failed to create application');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   return (
     <div className="space-y-6">
@@ -211,7 +234,8 @@ export const ConversionForm: React.FC<ConversionFormProps> = ({ onComplete }) =>
                 value={formData.account_number}
                 onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter your account number"
+                placeholder="9496632093-01"
+                pattern="^\d{10}-\d{2}$"
                 disabled={accountVerified}
               />
             </div>
