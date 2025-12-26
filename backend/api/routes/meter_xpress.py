@@ -239,7 +239,7 @@ async def create_new_service_application(
         logger.error(f"❌ New service application failed: {e}")
         raise HTTPException(500, str(e))
 
-@router.post("/applications/replacement")
+@router.get("/applications/replacement")
 async def create_replacement_application(
     form_data: ReplacementFormRequest,
     current_user: Dict = Depends(get_current_user),
@@ -320,7 +320,7 @@ async def create_replacement_application(
         raise HTTPException(500, str(e))
 
 
-@router.post("/applications/conversion")
+@router.get("/applications/conversion")
 async def create_conversion_application(
     form_data: ConversionFormRequest,
     current_user: Dict = Depends(get_current_user),
