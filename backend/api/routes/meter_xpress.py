@@ -72,7 +72,7 @@ class NewServiceFormRequest(BaseModel):
     appliances: Optional[List[Dict[str, Any]]] = []
 
 class ReplacementFormRequest(BaseModel):
-    account_number: str
+    meter_number: str  # ✅ CHANGE from account_number to meter_number
     state_of_building: str
     applicant_capacity: str
     map_vendor: str
@@ -249,6 +249,10 @@ async def create_replacement_application(
     📝 Create meter replacement application
     """
     try:
+        # ✅ FIXED DEBUG LOG:
+        logger.info(f"📦 Received replacement form data: {form_data.dict()}")
+        logger.info(f"🔍 Meter number from request: {form_data.meter_number}")  # ✅ THIS IS NOW CORRECT
+        
         user_id = current_user['id']
         supabase = db_service.supabase
         
