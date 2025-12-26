@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 interface DocumentUploadProps {
   applicationId: string;
-  applicationType?: 'new_service' | 'replacement' | 'conversion'; // ✅ OPTIONAL
+  applicationType?: 'new_service' | 'replacement' | 'conversion';
   onComplete: () => void;
 }
 
@@ -18,7 +18,7 @@ interface UploadedDocument {
   uploaded_at: string;
 }
 
-// ✅ HELPER FUNCTION OUTSIDE COMPONENT
+// ✅ UPDATED: Removed LECAN certificate requirement - Seamount provides this service
 const getRequiredDocs = (appType?: string) => {
   if (!appType) {
     return [
@@ -29,8 +29,8 @@ const getRequiredDocs = (appType?: string) => {
   if (appType === 'new_service') {
     return [
       { type: 'passport_photo', label: 'Passport Photograph', format: 'JPG/JPEG (Max 1MB)' },
-      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' },
-      { type: 'lecan_cert', label: 'Licensed Electrical Contractor Certificate', format: 'PDF (Max 2MB)' }
+      { type: 'id_card', label: 'Means of Identification', format: 'PDF (Max 1MB)' }
+      // ✅ LECAN CERTIFICATE REMOVED: We handle contractor coordination
     ];
   } else if (appType === 'replacement') {
     return [
@@ -45,10 +45,9 @@ const getRequiredDocs = (appType?: string) => {
   return [];
 };
 
-// ✅ COMPONENT STARTS HERE
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
   applicationId, 
-  applicationType,  // ✅ Destructure from props
+  applicationType,
   onComplete 
 }) => {
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
@@ -56,7 +55,6 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [selectedType, setSelectedType] = useState('passport_photo');
   const [loading, setLoading] = useState(true);
 
-  // ✅ NOW applicationType is in scope - call the function HERE
   const requiredDocs = getRequiredDocs(applicationType);
 
   useEffect(() => {
@@ -85,8 +83,8 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     try {
       setUploading(true);
 
-      // Validate file size
-      const maxSize = selectedType === 'passport_photo' ? 1 : selectedType === 'lecan_cert' ? 2 : 1;
+      // ✅ UPDATED: All documents now have 1MB limit (LECAN cert was 2MB)
+      const maxSize = 1; // MB
       if (file.size > maxSize * 1024 * 1024) {
         toast.error(`File size exceeds ${maxSize}MB limit`);
         return;
@@ -229,7 +227,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               onChange={handleUpload}
               disabled={uploading}
               className="hidden"
-              accept={selectedType === 'passport_photo' ? '.jpg,.jpeg' : '.pdf'}
+              accept={selectedType === 'passport_photo' || selectedType === 'meter_photo' ? '.jpg,.jpeg' : '.pdf'}
             />
           </label>
         </div>

@@ -370,7 +370,7 @@ async def create_conversion_application(
             "application_type": "conversion",
             "status": "draft",
             "form_data": form_data.dict(),
-            "phase_type": form_data.phase if needs_meter else None,
+            "phase_type": "1phase" if form_data.phase == "1 Phase" else "3phase" if needs_meter else None,
             "voltage_level": form_data.voltage_level if needs_meter else None,
             "map_vendor": form_data.map_vendor if needs_meter else None,
             "map_base_price": float(pricing['base_price']) if pricing else 0,
@@ -577,7 +577,17 @@ async def submit_application_for_payment(
             .eq("application_id", application_id)\
             .execute()
         
-        required_docs = ['passport_photo', 'id_card', 'lecan_cert']
+        # ✅ NEW CODE (no lecan_cert):
+        if app['application_type'] == 'new_service':
+            required_docs = ['passport_photo', 'id_card']
+        elif app['application_type'] == 'replacement':
+            required_docs = ['id_card', 'meter_photo']
+        elif app['application_type'] == 'conversion':
+            # Only require ID if converting TO metered
+            if app.get('metadata', {}).get('needs_meter', False):
+                required_docs = ['id_card']
+            else:
+                required_docs = []
         uploaded_types = [doc['document_type'] for doc in (docs_result.data or [])]
         
         missing_docs = [doc for doc in required_docs if doc not in uploaded_types]
