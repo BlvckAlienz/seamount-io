@@ -103,14 +103,14 @@ export const ReplacementForm: React.FC<ReplacementFormProps> = ({ onComplete }) 
     try {
         setLoading(true);
 
-        // ✅ CORRECT PAYLOAD: Backend now expects meter_number instead of account_number
+        // Prepare payload matching backend expectations
         const payload = {
-        meter_number: formData.meter_number,
-        state_of_building: formData.state_of_building,
-        applicant_capacity: formData.applicant_capacity,
-        phase: formData.phase,
-        voltage_level: formData.voltage_level,
-        map_vendor: formData.map_vendor
+          account_number: formData.meter_number, // Map meter_number to account_number
+          state_of_building: formData.state_of_building,
+          applicant_capacity: formData.applicant_capacity,
+          phase: formData.phase,
+          voltage_level: formData.voltage_level,
+          map_vendor: formData.map_vendor
         };
 
         const response = await apiClient.post('/api/v1/meter-xpress/applications/replacement', payload);
