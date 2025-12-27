@@ -35,7 +35,7 @@ class QuidaxService:
     - Verify webhook signatures
     """
     
-    BASE_URL = "https://www.quidax.com/api/v1"  # Updated from docs example
+    BASE_URL = "https://app.quidax.io/api/v1"  # Confirmed by Quidax support
     
     def __init__(self, supabase: Client):
         self.supabase = supabase
