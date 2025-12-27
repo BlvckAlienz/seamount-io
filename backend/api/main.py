@@ -725,6 +725,15 @@ except ImportError as e:
     logger.error(f"❌ Collateral router import error: {e}")
     routers_available['collateral'] = None
 
+# Tax Intelligence Routes
+try:
+    from backend.api.routes.tax_routes import router as tax_router
+    routers_available['tax'] = tax_router
+    logger.info("✅ Tax Intelligence router imported")
+except ImportError as e:
+    logger.error(f"❌ Tax Intelligence router import error: {e}")
+    routers_available['tax'] = None
+
 # 📊 Compliance OS Routes
 try:
     from backend.api.routes import subscriptions, compliance
@@ -734,6 +743,11 @@ try:
 except ImportError as e:
     logger.error(f"❌ Compliance routes import error: {e}")
 
+# Register Tax Intelligence Routes
+if routers_available.get('tax'):
+    app.include_router(routers_available['tax'], tags=["Tax Intelligence"])
+    logger.info("✅ Tax Intelligence router registered at /api/v1/tax")
+    
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router
