@@ -540,7 +540,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
         <p className="text-sm text-gray-600 dark:text-gray-400 text-center px-2 pb-2 font-medium">
           ⚡ Crypto credited <strong>instantly to 30 seconds</strong> after payment confirmation.
-          {currency === 'NGN' && <span className="block text-blue-600 mt-1">🔵 Powered by Quidax (Best rates for NGN)</span>}
+          {currency === 'NGN' && <span className="block text-blue-600 mt-1">🔵 Powered by Paystack (Best rates for NGN)</span>}
         </p>
       </DialogContent>
     </Dialog>
