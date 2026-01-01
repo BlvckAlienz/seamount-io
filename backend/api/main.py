@@ -745,8 +745,8 @@ except ImportError as e:
 
 # Register Tax Intelligence Routes
 if routers_available.get('tax'):
-    app.include_router(routers_available['tax'], tags=["Tax Intelligence"])
-    logger.info("✅ Tax Intelligence router registered at /api/v1/tax")
+    app.include_router(routers_available['tax'])
+    logger.info("✅ Tax Intelligence router registered with its own prefix")
     
 # ===== ADMIN ROUTES =====
 try:
