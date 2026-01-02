@@ -747,7 +747,21 @@ except ImportError as e:
 if routers_available.get('tax'):
     app.include_router(routers_available['tax'])
     logger.info("✅ Tax Intelligence router registered with its own prefix")
+
+# 🎯 Tax Intelligence Routes (V1 + V2)
+try:
+    from backend.api.routes.tax_routes import router as tax_router
+    routers_available['tax'] = tax_router
+    logger.info("✅ Tax Intelligence router imported (V1 + V2)")
     
+    # Register the main tax router (includes both V1 and V2)
+    app.include_router(tax_router)
+    logger.info("✅ Tax Intelligence router registered with automatic prefixes")
+    
+except ImportError as e:
+    logger.error(f"❌ Tax Intelligence router import error: {e}")
+    routers_available['tax'] = None
+       
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router
