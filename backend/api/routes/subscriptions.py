@@ -43,22 +43,43 @@ async def get_user_subscription(
     try:
         user_id = current_user['id']
         
+        # 🚨 FIX: Check multiple valid subscription statuses
+        # Paystack statuses: active, trialing, non-renewing (still valid until end date)
+        valid_statuses = ["active", "trialing", "non-renewing"]
+        
+        # Get all subscriptions ordered by creation date
         result = supabase.from_("user_subscriptions")\
             .select("*, subscription_plans(*)")\
             .eq("user_id", user_id)\
-            .eq("status", "active")\
+            .order("created_at", desc=True)\
             .execute()
         
-        subscription = result.data[0] if result.data else None
+        # Find first subscription with valid status
+        active_subscription = None
+        for sub in (result.data or []):
+            logger.info(f"📋 User {user_id} subscription: {sub.get('id')} | Status: {sub.get('status')} | Plan: {sub.get('plan_code')}")
+            if sub.get('status') in valid_statuses:
+                active_subscription = sub
+                logger.info(f"✅ Active subscription found: {sub.get('id')} with status '{sub.get('status')}'")
+                break
+        
+        if not active_subscription and result.data:
+            logger.warning(f"⚠️ User {user_id} has subscriptions but none are active. Statuses: {[s.get('status') for s in result.data]}")
         
         return {
             "success": True,
-            "subscription": subscription,
-            "has_active_subscription": subscription is not None
+            "subscription": active_subscription,
+            "has_active_subscription": active_subscription is not None
         }
     except Exception as e:
-        logger.error(f"[Subscription Fetch] Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[Subscription Fetch] Error for user {current_user.get('id')}: {e}")
+        # 🚨 CRITICAL: On error, return success=False so frontend can handle gracefully
+        return {
+            "success": False,
+            "subscription": None,
+            "has_active_subscription": False,
+            "error": str(e)
+        }
 
 @router.post("/initialize")
 async def initialize_subscription(

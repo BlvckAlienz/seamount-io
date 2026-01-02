@@ -1157,27 +1157,49 @@ const CompliancePage = () => {
 
       // First, check subscription status
       try {
-        const subRes = await apiClient.get('/api/v1/subscriptions/my-subscription')
-          .catch(e => ({ data: { success: false, subscription: null } }));
+        const subRes = await apiClient.get('/api/v1/subscriptions/my-subscription');
         
-        const subscription = subRes.data?.success ? subRes.data.subscription : null;
+        console.log('📋 Subscription API response:', subRes.data);
         
-        // If no subscription, return early to show subscription plans
-        if (!subscription) {
+        const subscription = subRes.data?.subscription || null;
+        const hasActiveSubscription = subRes.data?.has_active_subscription || false;
+        const apiSuccess = subRes.data?.success !== false;
+        
+        // Store subscription for reference
+        updateState({ subscription });
+        
+        // 🚨 FIX: Only block if API succeeded AND explicitly said no subscription
+        // If API failed, let user through (fail-open instead of fail-closed)
+        if (apiSuccess && !hasActiveSubscription) {
+          console.log('⚠️ API confirmed: No active subscription, showing plans');
           updateState({
             loading: false,
             refreshing: false,
             subscription: null
           });
           setAuthChecked(true);
-          return; // Exit early to show subscription page
+          return;
         }
         
-        // Store subscription for later use
-        updateState({ subscription });
+        // If API failed or subscription exists, proceed
+        if (!apiSuccess) {
+          console.warn('⚠️ Subscription API failed, proceeding with fallback access');
+        } else {
+          console.log('✅ Active subscription confirmed:', subscription?.plan_code, '| Status:', subscription?.status);
+        }
         
       } catch (error) {
-        console.error('❌ Subscription check failed:', error);
+        console.error('❌ Subscription check exception:', error);
+        // 🚨 CRITICAL FIX: On error, DON'T block access - fail open
+        console.warn('⚠️ Subscription check failed, granting access with fallback');
+        updateState({ 
+          subscription: { 
+            status: 'error', 
+            plan_code: 'fallback',
+            error_bypass: true 
+          } 
+        });
+        // Don't return - continue to data fetch
       }
 
       // Now fetch the rest of the data (only runs if subscription exists)
@@ -1403,6 +1425,23 @@ const CompliancePage = () => {
       is_mock: true
     }
   ];
+
+  const getFallbackSubscription = () => ({
+    id: 'temp_fallback',
+    user_id: 'temp_user',
+    plan_id: 'temp_plan',
+    plan_code: 'PLN_yp8p5obbu6azilo',
+    status: 'active',
+    amount: 900000,
+    currency: 'NGN',
+    metadata: { is_fallback: true },
+    start_date: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    subscription_plans: {
+      name: 'Compliance Essentials',
+      description: 'Fallback plan for development'
+    }
+  });
 
   // Deduplicate checklist items
   const deduplicateChecklistItems = (items: any[]): any[] => {

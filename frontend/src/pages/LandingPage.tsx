@@ -984,7 +984,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              <p className="mb-2">Tokenize assets. Get VAS. Send money instantly 24/7.</p>
+              <p className="mb-2">Global Payments. Asset tokenization. Compliance.</p>
               <p className="font-semibold text-gray-900">
                 One Platform. Real Solutions.
               </p>
