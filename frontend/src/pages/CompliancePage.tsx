@@ -361,8 +361,8 @@ const generateMockTaxCalculation = (inputs: any = {}) => {
   let taxable_profit = annual_profit - rnd_deduction;
   if (taxable_profit < 0) taxable_profit = 0;
 
-  // ✅ UPDATED: Small company qualification - ₦50M turnover AND ₦250M fixed assets
-  const is_small_company = annual_turnover <= 50000000 && fixed_assets <= 250000000;
+  // ✅ UPDATED: Small company qualification - ₦100M turnover AND ₦250M fixed assets
+  const is_small_company = annual_turnover <= 100000000 && fixed_assets <= 250000000;
 
   // ✅ UPDATED: CIT - Binary rate: 0% for small companies, 30% otherwise
   let citRate = is_small_company ? 0.00 : 0.30;
@@ -404,10 +404,10 @@ const generateMockTaxCalculation = (inputs: any = {}) => {
     exemptions_applied.push({
       exemption_code: "SMALL_COMPANY",
       exemption_name: "Small Company 0% CIT & Development Levy Exemption",
-      description: "Companies with turnover ≤ ₦50M and fixed assets ≤ ₦250M pay 0% CIT and exempt from Development Levy",
+      description: "Companies with turnover ≤ ₦100M and fixed assets ≤ ₦250M pay 0% CIT and exempt from Development Levy",
       estimated_savings: (taxable_profit * 0.30) + (devLevyAssessableProfit * 0.04),
       act_section: "Nigeria Tax Act 2025, Section 56(a)",
-      qualification_criteria: "Annual turnover ≤ ₦50,000,000 and fixed assets ≤ ₦250,000,000",
+      qualification_criteria: "Annual turnover ≤ ₦100,000,000 and fixed assets ≤ ₦250,000,000",
       required_documents: ["Audited Financial Statements", "Tax Clearance Certificate"],
       status: "qualified"
     });
@@ -420,7 +420,7 @@ const generateMockTaxCalculation = (inputs: any = {}) => {
         description: "Small companies pay 0% Capital Gains Tax on digital asset gains",
         estimated_savings: digital_asset_gains * 0.30,
         act_section: "Nigeria Tax Act 2025, Section 56(a) & 33-39",
-        qualification_criteria: "Annual turnover ≤ ₦50,000,000 and fixed assets ≤ ₦250,000,000",
+        qualification_criteria: "Annual turnover ≤ ₦100,000,000 and fixed assets ≤ ₦250,000,000",
         required_documents: ["Digital Asset Transaction Records", "Capital Gains Calculation"],
         status: "qualified"
       });
@@ -487,7 +487,7 @@ const generateMockTaxCalculation = (inputs: any = {}) => {
     citations: [
       {
         section: "Nigeria Tax Act 2025, Section 56(a)",
-        description: "Small company CIT exemption for turnover ≤ ₦50M and fixed assets ≤ ₦250M",
+        description: "Small company CIT exemption for turnover ≤ ₦100M and fixed assets ≤ ₦250M",
         applies_to: "CIT calculation"
       },
       {
@@ -762,7 +762,7 @@ const OverviewTab = ({ state, formatCurrency }: any) => (
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-yellow-400" />
             <span className="text-yellow-400 text-sm">
-              Confidence: {Math.round(state.taxData.confidenceScore * 100)}% • Complete tax profile for more accuracy
+              Confidence: {Math.round(state.taxData.confidenceScore * 100)}% • Complete audit profile for more accuracy
             </span>
           </div>
         </div>
@@ -1265,7 +1265,7 @@ const TaxCalculatorTab = ({ formatCurrency, onCalculationComplete, currentTaxDat
     <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
     <p><strong>Legislation:</strong> Nigeria Tax Act 2025 & Nigeria Tax Administration Act 2025</p>
     <p><strong>Calculation Engine:</strong> ${result.mock_data ? 'Browser Engine' : 'Legislative Engine'}</p>
-    <p><strong>Company Size:</strong> ${result.is_small_company ? 'Small Company (≤ ₦50M turnover & ≤ ₦250M fixed assets)' : 'Standard Company'}</p>
+    <p><strong>Company Size:</strong> ${result.is_small_company ? 'Small Company (≤ ₦100M turnover & ≤ ₦250M fixed assets)' : 'Standard Company'}</p>
   </div>
   
   <div class="section">
@@ -1350,7 +1350,7 @@ const TaxCalculatorTab = ({ formatCurrency, onCalculationComplete, currentTaxDat
     
     ${result.is_small_company ? `
     <div class="note">
-      <p><strong>Note:</strong> This company qualifies as a Small Company (turnover ≤ ₦50M and fixed assets ≤ ₦250M).</p>
+      <p><strong>Note:</strong> This company qualifies as a Small Company (turnover ≤ ₦100M and fixed assets ≤ ₦250M).</p>
       <p>Benefits: 0% CIT, 0% CGT, and 0% Development Levy.</p>
     </div>
     ` : ''}
@@ -1478,7 +1478,7 @@ const TaxCalculatorTab = ({ formatCurrency, onCalculationComplete, currentTaxDat
               className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">≤ ₦50M for small company qualification</p>
+            <p className="text-xs text-gray-500 mt-1">≤ ₦100M for small company qualification</p>
           </div>
 
           <div>
