@@ -38,6 +38,7 @@ tenacity==8.2.3
 requests==2.31.0
 slowapi==0.1.9
 redis==5.0.1
+groq==0.11.0
 
 # Blockchain
 py-algorand-sdk==2.11.1

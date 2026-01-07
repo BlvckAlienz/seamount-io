@@ -748,6 +748,14 @@ if routers_available.get('tax'):
     app.include_router(routers_available['tax'])
     logger.info("✅ Tax Intelligence router registered with its own prefix")
 
+# 📊 Bookkeeping Routes (Bank Statements + Trial Balance)
+try:
+    from backend.api.routes.bookkeeping_routes import router as bookkeeping_router
+    app.include_router(bookkeeping_router)
+    logger.info("✅ Bookkeeping router registered at /api/v1/bookkeeping")
+except ImportError as e:
+    logger.error(f"❌ Bookkeeping router import error: {e}")
+    
 # 🎯 Tax Intelligence Routes (V1 + V2)
 try:
     from backend.api.routes.tax_routes import router as tax_router
@@ -761,7 +769,7 @@ try:
 except ImportError as e:
     logger.error(f"❌ Tax Intelligence router import error: {e}")
     routers_available['tax'] = None
-       
+
 # ===== ADMIN ROUTES =====
 try:
     from backend.api.routes.admin import router as admin_router

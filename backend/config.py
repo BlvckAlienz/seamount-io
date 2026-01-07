@@ -598,6 +598,7 @@ class Settings(BaseSettings):
     DATABASE_URL: SecretStr = Field(default="postgresql://user:password@localhost:5432/seamount")
     ENCRYPTION_KEY: SecretStr = Field(default="default-encryption-key-change-in-production")
     IPINFO_TOKEN: Optional[SecretStr] = None
+    GROQ_API_KEY: Optional[SecretStr] = None
     
     # Supabase
     SUPABASE_URL: str = Field(default="https://your-supabase-url.supabase.co")
