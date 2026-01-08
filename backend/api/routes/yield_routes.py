@@ -32,7 +32,7 @@ from slowapi.util import get_remote_address
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/yield", tags=["Yield Management"])
-limiter = Limiter(key_func=get_remote_address)
+# limiter = Limiter(key_func=get_remote_address)  # ❌ REMOVED - causes .env encoding error
 
 # ============================================================================
 # REQUEST/RESPONSE MODELS
@@ -94,7 +94,7 @@ class UnstakeResponse(BaseModel):
 # ============================================================================
 
 @router.post("/stake", response_model=StakeResponse)
-@limiter.limit("10/minute")
+# @limiter.limit("10/minute")  # Using global limiter from main.py
 async def stake_funds(
     request: Request,
     stake_request: StakeRequest,
@@ -161,7 +161,7 @@ async def stake_funds(
         )
 
 @router.post("/unstake", response_model=UnstakeResponse)
-@limiter.limit("10/minute")
+# @limiter.limit("10/minute")  # Using global limiter from main.py
 async def unstake_funds(
     request: Request,
     unstake_request: UnstakeRequest,
@@ -211,7 +211,7 @@ async def unstake_funds(
         )
 
 @router.get("/stakes")
-@limiter.limit("30/minute")
+# @limiter.limit("30/minute")  # Using global limiter from main.py
 async def get_user_stakes(
     request: Request,
     current_user: dict = Depends(get_current_user),
@@ -248,7 +248,7 @@ async def get_user_stakes(
         )
 
 @router.get("/stake/{stake_id}")
-@limiter.limit("30/minute")
+# @limiter.limit("30/minute")  # Using global limiter from main.py
 async def get_stake_details(
     stake_id: str,
     request: Request,
@@ -299,7 +299,7 @@ async def get_stake_details(
         )
 
 @router.get("/tiers")
-@limiter.limit("60/minute")
+# @limiter.limit("60/minute")  # Using global limiter from main.py
 async def get_tier_info(
     request: Request,
     db_service: DatabaseService = Depends(get_db_service),
@@ -343,7 +343,7 @@ async def get_tier_info(
         )
 
 @router.get("/portfolio")
-@limiter.limit("30/minute")
+# @limiter.limit("30/minute")  # Using global limiter from main.py
 async def get_yield_portfolio(
     request: Request,
     current_user: dict = Depends(get_current_user),
@@ -413,7 +413,7 @@ async def get_yield_portfolio(
         )
 
 @router.get("/strategies")
-@limiter.limit("60/minute")
+# @limiter.limit("60/minute")  # Using global limiter from main.py
 async def get_strategy_info(request: Request):
     """
     Get information about yield strategies

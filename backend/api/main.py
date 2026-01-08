@@ -1,7 +1,40 @@
 # File: backend/api/main.py
-# Merged Production-Ready Version - Phase 1 Complete
-# Combines clean architecture with essential business logic
+# Self-Healing Import Path (Edge Computing Pattern)
 
+# 🔵 CRITICAL: Fix import path BEFORE any other imports
+import sys
+import os
+from pathlib import Path
+
+# Get absolute paths
+CURRENT_FILE = Path(__file__).resolve()
+API_DIR = CURRENT_FILE.parent  # backend/api/
+BACKEND_DIR = API_DIR.parent   # backend/
+PROJECT_ROOT = BACKEND_DIR.parent  # seamount-io/
+
+# Add to sys.path (multiple strategies for reliability)
+paths_to_add = [
+    str(PROJECT_ROOT),
+    str(BACKEND_DIR),
+    str(API_DIR),
+]
+
+for path in paths_to_add:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+# Verify paths
+print("=" * 70)
+print("🔵 PYTHON PATH SELF-HEALING")
+print("=" * 70)
+print(f"📍 CURRENT_FILE: {CURRENT_FILE}")
+print(f"📍 API_DIR: {API_DIR}")
+print(f"📍 BACKEND_DIR: {BACKEND_DIR}")
+print(f"📍 PROJECT_ROOT: {PROJECT_ROOT}")
+print(f"📍 sys.path[0:3]: {sys.path[0:3]}")
+print("=" * 70)
+
+# Now we can import normally
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Header, Depends, HTTPException, BackgroundTasks
@@ -19,12 +52,7 @@ from datetime import datetime, timedelta
 import asyncio
 import traceback
 import aiohttp
-import sys
-from pathlib import Path
 from decimal import Decimal
-
-# Add project root to Python path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # ===== LOGGING SETUP =====
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -36,7 +64,7 @@ dependencies_available = False
 oracle_service_available = False
 routers_available = {}
 
-logger.info("ðŸš€ Starting Seamount API initialization...")
+logger.info("🚀 Starting Seamount API initialization...")
 
 # ===== IMPORT DEPENDENCIES =====
 try:
@@ -52,9 +80,9 @@ try:
         get_oracle_service
     )
     dependencies_available = True
-    logger.info("âœ… Dependencies imported successfully")
+    logger.info("✅ Dependencies imported successfully")
 except ImportError as e:
-    logger.error(f"âŒ Critical dependency import error: {e}")
+    logger.error(f"❌ Critical dependency import error: {e}")
     dependencies_available = False
     
     # Create mock functions for graceful degradation
@@ -748,14 +776,57 @@ if routers_available.get('tax'):
     app.include_router(routers_available['tax'])
     logger.info("✅ Tax Intelligence router registered with its own prefix")
 
-# 📊 Bookkeeping Routes (Bank Statements + Trial Balance)
+# 📊 Bookkeeping Routes (Bank Statements + Trial Balance) - FORCE REGISTER
+logger.info("=" * 60)
+logger.info("🔵 ATTEMPTING TO REGISTER BOOKKEEPING ROUTES")
+logger.info("=" * 60)
+
 try:
-    from backend.api.routes.bookkeeping_routes import router as bookkeeping_router
-    app.include_router(bookkeeping_router)
-    logger.info("✅ Bookkeeping router registered at /api/v1/bookkeeping")
-except ImportError as e:
-    logger.error(f"❌ Bookkeeping router import error: {e}")
+    import sys
+    import importlib
     
+    # Force reload the module to ensure latest code
+    if 'backend.api.routes.bookkeeping_routes' in sys.modules:
+        logger.info("🔵 Module already loaded, reloading...")
+        importlib.reload(sys.modules['backend.api.routes.bookkeeping_routes'])
+    
+    from backend.api.routes.bookkeeping_routes import router as bookkeeping_router
+    
+    logger.info(f"🔵 Router object: {bookkeeping_router}")
+    logger.info(f"🔵 Router prefix: {bookkeeping_router.prefix}")
+    logger.info(f"🔵 Router routes: {[r.path for r in bookkeeping_router.routes]}")
+    
+    # Register with explicit prefix to avoid conflicts
+    app.include_router(
+        bookkeeping_router,
+        prefix="",  # Already has /api/v1/bookkeeping in router
+        tags=["Bookkeeping"]
+    )
+    
+    logger.info("=" * 60)
+    logger.info("✅ BOOKKEEPING ROUTES REGISTERED SUCCESSFULLY")
+    logger.info("=" * 60)
+    
+    # Verify registration
+    bookkeeping_routes = [r for r in app.routes if 'bookkeeping' in str(r.path)]
+    for route in bookkeeping_routes:
+        logger.info(f"   ✅ {route.methods} {route.path}")
+    
+except ImportError as e:
+    logger.error("=" * 60)
+    logger.error(f"❌ BOOKKEEPING ROUTER IMPORT FAILED")
+    logger.error(f"❌ Error: {e}")
+    logger.error("=" * 60)
+    import traceback
+    logger.error(traceback.format_exc())
+except Exception as e:
+    logger.error("=" * 60)
+    logger.error(f"❌ BOOKKEEPING ROUTER REGISTRATION FAILED")
+    logger.error(f"❌ Error: {e}")
+    logger.error("=" * 60)
+    import traceback
+    logger.error(traceback.format_exc())
+
 # 🎯 Tax Intelligence Routes (V1 + V2)
 try:
     from backend.api.routes.tax_routes import router as tax_router

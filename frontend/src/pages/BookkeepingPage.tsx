@@ -173,40 +173,81 @@ const BookkeepingPage = () => {
   const uploadStatement = async () => {
     if (!uploadedFile) return;
 
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
+    console.log('🔵 Starting upload process...');
+    console.log('🔵 File object:', uploadedFile);
+    console.log('🔵 File name:', uploadedFile.name);
+    console.log('🔵 File size:', uploadedFile.size);
+    console.log('🔵 File type:', uploadedFile.type);
 
-      const response = await apiClient.post(
+    try {
+        setLoading(true);
+        
+        // Create FormData
+        const formData = new FormData();
+        formData.append('file', uploadedFile);
+        
+        // Debug FormData contents
+        console.log('🔵 FormData entries:');
+        for (let [key, value] of formData.entries()) {
+        console.log(`   ${key}:`, value);
+        }
+        
+        console.log('🔵 Making API request to:', '/api/v1/bookkeeping/upload-statement');
+        
+        // Make request with explicit headers
+        const response = await apiClient.post(
         '/api/v1/bookkeeping/upload-statement',
         formData,
         {
-            headers: { 'Content-Type': 'multipart/form-data' }
+            headers: {
+            'Content-Type': 'multipart/form-data',
+            },
+            // Add timeout
+            timeout: 30000, // 30 seconds
         }
         );
 
-        // 🔵 DETAILED LOGGING
-        console.log('📤 Upload response:', response.data);
+        console.log('🔵 Raw response:', response);
+        console.log('🔵 Response status:', response.status);
+        console.log('🔵 Response headers:', response.headers);
+        console.log('📤 Response data:', response.data);
         console.log('📤 Statement ID:', response.data.statement_id);
         console.log('📤 Transaction count:', response.data.transaction_count);
         console.log('📤 Parsing status:', response.data.parsing_status);
+        
+        // Check if response is mock
+        if (response.data.statement_id === 'mock-123') {
+        console.error('❌❌❌ MOCK DATA DETECTED! Backend not responding! ❌❌❌');
+        toast.error('Backend is returning mock data. Check server logs.');
+        return;
+        }
 
-      if (response.data.success) {
+        if (response.data.success) {
         setUploadResult(response.data);
+        
+        // Fetch transactions for review
+        console.log('🔵 Fetching transactions for statement:', response.data.statement_id);
         await fetchTransactions(response.data.statement_id);
+        
         toast.success(`✅ Parsed ${response.data.transaction_count} transactions`);
         setCurrentStep('review');
-      } else {
+        } else {
+        console.error('❌ Upload failed:', response.data);
         toast.error('Upload failed');
-      }
+        }
     } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error('Upload failed');
+        console.error('❌❌❌ UPLOAD ERROR ❌❌❌');
+        console.error('Error object:', error);
+        console.error('Error message:', error.message);
+        console.error('Error response:', error.response);
+        console.error('Error response data:', error.response?.data);
+        console.error('Error response status:', error.response?.status);
+        
+        toast.error(error.response?.data?.detail || error.message || 'Upload failed');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   // ============================================
   // STEP 2: FETCH & REVIEW TRANSACTIONS

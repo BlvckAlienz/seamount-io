@@ -14,12 +14,10 @@ from backend.config import get_settings
 from backend.services.database_service import DatabaseService
 from backend.services.oracle_service import EnhancedOracleService
 from supabase import Client
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 import logging
 logger = logging.getLogger(__name__)
-limiter = Limiter(key_func=get_remote_address)
+# limiter = Limiter(key_func=get_remote_address)  # ❌ REMOVED - causes .env encoding error
 router = APIRouter()
 
 class DepositRequest(BaseModel):
@@ -83,7 +81,7 @@ class PaymentSmartRouter:
 payment_router = PaymentSmartRouter()
 
 @router.post("/deposit/initialize")
-@limiter.limit("20/minute")
+# @limiter.limit("20/minute")  # Using global rate limiter from main.py
 async def initialize_deposit(
     request: Request,
     deposit: DepositRequest,
@@ -91,7 +89,7 @@ async def initialize_deposit(
 ):
     """Initialize deposit with smart provider routing"""
     
-    logger.info(f"🔄 Initializing deposit: {deposit.amount} {deposit.currency} for {deposit.user_email}")
+    logger.info(f"📄 Initializing deposit: {deposit.amount} {deposit.currency} for {deposit.user_email}")
     
     try:
         # Generate transaction ID
@@ -104,7 +102,7 @@ async def initialize_deposit(
             deposit.amount
         )
         
-        logger.info(f"📍 Routing to provider: {selected_provider}")
+        logger.info(f"🔀 Routing to provider: {selected_provider}")
         
         # Store transaction in database
         transaction_data = {
@@ -150,7 +148,7 @@ async def initialize_deposit(
         raise HTTPException(status_code=500, detail=f"Failed to initialize payment: {str(e)}")
 
 @router.get("/transaction/{transaction_id}")
-@limiter.limit("30/minute")
+# @limiter.limit("30/minute")  # Using global rate limiter from main.py
 async def get_transaction_status(
     transaction_id: str,
     request: Request,
