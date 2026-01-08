@@ -181,8 +181,16 @@ const BookkeepingPage = () => {
       const response = await apiClient.post(
         '/api/v1/bookkeeping/upload-statement',
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
+        {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        }
+        );
+
+        // 🔵 DETAILED LOGGING
+        console.log('📤 Upload response:', response.data);
+        console.log('📤 Statement ID:', response.data.statement_id);
+        console.log('📤 Transaction count:', response.data.transaction_count);
+        console.log('📤 Parsing status:', response.data.parsing_status);
 
       if (response.data.success) {
         setUploadResult(response.data);
@@ -687,43 +695,43 @@ const CategorizeStep = ({
   const categorized = transactions.length - uncategorized;
 
   return (
-    <div className="py-6 sm:py-8">
-      <div className="text-center mb-6 sm:mb-8">
-        <Sparkles className="h-12 w-12 sm:h-16 sm:w-16 text-green-400 mx-auto mb-3 sm:mb-4" />
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 px-4">Categorize Transactions</h2>
-        <p className="text-sm sm:text-base text-gray-400 px-4">
+    <div className="py-8">
+      <div className="text-center mb-8">
+        <Sparkles className="h-16 w-16 text-green-400 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-white mb-2">Categorize Transactions</h2>
+        <p className="text-gray-400">
           {categorizationComplete 
-            ? `✅ ${categorized} transactions categorized`
+            ? `✅ ${categorized} of ${transactions.length} transactions categorized`
             : `Choose categorization method for ${transactions.length} transactions`
           }
         </p>
       </div>
 
       {!categorizationComplete && (
-        <div className="max-w-2xl mx-auto space-y-3 sm:space-y-4 px-4">
+        <div className="max-w-2xl mx-auto space-y-4">
           <div
             onClick={() => onMethodChange('ai')}
-            className={`p-4 sm:p-6 rounded-xl cursor-pointer transition-all ${
+            className={`p-6 rounded-xl cursor-pointer transition-all ${
               categorizationMethod === 'ai'
                 ? 'bg-green-900/20 border-2 border-green-500'
                 : 'bg-gray-700/50 border-2 border-gray-600 hover:border-gray-500'
             }`}
           >
-            <div className="flex items-start gap-3 sm:gap-4">
+            <div className="flex items-start gap-4">
               <input
                 type="radio"
                 checked={categorizationMethod === 'ai'}
                 onChange={() => onMethodChange('ai')}
                 className="mt-1"
               />
-              <div className="flex-1">
-                <h3 className="text-white font-semibold text-base sm:text-lg mb-2">🤖 AI-Powered (Recommended)</h3>
-                <p className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3">
-                  Uses Claude AI to intelligently categorize transactions based on Nigerian accounting standards
+              <div>
+                <h3 className="text-white font-semibold text-lg mb-2">🤖 AI-Powered (Groq - FREE)</h3>
+                <p className="text-gray-400 text-sm mb-3">
+                  Uses Groq AI (free, lightning fast) to intelligently categorize transactions based on Nigerian accounting standards
                 </p>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-green-400">
+                <div className="flex items-center gap-2 text-sm text-green-400">
                   <CheckCircle className="h-4 w-4" />
-                  <span>95%+ accuracy</span>
+                  <span>95%+ accuracy • FREE • 50x faster than GPT-4</span>
                 </div>
               </div>
             </div>
@@ -731,27 +739,27 @@ const CategorizeStep = ({
 
           <div
             onClick={() => onMethodChange('rules')}
-            className={`p-4 sm:p-6 rounded-xl cursor-pointer transition-all ${
+            className={`p-6 rounded-xl cursor-pointer transition-all ${
               categorizationMethod === 'rules'
                 ? 'bg-green-900/20 border-2 border-green-500'
                 : 'bg-gray-700/50 border-2 border-gray-600 hover:border-gray-500'
             }`}
           >
-            <div className="flex items-start gap-3 sm:gap-4">
+            <div className="flex items-start gap-4">
               <input
                 type="radio"
                 checked={categorizationMethod === 'rules'}
                 onChange={() => onMethodChange('rules')}
                 className="mt-1"
               />
-              <div className="flex-1">
-                <h3 className="text-white font-semibold text-base sm:text-lg mb-2">📋 Rule-Based</h3>
-                <p className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3">
-                  Uses keyword matching and predefined rules for categorization
+              <div>
+                <h3 className="text-white font-semibold text-lg mb-2">📋 Rule-Based</h3>
+                <p className="text-gray-400 text-sm mb-3">
+                  Uses keyword matching and predefined rules for categorization (no API needed)
                 </p>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-yellow-400">
+                <div className="flex items-center gap-2 text-sm text-yellow-400">
                   <AlertCircle className="h-4 w-4" />
-                  <span>80%+ accuracy</span>
+                  <span>80%+ accuracy • Works offline</span>
                 </div>
               </div>
             </div>
@@ -760,13 +768,41 @@ const CategorizeStep = ({
       )}
 
       {categorizationComplete && (
-        <div className="max-w-md mx-auto mt-6 sm:mt-8 px-4">
-          <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4 sm:p-6 text-center">
-            <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-400 mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-white font-semibold text-base sm:text-lg mb-2">Categorization Complete!</h3>
-            <p className="text-gray-400 text-xs sm:text-sm">
-              {categorized} transactions have been categorized and are ready for trial balance generation
+        <div className="max-w-md mx-auto mt-8">
+          <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-6 text-center">
+            <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-4" />
+            <h3 className="text-white font-semibold text-lg mb-2">✅ Categorization Complete!</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              {categorized} of {transactions.length} transactions have been categorized
             </p>
+            
+            {/* 🚨 NEW: Preview of categorized transactions */}
+            <div className="mt-6 space-y-2 max-h-60 overflow-y-auto">
+              <h4 className="text-sm font-semibold text-gray-300 mb-3">Sample Categorizations:</h4>
+              {transactions.slice(0, 5).map((trans: Transaction, idx: number) => (
+                trans.account_code && (
+                  <div key={idx} className="bg-gray-800/50 rounded p-3 text-left">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="text-white text-sm truncate">{trans.description}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {trans.category} ({trans.account_code})
+                        </p>
+                      </div>
+                      <span className="text-xs text-green-400 ml-2">
+                        {Math.round((trans.confidence_score || 0) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-gray-700">
+              <p className="text-sm text-gray-400">
+                Click <strong className="text-white">"Continue"</strong> below to generate trial balance →
+              </p>
+            </div>
           </div>
         </div>
       )}

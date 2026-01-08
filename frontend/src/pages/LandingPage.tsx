@@ -979,8 +979,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="block">Marketplace for</span>
-              <span className="gradient-text">Shared Ownership</span>
+              <span className="block">Seamount</span>
+              <span className="gradient-text">Digital Assets Market</span>
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">

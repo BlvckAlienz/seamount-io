@@ -73,62 +73,74 @@ async def upload_bank_statement(
 ):
     """
     📤 Upload and parse bank statement (CSV, Excel, PDF)
-    
-    **Flow:**
-    1. Validate file type and size
-    2. Save to temp location
-    3. Parse using BankStatementParser
-    4. Save metadata to database
-    5. Extract and save transactions
-    6. Return parsing results
-    
-    **Supported Formats:** CSV, XLSX, XLS, PDF
     """
     try:
+        logger.info(f"🔵 UPLOAD START: User {current_user['id']}, File: {file.filename}")
+        
         user_id = current_user['id']
         
         # 1️⃣ VALIDATE FILE
         allowed_extensions = ['csv', 'xlsx', 'xls', 'pdf']
         file_ext = file.filename.split('.')[-1].lower()
         
+        logger.info(f"🔵 File extension: {file_ext}")
+        
         if file_ext not in allowed_extensions:
+            logger.error(f"❌ Invalid file type: {file_ext}")
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
             )
         
         # Check file size (max 10MB)
-        file_size = 0
         temp_content = await file.read()
         file_size = len(temp_content)
         await file.seek(0)  # Reset file pointer
         
+        logger.info(f"🔵 File size: {file_size} bytes ({file_size / 1024:.2f} KB)")
+        
         if file_size > 10 * 1024 * 1024:  # 10MB
+            logger.error(f"❌ File too large: {file_size} bytes")
             raise HTTPException(
                 status_code=400,
                 detail="File size exceeds 10MB limit"
             )
         
         # 2️⃣ SAVE TO TEMP FILE
+        import tempfile
+        import os
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
             tmp_file.write(temp_content)
             tmp_file_path = tmp_file.name
+        
+        logger.info(f"🔵 Saved to temp file: {tmp_file_path}")
         
         try:
             # 3️⃣ PARSE BANK STATEMENT
             from backend.services.bookkeeping import BankStatementParser
             
+            logger.info("🔵 Initializing parser...")
             parser = BankStatementParser()
+            
+            logger.info(f"🔵 Parsing file: {tmp_file_path} (type: {file_ext})")
             parse_result = parser.parse_file(tmp_file_path, file_ext)
             
+            logger.info(f"🔵 Parse result success: {parse_result.get('success')}")
+            
             if not parse_result.get('success'):
+                error_msg = parse_result.get('error', 'Unknown error')
+                logger.error(f"❌ Parsing failed: {error_msg}")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Parsing failed: {parse_result.get('error', 'Unknown error')}"
+                    detail=f"Parsing failed: {error_msg}"
                 )
             
             transactions = parse_result.get('transactions', [])
             metadata = parse_result.get('metadata', {})
+            
+            logger.info(f"✅ Parsed {len(transactions)} transactions")
+            logger.info(f"🔵 Metadata: {metadata}")
             
             # 4️⃣ SAVE STATEMENT METADATA TO DATABASE
             statement_data = {
@@ -145,12 +157,15 @@ async def upload_bank_statement(
                 'parsing_status': 'success'
             }
             
+            logger.info(f"🔵 Saving statement to database...")
             stmt_result = supabase.table('bank_statements').insert(statement_data).execute()
             
             if not stmt_result.data:
+                logger.error("❌ Failed to save statement metadata")
                 raise HTTPException(status_code=500, detail="Failed to save statement metadata")
             
             statement_id = stmt_result.data[0]['id']
+            logger.info(f"✅ Statement saved with ID: {statement_id}")
             
             # 5️⃣ SAVE TRANSACTIONS TO DATABASE
             if transactions:
@@ -159,12 +174,15 @@ async def upload_bank_statement(
                     trans['user_id'] = user_id
                     trans['bank_statement_id'] = statement_id
                 
+                logger.info(f"🔵 Saving {len(transactions)} transactions...")
                 trans_result = supabase.table('transactions').insert(transactions).execute()
                 
-                if not trans_result.data:
-                    logger.warning(f"⚠️ Transactions insert may have failed")
+                if trans_result.data:
+                    logger.info(f"✅ Saved {len(trans_result.data)} transactions")
+                else:
+                    logger.warning(f"⚠️ Transaction insert returned no data")
             
-            logger.info(f"✅ Bank statement uploaded: {statement_id}, {len(transactions)} transactions")
+            logger.info(f"✅ UPLOAD COMPLETE: {statement_id}, {len(transactions)} transactions")
             
             # 6️⃣ TRIGGER CATEGORIZATION IN BACKGROUND (optional)
             if background_tasks and len(transactions) > 0:
@@ -173,6 +191,7 @@ async def upload_bank_statement(
                     statement_id=statement_id,
                     supabase_client=supabase
                 )
+                logger.info("🔵 Background categorization queued")
             
             return BankStatementUploadResponse(
                 success=True,
@@ -188,11 +207,13 @@ async def upload_bank_statement(
             # Clean up temp file
             if os.path.exists(tmp_file_path):
                 os.unlink(tmp_file_path)
+                logger.info(f"🔵 Cleaned up temp file")
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Bank statement upload failed: {str(e)}")
+        logger.error(f"❌ UPLOAD FAILED: {str(e)}")
+        logger.error(f"Stack trace:", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 # =====================================================
