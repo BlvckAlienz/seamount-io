@@ -128,17 +128,91 @@ class BankStatementParser:
                 'error': str(e)
             }
     
+    def _parse_pdf_with_pdfplumber(self, file_path: str) -> Dict:
+        """
+        Parse PDF using pdfplumber (better for tables)
+        """
+        try:
+            transactions = []
+            
+            with pdfplumber.open(file_path) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    # Extract tables
+                    tables = page.extract_tables()
+                    
+                    logger.info(f"🔵 Page {page_num + 1}: Found {len(tables)} tables")
+                    
+                    for table in tables:
+                        logger.info(f"🔵 Table has {len(table)} rows")
+                        
+                        # Skip header rows (usually first 2-3 rows)
+                        for row in table[2:]:
+                            if len(row) >= 5:
+                                try:
+                                    date_str = row[0]
+                                    desc = row[1]
+                                    debit = row[2] or '0'
+                                    credit = row[3] or '0'
+                                    balance = row[4] or '0'
+                                    
+                                    trans_date = self._parse_date(date_str)
+                                    
+                                    if trans_date:
+                                        transaction = {
+                                            'transaction_date': trans_date.strftime('%Y-%m-%d'),
+                                            'description': desc.strip() if desc else '',
+                                            'reference': '',
+                                            'debit_amount': self._clean_amount(debit),
+                                            'credit_amount': self._clean_amount(credit),
+                                            'balance': self._clean_amount(balance)
+                                        }
+                                        transactions.append(transaction)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Failed to parse row: {e}")
+                                    continue
+            
+            logger.info(f"✅ pdfplumber extracted {len(transactions)} transactions")
+            
+            return {
+                'success': True,
+                'transactions': transactions,
+                'metadata': {}
+            }
+        
+        except Exception as e:
+            logger.error(f"❌ pdfplumber parsing failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
     def _parse_pdf(self, file_path: str) -> Dict:
         """
-        Parse PDF bank statement (more complex - OCR may be needed)
-        For now, we'll extract text and try to parse
+        Parse PDF bank statement
         """
+        # Try pdfplumber first (better for tables)
+        try:
+            result = self._parse_pdf_with_pdfplumber(file_path)
+            if result['success'] and len(result.get('transactions', [])) > 0:
+                logger.info("✅ pdfplumber parsing successful")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ pdfplumber failed, trying PyPDF2: {e}")
+        
+        # Fallback to PyPDF2
         try:
             with open(file_path, 'rb') as file:
                 reader = PyPDF2.PdfReader(file)
                 text = ""
                 for page in reader.pages:
                     text += page.extract_text()
+            
+            # 🔵 LOG EXTRACTED TEXT
+            logger.info(f"🔵 PDF TEXT LENGTH: {len(text)} characters")
+            logger.info(f"🔵 PDF TEXT PREVIEW (first 500 chars):")
+            logger.info(text[:500])
+            logger.info(f"🔵 PDF TEXT PREVIEW (last 500 chars):")
+            logger.info(text[-500:])
             
             # Extract transactions using regex patterns
             transactions = self._extract_from_text(text)
@@ -259,43 +333,92 @@ class BankStatementParser:
     def _extract_from_text(self, text: str) -> List[Dict]:
         """
         Extract transactions from PDF text (regex-based)
-        This is a simplified version - production needs more robust parsing
+        Supports multiple Nigerian bank formats
         """
         transactions = []
         
-        # Pattern: Date | Description | Debit | Credit | Balance
-        # Example: 01/01/2025 POS PURCHASE 5000.00 45000.00
-        pattern = r'(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)'
+        logger.info(f"🔵 Attempting to extract transactions from text...")
         
-        matches = re.finditer(pattern, text)
+        # Pattern 1: Date | Description | Debit | Credit | Balance
+        pattern1 = r'(\d{2}[/-]\d{2}[/-]\d{4})\s+(.{10,}?)\s+([\d,]+\.?\d{2})\s+([\d,]+\.?\d{2})\s+([\d,]+\.?\d{2})'
         
-        for match in matches:
-            try:
-                date_str, desc, amt1, amt2, balance = match.groups()
+        # Pattern 2: Date | Description | Amount | Balance (with Dr/Cr indicator)
+        pattern2 = r'(\d{2}[/-]\d{2}[/-]\d{4})\s+(.{10,}?)\s+([\d,]+\.?\d{2})\s+(Dr|Cr)\s+([\d,]+\.?\d{2})'
+        
+        # Pattern 3: Date Description Amount Type Balance (space-separated)
+        pattern3 = r'(\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4})\s+(.{10,}?)\s+([\d,]+\.?\d{2})\s+([\d,]+\.?\d{2})'
+        
+        # Try each pattern
+        for pattern_num, pattern in enumerate([pattern1, pattern2, pattern3], 1):
+            logger.info(f"🔵 Trying pattern {pattern_num}...")
+            matches = list(re.finditer(pattern, text, re.MULTILINE))
+            logger.info(f"🔵 Pattern {pattern_num} found {len(matches)} matches")
+            
+            if matches:
+                for match in matches:
+                    try:
+                        groups = match.groups()
+                        logger.info(f"🔵 Match groups: {groups}")
+                        
+                        # Parse based on pattern
+                        if pattern_num == 1:
+                            date_str, desc, debit, credit, balance = groups
+                            trans_date = self._parse_date(date_str)
+                            
+                            if trans_date:
+                                transaction = {
+                                    'transaction_date': trans_date.strftime('%Y-%m-%d'),
+                                    'description': desc.strip(),
+                                    'reference': '',
+                                    'debit_amount': self._clean_amount(debit),
+                                    'credit_amount': self._clean_amount(credit),
+                                    'balance': self._clean_amount(balance)
+                                }
+                                transactions.append(transaction)
+                        
+                        elif pattern_num == 2:
+                            date_str, desc, amount, dr_cr, balance = groups
+                            trans_date = self._parse_date(date_str)
+                            
+                            if trans_date:
+                                amt = self._clean_amount(amount)
+                                transaction = {
+                                    'transaction_date': trans_date.strftime('%Y-%m-%d'),
+                                    'description': desc.strip(),
+                                    'reference': '',
+                                    'debit_amount': amt if dr_cr == 'Dr' else 0,
+                                    'credit_amount': amt if dr_cr == 'Cr' else 0,
+                                    'balance': self._clean_amount(balance)
+                                }
+                                transactions.append(transaction)
+                        
+                        elif pattern_num == 3:
+                            date_str, desc, debit, credit = groups
+                            trans_date = self._parse_date(date_str)
+                            
+                            if trans_date:
+                                transaction = {
+                                    'transaction_date': trans_date.strftime('%Y-%m-%d'),
+                                    'description': desc.strip(),
+                                    'reference': '',
+                                    'debit_amount': self._clean_amount(debit),
+                                    'credit_amount': self._clean_amount(credit),
+                                    'balance': 0
+                                }
+                                transactions.append(transaction)
+                    
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to parse match: {str(e)}")
+                        continue
                 
-                # Parse date
-                trans_date = self._parse_date(date_str)
-                if not trans_date:
-                    continue
-                
-                # Determine debit/credit
-                amt1 = self._clean_amount(amt1)
-                amt2 = self._clean_amount(amt2)
-                
-                transaction = {
-                    'transaction_date': trans_date.strftime('%Y-%m-%d'),
-                    'description': desc.strip(),
-                    'reference': '',
-                    'debit_amount': amt1 if amt1 > 0 else 0,
-                    'credit_amount': amt2 if amt2 > 0 else 0,
-                    'balance': self._clean_amount(balance)
-                }
-                
-                transactions.append(transaction)
-                
-            except Exception as e:
-                logger.warning(f"⚠️ Skipping match: {str(e)}")
-                continue
+                # If we found transactions, stop trying patterns
+                if transactions:
+                    logger.info(f"✅ Pattern {pattern_num} successfully extracted {len(transactions)} transactions")
+                    break
+        
+        if not transactions:
+            logger.warning(f"⚠️ No transactions extracted from PDF")
+            logger.warning(f"⚠️ Text sample: {text[:200]}")
         
         logger.info(f"✅ Extracted {len(transactions)} transactions from PDF")
         return transactions
