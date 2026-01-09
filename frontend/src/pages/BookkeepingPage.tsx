@@ -20,6 +20,7 @@ import {
   RefreshCw,
   X
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -175,75 +176,77 @@ const BookkeepingPage = () => {
 
     console.log('🔵 Starting upload process...');
     console.log('🔵 File object:', uploadedFile);
-    console.log('🔵 File name:', uploadedFile.name);
-    console.log('🔵 File size:', uploadedFile.size);
-    console.log('🔵 File type:', uploadedFile.type);
 
     try {
         setLoading(true);
-        
-        // Create FormData
         const formData = new FormData();
         formData.append('file', uploadedFile);
         
-        // Debug FormData contents
-        console.log('🔵 FormData entries:');
-        for (let [key, value] of formData.entries()) {
-        console.log(`   ${key}:`, value);
+        // 🔵 Get auth token from Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Not authenticated. Please log in.');
+        return;
         }
         
-        console.log('🔵 Making API request to:', '/api/v1/bookkeeping/upload-statement');
+        console.log('🔵 Auth token:', session.access_token.substring(0, 20) + '...');
+        console.log('🔵 Making NATIVE FETCH request (bypassing all interceptors)...');
         
-        // Make request with explicit headers
-        const response = await apiClient.post(
-        '/api/v1/bookkeeping/upload-statement',
-        formData,
-        {
-            headers: {
-            'Content-Type': 'multipart/form-data',
-            },
-            // Add timeout
-            timeout: 30000, // 30 seconds
-        }
-        );
-
-        console.log('🔵 Raw response:', response);
+        // 🚀 NATIVE FETCH - BYPASSES ALL INTERCEPTORS
+        const response = await fetch('http://localhost:8000/api/v1/bookkeeping/upload-statement', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            // Don't set Content-Type - browser sets it with boundary for multipart
+        },
+        body: formData,
+        });
+        
+        console.log('🔵🔵🔵 NATIVE FETCH RESPONSE 🔵🔵🔵');
         console.log('🔵 Response status:', response.status);
+        console.log('🔵 Response ok:', response.ok);
         console.log('🔵 Response headers:', response.headers);
-        console.log('📤 Response data:', response.data);
-        console.log('📤 Statement ID:', response.data.statement_id);
-        console.log('📤 Transaction count:', response.data.transaction_count);
-        console.log('📤 Parsing status:', response.data.parsing_status);
         
         // Check if response is mock
-        if (response.data.statement_id === 'mock-123') {
-        console.error('❌❌❌ MOCK DATA DETECTED! Backend not responding! ❌❌❌');
-        toast.error('Backend is returning mock data. Check server logs.');
+        if (response.status === 0 || !response.ok) {
+        console.error('❌ Network error or intercepted:', response.status);
+        toast.error('Network request failed. Check if backend is running.');
+        return;
+        }
+        
+        const data = await response.json();
+        
+        console.log('📤 Response data:', data);
+        console.log('📤 Statement ID:', data.statement_id);
+        console.log('📤 Transaction count:', data.transaction_count);
+        
+        // Check if response is mock
+        if (data.statement_id === 'mock-123') {
+        console.error('❌❌❌ MOCK DATA FROM BACKEND! ❌❌❌');
+        toast.error('Backend returned mock data. Check backend code.');
         return;
         }
 
-        if (response.data.success) {
-        setUploadResult(response.data);
+        if (data.success) {
+        setUploadResult(data);
         
         // Fetch transactions for review
-        console.log('🔵 Fetching transactions for statement:', response.data.statement_id);
-        await fetchTransactions(response.data.statement_id);
+        console.log('🔵 Fetching transactions for statement:', data.statement_id);
+        await fetchTransactions(data.statement_id);
         
-        toast.success(`✅ Parsed ${response.data.transaction_count} transactions`);
+        toast.success(`✅ Parsed ${data.transaction_count} transactions`);
         setCurrentStep('review');
         } else {
-        console.error('❌ Upload failed:', response.data);
-        toast.error('Upload failed');
+        console.error('❌ Upload failed:', data);
+        toast.error(data.message || 'Upload failed');
         }
     } catch (error: any) {
         console.error('❌❌❌ UPLOAD ERROR ❌❌❌');
         console.error('Error object:', error);
         console.error('Error message:', error.message);
-        console.error('Error response:', error.response);
-        console.error('Error response data:', error.response?.data);
-        console.error('Error response status:', error.response?.status);
         
-        toast.error(error.response?.data?.detail || error.message || 'Upload failed');
+        toast.error(error.message || 'Upload failed');
     } finally {
         setLoading(false);
     }
