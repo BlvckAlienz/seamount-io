@@ -220,18 +220,23 @@ async def upload_bank_statement(
             if transactions:
                 # Prepare transactions for insertion
                 trans_to_insert = []
-                for trans in transactions:
-                    trans_to_insert.append({
-                        'user_id': user_id,
-                        'bank_statement_id': statement_id,
-                        'transaction_date': trans['transaction_date'],
-                        'description': trans.get('description', '')[:255],  # Limit length
-                        'reference': trans.get('reference', '')[:100],
-                        'debit_amount': trans.get('debit_amount', 0),
-                        'credit_amount': trans.get('credit_amount', 0),
-                        'balance': trans.get('balance', 0),
-                        'is_manually_categorized': False
-                    })
+            for trans in transactions:
+                # Cap amounts before inserting
+                debit = min(trans.get('debit_amount', 0), 9999999999999.99)
+                credit = min(trans.get('credit_amount', 0), 9999999999999.99)
+                balance = min(trans.get('balance', 0), 9999999999999.99)
+                
+                trans_to_insert.append({
+                    'user_id': user_id,
+                    'bank_statement_id': statement_id,
+                    'transaction_date': trans['transaction_date'],
+                    'description': trans.get('description', '')[:255],
+                    'reference': trans.get('reference', '')[:100],
+                    'debit_amount': debit,
+                    'credit_amount': credit,
+                    'balance': balance,
+                    'is_manually_categorized': False
+                })
                 
                 logger.info(f"🔵 Saving {len(trans_to_insert)} transactions...")
                 

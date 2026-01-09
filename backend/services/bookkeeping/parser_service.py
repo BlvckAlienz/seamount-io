@@ -112,6 +112,14 @@ class BankStatementParser:
         """
         Main PDF parser with multiple strategies
         """
+        # First try direct Fidelity Bank parser
+        try:
+            result = self._parse_fidelity_pdf_direct(file_path)
+            if result['success'] and len(result.get('transactions', [])) > 0:
+                logger.info(f"✅ Fidelity direct parser extracted {len(result['transactions'])} transactions")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ Fidelity direct parser failed: {e}")
         # Try pdfplumber with table extraction first
         if PDFPLUMBER_AVAILABLE:
             try:
@@ -758,3 +766,13 @@ class BankStatementParser:
             return float(amount_str)
         except ValueError:
             return 0.0
+        
+    def _parse_fidelity_pdf_direct(self, file_path: str) -> Dict:
+        """Direct parsing for Fidelity Bank PDFs"""
+        try:
+            from .fidelity_parser import FidelityBankParser
+            parser = FidelityBankParser()
+            return parser.parse_pdf(file_path)
+        except Exception as e:
+            logger.error(f"❌ Fidelity direct parser failed: {str(e)}")
+            return {'success': False, 'error': str(e)}
