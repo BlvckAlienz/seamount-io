@@ -288,6 +288,66 @@ async def upload_bank_statement(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 # =====================================================
+# 8️⃣ UPLOAD STATUS CHECK
+# =====================================================
+
+@router.get("/upload-status/{statement_id}")
+async def check_upload_status(
+    statement_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    📊 Check if upload and background tasks are complete
+    """
+    try:
+        user_id = current_user['id']
+        
+        # Check if statement exists
+        stmt_result = supabase.table('bank_statements')\
+            .select('*')\
+            .eq('id', statement_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+        
+        if not stmt_result.data:
+            return {"success": False, "error": "Statement not found"}
+        
+        statement = stmt_result.data
+        
+        # Check if categorization is complete
+        trans_result = supabase.table('transactions')\
+            .select('account_code', count='exact')\
+            .eq('bank_statement_id', statement_id)\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .execute()
+        
+        total_result = supabase.table('transactions')\
+            .select('id', count='exact')\
+            .eq('bank_statement_id', statement_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        categorized_count = trans_result.count or 0
+        total_count = total_result.count or 0
+        
+        return {
+            "success": True,
+            "statement_id": statement_id,
+            "parsing_status": statement.get('parsing_status', 'unknown'),
+            "transaction_count": total_count,
+            "categorized_count": categorized_count,
+            "categorization_complete": categorized_count == total_count and total_count > 0,
+            "percentage": round((categorized_count / total_count * 100) if total_count > 0 else 0, 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Upload status check failed: {str(e)}")
+        return {"success": False, "error": str(e)}
+    
+# =====================================================
 # 2️⃣ TRANSACTION CATEGORIZATION
 # =====================================================
 
@@ -633,6 +693,66 @@ async def get_statement_transactions(
     except Exception as e:
         logger.error(f"❌ Failed to fetch transactions: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# 🚨 ADD THIS NEW CODE BLOCK RIGHT HERE:
+# =====================================================
+
+@router.get("/upload-status/{statement_id}")
+async def check_upload_status(
+    statement_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """
+    📊 Check if upload and background tasks are complete
+    """
+    try:
+        user_id = current_user['id']
+        
+        # Check if statement exists
+        stmt_result = supabase.table('bank_statements')\
+            .select('*')\
+            .eq('id', statement_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+        
+        if not stmt_result.data:
+            return {"success": False, "error": "Statement not found"}
+        
+        statement = stmt_result.data
+        
+        # Check if categorization is complete
+        trans_result = supabase.table('transactions')\
+            .select('account_code', count='exact')\
+            .eq('bank_statement_id', statement_id)\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .execute()
+        
+        total_result = supabase.table('transactions')\
+            .select('id', count='exact')\
+            .eq('bank_statement_id', statement_id)\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        categorized_count = trans_result.count or 0
+        total_count = total_result.count or 0
+        
+        return {
+            "success": True,
+            "statement_id": statement_id,
+            "parsing_status": statement.get('parsing_status', 'unknown'),
+            "transaction_count": total_count,
+            "categorized_count": categorized_count,
+            "categorization_complete": categorized_count == total_count and total_count > 0,
+            "percentage": round((categorized_count / total_count * 100) if total_count > 0 else 0, 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Upload status check failed: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 # =====================================================
 # BACKGROUND TASKS

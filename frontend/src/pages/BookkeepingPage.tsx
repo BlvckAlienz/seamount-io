@@ -94,6 +94,14 @@ const BookkeepingPage = () => {
   const [trialBalance, setTrialBalance] = useState<TrialBalance | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
+  // Reset loading state on step change
+  useEffect(() => {
+    // If we move away from upload step, reset loading
+    if (currentStep !== 'upload' && loading) {
+      setLoading(false);
+    }
+  }, [currentStep, loading]);
+
   // Mock API client (replace with your actual apiClient)
   const apiClient = {
     post: async (url: string, data: any, config?: any) => {
@@ -175,130 +183,177 @@ const BookkeepingPage = () => {
     if (!uploadedFile) return;
 
     console.log('🔵 Starting upload process...');
-    console.log('🔵 File object:', uploadedFile);
-
+    
     try {
         setLoading(true);
         const formData = new FormData();
         formData.append('file', uploadedFile);
         
-        // 🔵 Get auth token from Supabase
+        // Get auth token from Supabase
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.access_token) {
+        console.error('❌ Not authenticated. Please log in.');
         toast.error('Not authenticated. Please log in.');
+        setLoading(false);
         return;
         }
         
-        console.log('🔵 Auth token:', session.access_token.substring(0, 20) + '...');
-        console.log('🔵 Making NATIVE FETCH request (bypassing all interceptors)...');
+        console.log('🔵 Making upload request...');
         
-        // 🚀 NATIVE FETCH - BYPASSES ALL INTERCEPTORS
+        // 🚀 NATIVE FETCH
         const response = await fetch('http://localhost:8000/api/v1/bookkeeping/upload-statement', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
-            // Don't set Content-Type - browser sets it with boundary for multipart
         },
         body: formData,
         });
         
-        console.log('🔵🔵🔵 NATIVE FETCH RESPONSE 🔵🔵🔵');
         console.log('🔵 Response status:', response.status);
-        console.log('🔵 Response ok:', response.ok);
-        console.log('🔵 Response headers:', response.headers);
         
-        // Check if response is mock
-        if (response.status === 0 || !response.ok) {
-        console.error('❌ Network error or intercepted:', response.status);
-        toast.error('Network request failed. Check if backend is running.');
+        if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Upload failed:', errorData);
+        toast.error(errorData.detail || 'Upload failed');
+        setLoading(false);
         return;
         }
         
         const data = await response.json();
+        console.log('📤 Upload success:', data);
         
-        console.log('📤 Response data:', data);
-        console.log('📤 Statement ID:', data.statement_id);
-        console.log('📤 Transaction count:', data.transaction_count);
-        
-        // Check if response is mock
-        if (data.statement_id === 'mock-123') {
-        console.error('❌❌❌ MOCK DATA FROM BACKEND! ❌❌❌');
-        toast.error('Backend returned mock data. Check backend code.');
-        return;
-        }
-
         if (data.success) {
         setUploadResult(data);
-        
-        // Fetch transactions for review
-        console.log('🔵 Fetching transactions for statement:', data.statement_id);
-        await fetchTransactions(data.statement_id);
-        
         toast.success(`✅ Parsed ${data.transaction_count} transactions`);
+        
+        // 🚨 CRITICAL FIX: Move to review step IMMEDIATELY
         setCurrentStep('review');
+        
+        // 🚨 Start polling for categorization status
+        await pollForCategorizationStatus(data.statement_id);
+        
         } else {
-        console.error('❌ Upload failed:', data);
+        console.error('❌ Upload returned success=false:', data);
         toast.error(data.message || 'Upload failed');
         }
     } catch (error: any) {
-        console.error('❌❌❌ UPLOAD ERROR ❌❌❌');
-        console.error('Error object:', error);
-        console.error('Error message:', error.message);
-        
+        console.error('❌ UPLOAD ERROR:', error);
         toast.error(error.message || 'Upload failed');
     } finally {
         setLoading(false);
     }
     };
 
-  // ============================================
-  // STEP 2: FETCH & REVIEW TRANSACTIONS
-  // ============================================
-
-  const fetchTransactions = async (statementId: string) => {
-    try {
-      const response = await apiClient.get(
-        `/api/v1/bookkeeping/statements/${statementId}/transactions`
-      );
-
-      if (response.data.success) {
-        setTransactions(response.data.transactions);
-      }
-    } catch (error) {
-      console.error('Failed to fetch transactions:', error);
-      toast.error('Failed to load transactions');
-    }
-  };
-
-  const updateTransaction = async (
-    transactionId: string,
-    accountCode: string,
-    category: string
-  ) => {
-    try {
-      const response = await apiClient.put(
-        '/api/v1/bookkeeping/transactions/update',
-        { transaction_id: transactionId, account_code: accountCode, category: category }
-      );
-
-      if (response.data.success) {
-        setTransactions(prev =>
-          prev.map(t =>
-            t.id === transactionId
-              ? { ...t, account_code: accountCode, category: category, is_manually_categorized: true }
-              : t
-          )
+    // 🚨 ADD THIS NEW FUNCTION RIGHT AFTER uploadStatement (line ~201):
+    // Poll for categorization status
+    const pollForCategorizationStatus = async (statementId: string) => {
+    console.log('🔵 Starting categorization status polling for:', statementId);
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    
+    // Poll every 2 seconds for 30 seconds max
+    const maxAttempts = 15;
+    let attempts = 0;
+    
+    const pollInterval = setInterval(async () => {
+        attempts++;
+        
+        try {
+        const response = await fetch(
+            `http://localhost:8000/api/v1/bookkeeping/upload-status/${statementId}`,
+            {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            }
         );
         
-        toast.success('Transaction updated');
-        setEditingTransaction(null);
-      }
-    } catch (error) {
-      console.error('Update failed:', error);
-      toast.error('Failed to update transaction');
-    }
-  };
+        if (response.ok) {
+            const statusData = await response.json();
+            
+            if (statusData.success) {
+            console.log(`🔵 Poll ${attempts}: ${statusData.percentage}% categorized`);
+            
+            // If categorization is complete or we've waited long enough
+            if (statusData.categorization_complete || attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                console.log('✅ Polling complete. Fetching transactions...');
+                
+                // Fetch the categorized transactions
+                await fetchTransactions(statementId);
+            }
+            }
+        }
+        } catch (error) {
+        console.error('❌ Poll error:', error);
+        }
+        
+        // Stop polling after max attempts
+        if (attempts >= maxAttempts) {
+        clearInterval(pollInterval);
+        console.log('⏱️ Max polling attempts reached. Fetching transactions anyway...');
+        await fetchTransactions(statementId);
+        }
+    }, 2000);
+    };
+
+    // 🚨 UPDATE: fetchTransactions function (replace existing one)
+    const fetchTransactions = async (statementId: string) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session?.access_token) {
+            toast.error('Not authenticated');
+            return;
+            }
+            
+            console.log('🔵 Fetching transactions for:', statementId);
+            
+            // Use real API call, not mock
+            const response = await fetch(
+            `http://localhost:8000/api/v1/bookkeeping/statements/${statementId}/transactions`,
+            {
+                method: 'GET',
+                headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                },
+            }
+            );
+            
+            if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+            console.log(`✅ Loaded ${data.transactions?.length || 0} transactions`);
+            setTransactions(data.transactions || []);
+            
+            // Check if transactions are already categorized
+            const categorized = (data.transactions || []).filter((t: any) => t.account_code).length;
+            if (categorized > 0) {
+                console.log(`✅ ${categorized} transactions already categorized`);
+            }
+            } else {
+            toast.error('Failed to load transactions');
+            }
+        } catch (error) {
+            console.error('Failed to fetch transactions:', error);
+            toast.error('Failed to load transactions');
+            
+            // Fallback: show at least the mock data
+            const response = await apiClient.get(
+            `/api/v1/bookkeeping/statements/${statementId}/transactions`
+            );
+            if (response.data.success) {
+            setTransactions(response.data.transactions);
+            }
+        }
+        };
 
   // ============================================
   // STEP 3: CATEGORIZATION
@@ -400,13 +455,18 @@ const BookkeepingPage = () => {
 
   const nextStep = () => {
     if (currentStep === 'upload' && uploadedFile) {
-      uploadStatement();
+        // Only call uploadStatement, which now handles everything
+        uploadStatement();
     } else if (currentStep === 'review') {
-      setCurrentStep('categorize');
+        setCurrentStep('categorize');
     } else if (currentStep === 'categorize' && !categorizationComplete) {
-      categorizeTransactions();
+        // Only categorize if not already done
+        categorizeTransactions();
     } else if (currentStep === 'categorize' && categorizationComplete) {
-      setCurrentStep('report');
+        setCurrentStep('report');
+    } else if (currentStep === 'report' && !trialBalance) {
+        // Generate trial balance
+        generateTrialBalance();
     }
   };
 
