@@ -95,7 +95,6 @@ async def upload_bank_statement(
         # Check file size (max 10MB)
         temp_content = await file.read()
         file_size = len(temp_content)
-        await file.seek(0)  # Reset file pointer
         
         logger.info(f"🔵 File size: {file_size} bytes ({file_size / 1024:.2f} KB)")
         
@@ -106,24 +105,27 @@ async def upload_bank_statement(
                 detail="File size exceeds 10MB limit"
             )
         
-        # 2️⃣ SAVE TO TEMP FILE
-        import tempfile
-        import os
+        # Reset file pointer for temp file creation
+        await file.seek(0)
         
+        # 2️⃣ SAVE TO TEMP FILE
         with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
-            tmp_file.write(temp_content)
+            content = await file.read()
+            tmp_file.write(content)
             tmp_file_path = tmp_file.name
         
         logger.info(f"🔵 Saved to temp file: {tmp_file_path}")
         
         try:
             # 3️⃣ PARSE BANK STATEMENT
-            from backend.services.bookkeeping import BankStatementParser
+            from backend.services.bookkeeping.parser_service import BankStatementParser
             
             logger.info("🔵 Initializing parser...")
             parser = BankStatementParser()
             
             logger.info(f"🔵 Parsing file: {tmp_file_path} (type: {file_ext})")
+            
+            # Try to parse
             parse_result = parser.parse_file(tmp_file_path, file_ext)
             
             logger.info(f"🔵 Parse result success: {parse_result.get('success')}")
@@ -131,15 +133,62 @@ async def upload_bank_statement(
             if not parse_result.get('success'):
                 error_msg = parse_result.get('error', 'Unknown error')
                 logger.error(f"❌ Parsing failed: {error_msg}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Parsing failed: {error_msg}"
-                )
+                
+                # For PDFs, try to extract more debugging info
+                if file_ext == 'pdf':
+                    try:
+                        # Extract raw text for debugging
+                        raw_text = parser._extract_pdf_text(tmp_file_path)
+                        logger.info(f"🔵 Raw text length: {len(raw_text)}")
+                        
+                        # Try to find transaction lines manually
+                        lines = raw_text.split('\n')
+                        logger.info("🔵 Looking for transaction patterns...")
+                        
+                        found_patterns = []
+                        for i, line in enumerate(lines):
+                            line = line.strip()
+                            if len(line) > 20 and any(x in line for x in ['Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24']):
+                                found_patterns.append(f"Line {i}: {line[:100]}...")
+                                if len(found_patterns) <= 3:
+                                    logger.info(f"  Found pattern: {line[:100]}...")
+                        
+                        if found_patterns:
+                            logger.info(f"🔵 Found {len(found_patterns)} potential transaction lines")
+                        
+                        # Try alternative parsing
+                        logger.info("🔵 Trying alternative parsing method...")
+                        metadata = parser._extract_metadata_from_pdf_text(raw_text)
+                        transactions = parser._extract_transactions_from_pdf_text_enhanced(raw_text)
+                        
+                        if transactions:
+                            logger.info(f"🔵 Alternative parsing found {len(transactions)} transactions!")
+                            parse_result = {
+                                'success': True,
+                                'transactions': transactions,
+                                'metadata': metadata
+                            }
+                        else:
+                            logger.error("🔵 No transactions found with alternative parsing")
+                            
+                    except Exception as debug_error:
+                        logger.error(f"🔵 Debug extraction failed: {debug_error}")
+                
+                # If still not successful, raise error
+                if not parse_result.get('success'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Parsing failed: {error_msg}"
+                    )
             
             transactions = parse_result.get('transactions', [])
             metadata = parse_result.get('metadata', {})
             
             logger.info(f"✅ Parsed {len(transactions)} transactions")
+            
+            if transactions:
+                logger.info(f"🔵 Sample transaction: {transactions[0]}")
+            
             logger.info(f"🔵 Metadata: {metadata}")
             
             # 4️⃣ SAVE STATEMENT METADATA TO DATABASE
@@ -147,14 +196,14 @@ async def upload_bank_statement(
                 'user_id': user_id,
                 'file_name': file.filename,
                 'file_type': file_ext,
-                'bank_name': metadata.get('bank_name'),
-                'account_number': metadata.get('account_number'),
+                'bank_name': metadata.get('bank_name', 'Unknown'),
+                'account_number': metadata.get('account_number', ''),
                 'statement_period_start': metadata.get('period_start'),
                 'statement_period_end': metadata.get('period_end'),
                 'opening_balance': metadata.get('opening_balance'),
                 'closing_balance': metadata.get('closing_balance'),
                 'transaction_count': len(transactions),
-                'parsing_status': 'success'
+                'parsing_status': 'success' if transactions else 'partial'
             }
             
             logger.info(f"🔵 Saving statement to database...")
@@ -169,18 +218,35 @@ async def upload_bank_statement(
             
             # 5️⃣ SAVE TRANSACTIONS TO DATABASE
             if transactions:
-                # Add user_id and statement_id to each transaction
+                # Prepare transactions for insertion
+                trans_to_insert = []
                 for trans in transactions:
-                    trans['user_id'] = user_id
-                    trans['bank_statement_id'] = statement_id
+                    trans_to_insert.append({
+                        'user_id': user_id,
+                        'bank_statement_id': statement_id,
+                        'transaction_date': trans['transaction_date'],
+                        'description': trans.get('description', '')[:255],  # Limit length
+                        'reference': trans.get('reference', '')[:100],
+                        'debit_amount': trans.get('debit_amount', 0),
+                        'credit_amount': trans.get('credit_amount', 0),
+                        'balance': trans.get('balance', 0),
+                        'is_manually_categorized': False
+                    })
                 
-                logger.info(f"🔵 Saving {len(transactions)} transactions...")
-                trans_result = supabase.table('transactions').insert(transactions).execute()
+                logger.info(f"🔵 Saving {len(trans_to_insert)} transactions...")
                 
-                if trans_result.data:
-                    logger.info(f"✅ Saved {len(trans_result.data)} transactions")
-                else:
-                    logger.warning(f"⚠️ Transaction insert returned no data")
+                # Insert in batches to avoid issues
+                batch_size = 50
+                for i in range(0, len(trans_to_insert), batch_size):
+                    batch = trans_to_insert[i:i + batch_size]
+                    trans_result = supabase.table('transactions').insert(batch).execute()
+                    
+                    if not trans_result.data:
+                        logger.warning(f"⚠️ Batch {i//batch_size + 1} insert returned no data")
+                    else:
+                        logger.info(f"✅ Batch {i//batch_size + 1}: Saved {len(trans_result.data)} transactions")
+                
+                logger.info(f"✅ Saved all {len(transactions)} transactions")
             
             logger.info(f"✅ UPLOAD COMPLETE: {statement_id}, {len(transactions)} transactions")
             
@@ -230,7 +296,7 @@ async def categorize_transactions(
     🤖 Categorize transactions using AI or rule-based engine
     
     **Methods:**
-    - AI: Claude-powered categorization (requires ANTHROPIC_API_KEY)
+    - AI: Groq (FREE) or Claude-powered categorization
     - Rules: Keyword-based categorization (fallback)
     """
     try:
@@ -255,46 +321,52 @@ async def categorize_transactions(
         transactions = trans_result.data
         
         # 2️⃣ CATEGORIZE USING AI OR RULES
-        from backend.services.bookkeeping import TransactionCategorizer
-        from backend.config import get_settings
-
-        settings = get_settings()
-
-        # Try Groq first (FREE), fallback to Claude
-        groq_key = None
-        anthropic_key = None
-
-        if hasattr(settings, 'GROQ_API_KEY') and settings.GROQ_API_KEY:
-            groq_key = settings.GROQ_API_KEY.get_secret_value()
-
-        if hasattr(settings, 'ANTHROPIC_API_KEY') and settings.ANTHROPIC_API_KEY:
-            anthropic_key = settings.ANTHROPIC_API_KEY.get_secret_value()
-
+        from backend.services.bookkeeping.categorization_service import TransactionCategorizer
+        
+        # Get API keys from environment
+        import os
+        groq_key = os.environ.get('GROQ_API_KEY')
+        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        
         categorizer = TransactionCategorizer(
             groq_api_key=groq_key,
             anthropic_api_key=anthropic_key
         )
         
+        # Convert transactions to format expected by categorizer
+        trans_for_categorization = []
+        for trans in transactions:
+            trans_for_categorization.append({
+                'transaction_date': trans.get('transaction_date'),
+                'description': trans.get('description', ''),
+                'debit_amount': trans.get('debit_amount', 0),
+                'credit_amount': trans.get('credit_amount', 0),
+                'id': trans.get('id')  # Keep ID for updating
+            })
+        
+        # Categorize
         categorized = await categorizer.categorize_batch(
-            transactions=transactions,
-            use_ai=request.use_ai and anthropic_key is not None
+            transactions=trans_for_categorization,
+            use_ai=request.use_ai and (groq_key or anthropic_key)
         )
         
         # 3️⃣ UPDATE TRANSACTIONS IN DATABASE
         update_count = 0
         for trans in categorized:
-            update_result = supabase.table('transactions')\
-                .update({
-                    'account_code': trans.get('account_code'),
-                    'category': trans.get('category'),
-                    'confidence_score': trans.get('confidence_score'),
-                    'is_manually_categorized': trans.get('is_manually_categorized', False)
-                })\
-                .eq('id', trans['id'])\
-                .execute()
-            
-            if update_result.data:
-                update_count += 1
+            # Find the transaction by ID
+            if 'id' in trans:
+                update_result = supabase.table('transactions')\
+                    .update({
+                        'account_code': trans.get('account_code', ''),
+                        'category': trans.get('category', ''),
+                        'confidence_score': trans.get('confidence_score', 0.5),
+                        'is_manually_categorized': trans.get('is_manually_categorized', False)
+                    })\
+                    .eq('id', trans['id'])\
+                    .execute()
+                
+                if update_result.data:
+                    update_count += 1
         
         logger.info(f"✅ Categorized {update_count}/{len(transactions)} transactions")
         
@@ -302,7 +374,7 @@ async def categorize_transactions(
             "success": True,
             "message": f"Categorized {update_count} transactions",
             "categorized_count": update_count,
-            "method": "AI" if (request.use_ai and anthropic_key) else "Rules"
+            "method": "AI" if (request.use_ai and (groq_key or anthropic_key)) else "Rules"
         }
         
     except Exception as e:
@@ -379,7 +451,7 @@ async def generate_trial_balance(
         user_id = current_user['id']
         
         # Generate trial balance
-        from backend.services.bookkeeping import TrialBalanceGenerator
+        from backend.services.bookkeeping.trial_balance_service import TrialBalanceGenerator
         
         tb_generator = TrialBalanceGenerator(supabase)
         
@@ -468,7 +540,7 @@ async def export_trial_balance_to_excel(
             )
         
         # 2️⃣ GENERATE EXCEL FILE
-        from backend.services.bookkeeping import BookkeepingExporter
+        from backend.services.bookkeeping.exporter_service import BookkeepingExporter
         
         exporter = BookkeepingExporter()
         excel_bytes = exporter.export_trial_balance_to_excel(
@@ -601,3 +673,57 @@ async def auto_categorize_transactions(statement_id: str, supabase_client: Clien
         
     except Exception as e:
         logger.error(f"❌ Auto-categorization failed: {str(e)}")
+
+@router.post("/test-parser")
+async def test_parser_directly(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    🔧 Direct parser testing endpoint (for debugging)
+    """
+    try:
+        # Save file temporarily
+        file_ext = file.filename.split('.')[-1].lower()
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
+            content = await file.read()
+            tmp_file.write(content)
+            tmp_file_path = tmp_file.name
+        
+        # Initialize parser
+        from backend.services.bookkeeping.parser_service import BankStatementParser
+        parser = BankStatementParser()
+        
+        # Extract text
+        if file_ext == 'pdf':
+            text = parser._extract_pdf_text(tmp_file_path)
+            
+            # Show first 1000 chars
+            result = {
+                "text_length": len(text),
+                "text_preview": text[:1000],
+                "lines_found": []
+            }
+            
+            # Find transaction-like lines
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if len(line) > 20 and any(x in line for x in ['Jan-', 'Feb-', 'Mar-', 'Apr-', 'May-']):
+                    result["lines_found"].append({
+                        "line_number": i,
+                        "content": line[:150]
+                    })
+            
+            # Try to parse
+            parse_result = parser.parse_file(tmp_file_path, file_ext)
+            result["parse_result"] = parse_result
+            
+            # Clean up
+            os.unlink(tmp_file_path)
+            
+            return result
+            
+    except Exception as e:
+        return {"error": str(e)}
