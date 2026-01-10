@@ -5,7 +5,7 @@ Automated Bookkeeping Services
 from .parser_service import BankStatementParser
 from .categorization_service import TransactionCategorizer
 from .trial_balance_service import TrialBalanceGenerator
-from .export_service import BookkeepingExporter
+from .exporter_service import BookkeepingExporter
 
 __all__ = [
     'BankStatementParser',

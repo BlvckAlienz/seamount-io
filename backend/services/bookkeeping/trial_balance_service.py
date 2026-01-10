@@ -1,207 +1,229 @@
-# backend/services/bookkeeping/trial_balance_service.py
 """
-Trial Balance Generator - Produces accounting reports
+Trial Balance Generation Service - DEBUG VERSION
 """
-
 import logging
-from typing import Dict, List, Optional
-from datetime import datetime, date
-from decimal import Decimal
+import traceback
+from datetime import date
+from typing import Dict, Any, List
+from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger(__name__)
 
 class TrialBalanceGenerator:
-    """
-    Generate trial balance reports from categorized transactions
-    """
-    
     def __init__(self, supabase_client):
-        """
-        Initialize with Supabase client for database operations
-        """
         self.supabase = supabase_client
+        logger.info("✅ TrialBalanceGenerator initialized")
     
-    async def generate(
-        self,
-        user_id: str,
-        period_start: date,
-        period_end: date,
-        save_to_db: bool = True
-    ) -> Dict:
-        """
-        Generate trial balance for a given period
-        
-        Args:
-            user_id: User's UUID
-            period_start: Start date of reporting period
-            period_end: End date of reporting period
-            save_to_db: Whether to save the report to database
-        
-        Returns:
-            {
-                'success': bool,
-                'trial_balance': Dict,
-                'total_debits': Decimal,
-                'total_credits': Decimal,
-                'is_balanced': bool,
-                'report_id': Optional[str]
-            }
-        """
+    async def generate(self, user_id: str, period_start: date, period_end: date, save_to_db: bool = True) -> Dict:
+        """Generate trial balance for a period"""
         try:
-            # Call database function to generate trial balance
-            result = self.supabase.rpc(
-                'generate_trial_balance',
-                {
-                    'p_user_id': user_id,
-                    'p_period_start': period_start.isoformat(),
-                    'p_period_end': period_end.isoformat()
-                }
-            ).execute()
+            logger.info(f"🔵 Starting trial balance generation for user {user_id}")
+            logger.info(f"🔵 Period: {period_start} to {period_end}")
             
-            if not result.data:
+            # Fetch categorized transactions for the user in the period
+            logger.info("🔵 Fetching transactions from database...")
+            
+            try:
+                trans_result = self.supabase.table('transactions')\
+                    .select('*')\
+                    .eq('user_id', user_id)\
+                    .gte('transaction_date', period_start.isoformat())\
+                    .lte('transaction_date', period_end.isoformat())\
+                    .not_.is_('account_code', 'null')\
+                    .execute()
+                
+                logger.info(f"🔵 Query executed, got {len(trans_result.data) if trans_result.data else 0} transactions")
+                
+            except Exception as query_error:
+                logger.error(f"❌ Database query failed: {str(query_error)}")
+                logger.error(f"❌ Query error details: {traceback.format_exc()}")
                 return {
                     'success': False,
-                    'error': 'No data returned from database'
+                    'error': f'Database query failed: {str(query_error)}'
                 }
             
-            trial_balance_data = result.data
+            if not trans_result.data:
+                logger.warning("⚠️ No categorized transactions found for the period")
+                return {
+                    'success': False,
+                    'error': 'No categorized transactions found for the period'
+                }
             
-            # Parse response
-            accounts = trial_balance_data.get('accounts', [])
-            total_debits = Decimal(str(trial_balance_data.get('total_debits', 0)))
-            total_credits = Decimal(str(trial_balance_data.get('total_credits', 0)))
-            is_balanced = trial_balance_data.get('is_balanced', False)
+            transactions = trans_result.data
+            logger.info(f"✅ Found {len(transactions)} transactions")
+            
+            # Log a sample transaction for debugging
+            if transactions:
+                logger.info(f"🔵 Sample transaction: {transactions[0]}")
+            
+            # Group by account code
+            accounts = {}
+            for trans in transactions:
+                try:
+                    account_code = trans.get('account_code', '0000')
+                    if not account_code or account_code == 'null':
+                        account_code = '0000'  # Default code for uncategorized
+                    
+                    account_name = trans.get('category', 'Unknown')
+                    
+                    if account_code not in accounts:
+                        accounts[account_code] = {
+                            'account_code': account_code,
+                            'account_name': account_name,
+                            'debits': Decimal('0.00'),
+                            'credits': Decimal('0.00'),
+                            'balance': Decimal('0.00')
+                        }
+                    
+                    # Convert amounts safely
+                    try:
+                        debit_str = str(trans.get('debit_amount', 0))
+                        if debit_str is None or debit_str == 'null':
+                            debit = Decimal('0.00')
+                        else:
+                            debit = Decimal(debit_str)
+                    except (InvalidOperation, TypeError, ValueError) as e:
+                        logger.warning(f"⚠️ Invalid debit amount: {trans.get('debit_amount')}, error: {e}")
+                        debit = Decimal('0.00')
+                    
+                    try:
+                        credit_str = str(trans.get('credit_amount', 0))
+                        if credit_str is None or credit_str == 'null':
+                            credit = Decimal('0.00')
+                        else:
+                            credit = Decimal(credit_str)
+                    except (InvalidOperation, TypeError, ValueError) as e:
+                        logger.warning(f"⚠️ Invalid credit amount: {trans.get('credit_amount')}, error: {e}")
+                        credit = Decimal('0.00')
+                    
+                    accounts[account_code]['debits'] += debit
+                    accounts[account_code]['credits'] += credit
+                    
+                except Exception as trans_error:
+                    logger.error(f"❌ Error processing transaction {trans.get('id')}: {str(trans_error)}")
+                    continue
+            
+            if not accounts:
+                logger.error("❌ No accounts could be processed")
+                return {
+                    'success': False,
+                    'error': 'No valid account data could be processed'
+                }
+            
+            logger.info(f"✅ Processed {len(accounts)} accounts")
+            
+            # Calculate balances and totals
+            total_debits = Decimal('0.00')
+            total_credits = Decimal('0.00')
+            
+            for account_code, account_data in accounts.items():
+                # Simple balance calculation (debits - credits)
+                account_data['balance'] = account_data['debits'] - account_data['credits']
+                total_debits += account_data['debits']
+                total_credits += account_data['credits']
+            
+            # Format accounts for response
+            accounts_list = []
+            for account_code, account_data in accounts.items():
+                accounts_list.append({
+                    'account_code': account_data['account_code'],
+                    'account_name': account_data['account_name'],
+                    'account_type': self._get_account_type(account_code),
+                    'debits': float(account_data['debits']),
+                    'credits': float(account_data['credits']),
+                    'balance': float(account_data['balance'])
+                })
+            
+            trial_balance = {
+                'accounts': accounts_list,
+                'total_debits': float(total_debits),
+                'total_credits': float(total_credits),
+                'is_balanced': abs(total_debits - total_credits) < Decimal('0.01'),
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat()
+            }
+            
+            # 🚨 SANITY CHECK: Validate aggregated totals
+            if total_debits > 1_000_000_000:  # ₦1 Billion
+                logger.error(
+                    f"🚨 TRIAL BALANCE SANITY CHECK FAILED: "
+                    f"Total debits = ₦{total_debits:,.2f} (exceeds ₦1B)"
+                )
+                return {
+                    'success': False,
+                    'error': 'Trial balance contains suspicious amounts. Please verify source data.'
+                }
+
+            if total_credits > 1_000_000_000:
+                logger.error(
+                    f"🚨 TRIAL BALANCE SANITY CHECK FAILED: "
+                    f"Total credits = ₦{total_credits:,.2f} (exceeds ₦1B)"
+                )
+                return {
+                    'success': False,
+                    'error': 'Trial balance contains suspicious amounts. Please verify source data.'
+                }
+
+            logger.info(f"✅ Trial balance calculated: {len(accounts_list)} accounts")
+            logger.info(f"✅ Total debits: {total_debits}, Total credits: {total_credits}")
+            logger.info(f"✅ Is balanced: {trial_balance['is_balanced']}")
             
             # Save to database if requested
             report_id = None
             if save_to_db:
-                report_id = await self._save_report(
-                    user_id=user_id,
-                    period_start=period_start,
-                    period_end=period_end,
-                    report_data=trial_balance_data,
-                    total_debits=float(total_debits),
-                    total_credits=float(total_credits),
-                    is_balanced=is_balanced
-                )
-            
-            logger.info(f"✅ Trial balance generated: {len(accounts)} accounts, Balanced: {is_balanced}")
+                try:
+                    report_data = {
+                        'user_id': user_id,
+                        'period_start': period_start,
+                        'period_end': period_end,
+                        'report_data': trial_balance,  # This matches your JSONB column
+                        'total_debits': float(total_debits),
+                        'total_credits': float(total_credits),
+                        'is_balanced': trial_balance['is_balanced'],
+                        'generated_at': datetime.now().isoformat()
+                        # Note: Don't include excel_url unless you're generating it
+                    }
+                    
+                    logger.info("🔵 Saving trial balance to database...")
+                    result = self.supabase.table('trial_balances').insert(report_data).execute()
+                    if result.data:
+                        report_id = result.data[0]['id']
+                        logger.info(f"✅ Saved to database with ID: {report_id}")
+                except Exception as save_error:
+                    logger.error(f"❌ Failed to save trial balance to database: {str(save_error)}")
             
             return {
                 'success': True,
-                'trial_balance': trial_balance_data,
-                'total_debits': total_debits,
-                'total_credits': total_credits,
-                'is_balanced': is_balanced,
+                'trial_balance': trial_balance,
                 'report_id': report_id
             }
             
         except Exception as e:
             logger.error(f"❌ Trial balance generation failed: {str(e)}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'traceback': traceback.format_exc()
             }
     
-    async def _save_report(
-        self,
-        user_id: str,
-        period_start: date,
-        period_end: date,
-        report_data: Dict,
-        total_debits: float,
-        total_credits: float,
-        is_balanced: bool
-    ) -> Optional[str]:
-        """
-        Save trial balance report to database
-        """
-        try:
-            result = self.supabase.table('trial_balances').insert({
-                'user_id': user_id,
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat(),
-                'report_data': report_data,
-                'total_debits': total_debits,
-                'total_credits': total_credits,
-                'is_balanced': is_balanced,
-                'generated_at': datetime.utcnow().isoformat()
-            }).execute()
-            
-            if result.data:
-                report_id = result.data[0]['id']
-                logger.info(f"✅ Report saved: {report_id}")
-                return report_id
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to save report: {str(e)}")
-            return None
-    
-    async def get_saved_reports(
-        self,
-        user_id: str,
-        limit: int = 10
-    ) -> List[Dict]:
-        """
-        Retrieve user's saved trial balance reports
-        """
-        try:
-            result = self.supabase.table('trial_balances')\
-                .select('*')\
-                .eq('user_id', user_id)\
-                .order('generated_at', desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            return result.data if result.data else []
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to retrieve reports: {str(e)}")
-            return []
-    
-    def validate_trial_balance(self, trial_balance: Dict) -> Dict:
-        """
-        Validate trial balance and identify issues
+    def _get_account_type(self, account_code: str) -> str:
+        """Map account code to account type"""
+        if not account_code or len(account_code) == 0:
+            return 'Other'
         
-        Returns:
-            {
-                'is_valid': bool,
-                'issues': List[str],
-                'warnings': List[str]
-            }
-        """
-        issues = []
-        warnings = []
+        first_digit = account_code[0]
         
-        total_debits = Decimal(str(trial_balance.get('total_debits', 0)))
-        total_credits = Decimal(str(trial_balance.get('total_credits', 0)))
-        
-        # Check if balanced
-        if total_debits != total_credits:
-            difference = abs(total_debits - total_credits)
-            issues.append(
-                f"Trial balance not balanced. Difference: ₦{difference:,.2f}"
-            )
-        
-        # Check for empty accounts
-        accounts = trial_balance.get('accounts', [])
-        if len(accounts) == 0:
-            warnings.append("No transactions found for this period")
-        
-        # Check for accounts with zero balances
-        zero_balance_accounts = [
-            acc for acc in accounts 
-            if Decimal(str(acc.get('balance', 0))) == 0
-        ]
-        if zero_balance_accounts:
-            warnings.append(
-                f"{len(zero_balance_accounts)} accounts have zero balances"
-            )
-        
-        return {
-            'is_valid': len(issues) == 0,
-            'issues': issues,
-            'warnings': warnings
+        account_types = {
+            '1': 'Asset',
+            '2': 'Liability',
+            '3': 'Equity',
+            '4': 'Revenue',
+            '5': 'Expense',
+            '6': 'Expense',
+            '7': 'Revenue',
+            '8': 'Expense',
+            '9': 'Expense'
         }
+        
+        return account_types.get(first_digit, 'Other')

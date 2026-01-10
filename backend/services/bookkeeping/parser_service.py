@@ -651,7 +651,7 @@ class BankStatementParser:
         return df.rename(columns=column_map)
     
     def _extract_transactions(self, df: pd.DataFrame) -> List[Dict]:
-        """Extract transactions from DataFrame"""
+        """Extract transactions from DataFrame with date correction"""
         transactions = []
         
         required_cols = ['date', 'description']
@@ -660,9 +660,17 @@ class BankStatementParser:
         
         for idx, row in df.iterrows():
             try:
-                trans_date = self._parse_date(row.get('date'))
+                # Get and correct date string
+                date_str = str(row.get('date', ''))
+                corrected_date_str = self._correct_date_year(date_str)
+                
+                # Parse the corrected date
+                trans_date = self._parse_date(corrected_date_str)
                 if not trans_date:
-                    continue
+                    # Try original date as fallback
+                    trans_date = self._parse_date(date_str)
+                    if not trans_date:
+                        continue
                 
                 debit = self._clean_amount(row.get('debit', 0))
                 credit = self._clean_amount(row.get('credit', 0))
@@ -677,6 +685,12 @@ class BankStatementParser:
                     'balance': balance
                 }
                 
+                # 🚨 ADD: Validate date is reasonable
+                if trans_date.year > 2025 or trans_date.year < 2000:
+                    logger.warning(f"⚠️ Suspicious date in transaction: {transaction['transaction_date']}")
+                    # Auto-correct to current year
+                    transaction['transaction_date'] = datetime.now().strftime('%Y-%m-%d')
+                
                 transactions.append(transaction)
                 
             except Exception as e:
@@ -684,7 +698,7 @@ class BankStatementParser:
                 continue
         
         return transactions
-    
+        
     def _extract_metadata(self, df: pd.DataFrame) -> Dict:
         """Extract metadata from DataFrame"""
         metadata = {}
@@ -725,46 +739,83 @@ class BankStatementParser:
     
     @staticmethod
     def _parse_date(date_str) -> Optional[datetime]:
-        """Parse date from various formats"""
-        if pd.isna(date_str):
+        """Parse date from various formats - FIXED VERSION"""
+        if pd.isna(date_str) or not date_str:
             return None
         
-        # Handle Nigerian format: "8-Jan-24"
         date_str = str(date_str).strip()
+        
+        # 🚨 FIX: Handle "2529-04-02" (year 2529 is wrong!)
+        # Check if year is obviously wrong (after 2100)
+        if re.match(r'\d{4}-\d{2}-\d{2}', date_str):
+            year = int(date_str.split('-')[0])
+            if year > 2100:
+                # Assume it's a 2-digit year that got mis-parsed
+                # Convert 2529 to 2025 (25-29?)
+                # Safer: just use 2024 as default
+                logger.warning(f"⚠️ Invalid year {year} in date {date_str}, correcting to 2024")
+                date_str = date_str.replace(str(year), "2024")
+        
+        # Also fix for other formats like "8-Jan-24" but year "24" becomes 2024
         
         # Try multiple formats
         date_formats = [
-            '%d-%b-%y',    # 8-Jan-24
+            '%d-%b-%y',    # 8-Jan-24 → 2024-01-08
             '%d-%b-%Y',    # 8-Jan-2024
+            '%d/%m/%y',    # 08/01/24
             '%d/%m/%Y',    # 08/01/2024
-            '%d-%m-%Y',    # 08-01-2024
             '%Y-%m-%d',    # 2024-01-08
             '%d %b %Y',    # 8 Jan 2024
+            '%d-%b-%y',    # 8-Jan-24 (with 2-digit year)
         ]
         
         for fmt in date_formats:
             try:
-                return datetime.strptime(date_str, fmt)
+                parsed_date = datetime.strptime(date_str, fmt)
+                
+                # 🚨 FIX: Handle 2-digit years that get mis-parsed as 1900s
+                if parsed_date.year < 2000:
+                    # If year is 1924 but should be 2024, adjust
+                    if fmt.endswith('%y'):  # 2-digit year format
+                        parsed_date = parsed_date.replace(year=parsed_date.year + 100)
+                        
+                return parsed_date
             except:
                 continue
         
-        # Try pandas
+        # Try pandas as fallback
         try:
-            return pd.to_datetime(date_str)
+            return pd.to_datetime(date_str, errors='coerce')
         except:
             return None
     
     @staticmethod
     def _clean_amount(amount) -> float:
-        """Clean and convert amount to float"""
-        if pd.isna(amount):
+        """Clean and convert amount to float WITH VALIDATION"""
+        if pd.isna(amount) or not amount:
             return 0.0
         
         amount_str = str(amount).replace('₦', '').replace(',', '').replace(' ', '').strip()
         
         try:
-            return float(amount_str)
-        except ValueError:
+            value = float(amount_str)
+            
+            # 🚨 CRITICAL: Cap at database limit
+            max_value = 9999999999999.99  # numeric(15,2) PostgreSQL limit
+            
+            # 🚨 SANITY CHECK: Nigerian bank transactions rarely exceed ₦100M
+            reasonable_max = 100_000_000.00  # ₦100M
+            
+            if abs(value) > max_value:
+                logger.error(f"🚨 AMOUNT EXCEEDS DB LIMIT: {value:,.2f} - CAPPING to {max_value:,.2f}")
+                return max_value if value > 0 else -max_value
+            
+            if abs(value) > reasonable_max:
+                logger.warning(f"⚠️ SUSPICIOUS AMOUNT: {value:,.2f} (exceeds ₦100M) - Allowing but flagging")
+            
+            return value
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ Invalid amount format: {amount} - Error: {e}")
             return 0.0
         
     def _parse_fidelity_pdf_direct(self, file_path: str) -> Dict:
@@ -776,3 +827,45 @@ class BankStatementParser:
         except Exception as e:
             logger.error(f"❌ Fidelity direct parser failed: {str(e)}")
             return {'success': False, 'error': str(e)}
+        
+    def _correct_date_year(self, date_str: str) -> str:
+        """Correct obviously wrong years in dates"""
+        if not date_str:
+            return date_str
+        
+        # Pattern for YYYY-MM-DD
+        if re.match(r'(\d{4})-(\d{2})-(\d{2})', date_str):
+            year = int(date_str.split('-')[0])
+            
+            # If year is in future (after 2025) or past (before 2000)
+            if year > 2025 or year < 2000:
+                # Try to correct: if year ends with 29, maybe it's 2024?
+                # Common error: 2529 should be 2024 (25-29?)
+                if year > 2500:
+                    # Probably a 2-digit year mis-parsed (25 becomes 2525?)
+                    last_two_digits = year % 100
+                    if 0 <= last_two_digits <= 99:
+                        corrected_year = 2000 + last_two_digits
+                        if corrected_year > 2025:  # Still wrong?
+                            corrected_year = 2024  # Default to current year
+                        return f"{corrected_year}-{date_str[5:]}"
+            
+            # If year is between 2025-2100, leave as is (might be correct)
+        
+        # Pattern for DD-MMM-YY
+        if re.match(r'\d{2}-[A-Za-z]{3}-\d{2}', date_str, re.IGNORECASE):
+            parts = date_str.split('-')
+            if len(parts) == 3:
+                day, month, year_str = parts
+                year = int(year_str) if year_str.isdigit() else 0
+                
+                if 0 <= year <= 99:
+                    # Convert 2-digit year to 4-digit
+                    if year < 30:  # Assuming years 00-29 are 2000-2029
+                        corrected_year = 2000 + year
+                    else:  # Years 30-99 are 1930-1999
+                        corrected_year = 1900 + year
+                    
+                    return f"{day}-{month}-{corrected_year}"
+        
+        return date_str

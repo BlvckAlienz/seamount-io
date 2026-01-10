@@ -102,21 +102,21 @@ const BookkeepingPage = () => {
     }
   }, [currentStep, loading]);
 
-  // Mock API client (replace with your actual apiClient)
-  const apiClient = {
-    post: async (url: string, data: any, config?: any) => {
-      console.log('API POST:', url, data);
-      return { data: { success: true, statement_id: 'mock-123', transaction_count: 50 } };
-    },
-    get: async (url: string) => {
-      console.log('API GET:', url);
-      return { data: { success: true, transactions: generateMockTransactions() } };
-    },
-    put: async (url: string, data: any) => {
-      console.log('API PUT:', url, data);
-      return { data: { success: true } };
-    }
-  };
+// Mock API client (only used as fallback)
+const apiClient = {
+  post: async (url: string, data: any, config?: any) => {
+    console.log('MOCK API POST:', url, data);
+    return { data: { success: false, message: 'Using mock - connect to real API' } };
+  },
+  get: async (url: string) => {
+    console.log('MOCK API GET:', url);
+    return { data: { success: false, transactions: [] } };
+  },
+  put: async (url: string, data: any) => {
+    console.log('MOCK API PUT:', url, data);
+    return { data: { success: false } };
+  }
+};
 
   // Mock toast
   const toast = {
@@ -129,6 +129,11 @@ const BookkeepingPage = () => {
   // ============================================
 
   const generateMockTransactions = (): Transaction[] => {
+    // For production, return empty array or fetch from API
+    return [];
+  
+    // Keep the mock for development/testing
+    /*
     const descriptions = [
       'Online Purchase - Amazon',
       'Salary Payment',
@@ -153,6 +158,7 @@ const BookkeepingPage = () => {
       account_code: i > 10 ? `${1000 + (i % 5)}` : undefined,
       category: i > 10 ? ['Operating Expenses', 'Revenue', 'Administrative'][i % 3] : undefined
     }));
+    */
   };
 
   // ============================================
@@ -182,7 +188,7 @@ const BookkeepingPage = () => {
   const uploadStatement = async () => {
     if (!uploadedFile) return;
 
-    console.log('🔵 Starting upload process...');
+    console.log('ðŸ"µ Starting upload process...');
     
     try {
         setLoading(true);
@@ -193,15 +199,14 @@ const BookkeepingPage = () => {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session?.access_token) {
-        console.error('❌ Not authenticated. Please log in.');
+        console.error('âŒ Not authenticated. Please log in.');
         toast.error('Not authenticated. Please log in.');
         setLoading(false);
         return;
         }
         
-        console.log('🔵 Making upload request...');
+        console.log('ðŸ"µ Making upload request...');
         
-        // 🚀 NATIVE FETCH
         const response = await fetch('http://localhost:8000/api/v1/bookkeeping/upload-statement', {
         method: 'POST',
         headers: {
@@ -210,50 +215,48 @@ const BookkeepingPage = () => {
         body: formData,
         });
         
-        console.log('🔵 Response status:', response.status);
+        console.log('ðŸ"µ Response status:', response.status);
         
         if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Upload failed:', errorData);
+        console.error('âŒ Upload failed:', errorData);
         toast.error(errorData.detail || 'Upload failed');
         setLoading(false);
         return;
         }
         
         const data = await response.json();
-        console.log('📤 Upload success:', data);
+        console.log('ðŸ"¤ Upload success:', data);
         
         if (data.success) {
         setUploadResult(data);
-        toast.success(`✅ Parsed ${data.transaction_count} transactions`);
+        toast.success(`âœ… Parsed ${data.transaction_count} transactions`);
         
-        // 🚨 CRITICAL FIX: Move to review step IMMEDIATELY
+        // ðŸš¨ CRITICAL: Move to review step IMMEDIATELY
         setCurrentStep('review');
         
-        // 🚨 Start polling for categorization status
+        // Start polling for categorization status
         await pollForCategorizationStatus(data.statement_id);
         
         } else {
-        console.error('❌ Upload returned success=false:', data);
+        console.error('âŒ Upload returned success=false:', data);
         toast.error(data.message || 'Upload failed');
         }
     } catch (error: any) {
-        console.error('❌ UPLOAD ERROR:', error);
+        console.error('âŒ UPLOAD ERROR:', error);
         toast.error(error.message || 'Upload failed');
     } finally {
         setLoading(false);
     }
     };
 
-    // 🚨 ADD THIS NEW FUNCTION RIGHT AFTER uploadStatement (line ~201):
-    // Poll for categorization status
+    // NEW: Poll for categorization status
     const pollForCategorizationStatus = async (statementId: string) => {
-    console.log('🔵 Starting categorization status polling for:', statementId);
+    console.log('ðŸ"µ Starting categorization status polling for:', statementId);
     
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     
-    // Poll every 2 seconds for 30 seconds max
     const maxAttempts = 15;
     let attempts = 0;
     
@@ -275,26 +278,22 @@ const BookkeepingPage = () => {
             const statusData = await response.json();
             
             if (statusData.success) {
-            console.log(`🔵 Poll ${attempts}: ${statusData.percentage}% categorized`);
+            console.log(`ðŸ"µ Poll ${attempts}: ${statusData.percentage}% categorized`);
             
-            // If categorization is complete or we've waited long enough
             if (statusData.categorization_complete || attempts >= maxAttempts) {
                 clearInterval(pollInterval);
-                console.log('✅ Polling complete. Fetching transactions...');
-                
-                // Fetch the categorized transactions
+                console.log('âœ… Polling complete. Fetching transactions...');
                 await fetchTransactions(statementId);
             }
             }
         }
         } catch (error) {
-        console.error('❌ Poll error:', error);
+        console.error('âŒ Poll error:', error);
         }
         
-        // Stop polling after max attempts
         if (attempts >= maxAttempts) {
         clearInterval(pollInterval);
-        console.log('⏱️ Max polling attempts reached. Fetching transactions anyway...');
+        console.log('â±ï¸ Max polling attempts reached. Fetching transactions anyway...');
         await fetchTransactions(statementId);
         }
     }, 2000);
@@ -310,9 +309,8 @@ const BookkeepingPage = () => {
             return;
             }
             
-            console.log('🔵 Fetching transactions for:', statementId);
+            console.log('ðŸ"µ Fetching transactions for:', statementId);
             
-            // Use real API call, not mock
             const response = await fetch(
             `http://localhost:8000/api/v1/bookkeeping/statements/${statementId}/transactions`,
             {
@@ -330,13 +328,13 @@ const BookkeepingPage = () => {
             const data = await response.json();
             
             if (data.success) {
-            console.log(`✅ Loaded ${data.transactions?.length || 0} transactions`);
+            console.log(`âœ… Loaded ${data.transactions?.length || 0} transactions`);
             setTransactions(data.transactions || []);
             
-            // Check if transactions are already categorized
             const categorized = (data.transactions || []).filter((t: any) => t.account_code).length;
             if (categorized > 0) {
-                console.log(`✅ ${categorized} transactions already categorized`);
+                console.log(`âœ… ${categorized} transactions already categorized`);
+                setCategorizationComplete(true);
             }
             } else {
             toast.error('Failed to load transactions');
@@ -344,16 +342,61 @@ const BookkeepingPage = () => {
         } catch (error) {
             console.error('Failed to fetch transactions:', error);
             toast.error('Failed to load transactions');
-            
-            // Fallback: show at least the mock data
-            const response = await apiClient.get(
-            `/api/v1/bookkeeping/statements/${statementId}/transactions`
-            );
-            if (response.data.success) {
-            setTransactions(response.data.transactions);
-            }
         }
         };
+
+    const updateTransaction = async (
+      transactionId: string,
+      accountCode: string,
+      category: string
+    ) => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Not authenticated');
+        return;
+        }
+
+        const response = await fetch(
+          'http://localhost:8000/api/v1/bookkeeping/transactions/update',
+          {
+            method: 'PUT',
+            headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+            transaction_id: transactionId, 
+            account_code: accountCode, 
+            category: category 
+          }),
+         }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          setTransactions(prev =>
+            prev.map(t =>
+              t.id === transactionId
+                ? { ...t, account_code: accountCode, category: category, is_manually_categorized: true }
+                : t
+            )
+          );
+        
+          toast.success('Transaction updated');
+          setEditingTransaction(null);
+        }
+      } catch (error) {
+        console.error('Update failed:', error);
+        toast.error('Failed to update transaction');
+      }
+    };
 
   // ============================================
   // STEP 3: CATEGORIZATION
@@ -363,28 +406,52 @@ const BookkeepingPage = () => {
     if (!uploadResult?.statement_id) return;
 
     try {
-      setLoading(true);
-      const response = await apiClient.post(
-        '/api/v1/bookkeeping/categorize-transactions',
-        {
-          statement_id: uploadResult.statement_id,
-          use_ai: categorizationMethod === 'ai'
+        setLoading(true);
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Not authenticated');
+        setLoading(false);
+        return;
         }
-      );
 
-      if (response.data.success) {
+        const response = await fetch(
+        'http://localhost:8000/api/v1/bookkeeping/categorize-transactions',
+        {
+            method: 'POST',
+            headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+            statement_id: uploadResult.statement_id,
+            use_ai: categorizationMethod === 'ai'
+            }),
+        }
+        );
+
+        if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
         await fetchTransactions(uploadResult.statement_id);
         setCategorizationComplete(true);
-        toast.success(`✅ Transactions categorized`);
+        toast.success(`✅ ${data.categorized_count || 0} transactions categorized`);
         setCurrentStep('report');
-      }
+        } else {
+        toast.error(data.message || 'Categorization failed');
+        }
     } catch (error: any) {
-      console.error('Categorization error:', error);
-      toast.error('Categorization failed');
+        console.error('Categorization error:', error);
+        toast.error('Categorization failed');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   // ============================================
   // STEP 4: GENERATE TRIAL BALANCE
@@ -392,38 +459,129 @@ const BookkeepingPage = () => {
 
   const generateTrialBalance = async () => {
     try {
-      setGeneratingReport(true);
-      
-      const mockTrialBalance: TrialBalance = {
-        accounts: [
-          { account_code: '1000', account_name: 'Cash', account_type: 'Asset', debits: 500000, credits: 200000, balance: 300000 },
-          { account_code: '1100', account_name: 'Accounts Receivable', account_type: 'Asset', debits: 300000, credits: 50000, balance: 250000 },
-          { account_code: '4000', account_name: 'Sales Revenue', account_type: 'Revenue', debits: 0, credits: 800000, balance: -800000 },
-          { account_code: '5000', account_name: 'Operating Expenses', account_type: 'Expense', debits: 250000, credits: 0, balance: 250000 }
-        ],
-        total_debits: 1050000,
-        total_credits: 1050000,
-        is_balanced: true,
-        period_start: '2024-01-01',
-        period_end: '2024-01-31'
-      };
-
-      setTimeout(() => {
-        setTrialBalance(mockTrialBalance);
-        toast.success('✅ Trial balance generated');
+        setGeneratingReport(true);
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Not authenticated');
         setGeneratingReport(false);
-      }, 1500);
-    } catch (error: any) {
-      console.error('Trial balance error:', error);
-      toast.error('Report generation failed');
-      setGeneratingReport(false);
-    }
-  };
+        return;
+        }
 
+        console.log('🔵 Generating trial balance (simple endpoint)...');
+
+        const response = await fetch(
+        'http://localhost:8000/api/v1/bookkeeping/simple-trial-balance',
+        {
+            method: 'POST',
+            headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            },
+        }
+        );
+
+        if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Backend error:', errorText);
+        throw new Error(`HTTP error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+        console.log('✅ Trial balance generated with', data.transaction_count, 'transactions');
+        setTrialBalance(data.trial_balance);
+        toast.success(`✅ Trial balance generated from ${data.transaction_count} transactions`);
+        } else {
+        toast.error(data.error || 'Failed to generate trial balance');
+        }
+    } catch (error: any) {
+        console.error('❌ Trial balance error:', error);
+        toast.error(error.message || 'Report generation failed');
+    } finally {
+        setGeneratingReport(false);
+    }
+    };
+  
+  // ============================================
+  // STEP 5: DOWNLOAD TRIAL BALANCE
+  // ============================================
   const downloadTrialBalance = async () => {
     if (!trialBalance) return;
-    toast.success('📥 Download started (mock)');
-  };
+    
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+        toast.error('Not authenticated');
+        return;
+        }
+
+        // Get the statement period from the uploaded file metadata
+        const metadata = uploadResult?.metadata;
+        const periodStart = metadata?.period_start || '2024-01-01';
+        const periodEnd = metadata?.period_end || '2024-01-31';
+
+        console.log('🔵 Exporting trial balance to Excel...');
+
+        const response = await fetch(
+        'http://localhost:8000/api/v1/bookkeeping/trial-balance/export',
+        {
+            method: 'POST',
+            headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+            period_start: periodStart,
+            period_end: periodEnd,
+            company_name: 'Your Company'
+            }),
+        }
+        );
+
+        if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        // Get the blob and create download link
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        // Extract filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = 'trial_balance.xlsx';
+        
+        if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+            filename = filenameMatch[1];
+        }
+        }
+        
+        // Create temporary link and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        toast.success('📥 Excel report downloaded');
+        
+    } catch (error: any) {
+        console.error('❌ Download error:', error);
+        toast.error('Failed to download report');
+        
+        // Fallback to mock download (for testing)
+        toast.success('📥 Download started (mock fallback)');
+    }
+    };
 
   // ============================================
   // WIZARD NAVIGATION

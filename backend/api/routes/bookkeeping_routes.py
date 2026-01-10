@@ -218,42 +218,123 @@ async def upload_bank_statement(
             
             # 5️⃣ SAVE TRANSACTIONS TO DATABASE
             if transactions:
+                # 🚨 CRITICAL: Pre-validate amounts before database insertion
+                reasonable_max = 100_000_000.00  # ₦100M sanity check
+                
                 # Prepare transactions for insertion
                 trans_to_insert = []
-            for trans in transactions:
-                # Cap amounts before inserting
-                debit = min(trans.get('debit_amount', 0), 9999999999999.99)
-                credit = min(trans.get('credit_amount', 0), 9999999999999.99)
-                balance = min(trans.get('balance', 0), 9999999999999.99)
-                
-                trans_to_insert.append({
-                    'user_id': user_id,
-                    'bank_statement_id': statement_id,
-                    'transaction_date': trans['transaction_date'],
-                    'description': trans.get('description', '')[:255],
-                    'reference': trans.get('reference', '')[:100],
-                    'debit_amount': debit,
-                    'credit_amount': credit,
-                    'balance': balance,
-                    'is_manually_categorized': False
-                })
+                for idx, trans in enumerate(transactions):
+                    # Cap amounts before inserting
+                    debit = float(trans.get('debit_amount', 0))
+                    credit = float(trans.get('credit_amount', 0))
+                    balance = float(trans.get('balance', 0))
+                    
+                    # 🚨 VALIDATION: Flag suspicious amounts
+                    if abs(debit) > reasonable_max or abs(credit) > reasonable_max:
+                        logger.error(
+                            f"🚨 TRANSACTION {idx+1} HAS SUSPICIOUS AMOUNT: "
+                            f"Debit={debit:,.2f}, Credit={credit:,.2f} - SKIPPING"
+                        )
+                        continue  # Skip this transaction entirely
+                    
+                    # Ensure amounts are within limits
+                    debit = min(debit, 9999999999999.99)
+                    credit = min(credit, 9999999999999.99)
+                    balance = min(balance, 9999999999999.99)
+                    
+                    # Clean description and reference to avoid SQL issues
+                    description = str(trans.get('description', '')).strip()
+                    if not description:
+                        description = "No description provided"  # Default value since column is NOT NULL
+                    
+                    reference = str(trans.get('reference', '')).strip()
+                    if not reference:
+                        reference = None  # This column is nullable
+                    
+                    # Ensure transaction_date is valid
+                    trans_date = trans.get('transaction_date', '')
+                    if not trans_date:
+                        # Use today's date if missing
+                        trans_date = datetime.now().strftime('%Y-%m-%d')
+                    
+                    # Format the date properly
+                    try:
+                        # Convert to ISO format if needed
+                        if 'T' in trans_date:
+                            trans_date = trans_date.split('T')[0]
+                    except:
+                        trans_date = datetime.now().strftime('%Y-%m-%d')
+                    
+                    trans_to_insert.append({
+                        'user_id': user_id,
+                        'bank_statement_id': statement_id,
+                        'transaction_date': trans_date,
+                        'description': description[:255],  # Ensure it fits in text column
+                        'reference': reference[:100] if reference else None,
+                        'debit_amount': str(debit),  # Convert to string for decimal
+                        'credit_amount': str(credit),
+                        'balance': str(balance),
+                        'is_manually_categorized': False,
+                        'created_at': datetime.now().isoformat(),
+                        'updated_at': datetime.now().isoformat()
+                    })
                 
                 logger.info(f"🔵 Saving {len(trans_to_insert)} transactions...")
+                logger.info(f"🔵 Sample transaction: {trans_to_insert[0] if trans_to_insert else 'No transactions'}")
                 
-                # Insert in batches to avoid issues
-                batch_size = 50
+                # Insert in smaller batches to avoid issues
+                batch_size = 10  # Reduced for safety
+                successful_inserts = 0
+                
                 for i in range(0, len(trans_to_insert), batch_size):
                     batch = trans_to_insert[i:i + batch_size]
-                    trans_result = supabase.table('transactions').insert(batch).execute()
-                    
-                    if not trans_result.data:
-                        logger.warning(f"⚠️ Batch {i//batch_size + 1} insert returned no data")
-                    else:
-                        logger.info(f"✅ Batch {i//batch_size + 1}: Saved {len(trans_result.data)} transactions")
+                    try:
+                        logger.info(f"🔵 Inserting batch {i//batch_size + 1} of {(len(trans_to_insert)-1)//batch_size + 1}")
+                        
+                        # Convert decimal amounts to strings for JSON serialization
+                        for item in batch:
+                            for amount_field in ['debit_amount', 'credit_amount', 'balance']:
+                                if amount_field in item and isinstance(item[amount_field], (int, float)):
+                                    item[amount_field] = str(item[amount_field])
+                        
+                        trans_result = supabase.table('transactions').insert(batch).execute()
+                        
+                        if not trans_result.data:
+                            logger.warning(f"⚠️ Batch {i//batch_size + 1} insert returned no data")
+                        else:
+                            successful_inserts += len(trans_result.data)
+                            logger.info(f"✅ Batch {i//batch_size + 1}: Saved {len(trans_result.data)} transactions")
+                            
+                    except Exception as batch_error:
+                        logger.error(f"❌ Batch {i//batch_size + 1} insert failed: {str(batch_error)}")
+                        
+                        # Log the error response if available
+                        if hasattr(batch_error, 'message'):
+                            logger.error(f"❌ Error message: {batch_error.message}")
+                        if hasattr(batch_error, 'details'):
+                            logger.error(f"❌ Error details: {batch_error.details}")
+                        
+                        # Try inserting one by one to identify the problematic transaction
+                        logger.info("🔄 Trying to insert transactions one by one...")
+                        for j, single_trans in enumerate(batch):
+                            try:
+                                # Ensure all decimal fields are strings
+                                for amount_field in ['debit_amount', 'credit_amount', 'balance']:
+                                    if amount_field in single_trans and isinstance(single_trans[amount_field], (int, float)):
+                                        single_trans[amount_field] = str(single_trans[amount_field])
+                                
+                                single_result = supabase.table('transactions').insert(single_trans).execute()
+                                if single_result.data:
+                                    successful_inserts += 1
+                                    logger.info(f"  ✅ Transaction {j+1} saved")
+                                else:
+                                    logger.warning(f"  ⚠️ Transaction {j+1} failed - no data returned")
+                            except Exception as single_error:
+                                logger.error(f"  ❌ Transaction {j+1} error: {str(single_error)}")
+                                # Don't log the full transaction to avoid PII in logs
+                                logger.error(f"  ❌ Problem with transaction date: {single_trans.get('transaction_date')}, description: {single_trans.get('description')[:50]}")
                 
-                logger.info(f"✅ Saved all {len(transactions)} transactions")
-            
-            logger.info(f"✅ UPLOAD COMPLETE: {statement_id}, {len(transactions)} transactions")
+                logger.info(f"✅ Saved {successful_inserts}/{len(transactions)} transactions")
             
             # 6️⃣ TRIGGER CATEGORIZATION IN BACKGROUND (optional)
             if background_tasks and len(transactions) > 0:
@@ -852,3 +933,186 @@ async def test_parser_directly(
             
     except Exception as e:
         return {"error": str(e)}
+    
+@router.post("/test-trial-balance")
+async def test_trial_balance_service(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Test trial balance service directly"""
+    try:
+        user_id = current_user['id']
+        
+        from backend.services.bookkeeping.trial_balance_service import TrialBalanceGenerator
+        
+        tb_generator = TrialBalanceGenerator(supabase)
+        
+        # Test with a simple date range
+        from datetime import date
+        test_result = await tb_generator.generate(
+            user_id=user_id,
+            period_start=date(2024, 1, 1),
+            period_end=date(2024, 1, 31),
+            save_to_db=False
+        )
+        
+        logger.info(f"🔵 Test result: {test_result}")
+        
+        return test_result
+        
+    except Exception as e:
+        logger.error(f"❌ Test failed: {str(e)}", exc_info=True)
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+    
+@router.get("/debug/user-info")
+async def debug_user_info(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Get current user info for debugging"""
+    try:
+        user_id = current_user['id']
+        email = current_user.get('email', 'No email')
+        
+        # Check transaction counts
+        all_trans = supabase.table('transactions')\
+            .select('id', count='exact')\
+            .eq('user_id', user_id)\
+            .execute()
+        
+        categorized_trans = supabase.table('transactions')\
+            .select('id', count='exact')\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .execute()
+        
+        # Get date range
+        date_range = supabase.table('transactions')\
+            .select('transaction_date')\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .order('transaction_date')\
+            .limit(1)\
+            .execute()
+        
+        earliest_date = None
+        latest_date = None
+        
+        if date_range.data and len(date_range.data) > 0:
+            earliest_date = date_range.data[0].get('transaction_date')
+        
+        date_range_end = supabase.table('transactions')\
+            .select('transaction_date')\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .order('transaction_date', desc=True)\
+            .limit(1)\
+            .execute()
+        
+        if date_range_end.data and len(date_range_end.data) > 0:
+            latest_date = date_range_end.data[0].get('transaction_date')
+        
+        return {
+            "success": True,
+            "user_info": {
+                "user_id": user_id,
+                "email": email,
+                "total_transactions": all_trans.count or 0,
+                "categorized_transactions": categorized_trans.count or 0,
+                "categorized_percentage": round((categorized_trans.count / all_trans.count * 100) if all_trans.count > 0 else 0, 1),
+                "earliest_categorized_date": earliest_date,
+                "latest_categorized_date": latest_date
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Debug endpoint failed: {str(e)}")
+        return {"success": False, "error": str(e)}
+    
+@router.post("/simple-trial-balance")
+async def simple_trial_balance(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Generate trial balance from ALL categorized transactions (no date filter)"""
+    try:
+        user_id = current_user['id']
+        
+        # Get ALL categorized transactions
+        result = supabase.table('transactions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .not_.is_('account_code', 'null')\
+            .execute()
+        
+        if not result.data:
+            return {"success": False, "error": "No categorized transactions found"}
+        
+        transactions = result.data
+        logger.info(f"✅ Found {len(transactions)} categorized transactions")
+        
+        # Simple aggregation
+        accounts = {}
+        for trans in transactions:
+            account_code = trans.get('account_code', '0000')
+            if account_code not in accounts:
+                accounts[account_code] = {
+                    'account_code': account_code,
+                    'account_name': trans.get('category', 'Unknown'),
+                    'debits': 0.0,
+                    'credits': 0.0
+                }
+            
+            # Convert amounts safely
+            debit = float(trans.get('debit_amount', 0) or 0)
+            credit = float(trans.get('credit_amount', 0) or 0)
+            
+            accounts[account_code]['debits'] += debit
+            accounts[account_code]['credits'] += credit
+        
+        # Prepare response
+        accounts_list = []
+        total_debits = 0.0
+        total_credits = 0.0
+        
+        for acc_code, acc in accounts.items():
+            balance = acc['debits'] - acc['credits']
+            accounts_list.append({
+                'account_code': acc_code,
+                'account_name': acc['account_name'],
+                'account_type': 'Asset' if acc_code.startswith('1') else 
+                               'Liability' if acc_code.startswith('2') else 
+                               'Equity' if acc_code.startswith('3') else 
+                               'Revenue' if acc_code.startswith('4') else 
+                               'Expense',
+                'debits': acc['debits'],
+                'credits': acc['credits'],
+                'balance': balance
+            })
+            
+            total_debits += acc['debits']
+            total_credits += acc['credits']
+        
+        # Get actual date range
+        dates = [t.get('transaction_date') for t in transactions if t.get('transaction_date')]
+        period_start = min(dates) if dates else '2024-01-01'
+        period_end = max(dates) if dates else '2024-12-31'
+        
+        trial_balance = {
+            'accounts': accounts_list,
+            'total_debits': total_debits,
+            'total_credits': total_credits,
+            'is_balanced': abs(total_debits - total_credits) < 0.01,
+            'period_start': period_start,
+            'period_end': period_end
+        }
+        
+        return {
+            "success": True,
+            "trial_balance": trial_balance,
+            "transaction_count": len(transactions)
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Simple trial balance failed: {str(e)}")
+        return {"success": False, "error": str(e)}
