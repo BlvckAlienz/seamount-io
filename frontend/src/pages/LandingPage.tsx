@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ArrowRight, Globe, Shield, Zap, Briefcase, Mail, MapPin, Phone, 
-  ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Info, Lock, 
+  ChevronDown, ChevronUp, TrendingUp, AlertTriangle, Server, ShieldCheck, Info, Lock, 
   Wallet, CreditCard, Layers, Coins, LineChart, Users, Building, 
   Target, PieChart, Database, Smartphone, Cpu, BarChart3,
   CheckCircle, Award, Globe2, Clock, Eye, Sparkles, Key, DollarSign
@@ -216,7 +216,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     prediction: {
       title: "🎯 Seamount Marketplace",
-      description: "List and invest in traditional and tokenized assets",
+      description: "List and invest in tokenized assets",
       features: [
         "Publish tokenized assets for sale",
         "Invest in real-world assets like equities, real-estate, data centers, etc",
@@ -245,49 +245,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     }
   };
 
-  const features = [
-    {
-      icon: <Database className="h-8 w-8" />,
-      title: "Multi-Chain Infrastructure",
-      description: "Unified access across 5+ blockchain networks with atomic settlement",
-      color: "text-blue-500",
-      bg: "bg-blue-50"
-    },
-    {
-      icon: <Smartphone className="h-8 w-8" />,
-      title: "Mobile-First Experience",
-      description: "Full platform functionality on any device, anywhere in the world",
-      color: "text-purple-500",
-      bg: "bg-purple-50"
-    },
-    {
-      icon: <Cpu className="h-8 w-8" />,
-      title: "AI Strategy",
-      description: "Data acquisition for proprietary model development and training",
-      color: "text-green-500",
-      bg: "bg-green-50"
-    },
-    {
-      icon: <BarChart3 className="h-8 w-8" />,
-      title: "Institutional-Grade Security",
-      description: "Military-grade encryption with multi-signature wallet protection",
-      color: "text-red-500",
-      bg: "bg-red-50"
-    }
-  ];
-
   const faqs = [
     { 
       question: "What assets can be tokenized on Seamount?", 
       answer: "We support tokenization of securities, real estate, private equities/shares, infrastructure (data centers, power grids, etc.), commodities, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
     },
     { 
-      question: "How do prediction markets work?", 
-      answer: "Seamount's prediction markets (powered by CAMP network) allow you to trade outcomes of real-world events. From sports to commodity prices, you can stake tokens on outcomes and earn based on market accuracy. All settlements are transparent and on-chain." 
+      question: "What licenses do we need to use Seamount?", 
+      answer: "Seamount is a technology provider, not a licensed financial service provider. You operate the service under your existing or new financial license (e-money issuer, payment service provider, etc.). We provide the technical infrastructure while you maintain regulatory compliance and customer relationships." 
     },
-    { 
-      question: "Is this available in my country?", 
-      answer: "Seamount operates globally with specific compliance frameworks for Nigeria (ISA 2025), Kenya (VASP Act), South Africa (FSCA), and the UAE (DFSA). We're expanding regulatory coverage across Africa and the Middle East." 
+    {
+      question: "What markets do you currently operate in?",
+      answer: "Our infrastructure is live in Nigeria (via Quidax partnership). We're expanding to Kenya, Ghana, and South Africa soon."
     },
     {
       question: "How does the audit & taxation service work?",
@@ -979,8 +948,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="block">Seamount</span>
-              <span className="gradient-text">Digital Assets Market</span>
+              <span className="block">Gateway to</span>
+              <span className="gradient-text">Alternative Assets</span>
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
@@ -1167,42 +1136,173 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           )}
         </div>
       </section>
-
-      {/* Features Grid */}
-      <section id="features" className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
-        <FloatingCrypto count={8} section="features" />
+      
+      {/* ===== NEW INFRASTRUCTURE SECTION ===== */}
+      <section className="py-12 sm:py-20 px-3 sm:px-6 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full text-sm font-medium mb-4 shadow-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-gray-700">Modular, cloud-native, API-first "Fintech OS"</span>
+              </div>
+            </div>
+            
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
-              Why <span className="gradient-text">Seamount</span> Stands Out
+              <span className="gradient-text">Infrastructure</span> for Emerging Markets
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Institutional-grade infrastructure with consumer-friendly simplicity
+              Launch Your Service in <span className="gradient-text">Weeks, Not Years</span>
             </p>
           </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 px-2">
-            {features.map((feature, idx) => (
+
+          {/* Infrastructure Cards */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-2">
+            {[
+              {
+                title: "Payment Processing Engine",
+                description: "High-volume transaction switch for banks & MNOs",
+                features: ["10,000+ TPS capacity", "99.99% uptime SLA", "Multi-channel support"],
+                icon: <Server className="h-8 w-8" />,
+                color: "from-blue-500 to-cyan-500",
+                partnerNote: "Available for licensing"
+              },
+              {
+                title: "Agent Network Management",
+                description: "Complete platform for managing distribution networks",
+                features: ["Real-time settlement", "Liquidity management", "Fraud monitoring"],
+                icon: <Users className="h-8 w-8" />,
+                color: "from-green-500 to-emerald-500",
+                partnerNote: "Available for licensing"
+              },
+              {
+                title: "Regulatory Compliance Core",
+                description: "Built-in compliance for African markets",
+                features: ["KYC/AML automation", "Tax engine", "Audit trail system"],
+                icon: <ShieldCheck className="h-8 w-8" />,
+                color: "from-purple-500 to-pink-500",
+                partnerNote: "Localized for Nigeria. Processing for Kenya and other regions"
+              }
+            ].map((service, idx) => (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
                 viewport={{ once: true }}
-                className="glass-card rounded-2xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300"
+                className="glass-card rounded-2xl p-6 hover:shadow-xl transition-all duration-300 border-2 border-gray-100"
               >
-                <div className={`w-12 h-12 ${feature.bg} rounded-xl flex items-center justify-center mb-4`}>
-                  <div className={feature.color}>
-                    {feature.icon}
+                <div className={`w-12 h-12 bg-gradient-to-br ${service.color} rounded-xl flex items-center justify-center mb-4`}>
+                  <div className="text-white">
+                    {service.icon}
                   </div>
                 </div>
-                <h3 className="text-xl font-bold mb-3 text-gray-900">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+                
+                <h3 className="text-xl font-bold mb-2 text-gray-900">{service.title}</h3>
+                <p className="text-gray-600 mb-4 text-sm">{service.description}</p>
+                
+                <div className="space-y-2 mb-4">
+                  {service.features.map((feature, fIdx) => (
+                    <div key={fIdx} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-700">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                {service.partnerNote && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 font-medium">{service.partnerNote}</p>
+                  </div>
+                )}
+                
+                <button 
+                  onClick={() => {
+                    document.getElementById('business')?.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Auto-focus the first input field after scrolling
+                    setTimeout(() => {
+                      const firstInput = document.querySelector('#business input[type="text"]') as HTMLInputElement;
+                      if (firstInput) {
+                        firstInput.focus();
+                      }
+                    }, 500);
+                  }}
+                  className="mt-4 w-full px-4 py-2 bg-gray-50 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition text-sm"
+                >
+                  Request Demo
+                </button>
               </motion.div>
             ))}
           </div>
+
+          {/* Partnership Model Explanation */}
+          <div className="mt-16 max-w-4xl mx-auto">
+            <div className="glass-card rounded-2xl p-6 sm:p-8">
+              <div className="flex flex-col md:flex-row items-start gap-6">
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold mb-4 text-gray-900">Our Partnership Model</h3>
+                  <div className="space-y-4 text-gray-600">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-blue-600 font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Licensed Operations (Nigeria)</p>
+                        <p className="text-sm">We operate payment services in Nigeria through our API integration partnership with Quidax, an SEC-licensed VASP.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-green-600 font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Technology Licensing</p>
+                        <p className="text-sm">We license our infrastructure technology to banks, MNOs, and fintechs in other markets who operate under their own licenses.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-purple-600 font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Platform Services</p>
+                        <p className="text-sm">We operate the Seamount platform for asset tokenization and investment services through licensed partners and fund managers.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="md:w-1/3">
+                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
+                    <h4 className="font-bold text-gray-900 mb-3">Regulatory Transparency</h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Seamount operates through multiple models to ensure full regulatory compliance in each market we serve.
+                    </p>
+                    <div className="space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700">Nigeria Operations:</span>
+                        <span className="font-semibold text-green-600">Via Quidax License</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700">Kenya Expansion:</span>
+                        <span className="font-semibold text-amber-600">In Progress</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700">Technology Licensing:</span>
+                        <span className="font-semibold text-blue-600">Available Now</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
+      {/* ===== END NEW SECTION ===== */}
 
       {/* 📍 COMPLETE CALCULATOR SECTION (from old version) */}
       <section id="calculator" className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
@@ -1462,6 +1562,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     }
                   </div>
                 </div>
+                <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs">
+                    <p className="font-medium text-amber-800 mb-1">Investment Services Note:</p>
+                    <p className="text-amber-700">
+                      Seamount operates investment services through licensed fund managers and partners. 
+                      All investment products are managed by third-party licensed entities. 
+                      Past performance does not guarantee future results.
+                    </p>
+               </div>
               </div>
             </div>
           </div>
@@ -1477,7 +1585,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               For <span className="gradient-text">Business</span> & Institutions
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Transform your business with Web3 infrastructure
+              Transform your business with fast, compliant payment solutions
             </p>
           </div>
           
@@ -1490,6 +1598,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 
                 <div className="space-y-6">
                   {[
+                    {
+                      icon: "🎯",
+                      title: "Payment Service Development",
+                      description: "Build the next M-Pesa. Launch your digital bank"
+                    },
                     {
                       icon: "🏢",
                       title: "Asset Tokenization",
@@ -1504,11 +1617,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       icon: "📊",
                       title: "Regulatory Compliance",
                       description: "Full statutory audits, tax compliance, and regulatory reporting"
-                    },
-                    {
-                      icon: "🎯",
-                      title: "Smart Contract Development",
-                      description: "Build the operating system for how your asset is launched, distributed, and scaled"
                     }
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors">
