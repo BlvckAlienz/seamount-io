@@ -10,7 +10,6 @@ import { api } from '@/lib/api';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import TerminalPage from './pages/TerminalPage';
 import CompliancePage from './pages/CompliancePage';
-import BookkeepingPage from '@/pages/BookkeepingPage';
 import MeterXpressPage from '@/pages/MeterXpressPage';
 
 // ✅ ADD THESE IMPORTS
@@ -294,16 +293,6 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute businessRequired={true}>
               <CompliancePage />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* 📊 Bookkeeping Routes - BUSINESS ONLY */}
-        <Route 
-          path="/bookkeeping" 
-          element={
-            <ProtectedRoute businessRequired={true}>
-              <BookkeepingPage />
             </ProtectedRoute>
           } 
         />

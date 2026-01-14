@@ -46,7 +46,6 @@ const Sidebar: React.FC = () => {
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
     { label: 'Collateral', icon: Lock, path: '/collateral', badge: 'NEW', businessOnly: true },
     { label: 'Audit & Tax', icon: Receipt, path: '/compliance', businessOnly: true },
-    { label: 'Bookkeeping', icon: BookOpen, path: '/bookkeeping', badge: 'NEW', businessOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
     { label: 'Predictions', icon: Target, path: '/predictions', individualOnly: true },

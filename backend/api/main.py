@@ -776,57 +776,6 @@ if routers_available.get('tax'):
     app.include_router(routers_available['tax'])
     logger.info("✅ Tax Intelligence router registered with its own prefix")
 
-# 📊 Bookkeeping Routes (Bank Statements + Trial Balance) - FORCE REGISTER
-logger.info("=" * 60)
-logger.info("🔵 ATTEMPTING TO REGISTER BOOKKEEPING ROUTES")
-logger.info("=" * 60)
-
-try:
-    import sys
-    import importlib
-    
-    # Force reload the module to ensure latest code
-    if 'backend.api.routes.bookkeeping_routes' in sys.modules:
-        logger.info("🔵 Module already loaded, reloading...")
-        importlib.reload(sys.modules['backend.api.routes.bookkeeping_routes'])
-    
-    from backend.api.routes.bookkeeping_routes import router as bookkeeping_router
-    
-    logger.info(f"🔵 Router object: {bookkeeping_router}")
-    logger.info(f"🔵 Router prefix: {bookkeeping_router.prefix}")
-    logger.info(f"🔵 Router routes: {[r.path for r in bookkeeping_router.routes]}")
-    
-    # Register with explicit prefix to avoid conflicts
-    app.include_router(
-        bookkeeping_router,
-        prefix="",  # Already has /api/v1/bookkeeping in router
-        tags=["Bookkeeping"]
-    )
-    
-    logger.info("=" * 60)
-    logger.info("✅ BOOKKEEPING ROUTES REGISTERED SUCCESSFULLY")
-    logger.info("=" * 60)
-    
-    # Verify registration
-    bookkeeping_routes = [r for r in app.routes if 'bookkeeping' in str(r.path)]
-    for route in bookkeeping_routes:
-        logger.info(f"   ✅ {route.methods} {route.path}")
-    
-except ImportError as e:
-    logger.error("=" * 60)
-    logger.error(f"❌ BOOKKEEPING ROUTER IMPORT FAILED")
-    logger.error(f"❌ Error: {e}")
-    logger.error("=" * 60)
-    import traceback
-    logger.error(traceback.format_exc())
-except Exception as e:
-    logger.error("=" * 60)
-    logger.error(f"❌ BOOKKEEPING ROUTER REGISTRATION FAILED")
-    logger.error(f"❌ Error: {e}")
-    logger.error("=" * 60)
-    import traceback
-    logger.error(traceback.format_exc())
-
 # 🎯 Tax Intelligence Routes (V1 + V2)
 try:
     from backend.api.routes.tax_routes import router as tax_router

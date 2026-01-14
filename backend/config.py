@@ -657,6 +657,8 @@ class Settings(BaseSettings):
         default=None,
         description="Alchemy API key for Polygon"
     )
+
+    SOLANA_RPC_URL: Optional[str] = "https://api.mainnet-beta.solana.com"
     
     # ========================================================================
     # ALGORAND CONFIGURATION

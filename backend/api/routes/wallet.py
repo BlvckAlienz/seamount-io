@@ -82,7 +82,15 @@ SUPPORTED_CHAINS = {
         "speed": "3 seconds",
         "cost": "~$0.05",
         "address_pattern": r'^T[A-Za-z1-9]{33}$'
-    }
+    },
+    "solana": {
+        "name": "Solana",
+        "native_asset": "SOL",
+        "supported_assets": ["SOL", "USDT", "USDC"],
+        "speed": "0.4 seconds",
+        "cost": "~$0.00025",
+        "address_pattern": r'^[1-9A-HJ-NP-Za-km-z]{32,44}$'  # Base58 address
+    } 
 }
 
 GASLESS_CHAINS = ["ethereum", "polygon"]

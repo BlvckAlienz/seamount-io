@@ -52,7 +52,12 @@ class MultiChainWalletService:
         
         # USDC variants
         'USDC_ETH': 'ethereum',
-        'USDC_POLYGON': 'polygon'
+        'USDC_POLYGON': 'polygon',
+
+        # Solana native assets
+        'SOL': 'solana',
+        'USDT_SOLANA': 'solana',
+        'USDC_SOLANA': 'solana'
     }
     
     # Algorand Asset IDs (ASA)
@@ -66,7 +71,7 @@ class MultiChainWalletService:
     }
     
     # Supported chains
-    SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+    SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
     
     def __init__(self, db_service: DatabaseService, algorand_service: AlgorandService, 
                  fee_calculator: FeeCalculatorService, oracle_service: OracleService):
@@ -255,7 +260,8 @@ class MultiChainWalletService:
             'ethereum': 'ETH',
             'polygon': 'MATIC',
             'tron': 'TRX',
-            'algorand': 'ALGO'
+            'algorand': 'ALGO',
+            'solana': 'SOL'  # ➕ ADD THIS
         }
         return native_map.get(chain, 'UNKNOWN')
 
@@ -645,6 +651,11 @@ class MultiChainWalletService:
             logger.info(f"✅ Routed {asset} → tron")
             return 'tron'
         
+        # Solana
+        if asset == 'SOL':
+            logger.info(f"✅ Routed {asset} → solana")
+            return 'solana'
+        
         # ✅ USDT routing (optimized for 5 chains only)
         if asset == 'USDT':
             if amount < Decimal('500'):
@@ -802,6 +813,7 @@ class MultiChainWalletService:
             'bitcoin': '10-60 minutes',
             'ethereum': '12 seconds',
             'polygon': '2 seconds',
-            'tron': '3 seconds'
+            'tron': '3 seconds',
+            'solana': '0.4 seconds'
         }
         return times.get(chain, '1-5 minutes')

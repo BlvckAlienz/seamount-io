@@ -87,6 +87,7 @@ class WDKClient:
         'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
         'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
         'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
+        'solana',       # ✅ Available via @tetherto/wdk-wallet-solana
     ]
     
     # EVM gasless chains that use the same wallet manager
@@ -1121,7 +1122,129 @@ class WDKClient:
                         'error': str(e),
                         'chain': 'tron'
                     }
-            
+                
+            # ╔═══════════════════════════════════════════════════════════════
+            # SOLANA
+            # ╚═══════════════════════════════════════════════════════════════
+            elif chain == 'solana':
+                try:
+                    logger.info(f"🔍 Querying Solana balance for {address[:10]}...")
+                    
+                    # Solana RPC endpoint (public or from config)
+                    solana_rpc = self.settings.SOLANA_RPC_URL if hasattr(self.settings, 'SOLANA_RPC_URL') else "https://api.mainnet-beta.solana.com"
+                    
+                    async with aiohttp.ClientSession() as session:
+                        headers = {
+                            "Content-Type": "application/json"
+                        }
+                        
+                        # Solana RPC request format
+                        payload = {
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "getBalance",
+                            "params": [address]
+                        }
+                        
+                        timeout = aiohttp.ClientTimeout(total=15)
+                        
+                        async with session.post(solana_rpc, json=payload, headers=headers, timeout=timeout) as response:
+                            response_text = await response.text()
+                            
+                            logger.info(f"📡 Solana RPC response status: {response.status}")
+                            
+                            if response.status == 200:
+                                try:
+                                    data = await response.json() if response.content_type == 'application/json' else None
+                                    
+                                    if not data or 'result' not in data:
+                                        logger.error(f"❌ Solana RPC returned invalid response: {response_text[:200]}")
+                                        return {
+                                            'balance': '0',
+                                            'success': False,
+                                            'error': 'Invalid JSON response from Solana RPC',
+                                            'chain': 'solana'
+                                        }
+                                    
+                                    # Extract balance (in lamports, 1 SOL = 1,000,000,000 lamports)
+                                    balance_lamports = data['result'].get('value', 0)
+                                    balance_sol = Decimal(balance_lamports) / Decimal('1000000000')
+                                    
+                                    logger.info(f"✅ SOL balance: {balance_sol} SOL ({balance_lamports} lamports)")
+                                    
+                                    return {
+                                        'balance': str(balance_sol),
+                                        'success': True,
+                                        'chain': 'solana',
+                                        'source': 'solana_rpc',
+                                        'address': address,
+                                        'raw_balance_lamports': balance_lamports
+                                    }
+                                    
+                                except (ValueError, KeyError) as parse_err:
+                                    logger.error(f"❌ Failed to parse Solana response: {parse_err}")
+                                    logger.error(f"   Raw response: {response_text[:500]}")
+                                    return {
+                                        'balance': '0',
+                                        'success': False,
+                                        'error': f'JSON parse error: {parse_err}',
+                                        'chain': 'solana'
+                                    }
+                            
+                            elif response.status == 429:
+                                logger.error(f"⚠️ Solana RPC rate limit exceeded (429)")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': 'Rate limit exceeded - add SOLANA_RPC_URL to .env',
+                                    'chain': 'solana'
+                                }
+                            
+                            elif response.status in [500, 502, 503, 504]:
+                                logger.error(f"❌ Solana RPC server error: {response.status}")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': f'Solana RPC service unavailable ({response.status})',
+                                    'chain': 'solana'
+                                }
+                            
+                            else:
+                                logger.error(f"❌ Solana RPC unexpected status {response.status}: {response_text[:200]}")
+                                return {
+                                    'balance': '0',
+                                    'success': False,
+                                    'error': f'HTTP {response.status}',
+                                    'chain': 'solana'
+                                }
+                
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ Solana RPC timeout for {address[:10]}...")
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': 'Solana RPC timeout',
+                        'chain': 'solana'
+                    }
+                
+                except aiohttp.ClientError as http_err:
+                    logger.error(f"❌ Solana RPC HTTP error: {http_err}")
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': f'Network error: {http_err}',
+                        'chain': 'solana'
+                    }
+                
+                except Exception as e:
+                    logger.error(f"❌ Unexpected error querying Solana balance: {e}", exc_info=True)
+                    return {
+                        'balance': '0',
+                        'success': False,
+                        'error': str(e),
+                        'chain': 'solana'
+                    }
+                
             # ╔════════════════════════════════════════════════
             # UNSUPPORTED CHAIN
             # ╚════════════════════════════════════════════════
