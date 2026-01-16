@@ -201,13 +201,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'wallets'
     },
     tokenization: {
-      title: "🗝️ Asset Tokenization",
-      description: "Transform real-world assets into liquid digital securities",
+      title: "🗝️ Asset Tokenization & Crowdfunding",
+      description: "Transform assets into digital securities and raise capital from private markets",
       features: [
-        "Asset conversion and listing on Seamount marketplace",
-        "Unlock capital via fractional sale of premium assets",
-        "Collateral management",
-        "Secondary market trading"
+        "Raise capital through fractional ownership",
+        "Bypass traditional gatekeepers with direct access to investors",
+        "Women-led businesses gain equal visibility and opportunity",
+        "Transparent, merit-based capital allocation"
       ],
       icon: <PieChart className="h-12 w-12" />,
       color: "from-purple-500 to-pink-500",
@@ -215,13 +215,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'tokenization'
     },
     prediction: {
-      title: "🎯 Seamount Marketplace",
-      description: "List and invest in tokenized assets",
+      title: "👩‍🚀 Founder Marketplace",
+      description: "Raise capital from a global pool of investors",
       features: [
-        "Publish tokenized assets for sale",
-        "Invest in real-world assets like equities, real-estate, data centers, etc",
-        "Manage your assets seamlessly",
-        "Transparent DVP settlement (<4 mins)"
+        "List your business for equity crowdfunding",
+        "Access investors who value diverse leadership",
+        "Digital-first capital raising reduces bias",
+        "Real-time settlement for investor payouts"
       ],
       icon: <Target className="h-12 w-12" />,
       color: "from-orange-500 to-yellow-500",
@@ -247,20 +247,20 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const faqs = [
     { 
-      question: "What assets can be tokenized on Seamount?", 
-      answer: "We support tokenization of securities, real estate, private equities/shares, infrastructure (data centers, power grids, etc.), commodities, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
+      question: "How does Seamount help women entrepreneurs raise capital?", 
+      answer: "We provide direct access to private markets through equity crowdfunding. Our platform gives equal visibility to women-led businesses and uses alternative data for credit scoring, focusing on transaction history and trade behavior rather than traditional collateral." 
     },
     { 
-      question: "Is Seamount regulated?", 
+      question: "How do you assess creditworthiness for SMEs without formal financials?", 
+      answer: "We use transaction data from your bank statements, cash flow patterns, trade behavior, and market engagement. This alternative data approach makes SMEs visible and financeable without requiring extensive financial history or collateral." 
+    },
+    {
+      question: "Is Seamount regulated?",
       answer: "Seamount operates in Nigeria via partnership with a licensed VASP under regulatory oversight of the SEC's ISA 2025. We are also registered with the NFIU. Globally, we are pursuing licenses under frameworks such as Kenya (VASP Act), South Africa (FSCA), and the UAE (DFSA)."
     },
     {
       question: "What markets do you currently operate in?",
       answer: "Our infrastructure is live in Nigeria (via Quidax partnership). We're expanding to Kenya, Ghana, and South Africa soon."
-    },
-    {
-      question: "How does the audit & taxation service work?",
-      answer: "Our Audit & Taxation process begins with understanding your business and document gathering. Afterwards, our licensed audit partners ensure we deliver end-to-end regulatory tax compliance for your business. The service is designed specifically for SMEs who want to stay compliant and unlock greater capital."
     }
   ];
 
@@ -904,9 +904,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
+            <a href="#entrepreneurs" className="text-gray-700 hover:text-purple-600 transition-all hover:scale-105">👩‍🚀 For Founders</a>
             <a href="#services" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Services</a>
-            <a href="#features" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Features</a>
-            <a href="#calculator" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Calculator</a>
+            <a href="#calculator" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">Invest</a>
             <a href="#business" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Business</a>
           </nav>
           
@@ -948,14 +948,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="block">Gateway to</span>
-              <span className="gradient-text">Alternative Assets</span>
+              <span className="block">Crowdfunding</span>
+              <span className="gradient-text">for SMEs</span>
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              <p className="mb-2">Global Payments. Asset tokenization. Compliance.</p>
+              <p className="mb-2">Raise capital, build creditworthiness, access 24/7 settlements.</p>
               <p className="font-semibold text-gray-900">
-                One Platform. Real Solutions.
+                Where women founders and SMEs become visible.
               </p>
             </div>
             
@@ -1056,6 +1056,46 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
+      {/* Women & MSME Success Stories Section */}
+      <section id="entrepreneurs" className="py-16 px-3 sm:px-6 bg-gradient-to-r from-purple-50 to-pink-50 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
+              Built for <span className="gradient-text">Founders</span>
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Traditional credit tests fail SMEs. We flip the model.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <div className="text-4xl mb-4">📱</div>
+              <h3 className="text-xl font-bold mb-3">Digital-First Access</h3>
+              <p className="text-gray-600">
+                For many in remote areas, a phone = access + inclusion. No gatekeepers, no bias.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <div className="text-4xl mb-4">🏪</div>
+              <h3 className="text-xl font-bold mb-3">SMEs Become Visible</h3>
+              <p className="text-gray-600">
+                We use transaction data, cash flow, trade behavior, not credit committees.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 shadow-lg">
+              <div className="text-4xl mb-4">👩‍🚀</div>
+              <h3 className="text-xl font-bold mb-3">Bypass Broken Systems</h3>
+              <p className="text-gray-600">
+                Entrepreneurs access growth capital without permission. Equity crowdfunding = structural shift.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Services Section WITH IMAGES */}
       <section id="services" ref={servicesRef} className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={10} section="services" />
@@ -1136,173 +1176,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           )}
         </div>
       </section>
-      
-      {/* ===== NEW INFRASTRUCTURE SECTION ===== */}
-      <section className="py-12 sm:py-20 px-3 sm:px-6 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full text-sm font-medium mb-4 shadow-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-gray-700">Modular, cloud-native, API-first "Fintech OS"</span>
-              </div>
-            </div>
-            
-            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
-              <span className="gradient-text">Infrastructure</span> for Emerging Markets
-            </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Launch Your Service in <span className="gradient-text">Weeks, Not Years</span>
-            </p>
-          </div>
-
-          {/* Infrastructure Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-2">
-            {[
-              {
-                title: "Payment Processing Engine",
-                description: "High-volume transaction switch for banks & MNOs",
-                features: ["10,000+ TPS capacity", "99.99% uptime SLA", "Multi-channel support"],
-                icon: <Server className="h-8 w-8" />,
-                color: "from-blue-500 to-cyan-500",
-                partnerNote: "Available for licensing"
-              },
-              {
-                title: "Agent Network Management",
-                description: "Complete platform for managing distribution networks",
-                features: ["Real-time settlement", "Liquidity management", "Fraud monitoring"],
-                icon: <Users className="h-8 w-8" />,
-                color: "from-green-500 to-emerald-500",
-                partnerNote: "Available for licensing"
-              },
-              {
-                title: "Regulatory Compliance Core",
-                description: "Built-in compliance for African markets",
-                features: ["KYC/AML automation", "Tax engine", "Audit trail system"],
-                icon: <ShieldCheck className="h-8 w-8" />,
-                color: "from-purple-500 to-pink-500",
-                partnerNote: "Localized for Nigeria. Processing for Kenya and other regions"
-              }
-            ].map((service, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                viewport={{ once: true }}
-                className="glass-card rounded-2xl p-6 hover:shadow-xl transition-all duration-300 border-2 border-gray-100"
-              >
-                <div className={`w-12 h-12 bg-gradient-to-br ${service.color} rounded-xl flex items-center justify-center mb-4`}>
-                  <div className="text-white">
-                    {service.icon}
-                  </div>
-                </div>
-                
-                <h3 className="text-xl font-bold mb-2 text-gray-900">{service.title}</h3>
-                <p className="text-gray-600 mb-4 text-sm">{service.description}</p>
-                
-                <div className="space-y-2 mb-4">
-                  {service.features.map((feature, fIdx) => (
-                    <div key={fIdx} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                {service.partnerNote && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 font-medium">{service.partnerNote}</p>
-                  </div>
-                )}
-                
-                <button 
-                  onClick={() => {
-                    document.getElementById('business')?.scrollIntoView({ behavior: 'smooth' });
-                    
-                    // Auto-focus the first input field after scrolling
-                    setTimeout(() => {
-                      const firstInput = document.querySelector('#business input[type="text"]') as HTMLInputElement;
-                      if (firstInput) {
-                        firstInput.focus();
-                      }
-                    }, 500);
-                  }}
-                  className="mt-4 w-full px-4 py-2 bg-gray-50 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition text-sm"
-                >
-                  Request Demo
-                </button>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Partnership Model Explanation */}
-          <div className="mt-16 max-w-4xl mx-auto">
-            <div className="glass-card rounded-2xl p-6 sm:p-8">
-              <div className="flex flex-col md:flex-row items-start gap-6">
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold mb-4 text-gray-900">Our Partnership Model</h3>
-                  <div className="space-y-4 text-gray-600">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-blue-600 font-bold">1</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Licensed Operations (Nigeria)</p>
-                        <p className="text-sm">We operate payment services in Nigeria through our API integration partnership with Quidax, an SEC-licensed VASP.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-green-600 font-bold">2</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Technology Licensing</p>
-                        <p className="text-sm">We license our infrastructure technology to banks, MNOs, and fintechs in other markets who operate under their own licenses.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-purple-600 font-bold">3</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Platform Services</p>
-                        <p className="text-sm">We operate the Seamount platform for asset tokenization and investment services through licensed partners and fund managers.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="md:w-1/3">
-                  <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-                    <h4 className="font-bold text-gray-900 mb-3">Regulatory Transparency</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Seamount operates through multiple models to ensure full regulatory compliance in each market we serve.
-                    </p>
-                    <div className="space-y-3 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-700">Nigeria Operations:</span>
-                        <span className="font-semibold text-green-600">Via Quidax License</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-700">Kenya Expansion:</span>
-                        <span className="font-semibold text-amber-600">In Progress</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-700">Technology Licensing:</span>
-                        <span className="font-semibold text-blue-600">Available Now</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      {/* ===== END NEW SECTION ===== */}
 
       {/* 📍 COMPLETE CALCULATOR SECTION (from old version) */}
       <section id="calculator" className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
@@ -1311,7 +1184,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           <div className="text-center mb-16">
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">Calculate Your Returns</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              See how much your crypto can earn. Prime (5.25% net, instant) and Alpha (8.20% net, quarterly) tiers available now via Seamount. All fees included.
+              See how much you can earn. Prime (5.25% net, instant) and Alpha (8.20% net, quarterly) tiers available now via Seamount. All fees included.
             </p>
           </div>
           
@@ -1576,16 +1449,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* Business Section WITH FORM */}
+       {/* Business Section WITH FORM */}
       <section id="business" className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={10} section="business" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
-              For <span className="gradient-text">Business</span> & Institutions
+              Find Your Next <span className="gradient-text">Deal</span>
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Transform your business with fast, compliant payment solutions
+              Founder? Unlock capital. Investor? Find opportunities.
             </p>
           </div>
           
@@ -1599,19 +1472,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <div className="space-y-6">
                   {[
                     {
-                      icon: "🎯",
-                      title: "Payment Service Development",
-                      description: "Build the next M-Pesa. Launch your digital bank"
-                    },
-                    {
                       icon: "🏢",
-                      title: "Asset Tokenization",
-                      description: "Convert real estate, private equity, and infrastructure into digital securities"
+                      title: "Asset Tokenization & Crowdfunding",
+                      description: "Convert real estate or private equity into digital securities and raise capital"
                     },
                     {
                       icon: "💸",
                       title: "Digital Treasury",
                       description: "24/7 global payments with multi-currency support and yield generation"
+                    },
+                    {
+                      icon: "🎯",
+                      title: "Market Intelligence",
+                      description: "View deals and African SMEs with clarity and transparency"
                     },
                     {
                       icon: "📊",
@@ -1765,10 +1638,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-30"></div>
             <div className="relative glass-card rounded-3xl p-6 sm:p-12">
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 text-gray-900 px-2">
-                Building an <span className="gradient-text">Ownership</span> Economy
+                Building an <span className="gradient-text">Ownership Economy</span> for Everyone
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                We are on a mission to improve financial inclusion, and quality of lives in Africa through asset ownership.
+                Join the platform where women founders and MSMEs are the default users, not an afterthought.
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 
@@ -1796,12 +1669,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain rounded-lg" />
                 <span className="text-xl font-bold text-white">Seamount</span>
               </div>
-              <p className="text-gray-400 text-sm">The future of capital markets is on-chain</p>
+              <p className="text-gray-400 text-sm">Where women entrepreneurs and MSMEs become the economy's engine</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition">Features</a></li>
+                <li><a href="#services" className="hover:text-white transition">Features</a></li>
                 <li><a href="#calculator" className="hover:text-white transition">Calculator</a></li>
               </ul>
             </div>

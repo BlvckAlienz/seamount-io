@@ -408,7 +408,7 @@ class WDKClient:
         """
         
         if chains is None:
-            chains = ['bitcoin', 'ethereum', 'polygon', 'tron']
+            chains = ['bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
         
         # Validate chains
         invalid_chains = [c for c in chains if c not in self.SUPPORTED_CHAINS]
@@ -420,7 +420,7 @@ class WDKClient:
         if len(seed_words) != 12:
             raise ValueError(f"Invalid seed: expected 12 words, got {len(seed_words)}")
         
-        logger.info(f"🔐 Creating wallets for {len(chains)} chains with validated 12-word seed")
+        logger.info(f"🔧 Creating wallets for {len(chains)} chains with validated 12-word seed")
         
         payload = {
             'plaintext_seed': plaintext_seed.strip(),  # ✅ Clean whitespace
@@ -464,8 +464,8 @@ class WDKClient:
         """
         Get balance with intelligent routing based on asset type:
         
-        NATIVE ASSETS (ETH, BTC, TRX, MATIC):
-        → Direct RPC (Alchemy, TronGrid, Blockchain.info)
+        NATIVE ASSETS (ETH, BTC, TRX, MATIC, SOL):
+        → Direct RPC (Alchemy, TronGrid, Blockchain.info, Solana RPC)
         
         TOKEN ASSETS (USDT, USDC, XAUT):
         → Try Tether Indexer → Fallback to Direct RPC
@@ -476,14 +476,15 @@ class WDKClient:
         
         logger.info(f"🔍 Balance query: {chain} / {asset or 'native'} / {address[:10]}...")
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # DETERMINE ASSET TYPE
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         native_assets = {
             'ethereum': 'ETH',
             'bitcoin': 'BTC',
             'tron': 'TRX',
-            'polygon': 'MATIC'
+            'polygon': 'MATIC',
+            'solana': 'SOL'
         }
         
         # Map asset names to Tether Indexer token identifiers
@@ -492,6 +493,7 @@ class WDKClient:
             'USDT_ETH': 'usdt',
             'USDT_POLYGON': 'usdt',
             'USDT_TRON': 'usdt',
+            'USDT_SOLANA': 'usdt',
             'USDC': 'usdt',  # Tether only indexes USDT, not USDC
             'XAUT': 'xaut',
             'goBTC': 'btc'
@@ -503,9 +505,9 @@ class WDKClient:
             asset.upper() == native_assets.get(chain, '').upper()
         )
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # PATH 1: NATIVE ASSETS → Direct RPC Only
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         if is_native:
             logger.info(f"🎯 Native asset detected ({native_assets.get(chain)}) - using Direct RPC")
             result = await self.get_balance_direct_rpc(address, chain)
@@ -523,9 +525,9 @@ class WDKClient:
                     'source': 'fallback'
                 }
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # PATH 2: TOKEN ASSETS → Try Tether Indexer First
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         token_identifier = tether_token_map.get(asset.upper() if asset else None)
         
         if use_indexer and self.indexer_url and token_identifier:
@@ -564,9 +566,9 @@ class WDKClient:
             if not token_identifier:
                 logger.debug(f"⚠️ Token {asset} not supported by Tether Indexer")
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # TIER 2: Your WDK Service (Optional Middle Layer)
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         try:
             logger.debug(f"📡 TIER 2: Trying your WDK Service...")
             
@@ -595,9 +597,9 @@ class WDKClient:
         except Exception as e:
             logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # TIER 3: Direct RPC (Final Fallback)
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         logger.info(f"🔄 TIER 3: Falling back to Direct RPC...")
         result = await self.get_balance_direct_rpc(address, chain)
         
@@ -605,9 +607,9 @@ class WDKClient:
             logger.info(f"✅ TIER 3 SUCCESS: Balance from Direct RPC")
             return result
         
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         # COMPLETE FAILURE: Return Zero Balance
-        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # ═════════════════════════════════════════════════════════════════════
         logger.error(f"❌ ALL TIERS FAILED for {chain}/{asset}: {address[:10]}...")
         return {
             'balance': '0',
@@ -630,13 +632,14 @@ class WDKClient:
         enable_gasless: bool = True
     ) -> Dict[str, Any]:
         """
-        Send transaction with WDK - Supports BTC, ETH, MATIC, TRX
+        Send transaction with WDK - Supports BTC, ETH, MATIC, TRX, SOL
         
         CHAIN-SPECIFIC IMPLEMENTATIONS:
         - Bitcoin: Native BTC only, no tokens
         - Ethereum: ETH + ERC-20 tokens (USDT, USDC)
         - Polygon: MATIC + ERC-20 tokens (USDT, USDC)
         - Tron: TRX + TRC-20 tokens (USDT)
+        - Solana: SOL + SPL tokens
         """
         
         if chain not in self.SUPPORTED_CHAINS:
@@ -709,7 +712,6 @@ class WDKClient:
                 
             else:
                 # ERC-20 token transfer (USDT, USDC, etc.)
-                # Get token contract address
                 from backend.config import get_settings
                 settings = get_settings()
                 
@@ -817,6 +819,69 @@ class WDKClient:
                 logger.error(f"❌ Tron transaction failed: {tron_error}")
                 raise
         
+        # ============================================================================
+        # SOLANA TRANSACTIONS (✅ NEW)
+        # ============================================================================
+        elif chain == 'solana':
+            # Determine if native SOL or SPL token
+            is_native = (asset == 'SOL')
+            
+            if is_native:
+                # Native SOL transfer
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'amount_lamports': int(amount * 1_000_000_000),  # SOL to lamports
+                    'chain': 'solana'
+                }
+                
+                endpoint = '/wallet/solana/send'
+                
+            else:
+                # SPL token transfer
+                from backend.config import get_settings
+                settings = get_settings()
+                
+                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_SOLANA")
+                if not asset_config:
+                    raise Exception(f"Asset {asset} not configured for Solana")
+                
+                token_address = asset_config.get('contract_address')
+                if not token_address:
+                    raise Exception(f"No contract address for {asset} on Solana")
+                
+                decimals = asset_config.get('decimals', 9)
+                amount_base = int(amount * (10 ** decimals))
+                
+                payload = {
+                    'plaintext_seed': plaintext_seed,
+                    'from_address': from_address,
+                    'to_address': to_address,
+                    'token_address': token_address,
+                    'amount': str(amount_base),
+                    'chain': 'solana'
+                }
+                
+                endpoint = '/wallet/solana/send-token'
+            
+            try:
+                result = await self._make_request('POST', endpoint, data=payload)
+                
+                if not result.get('success'):
+                    raise Exception(result.get('error', 'Solana transaction failed'))
+                
+                return {
+                    'tx_id': result['tx_hash'],
+                    'chain': 'solana',
+                    'fee': result.get('fee_lamports', 0) / 1_000_000_000,  # Back to SOL
+                    'success': True
+                }
+                
+            except Exception as sol_error:
+                logger.error(f"❌ Solana transaction failed: {sol_error}")
+                raise
+        
         else:
             raise ValueError(f"Chain {chain} not implemented yet")
     
@@ -834,9 +899,9 @@ class WDKClient:
         try:
             logger.info(f"🔄 Direct RPC: {chain} / {address[:10]}...")
             
-            # ╔════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════
             # BITCOIN
-            # ╚════════════════════════════════════════════════
+            # ╚═══════════════════════════════════════════════════════════════
             if chain == 'bitcoin':
                 async with aiohttp.ClientSession() as session:
                     url = f"https://blockchain.info/balance?active={address}"
@@ -857,9 +922,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ╔════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════
             # ETHEREUM
-            # ╚════════════════════════════════════════════════
+            # ╚═══════════════════════════════════════════════════════════════
             elif chain == 'ethereum':
                 if not self.settings.ALCHEMY_API_KEY_ETHEREUM:
                     logger.error("❌ No Alchemy API key for Ethereum")
@@ -892,9 +957,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ╔════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════
             # POLYGON
-            # ╚════════════════════════════════════════════════
+            # ╚═══════════════════════════════════════════════════════════════
             elif chain == 'polygon':
                 if not self.settings.ALCHEMY_API_KEY_POLYGON:
                     logger.error("❌ No Alchemy API key for Polygon")
@@ -973,9 +1038,9 @@ class WDKClient:
                                 'address': address
                             }
             
-            # ╔════════════════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════════════════════════════
             # TRON - BULLETPROOF IMPLEMENTATION
-            # ╚════════════════════════════════════════════════════════════
+            # ╚═══════════════════════════════════════════════════════════════════════════════════════
             elif chain == 'tron':
                 try:
                     logger.info(f"🔍 Querying Tron balance for {address[:10]}...")
@@ -1123,9 +1188,9 @@ class WDKClient:
                         'chain': 'tron'
                     }
                 
-            # ╔═══════════════════════════════════════════════════════════════
-            # SOLANA
-            # ╚═══════════════════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════════════════════════════
+            # SOLANA (✅ NEW)
+            # ╚═══════════════════════════════════════════════════════════════════════════════════════
             elif chain == 'solana':
                 try:
                     logger.info(f"🔍 Querying Solana balance for {address[:10]}...")
@@ -1245,9 +1310,9 @@ class WDKClient:
                         'chain': 'solana'
                     }
                 
-            # ╔════════════════════════════════════════════════
+            # ╔═══════════════════════════════════════════════════════════════
             # UNSUPPORTED CHAIN
-            # ╚════════════════════════════════════════════════
+            # ╚═══════════════════════════════════════════════════════════════
             else:
                 logger.warning(f"⚠️ Chain {chain} not implemented in Direct RPC")
                 return {
@@ -1304,47 +1369,6 @@ class WDKClient:
         
         return balances
     
-    # ========== TRANSACTIONS ==========
-    
-    async def send_transaction(
-        self,
-        from_address: str,
-        to_address: str,
-        amount: Decimal,
-        asset: str,
-        chain: str,
-        encrypted_seed: str,
-        enable_gasless: bool = True
-    ) -> Dict[str, Any]:
-        """Send transaction on specified chain"""
-        
-        if chain not in self.SUPPORTED_CHAINS:
-            raise ValueError(f"Unsupported chain: {chain}")
-        
-        # Check if gasless is available
-        use_gasless = enable_gasless and chain in self.GASLESS_CHAINS
-        
-        payload = {
-            'from_address': from_address,
-            'to_address': to_address,
-            'amount': str(amount),
-            'asset': asset,
-            'chain': chain,
-            'encrypted_seed': encrypted_seed,
-            'gasless': use_gasless
-        }
-        
-        result = await self._make_request('POST', '/wallet/send', data=payload)
-        
-        if not result.get('success'):
-            raise Exception(f"Transaction failed: {result.get('error', 'Unknown error')}")
-        
-        result['gasless_used'] = use_gasless
-        result['chain_used'] = chain
-        
-        logger.info(f"✅ Transaction sent on {chain} ({'gasless' if use_gasless else 'standard'})")
-        return result
-    
     # ========== UTILITY METHODS ==========
     
     def is_chain_supported(self, chain: str) -> bool:
@@ -1355,204 +1379,6 @@ class WDKClient:
         """Check if gasless transactions available"""
         return chain.lower() in self.GASLESS_CHAINS
     
-    # ============================================================================
-    # SEND TRANSACTIONS (Multi-Chain)
-    # ============================================================================
-    
-    async def send_transaction(
-        self,
-        from_address: str,
-        to_address: str,
-        amount: Decimal,
-        asset: str,
-        chain: str,
-        encrypted_seed: str,
-        enable_gasless: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Send transaction via WDK - Supports BTC, ETH, MATIC, TRX
-        
-        CHAIN-SPECIFIC IMPLEMENTATIONS:
-        - Bitcoin: Native BTC only (UTXO management in Phase 2)
-        - Ethereum: ETH + ERC-20 tokens (USDT, USDC)
-        - Polygon: MATIC + ERC-20 tokens (USDT, USDC) + Gasless
-        - Tron: TRX + TRC-20 tokens (USDT)
-        
-        Returns:
-            {
-                'tx_id': 'transaction_hash',
-                'chain': 'ethereum',
-                'fee': 0.0015,
-                'gasless_used': False,
-                'success': True
-            }
-        """
-        
-        if chain not in self.SUPPORTED_CHAINS:
-            raise ValueError(f"Unsupported chain: {chain}")
-        
-        logger.info(f"🚀 WDK Transaction: {amount} {asset} on {chain}")
-        
-        # Decrypt seed for signing
-        from backend.services.seed_encryption_service import SeedEncryptionService
-        encryption_service = SeedEncryptionService()
-        
-        try:
-            plaintext_seed = encryption_service.decrypt_seed(encrypted_seed)
-            logger.info(f"🔓 Seed decrypted successfully")
-        except Exception as decrypt_err:
-            logger.error(f"❌ Seed decryption failed: {decrypt_err}")
-            raise Exception(f"Cannot decrypt wallet seed: {decrypt_err}")
-        
-        # ========================================================================
-        # BITCOIN TRANSACTIONS (Phase 2 - UTXO Management)
-        # ========================================================================
-        if chain == 'bitcoin':
-            logger.warning(f"⏸️ Bitcoin sends require UTXO management (coming in Phase 2)")
-            
-            # Return user-friendly error
-            raise Exception(
-                "Bitcoin sends coming soon! "
-                "Use Ethereum or Polygon for instant transfers. "
-                "Bitcoin requires UTXO selection (complex implementation)."
-            )
-        
-        # ========================================================================
-        # ETHEREUM & POLYGON TRANSACTIONS (EVM chains)
-        # ========================================================================
-        elif chain in ['ethereum', 'polygon']:
-            # Determine if native currency or token
-            is_native = (
-                (chain == 'ethereum' and asset == 'ETH') or
-                (chain == 'polygon' and asset == 'MATIC')
-            )
-            
-            if is_native:
-                # Native currency transfer (ETH or MATIC)
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount_wei': str(int(amount * 10**18)),  # ETH/MATIC to wei
-                    'chain': chain,
-                    'gasless': enable_gasless and chain == 'polygon'  # Only Polygon supports gasless
-                }
-                
-                endpoint = f'/wallet/{chain}/send'
-                
-            else:
-                # ERC-20 token transfer (USDT, USDC, etc.)
-                from backend.config import get_settings
-                settings = get_settings()
-                
-                # Get token contract address
-                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_{chain.upper()}")
-                if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for {chain}")
-                
-                token_address = asset_config.get('contract_address')
-                if not token_address:
-                    raise Exception(f"No contract address for {asset} on {chain}")
-                
-                decimals = asset_config.get('decimals', 6)
-                amount_base = int(amount * (10 ** decimals))
-                
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'token_address': token_address,
-                    'amount': str(amount_base),
-                    'chain': chain,
-                    'gasless': enable_gasless and chain == 'polygon'
-                }
-                
-                endpoint = f'/wallet/{chain}/send-token'
-            
-            try:
-                result = await self._make_request('POST', endpoint, data=payload)
-                
-                if not result.get('success'):
-                    raise Exception(result.get('error', f'{chain} transaction failed'))
-                
-                return {
-                    'tx_id': result['tx_hash'],
-                    'chain': chain,
-                    'fee': result.get('gas_used', 0),
-                    'gasless_used': result.get('gasless', False),
-                    'success': True
-                }
-                
-            except Exception as evm_error:
-                logger.error(f"❌ {chain} transaction failed: {evm_error}")
-                raise
-        
-        # ========================================================================
-        # TRON TRANSACTIONS
-        # ========================================================================
-        elif chain == 'tron':
-            # Determine if native TRX or TRC-20 token
-            is_native = (asset == 'TRX')
-            
-            if is_native:
-                # Native TRX transfer
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount_sun': int(amount * 1_000_000),  # TRX to sun
-                    'chain': 'tron'
-                }
-                
-                endpoint = '/wallet/tron/send'
-                
-            else:
-                # TRC-20 token transfer (USDT)
-                from backend.config import get_settings
-                settings = get_settings()
-                
-                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
-                if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for Tron")
-                
-                token_address = asset_config.get('contract_address')
-                if not token_address:
-                    raise Exception(f"No contract address for {asset} on Tron")
-                
-                decimals = asset_config.get('decimals', 6)
-                amount_base = int(amount * (10 ** decimals))
-                
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'token_address': token_address,
-                    'amount': str(amount_base),
-                    'chain': 'tron'
-                }
-                
-                endpoint = '/wallet/tron/send-token'
-            
-            try:
-                result = await self._make_request('POST', endpoint, data=payload)
-                
-                if not result.get('success'):
-                    raise Exception(result.get('error', 'Tron transaction failed'))
-                
-                return {
-                    'tx_id': result['tx_hash'],
-                    'chain': 'tron',
-                    'fee': result.get('energy_used', 0),
-                    'success': True
-                }
-                
-            except Exception as tron_error:
-                logger.error(f"❌ Tron transaction failed: {tron_error}")
-                raise
-        
-        else:
-            raise ValueError(f"Chain {chain} not implemented yet")
-        
     async def health_check(self) -> Dict[str, Any]:
         """Check WDK service health"""
         try:

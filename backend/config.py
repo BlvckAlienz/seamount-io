@@ -833,6 +833,13 @@ class Settings(BaseSettings):
     CASHRAMP_WEBHOOK_SECRET: Optional[SecretStr] = None
     FLUTTERWAVE_SECRET_KEY: Optional[SecretStr] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
+
+    # Harbor (OwlPay) - Multi-chain crypto gateway
+    HARBOR_API_KEY: Optional[SecretStr] = Field(None, env="HARBOR_API_KEY")
+    HARBOR_WEBHOOK_URL: Optional[str] = Field(
+        "https://seamount-api.onrender.com/api/v1/webhooks/owlpay",
+        env="HARBOR_WEBHOOK_URL"
+    )
     # Commodity & Forex API Keys (Optional - improves rate limits)
     ALPHA_VANTAGE_API_KEY: Optional[SecretStr] = None  # Free: 500 req/day
     TWELVE_DATA_API_KEY: Optional[SecretStr] = None     # Free: 800 req/day

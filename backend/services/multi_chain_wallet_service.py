@@ -2,7 +2,8 @@
 """
 Multi-Chain Wallet Service - PRODUCTION READY v2.0
 ✅ Fixed all duplications
-✅ Removed unsupported chains (arbitrum, solana, ton)
+✅ Removed unsupported chains (arbitrum, ton)
+✅ Added Solana support
 ✅ Added robust error handling
 ✅ Fixed asset key normalization
 ✅ Added comprehensive logging
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 class MultiChainWalletService:
     """
     Production-ready multi-chain wallet orchestrator
-    Supports: Algorand, Bitcoin, Ethereum, Polygon, Tron (5 chains)
+    Supports: Algorand, Bitcoin, Ethereum, Polygon, Tron, Solana (6 chains)
     """
     
     # ========== ASSET-TO-CHAIN MAPPING ==========
@@ -43,21 +44,19 @@ class MultiChainWalletService:
         'USDT_ETH': 'ethereum',
         'USDT_POLYGON': 'polygon',
         'USDT_TRON': 'tron',
+        'USDT_SOLANA': 'solana',  # ✅ NEW
         
         # Native chain assets
         'BTC': 'bitcoin',
         'ETH': 'ethereum',
         'MATIC': 'polygon',
         'TRX': 'tron',
+        'SOL': 'solana',  # ✅ NEW
         
         # USDC variants
         'USDC_ETH': 'ethereum',
         'USDC_POLYGON': 'polygon',
-
-        # Solana native assets
-        'SOL': 'solana',
-        'USDT_SOLANA': 'solana',
-        'USDC_SOLANA': 'solana'
+        'USDC_SOLANA': 'solana'  # ✅ NEW
     }
     
     # Algorand Asset IDs (ASA)
@@ -144,7 +143,7 @@ class MultiChainWalletService:
                 return {'success': True, 'address': algo_address, 'chain': chain}
             
             else:
-                # Create WDK wallet (Bitcoin, Ethereum, Polygon, Tron)
+                # Create WDK wallet (Bitcoin, Ethereum, Polygon, Tron, Solana)
                 from mnemonic import Mnemonic
                 
                 # Generate plaintext seed
@@ -229,6 +228,12 @@ class MultiChainWalletService:
             # Default: All supported WDK chains
             wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
         
+        # 🔍 DEBUG LOGGING (temporary)
+        logger.info(f"🔍 DEBUG: Input chains = {chains}")
+        logger.info(f"🔍 DEBUG: self.SUPPORTED_CHAINS = {self.SUPPORTED_CHAINS}")
+        logger.info(f"🔍 DEBUG: wdk_chains = {wdk_chains}")
+        logger.info(f"🔍 DEBUG: About to create {len(wdk_chains)} WDK wallets")
+        
         # 3. Create WDK wallets sequentially
         for chain in wdk_chains:
             try:
@@ -261,7 +266,7 @@ class MultiChainWalletService:
             'polygon': 'MATIC',
             'tron': 'TRX',
             'algorand': 'ALGO',
-            'solana': 'SOL'  # ➕ ADD THIS
+            'solana': 'SOL'  # ✅ ADD THIS
         }
         return native_map.get(chain, 'UNKNOWN')
 
@@ -580,7 +585,7 @@ class MultiChainWalletService:
             # ============================================================================
             return {
                 'success': True,
-                'message': f'Payment sent! Your {asset} will arrive shortly. ✓',
+                'message': f'Payment sent! Your {asset} will arrive shortly. ✔',
                 'transaction_id': result['tx_id'],
                 'amount': float(amount),
                 'asset': asset,
@@ -603,8 +608,8 @@ class MultiChainWalletService:
     
     async def auto_route_transaction(self, asset: str, amount: Decimal, recipient: str) -> str:
         """
-        Smart chain selection for 5 supported chains
-        Updated to remove unsupported chains (arbitrum, solana, ton)
+        Smart chain selection for 6 supported chains
+        Updated to include Solana support
         """
         
         logger.info(f"🔀 Auto-routing: {asset} (amount: {amount})")
@@ -618,7 +623,8 @@ class MultiChainWalletService:
                 "algo": "algorand",
                 "eth": "ethereum",
                 "polygon": "polygon",
-                "tron": "tron"
+                "tron": "tron",
+                "solana": "solana"  # ✅ NEW
             }
             
             routed_chain = chain_map.get(chain_suffix)
@@ -651,19 +657,19 @@ class MultiChainWalletService:
             logger.info(f"✅ Routed {asset} → tron")
             return 'tron'
         
-        # Solana
+        # Solana (✅ NEW)
         if asset == 'SOL':
             logger.info(f"✅ Routed {asset} → solana")
             return 'solana'
         
-        # ✅ USDT routing (optimized for 5 chains only)
+        # ✅ USDT routing (optimized for 6 chains)
         if asset == 'USDT':
             if amount < Decimal('500'):
                 logger.info(f"✅ Routed USDT → polygon (gasless, amount < $500)")
                 return 'polygon'  # Gasless for small amounts
             elif amount < Decimal('5000'):
-                logger.info(f"✅ Routed USDT → tron (low cost, amount < $5000)")
-                return 'tron'  # Low fees
+                logger.info(f"✅ Routed USDT → solana (lowest fees, amount < $5000)")
+                return 'solana'  # ✅ NEW: Lowest fees for medium amounts
             else:
                 logger.info(f"✅ Routed USDT → tron (best liquidity, amount ≥ $5000)")
                 return 'tron'  # Best for large amounts
@@ -736,7 +742,7 @@ class MultiChainWalletService:
         chain: str
     ) -> Dict:
         """
-        Send transaction via WDK chains (Bitcoin, Ethereum, Polygon, Tron)
+        Send transaction via WDK chains (Bitcoin, Ethereum, Polygon, Tron, Solana)
         
         FLOW:
         1. Get wallet credentials from database
