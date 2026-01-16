@@ -123,7 +123,7 @@ async def create_multi_chain_wallet(
                     logger.warning(f"Unsupported chain requested: {chain}")
         else:
             # Default essential chains
-            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
+            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon", "solana"]
         
         logger.info(f"Creating multi-chain wallet for user {user_id} on chains: {chains}")
         

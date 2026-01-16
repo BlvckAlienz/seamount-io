@@ -251,8 +251,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       answer: "We support tokenization of securities, real estate, private equities/shares, infrastructure (data centers, power grids, etc.), commodities, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
     },
     { 
-      question: "What licenses do we need to use Seamount?", 
-      answer: "Seamount is a technology provider, not a licensed financial service provider. You operate the service under your existing or new financial license (e-money issuer, payment service provider, etc.). We provide the technical infrastructure while you maintain regulatory compliance and customer relationships." 
+      question: "Is Seamount regulated?", 
+      answer: "Seamount operates in Nigeria via partnership with a licensed VASP under regulatory oversight of the SEC's ISA 2025. We are also registered with the NFIU. Globally, we are pursuing licenses under frameworks such as Kenya (VASP Act), South Africa (FSCA), and the UAE (DFSA)."
     },
     {
       question: "What markets do you currently operate in?",
@@ -1768,7 +1768,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Building an <span className="gradient-text">Ownership</span> Economy
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                Tokenize assets, unlock capital, invest, and ensure compliance—all in one place.
+                We are on a mission to improve financial inclusion, and quality of lives in Africa through asset ownership.
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 

@@ -227,7 +227,7 @@ class MultiChainWalletService:
             wdk_chains = [c for c in chains if c != 'algorand' and c in self.SUPPORTED_CHAINS]
         else:
             # Default: All supported WDK chains
-            wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'tron']
+            wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
         
         # 3. Create WDK wallets sequentially
         for chain in wdk_chains:
