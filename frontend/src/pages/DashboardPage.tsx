@@ -291,7 +291,7 @@ const DashboardPage = () => {
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-4 md:p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg md:text-xl font-bold text-white">Multi-Chain Wallets</h2>
-              <span className="text-xs md:text-sm text-gray-400">{createdChains} of 5 created</span>
+              <span className="text-xs md:text-sm text-gray-400">{createdChains} of 6 created</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
