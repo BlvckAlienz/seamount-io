@@ -57,6 +57,11 @@ const ASSET_GROUPS = {
   tron: [
     { value: 'TRX', label: 'TRON (TRX)', icon: '⚡', backend_key: 'TRX' },
     { value: 'USDT_TRON', label: 'Tether (Tron)', icon: '₮', backend_key: 'USDT_TRON' },
+  ],
+  solana: [
+    { value: 'SOL', label: 'Solana (SOL)', icon: '◎', backend_key: 'SOL' },
+    { value: 'USDT_SOLANA', label: 'Tether (Solana)', icon: '₮', backend_key: 'USDT_SOLANA' },
+    { value: 'USDC_SOLANA', label: 'USD Coin (Solana)', icon: '◎', backend_key: 'USDC_SOLANA' },
   ]
 }
 
@@ -73,7 +78,8 @@ const CHAIN_NAMES: { [key: string]: string } = {
   'bitcoin': '🟠 Bitcoin',
   'ethereum': '🔵 Ethereum',
   'polygon': '🟣 Polygon',
-  'tron': '🔴 Tron'
+  'tron': '🔴 Tron',
+  'solana': '🟣 Solana'
 }
 
 // ========== CASHRAMP-SUPPORTED WITHDRAWAL CURRENCIES ==========

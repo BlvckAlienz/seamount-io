@@ -106,6 +106,7 @@ const DashboardPage = () => {
     { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
     { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
     { id: 'tron', name: 'TRON', symbol: 'TRX' },
+    { id: 'solana', name: 'Solana', symbol: 'SOL' },
   ];
 
   useEffect(() => {
@@ -293,7 +294,7 @@ const DashboardPage = () => {
               <span className="text-xs md:text-sm text-gray-400">{createdChains} of 5 created</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
               {AUTO_CREATED_CHAINS.map(chain => (
                 <ChainWalletCard 
                   key={chain.id} 

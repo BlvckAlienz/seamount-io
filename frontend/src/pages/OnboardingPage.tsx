@@ -271,6 +271,16 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       emoji: '🔴',
       description: 'High Throughput',
       index: 5
+    },
+    { 
+    id: 'solana', 
+    name: 'Solana', 
+    icon: Zap, 
+    color: 'from-purple-400 to-pink-600',
+    gradient: 'bg-gradient-to-br from-purple-500 to-pink-700',
+    emoji: '🟣',
+    description: 'Ultra-Fast Blockchain',
+    index: 6
     }
   ];
 
@@ -285,7 +295,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
     
     try {
       const response = await apiClient.post('/api/v1/wallet/create-multi-chain', {
-        chains: ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+        chains: ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
       });
 
       if (response.data.success) {
@@ -345,7 +355,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
       </div>
 
       {/* Chain Cards Grid - RESPONSIVE & PROPERLY SIZED */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {chains.map((chain) => {
           const Icon = chain.icon;
           const isCreated = wallets[chain.id];
@@ -417,7 +427,7 @@ const MultiChainWalletStep = ({ onComplete }: { onComplete: (wallets: any) => vo
           <span className="text-xl">📊</span>
           Chain Status Overview
         </h4>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-6 gap-2">
           {chains.map(chain => {
             const isCreated = wallets[chain.id];
             return (

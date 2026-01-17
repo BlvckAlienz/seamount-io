@@ -75,6 +75,11 @@ const ASSET_GROUPS = {
   tron: [
     { value: 'TRX', label: 'TRON (TRX)', icon: '⚡', description: 'High-throughput blockchain', backend_key: 'TRX' },
     { value: 'USDT_TRON', label: 'Tether USD (Tron)', icon: '₮', description: 'USDT on Tron', backend_key: 'USDT_TRON' },
+  ],
+  solana: [
+    { value: 'SOL', label: 'Solana (SOL)', icon: '◎', description: 'Ultra-fast blockchain', backend_key: 'SOL' },
+    { value: 'USDT_SOLANA', label: 'Tether USD (Solana)', icon: '₮', description: 'USDT on Solana', backend_key: 'USDT_SOLANA' },
+    { value: 'USDC_SOLANA', label: 'USD Coin (Solana)', icon: '◎', description: 'USDC on Solana', backend_key: 'USDC_SOLANA' },
   ]
 }
 
@@ -93,7 +98,8 @@ const CHAIN_NAMES: { [key: string]: string } = {
   'bitcoin': '🟠 Bitcoin',
   'ethereum': '🔵 Ethereum',
   'polygon': '🟣 Polygon',
-  'tron': '🔴 Tron'
+  'tron': '🔴 Tron',
+  'solana': '🟣 Solana'
 }
 
 import { useAuth } from '@/contexts/AuthContext';

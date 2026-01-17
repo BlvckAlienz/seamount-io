@@ -71,6 +71,12 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         icon: 'https://cryptologos.cc/logos/tron-trx-logo.svg',
         color: 'from-red-500 to-red-700',
         symbol: 'TRX'
+      },
+      solana: {
+      name: 'Solana',
+      icon: 'https://cryptologos.cc/logos/solana-sol-logo.svg',
+      color: 'from-purple-400 to-pink-600',
+      symbol: 'SOL'
       }
     };
     return configs[chain as keyof typeof configs] || configs.algorand;
@@ -103,6 +109,11 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/trx.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/trx.png',
         'https://cryptoicon-api.vercel.app/api/icon/trx'
+      ],
+      solana: [
+        'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/sol.png',
+        'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/sol.png',
+        'https://cryptoicon-api.vercel.app/api/icon/sol'
       ]
     };
     

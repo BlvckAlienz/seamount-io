@@ -56,6 +56,11 @@ const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = 
   tron: [
     { symbol: 'TRX', name: 'TRON' },
     { symbol: 'USDT', name: 'Tether' }
+  ],
+  solana: [
+    { symbol: 'SOL', name: 'Solana' },
+    { symbol: 'USDT', name: 'Tether' },
+    { symbol: 'USDC', name: 'USD Coin' }
   ]
 };
 
@@ -63,9 +68,9 @@ const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = 
 const getOracleAssetName = (symbol: string): string => {
   const assetMap: { [key: string]: string } = {
     'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic',
-    'ALGO': 'algorand', 'TRX': 'tron', 'USDT': 'tether',
-    'USDC': 'tether', 'USDCa': 'tether', 'goBTC': 'bitcoin',
-    'goETH': 'ethereum'
+    'ALGO': 'algorand', 'TRX': 'tron', 'SOL': 'solana',
+    'USDT': 'tether', 'USDC': 'tether', 'USDCa': 'tether', 
+    'goBTC': 'bitcoin', 'goETH': 'ethereum'
   };
   return assetMap[symbol] || 'algorand';
 };
@@ -74,9 +79,9 @@ const getOracleAssetName = (symbol: string): string => {
 const getEmergencyFallbackPrice = (symbol: string): number => {
   const fallbackPrices: { [key: string]: number } = {
     'BTC': 63500.00, 'ETH': 2650.00, 'ALGO': 0.18,
-    'MATIC': 0.75, 'TRX': 0.12, 'USDT': 1.00,
-    'USDC': 1.00, 'USDCa': 1.00, 'goBTC': 63500.00,
-    'goETH': 2650.00
+    'MATIC': 0.75, 'TRX': 0.12, 'SOL': 145.00,
+    'USDT': 1.00, 'USDC': 1.00, 'USDCa': 1.00, 
+    'goBTC': 63500.00, 'goETH': 2650.00
   };
   return fallbackPrices[symbol] || 0.00;
 };
@@ -119,9 +124,9 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     try {
       const binanceSymbols: { [key: string]: string } = {
         'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'MATIC': 'MATICUSDT',
-        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'USDT': 'USDCUSDT',
-        'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT', 'goBTC': 'BTCUSDT',
-        'goETH': 'ETHUSDT'
+        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'SOL': 'SOLUSDT',
+        'USDT': 'USDCUSDT', 'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT', 
+        'goBTC': 'BTCUSDT', 'goETH': 'ETHUSDT'
       };
       
       const binanceSymbol = binanceSymbols[symbol];
@@ -146,9 +151,9 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     try {
       const coinGeckoIds: { [key: string]: string } = {
         'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic-network',
-        'ALGO': 'algorand', 'TRX': 'tron', 'USDT': 'tether',
-        'USDC': 'usd-coin', 'USDCa': 'usd-coin', 'goBTC': 'bitcoin',
-        'goETH': 'ethereum'
+        'ALGO': 'algorand', 'TRX': 'tron', 'SOL': 'solana',
+        'USDT': 'tether', 'USDC': 'usd-coin', 'USDCa': 'usd-coin', 
+        'goBTC': 'bitcoin', 'goETH': 'ethereum'
       };
       
       const coinId = coinGeckoIds[symbol];
@@ -191,9 +196,9 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     try {
       const binanceSymbols: { [key: string]: string } = {
         'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'MATIC': 'MATICUSDT',
-        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'USDT': 'USDCUSDT',
-        'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT', 'goBTC': 'BTCUSDT',
-        'goETH': 'ETHUSDT'
+        'ALGO': 'ALGOUSDT', 'TRX': 'TRXUSDT', 'SOL': 'SOLUSDT',
+        'USDT': 'USDCUSDT', 'USDC': 'USDCUSDT', 'USDCa': 'USDCUSDT',
+        'goBTC': 'BTCUSDT', 'goETH': 'ETHUSDT'
       };
       
       const binanceSymbol = binanceSymbols[symbol];
@@ -220,9 +225,9 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     try {
       const coinGeckoIds: { [key: string]: string } = {
         'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic-network',
-        'ALGO': 'algorand', 'TRX': 'tron', 'USDT': 'tether',
-        'USDC': 'usd-coin', 'USDCa': 'usd-coin', 'goBTC': 'bitcoin',
-        'goETH': 'ethereum'
+        'ALGO': 'algorand', 'TRX': 'tron', 'SOL': 'solana',
+        'USDT': 'tether', 'USDC': 'usd-coin', 'USDCa': 'usd-coin',
+        'goBTC': 'bitcoin', 'goETH': 'ethereum'
       };
       
       const coinId = coinGeckoIds[symbol];
@@ -251,7 +256,8 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       'MATIC': { volume24h: 500e6, marketCap: 7e9, ath: 2.92 },
       'TRX': { volume24h: 2e9, marketCap: 15e9, ath: 0.23 },
       'USDT': { volume24h: 80e9, marketCap: 140e9, ath: 1.05 },
-      'USDC': { volume24h: 10e9, marketCap: 50e9, ath: 1.05 }
+      'USDC': { volume24h: 10e9, marketCap: 50e9, ath: 1.05 },
+      'SOL': { volume24h: 5e9, marketCap: 65e9, ath: 260 }
     };
 
     if (volume24h === 0 || marketCap === 0 || ath === 0) {
@@ -480,7 +486,8 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
       ethereum: `https://etherscan.io/address/${address}`,
       polygon: `https://polygonscan.com/address/${address}`,
       algorand: `https://explorer.perawallet.app/address/${address}`,
-      tron: `https://tronscan.org/#/address/${address}`
+      tron: `https://tronscan.org/#/address/${address}`,
+      solana: `https://explorer.solana.com/address/${address}`
     };
     return explorers[chain] || '#';
   };
