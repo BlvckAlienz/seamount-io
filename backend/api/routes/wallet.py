@@ -2,7 +2,7 @@
 """
 ðŸŽ¯ ULTIMATE Multi-Chain Wallet API Routes
 Merged for Maximum Efficiency & Supremacy
-Unified endpoints for Algorand + 4 WDK chains
+Unified endpoints for Algorand + 5 WDK chains
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,7 +20,7 @@ class ValidateAddressRequest(BaseModel):
 
 class WalletCreateRequest(BaseModel):
     chains: Optional[List[str]] = None  # None = default essential chains
-    create_all: bool = False  # True = create on all 5 chains
+    create_all: bool = False  # True = create on all 6 chains
 
 class SendPaymentRequest(BaseModel):
     recipient: str
@@ -184,7 +184,7 @@ async def create_multi_chain_wallet_legacy(
         elif request and request.chains:
             chains = [chain for chain in request.chains if chain in SUPPORTED_CHAINS]
         else:
-            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
+            chains = ["algorand", "tron", "bitcoin", "ethereum", "polygon", "solana"]
         
         logger.info(f"Creating multi-chain wallet via legacy endpoint for user {user_id}")
         
@@ -309,8 +309,8 @@ async def get_multi_chain_status(
         from backend.services.database_service import DatabaseService
         db = DatabaseService()
         
-        # âœ… ONLY CHECK FOR 5 SUPPORTED CHAINS
-        SUPPORTED_CHAIN_IDS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+        # ✅ CHECK FOR ALL 6 SUPPORTED CHAINS (INCLUDING SOLANA)
+        SUPPORTED_CHAIN_IDS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
         
         # Get WDK chain wallets - ONLY from supported chains
         wdk_wallets = db.supabase.table("multi_chain_addresses") \
@@ -588,7 +588,7 @@ async def get_supported_chains():
             "chains": chains_list,
             "total_chains": len(chains_list),
             "gasless_chains": GASLESS_CHAINS,
-            "default_chains": ["algorand", "tron", "bitcoin", "ethereum", "polygon"]
+            "default_chains": ["algorand", "tron", "bitcoin", "ethereum", "polygon", "solana"]
         }
         
     except Exception as e:
