@@ -840,6 +840,9 @@ class Settings(BaseSettings):
         "https://seamount-api.onrender.com/api/v1/webhooks/owlpay",
         env="HARBOR_WEBHOOK_URL"
     )
+    # ✅ Webhook secret is OPTIONAL (Harbor doesn't provide one)
+    HARBOR_WEBHOOK_SECRET: Optional[SecretStr] = Field(None, env="HARBOR_WEBHOOK_SECRET")
+    
     # Commodity & Forex API Keys (Optional - improves rate limits)
     ALPHA_VANTAGE_API_KEY: Optional[SecretStr] = None  # Free: 500 req/day
     TWELVE_DATA_API_KEY: Optional[SecretStr] = None     # Free: 800 req/day

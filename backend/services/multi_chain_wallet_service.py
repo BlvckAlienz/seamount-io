@@ -237,19 +237,39 @@ class MultiChainWalletService:
         # 3. Create WDK wallets sequentially
         for chain in wdk_chains:
             try:
+                logger.info(f"🔨 ATTEMPTING {chain.upper()} wallet creation...")
+                
                 chain_result = await self.create_single_chain_wallet(user_id, chain)
-                if chain_result['success']:
+                
+                # 🚨 CRITICAL: Log FULL response (not just success/fail)
+                logger.info(f"📦 {chain.upper()} creation result: {chain_result}")
+                
+                if chain_result.get('success'):
                     result['wallets'][chain] = {
                         'address': chain_result['address'],
                         'created_at': chain_result.get('created_at', datetime.utcnow().isoformat())
                     }
                     logger.info(f"✅ {chain.upper()} wallet: {chain_result['address'][:10]}...")
                 else:
-                    result['errors'].append(f"{chain}: {chain_result.get('error')}")
+                    error_msg = chain_result.get('error', 'Unknown error')
+                    logger.error(f"❌ {chain.upper()} creation FAILED: {error_msg}")
+                    result['errors'].append(f"{chain}: {error_msg}")
                     
+                    # 🚨 NEW: Raise exception if critical chain fails
+                    if chain == 'solana' and chains and 'solana' in chains:
+                        raise Exception(f"Solana wallet creation failed: {error_msg}")
+                        
             except Exception as e:
-                logger.error(f"❌ {chain} wallet creation failed: {e}")
-                result['errors'].append(f"{chain}: {str(e)}")
+                error_details = str(e)
+                logger.error(f"❌ {chain} wallet creation EXCEPTION: {error_details}")
+                logger.error(f"   Exception type: {type(e).__name__}")
+                logger.error(f"   Full traceback:", exc_info=True)
+                
+                result['errors'].append(f"{chain}: {error_details}")
+                
+                # 🚨 NEW: Re-raise if explicitly requested chain
+                if chains and chain in chains:
+                    raise Exception(f"{chain.upper()} wallet creation failed: {error_details}")
         
         result['total_chains'] = len(result['wallets'])
         result['success'] = len(result['wallets']) > 0

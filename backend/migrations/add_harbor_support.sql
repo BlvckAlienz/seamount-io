@@ -1,5 +1,6 @@
 -- File: backend/migrations/add_harbor_support.sql
 -- Harbor transaction tracking and webhook management
+-- FIXED: Separated index creation from table definition
 
 -- ============================================================================
 -- TABLE: harbor_transactions
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.harbor_transactions (
     
     -- Transaction metadata
     transaction_type TEXT NOT NULL CHECK (transaction_type IN ('on-ramp', 'off-ramp', 'swap', 'transfer')),
-    blockchain TEXT NOT NULL CHECK (blockchain IN ('ethereum', 'polygon', 'solana', 'bitcoin', 'tron')),
+    blockchain TEXT NOT NULL CHECK (blockchain IN ('ethereum', 'polygon', 'solana', 'bitcoin', 'tron', 'algorand')),
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
     
     -- Amounts
@@ -43,15 +44,15 @@ CREATE TABLE IF NOT EXISTS public.harbor_transactions (
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    
-    -- Indexes
-    INDEX idx_harbor_user_id (user_id),
-    INDEX idx_harbor_payment_id (harbor_payment_id),
-    INDEX idx_harbor_status (status),
-    INDEX idx_harbor_blockchain (blockchain),
-    INDEX idx_harbor_created_at (created_at)
+    completed_at TIMESTAMPTZ
 );
+
+-- Create indexes AFTER table creation
+CREATE INDEX IF NOT EXISTS idx_harbor_user_id ON public.harbor_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_harbor_payment_id ON public.harbor_transactions(harbor_payment_id);
+CREATE INDEX IF NOT EXISTS idx_harbor_status ON public.harbor_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_harbor_blockchain ON public.harbor_transactions(blockchain);
+CREATE INDEX IF NOT EXISTS idx_harbor_created_at ON public.harbor_transactions(created_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.harbor_transactions ENABLE ROW LEVEL SECURITY;
@@ -90,13 +91,14 @@ CREATE TABLE IF NOT EXISTS public.harbor_webhook_logs (
     
     -- Timestamps
     received_at TIMESTAMPTZ DEFAULT NOW(),
-    processed_at TIMESTAMPTZ,
-    
-    -- Indexes
-    INDEX idx_webhook_event_type (event_type),
-    INDEX idx_webhook_payment_id (harbor_payment_id),
-    INDEX idx_webhook_processed (processed)
+    processed_at TIMESTAMPTZ
 );
+
+-- Create indexes for webhook logs
+CREATE INDEX IF NOT EXISTS idx_webhook_event_type ON public.harbor_webhook_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_webhook_payment_id ON public.harbor_webhook_logs(harbor_payment_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_processed ON public.harbor_webhook_logs(processed);
+CREATE INDEX IF NOT EXISTS idx_webhook_received_at ON public.harbor_webhook_logs(received_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.harbor_webhook_logs ENABLE ROW LEVEL SECURITY;
@@ -108,7 +110,7 @@ CREATE POLICY "Only service role can access webhook logs"
     USING (auth.jwt() ->> 'role' = 'service_role');
 
 -- ============================================================================
--- FUNCTION: Update timestamp
+-- FUNCTION: Update timestamp trigger
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.update_harbor_transaction_timestamp()
@@ -123,7 +125,9 @@ BEGIN
 END;
 $$;
 
--- Trigger
+-- Attach trigger to table
+DROP TRIGGER IF EXISTS trigger_update_harbor_transaction_timestamp ON public.harbor_transactions;
+
 CREATE TRIGGER trigger_update_harbor_transaction_timestamp
     BEFORE UPDATE ON public.harbor_transactions
     FOR EACH ROW
@@ -136,3 +140,11 @@ CREATE TRIGGER trigger_update_harbor_transaction_timestamp
 GRANT SELECT, INSERT, UPDATE ON public.harbor_transactions TO authenticated;
 GRANT ALL ON public.harbor_transactions TO service_role;
 GRANT ALL ON public.harbor_webhook_logs TO service_role;
+
+-- ============================================================================
+-- VERIFICATION QUERIES
+-- ============================================================================
+
+-- Run these to verify migration succeeded:
+-- SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'harbor%';
+-- SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'harbor_transactions';
