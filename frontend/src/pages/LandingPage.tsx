@@ -247,8 +247,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
   const faqs = [
     { 
-      question: "How does Seamount help women entrepreneurs raise capital?", 
-      answer: "We provide direct access to private markets through equity crowdfunding. Our platform gives equal visibility to women-led businesses and uses alternative data for credit scoring, focusing on transaction history and trade behavior rather than traditional collateral." 
+      question: "What assets can be tokenized on Seamount?", 
+      answer: "We support tokenization of securities, real estate, private equities/shares, infrastructure (data centers, power grids, etc.), commodities, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
+
     },
     { 
       question: "How do you assess creditworthiness for SMEs without formal financials?", 
@@ -904,9 +905,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
-            <a href="#entrepreneurs" className="text-gray-700 hover:text-purple-600 transition-all hover:scale-105">👩‍🚀 For Founders</a>
             <a href="#services" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Services</a>
-            <a href="#calculator" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">Invest</a>
+            <a href="#entrepreneurs" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Founders</a>
+            <a href="#calculator" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Calculator</a>
             <a href="#business" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Business</a>
           </nav>
           
@@ -948,14 +949,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              <span className="block">Crowdfunding</span>
-              <span className="gradient-text">for SMEs</span>
+              <span className="block">Seamount</span>
+              <span className="gradient-text">Digital Assets Market</span>
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              <p className="mb-2">Raise capital, build creditworthiness, access 24/7 settlements.</p>
+              <p className="mb-2">Global Payments. Asset tokenization. Compliance.</p>
               <p className="font-semibold text-gray-900">
-                Where women founders and SMEs become visible.
+                One Platform. Real Solutions.
               </p>
             </div>
             
