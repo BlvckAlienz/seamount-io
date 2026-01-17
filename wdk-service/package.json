@@ -1,7 +1,7 @@
 {
   "name": "seamount-wdk-service",
   "version": "2.0.0",
-  "description": "Multi-chain wallet service for Seamount.io using Tether WDK - PRODUCTION READY",
+  "description": "Multi-chain wallet service for Seamount.io - PRODUCTION READY",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -19,9 +19,6 @@
     "express": "^4.18.2",
     "tiny-secp256k1": "^2.2.4",
     "tronweb": "^6.1.0",
-    "@tetherto/wdk-wallet-solana": "^1.0.0",
-    "@tetherto/wdk-wallet-btc": "^1.0.0",
-    "@tetherto/wdk-wallet-tron": "^1.0.0",
     "@solana/web3.js": "^1.87.0"
   },
   "devDependencies": {
