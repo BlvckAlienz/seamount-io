@@ -14,7 +14,6 @@ import logging
 from backend.dependencies import get_current_user, get_db_service, get_audit_service
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
-from backend.services.payment_providers.harbor import HarborProvider
 from backend.services.cashramp_service import CashrampService
 from backend.services.payment_providers.pretium import PretiumProvider
 from backend.services.revenue_tracking_service import RevenueTrackingService
@@ -39,119 +38,117 @@ async def initialize_onramp(
 ):
     """
     Initialize fiat → crypto on-ramp
-    PRIORITY: Harbor (crypto) → Paystack (NGN) → Flutterwave (international)
+    PRIORITY: Paystack (NGN) → Flutterwave (International) → Cashramp (P2P)
     """
     
     try:
         settings = get_settings()
         
-        # Extract payload
+        # ✅ STEP 1: Extract payload FIRST (CRITICAL!)
         data = await request.json()
         amount = Decimal(str(data.get("amount_fiat", 0)))
         currency = data.get("currency", "NGN")
-        crypto_asset = data.get("crypto_asset", "USDT_ALGO")
+        crypto_asset = data.get("crypto_asset", "USDT_ALGO")  # ← MUST BE HERE
         payment_method = data.get("payment_method", "auto")
         user_country = data.get("user_country", "NG")
+        phone_number = data.get("phone_number")  # Optional (not used for Tron anymore)
+        mobile_network = data.get("mobile_network", "Safaricom")
         
         # Validate amount
         if amount <= 0:
-            raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+            raise HTTPException(
+                status_code=400, 
+                detail="Amount must be greater than 0"
+            )
         
         # Get asset config
         asset_config = settings.SUPPORTED_ASSETS.get(crypto_asset)
         if not asset_config:
-            raise HTTPException(status_code=400, detail=f"Unsupported asset: {crypto_asset}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported asset: {crypto_asset}"
+            )
         
-        blockchain = asset_config.get("blockchain")
-        
-        # Get user wallet address
+        # ===================================================================
+        # STEP 2: Get user wallet address
+        # ===================================================================
         try:
-            if blockchain == "algorand":
-                wallet_result = db_service.supabase.from_('user_wallets')\
-                    .select('algorand_address')\
-                    .eq('user_id', current_user["id"])\
-                    .limit(1)\
-                    .execute()
-                
-                if not wallet_result.data or len(wallet_result.data) == 0:
-                    raise HTTPException(status_code=400, detail="User wallet not found. Create wallet first.")
-                
-                wallet_address = wallet_result.data[0]["algorand_address"]
-            else:
-                # WDK/Harbor chains
-                wallet_result = db_service.supabase.from_('multi_chain_addresses')\
-                    .select('address')\
-                    .eq('user_id', current_user["id"])\
-                    .eq('blockchain', blockchain)\
-                    .limit(1)\
-                    .execute()
-                
-                if not wallet_result.data or len(wallet_result.data) == 0:
-                    raise HTTPException(status_code=400, detail=f"No {blockchain} wallet found")
-                
-                wallet_address = wallet_result.data[0]["address"]
-                
+            wallet_result = db_service.supabase.from_('user_wallets')\
+                .select('algorand_address')\
+                .eq('user_id', current_user["id"])\
+                .limit(1)\
+                .execute()
+            
+            if not wallet_result.data or len(wallet_result.data) == 0:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="User wallet not found. Create wallet first."
+                )
+            
+            wallet_address = wallet_result.data[0]["algorand_address"]
+            
         except HTTPException:
             raise
         except Exception as e:
             logger.error(f"Failed to fetch wallet: {e}")
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Database error: {str(e)}"
+            )
         
         # ===================================================================
-        # 🎯 TIER 1: HARBOR (PRIMARY FOR CRYPTO ON ALL SUPPORTED CHAINS)
+        # STEP 3: SMART ROUTING - PAYSTACK-FIRST FOR NGN
         # ===================================================================
         provider = None
         payment_result = None
         checkout_url = None
         
-        # Check if Harbor supports this blockchain
-        harbor_chains = ['ethereum', 'polygon', 'solana', 'bitcoin', 'tron']
-        
-        if blockchain in harbor_chains and payment_method in ["auto", "harbor"]:
+        # 🥇 TIER 1: PAYSTACK (PRIMARY FOR NGN - INSTANT PAYMENT LINKS)
+        if currency == "NGN" and payment_method in ["auto", "paystack"]:
             try:
-                logger.info(f"🏛️ TIER 1: Attempting Harbor on-ramp: {amount} {currency} → {crypto_asset}")
-                harbor = HarborProvider(settings)
+                logger.info(f"🔵 TIER 1: Attempting Paystack on-ramp: {amount} {currency}")
+                paystack = PaystackProvider(settings)
                 
-                tx_ref = f"ONRAMP_HARBOR_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                our_fee = amount * Decimal("0.005")  # 0.5% Seamount margin
+                provider_amount = amount
                 
-                payment_result = await harbor.initialize_onramp(
-                    amount_fiat=amount,
-                    currency=currency,
-                    crypto_asset=crypto_asset.split('_')[0],  # ETH from USDT_ETH
-                    blockchain=blockchain,
-                    wallet_address=wallet_address,
-                    user_email=current_user["email"],
-                    tx_ref=tx_ref,
-                    metadata={
-                        "user_id": current_user["id"],
-                        "user_country": user_country,
-                        "seamount_asset": crypto_asset
-                    }
+                payment_result = await paystack.initialize_payment(
+                    amount=float(provider_amount),
+                    currency="NGN",
+                    email=current_user["email"],
+                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                    phone=current_user.get("phone"),
+                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
                 )
                 
-                if payment_result and payment_result.get("success"):
-                    checkout_url = payment_result.get("checkout_url")
+                if payment_result and payment_result.get("status") == "success":
+                    checkout_url = (
+                        payment_result.get("authorization_url") or 
+                        payment_result.get("payment_link") or
+                        payment_result.get("access_url")
+                    )
                     
                     if checkout_url:
-                        provider = "harbor"
-                        logger.info(f"✅ Harbor (TIER 1) checkout URL: {checkout_url}")
+                        provider = "paystack"
+                        logger.info(f"✅ Paystack (TIER 1) checkout URL: {checkout_url}")
                         
-                        # Store transaction
+                        # 🚨 CREATE TRANSACTION AND RETURN IMMEDIATELY
+                        tx_id = f"ONRAMP_PAYSTACK_{current_user['id'][:8]}_{int(datetime.now().timestamp())}"
+                        
                         tx_data = {
-                            "id": tx_ref,
+                            "id": tx_id,
                             "user_id": current_user["id"],
                             "type": "onramp",
                             "status": "pending_payment",
-                            "provider": "harbor",
-                            "provider_name": f"Harbor ({blockchain.title()})",
+                            "provider": "paystack",
+                            "provider_name": "Paystack (Bank Transfer)",
                             "currency": currency,
                             "crypto_asset": crypto_asset,
-                            "blockchain": blockchain,
+                            "blockchain": asset_config["blockchain"],
                             "amount_fiat": float(amount),
+                            "seamount_fee": float(our_fee),
                             "wallet_address": wallet_address,
                             "checkout_url": checkout_url,
-                            "harbor_payment_id": payment_result.get("payment_id"),
-                            "estimated_crypto": payment_result.get("estimated_crypto"),
                             "user_email": current_user["email"],
                             "user_country": user_country,
                             "estimated_settlement": "5-10 minutes",
@@ -159,146 +156,314 @@ async def initialize_onramp(
                         }
                         
                         db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+                        logger.info(f"✅ Paystack (TIER 1) transaction created: {tx_id}")
                         
-                        # Also log in harbor_transactions
-                        harbor_tx_data = {
-                            "user_id": current_user["id"],
-                            "harbor_payment_id": payment_result.get("payment_id"),
-                            "transaction_type": "on-ramp",
-                            "blockchain": blockchain,
-                            "amount": float(amount),
-                            "currency": currency,
-                            "crypto_asset": crypto_asset,
-                            "wallet_address": wallet_address,
-                            "status": "pending",
-                            "metadata": {
-                                "tx_ref": tx_ref,
-                                "estimated_crypto": payment_result.get("estimated_crypto")
-                            }
-                        }
+                        # Track revenue (non-blocking)
+                        try:
+                            revenue_service = RevenueTrackingService(db_service)
+                            await revenue_service.track_transaction_fee(
+                                user_id=current_user["id"],
+                                transaction_type="on_ramp",
+                                amount=amount,
+                                fee_rate=Decimal("0.005"),
+                                platform_fee=our_fee,
+                                network_fee=Decimal("0.001"),
+                                blockchain="algorand",
+                                metadata={
+                                    "transaction_id": tx_id,
+                                    "provider": "paystack",
+                                    "currency": currency
+                                }
+                            )
+                        except Exception as revenue_error:
+                            logger.warning(f"Failed to track revenue: {revenue_error}")
                         
-                        db_service.supabase.from_('harbor_transactions').insert(harbor_tx_data).execute()
+                        # Log audit trail (non-blocking)
+                        if audit_service:
+                            try:
+                                await audit_service.log_event(
+                                    "ONRAMP_INITIATED",
+                                    user_id=str(current_user["id"]),
+                                    resource_id=str(tx_id),
+                                    details={
+                                        "provider": "paystack",
+                                        "amount": float(amount),
+                                        "currency": str(currency),
+                                        "asset": str(crypto_asset)
+                                    }
+                                )
+                            except Exception as audit_error:
+                                logger.warning(f"Failed to log audit: {audit_error}")
                         
-                        logger.info(f"✅ Harbor (TIER 1) on-ramp initialized: {tx_ref}")
+                        logger.info(f"✅ Paystack (TIER 1) on-ramp initialized: {tx_id}")
                         
                         return {
                             "success": True,
-                            "transaction_id": tx_ref,
+                            "transaction_id": tx_id,
                             "checkout_url": checkout_url,
-                            "provider": "harbor",
-                            "blockchain": blockchain,
+                            "provider": "paystack",
                             "amount_fiat": float(amount),
                             "currency": currency,
                             "crypto_asset": crypto_asset,
-                            "estimated_crypto": payment_result.get("estimated_crypto"),
                             "estimated_settlement": "5-10 minutes"
                         }
                     else:
-                        logger.warning(f"⚠️ Harbor returned success but no checkout URL")
+                        logger.warning(f"⚠️ Paystack returned success but no URL")
                 else:
-                    logger.warning(f"⚠️ Harbor (TIER 1) failed: {payment_result.get('error')}")
+                    logger.warning(f"⚠️ Paystack returned invalid response")
                     
-            except Exception as harbor_error:
-                logger.warning(f"⚠️ Harbor (TIER 1) exception: {harbor_error}")
-        
-        # ===================================================================
-        # 🥇 TIER 2: PAYSTACK (NGN ONLY - FIAT GATEWAY)
-        # ===================================================================
-        if not checkout_url and currency == "NGN" and blockchain == "algorand":
-            # Paystack for NGN → Algorand USDT flow
-            try:
-                logger.info(f"🔵 TIER 2: Attempting Paystack: {amount} NGN")
-                paystack = PaystackProvider(settings)
-                
-                payment_result = await paystack.initialize_payment(
-                    amount=float(amount),
-                    currency="NGN",
-                    email=current_user["email"],
-                    tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
-                    name=current_user.get('first_name', 'User')
-                )
-                
-                if payment_result and payment_result.get("status") == "success":
-                    checkout_url = payment_result.get("authorization_url")
-                    if checkout_url:
-                        provider = "paystack"
-                        logger.info(f"✅ Paystack (TIER 2) checkout URL: {checkout_url}")
-                        
             except Exception as paystack_error:
-                logger.warning(f"⚠️ Paystack (TIER 2) failed: {paystack_error}")
+                logger.warning(f"⚠️ Paystack (TIER 1) failed: {paystack_error}")
+                # Fall through to Flutterwave
         
-        # ===================================================================
-        # 🥈 TIER 3: FLUTTERWAVE (INTERNATIONAL FALLBACK)
-        # ===================================================================
+        # 🥈 TIER 2: FLUTTERWAVE (INTERNATIONAL + NGN BACKUP)
         if not checkout_url and payment_method in ["auto", "flutterwave"]:
             try:
-                logger.info(f"🌐 TIER 3: Attempting Flutterwave: {amount} {currency}")
+                logger.info(f"🌍 TIER 2: Attempting Flutterwave: {amount} {currency}")
                 flutterwave = FlutterwaveProvider(settings)
                 
+                our_fee = amount * Decimal("0.005")
+                provider_amount = amount
+                
                 payment_result = await flutterwave.initialize_payment(
-                    amount=float(amount),
+                    amount=float(provider_amount),
                     currency=currency,
                     email=current_user["email"],
                     tx_ref=f"ONRAMP_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
-                    name=current_user.get('first_name', 'User')
+                    phone=current_user.get("phone"),
+                    name=f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}"
                 )
                 
                 if payment_result and payment_result.get("status") == "success":
-                    checkout_url = payment_result.get("data", {}).get("link")
+                    checkout_url = (
+                        payment_result.get("link") or 
+                        payment_result.get("payment_link") or
+                        payment_result.get("data", {}).get("link")
+                    )
+                    
                     if checkout_url:
                         provider = "flutterwave"
-                        logger.info(f"✅ Flutterwave (TIER 3) checkout URL: {checkout_url}")
-                        
-            except Exception as fw_error:
-                logger.warning(f"⚠️ Flutterwave (TIER 3) failed: {fw_error}")
+                        logger.info(f"✅ Flutterwave (TIER 2) checkout URL: {checkout_url}")
+                    else:
+                        logger.warning(f"⚠️ Flutterwave returned success but no URL")
+                else:
+                    logger.warning(f"⚠️ Flutterwave returned invalid response")
+                    
+            except Exception as flutterwave_error:
+                logger.warning(f"⚠️ Flutterwave (TIER 2) failed: {flutterwave_error}")
+                # Fall through to Cashramp
         
-        # ===================================================================
-        # VALIDATION: Ensure we have a checkout URL
-        # ===================================================================
+        # 🥉 TIER 3: CASHRAMP (P2P - CURRENTLY UNDER MAINTENANCE)
+        if not checkout_url and payment_method in ["auto", "cashramp"]:
+            try:
+                logger.info(f"🔵 TIER 3: Attempting Cashramp (P2P): {amount} {currency}")
+                cashramp = CashrampService(db_service)
+                
+                if not cashramp.is_available():
+                    logger.warning("Cashramp not available (missing API keys)")
+                    raise Exception("Cashramp service not configured")
+                
+                payment_result = await cashramp.create_ngn_onramp(
+                    user_id=current_user["id"],
+                    asset=crypto_asset,
+                    amount_ngn=amount,
+                    payment_method="p2p"
+                )
+                
+                if payment_result and isinstance(payment_result, dict) and payment_result.get("success"):
+                    url_candidates = [
+                        payment_result.get("payment_url"),
+                        payment_result.get("checkout_url"), 
+                        payment_result.get("url"),
+                        payment_result.get("link")
+                    ]
+                    
+                    for candidate in url_candidates:
+                        if candidate and isinstance(candidate, str) and candidate.startswith(('http://', 'https://')):
+                            checkout_url = candidate
+                            provider = "cashramp"
+                            logger.info(f"✅ Cashramp (TIER 3) URL: {checkout_url}")
+                            break
+                    
+                    if not checkout_url:
+                        logger.warning(f"Cashramp returned success but no valid URL")
+                else:
+                    logger.warning(f"Cashramp returned invalid response")
+                    
+            except Exception as cashramp_error:
+                logger.warning(f"⚠️ Cashramp (TIER 3) failed: {cashramp_error}")
+                # Fall through to emergency
+        
+        # ========================================================================
+        # QUIDAX DISABLED - Requires pre-funded wallet, not suitable for on-ramp
+        # Keeping code commented for future offramp feature
+        # ========================================================================
+        """
+        # TIER X: QUIDAX (DISABLED - Trading API, not payment gateway)
+        # Quidax instant orders require existing NGN balance in wallet
+        # Not suitable for "user pays now, gets crypto" flow
+        # Will be used for offramp (sell crypto → receive NGN) in future
+        if currency == "NGN" and payment_method in ["quidax"]:
+            logger.info("Quidax requires pre-funded wallet - skipping")
+        """
+        
+        # EMERGENCY FALLBACK: Force Paystack (most reliable)
         if not checkout_url:
-            logger.error("All providers failed to return checkout URL")
+            try:
+                logger.info("⚠️ ACTIVATING EMERGENCY PAYSTACK FALLBACK...")
+                
+                # Only for NGN - Flutterwave for others
+                if currency == "NGN":
+                    paystack = PaystackProvider(settings)
+                    
+                    payment_result = await paystack.initialize_payment(
+                        amount=float(amount),
+                        currency="NGN",
+                        email=current_user["email"],
+                        tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                        name=current_user.get('first_name', 'User')
+                    )
+                    
+                    if payment_result and payment_result.get("status") == "success":
+                        checkout_url = payment_result.get("authorization_url") or payment_result.get("payment_link")
+                        if checkout_url:
+                            provider = "paystack_emergency"
+                            logger.info(f"✅ EMERGENCY PAYSTACK URL: {checkout_url}")
+                else:
+                    # Non-NGN: Use Flutterwave
+                    flutterwave = FlutterwaveProvider(settings)
+                    
+                    payment_result = await flutterwave.initialize_payment(
+                        amount=float(amount),
+                        currency=currency,
+                        email=current_user["email"],
+                        tx_ref=f"EMG_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                        name=current_user.get('first_name', 'User')
+                    )
+                    
+                    if payment_result and payment_result.get("status") == "success":
+                        checkout_url = payment_result.get("data", {}).get("link") or payment_result.get("link")
+                        if checkout_url:
+                            provider = "flutterwave_emergency"
+                            logger.info(f"✅ EMERGENCY FLUTTERWAVE URL: {checkout_url}")
+                        
+            except Exception as emergency_error:
+                logger.error(f"❌ EMERGENCY FALLBACK FAILED: {emergency_error}")
+
+        # VALIDATION: Ensure we have a checkout URL
+        if not checkout_url:
+            logger.error(
+                f"All providers failed to return checkout URL. "
+                f"Last provider: {provider}, Last result: {payment_result}"
+            )
             raise HTTPException(
                 status_code=503,
-                detail="Payment service temporarily unavailable. Please try again."
+                detail=(
+                    "Payment service temporarily unavailable. "
+                    "All providers failed to generate payment link. "
+                    "Please try again in a few minutes."
+                )
             )
         
-        # Store transaction (if not Harbor - already stored above)
-        if provider != "harbor":
-            tx_id = f"ONRAMP_{current_user['id'][:8]}_{int(amount)}_{int(datetime.now().timestamp())}"
-            
-            tx_data = {
-                "id": tx_id,
-                "user_id": current_user["id"],
-                "type": "onramp",
-                "status": "pending_payment",
-                "provider": provider,
-                "currency": currency,
-                "crypto_asset": crypto_asset,
-                "amount_fiat": float(amount),
-                "wallet_address": wallet_address,
-                "checkout_url": checkout_url,
-                "created_at": datetime.now().isoformat()
-            }
-            
-            db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+        # STEP 4: Store on-ramp transaction
+        tx_id = f"ONRAMP_{current_user['id'][:8]}_{int(amount)}_{int(datetime.now().timestamp())}"
         
-        logger.info(f"On-ramp initialized via {provider}")
+        our_fee = amount * Decimal("0.005")  # 0.5% Seamount margin
+        
+        tx_data = {
+            "id": tx_id,
+            "user_id": current_user["id"],
+            "type": "onramp",
+            "status": "pending_payment",
+            "provider": provider,
+            "provider_name": provider.title(),
+            "currency": currency,
+            "crypto_asset": crypto_asset,
+            "amount_fiat": float(amount),
+            "seamount_fee": float(our_fee),
+            "net_to_user": float(amount - our_fee),
+            "wallet_address": wallet_address,
+            "checkout_url": checkout_url,
+            "user_email": current_user["email"],
+            "user_country": user_country,
+            "fee_breakdown": {
+                "seamount_fee": float(our_fee),
+                "provider": provider,
+                "currency": currency
+            },
+            "estimated_settlement": "5-10 minutes",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        try:
+            db_service.supabase.from_('onramp_transactions').insert(tx_data).execute()
+            logger.info(f"Transaction record created: {tx_id}")
+        except Exception as db_error:
+            logger.error(f"Failed to store transaction: {db_error}")
+            # Continue anyway - payment link is still valid
+        
+        # STEP 5: Track revenue (optional, non-blocking)
+        try:
+            revenue_service = RevenueTrackingService(db_service)
+            await revenue_service.track_transaction_fee(
+                user_id=current_user["id"],
+                transaction_type="on_ramp",
+                amount=amount,
+                fee_rate=Decimal("0.005"),
+                platform_fee=our_fee,
+                network_fee=Decimal("0.001"),
+                blockchain="algorand",
+                metadata={
+                    "transaction_id": tx_id,
+                    "provider": provider,
+                    "currency": currency
+                }
+            )
+        except Exception as revenue_error:
+            logger.warning(f"Failed to track revenue: {revenue_error}")
+        
+        # STEP 6: Log audit trail (optional, non-blocking)
+        if audit_service:
+            try:
+                await audit_service.log_event(
+                    "ONRAMP_INITIATED",
+                    user_id=str(current_user["id"]) if current_user else "unknown",
+                    resource_id=str(tx_id) if tx_id else "unknown",
+                    details={
+                        "provider": str(provider) if provider else "unknown",
+                        "amount": float(amount) if amount else 0,
+                        "currency": str(currency),
+                        "asset": str(crypto_asset)
+                    }
+                )
+            except Exception as audit_error:
+                logger.warning(f"Failed to log audit (non-critical): {audit_error}")
+        
+        logger.info(f"On-ramp initialized: {tx_id} via {provider} - URL: {checkout_url}")
         
         return {
             "success": True,
+            "transaction_id": tx_id,
             "checkout_url": checkout_url,
             "provider": provider,
-            "blockchain": blockchain,
             "amount_fiat": float(amount),
             "currency": currency,
-            "crypto_asset": crypto_asset
+            "crypto_asset": crypto_asset,
+            "amount_paid": float(amount),
+            "seamount_fee": float(our_fee),
+            "net_value": float(amount - our_fee),
+            "estimated_crypto_amount": float(amount - our_fee),
+            "estimated_settlement": "5-10 minutes"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"On-ramp initialization failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"On-ramp failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"On-ramp failed: {str(e)}"
+        )
 
 
 @router.post("/webhook/{provider}")
