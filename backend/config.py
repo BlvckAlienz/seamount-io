@@ -817,8 +817,39 @@ class Settings(BaseSettings):
             "is_stable": True,
             "oracle_symbol": "tether",
             "wdk_enabled": True
+        },
+        
+        # ========== SOLANA (WDK) ========== ✅ NEW
+        "SOL": {
+            "blockchain": "solana",
+            "name": "Solana",
+            "unit_name": "SOL",
+            "decimals": 9,
+            "is_stable": False,
+            "oracle_symbol": "solana",
+            "wdk_enabled": True
+        },
+        "USDT_SOLANA": {
+            "blockchain": "solana",
+            "contract_address": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "name": "Tether USD (Solana)",
+            "unit_name": "USDT",
+            "decimals": 6,
+            "is_stable": True,
+            "oracle_symbol": "tether",
+            "wdk_enabled": True
+        },
+        "USDC_SOLANA": {
+            "blockchain": "solana",
+            "contract_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "name": "USD Coin (Solana)",
+            "unit_name": "USDC",
+            "decimals": 6,
+            "is_stable": True,
+            "oracle_symbol": "usd-coin",
+            "wdk_enabled": True
         }
-    }
+    }  
 
     # Treasury
     TREASURY_ADDRESS: Optional[str] = None
@@ -842,7 +873,7 @@ class Settings(BaseSettings):
     )
     # ✅ Webhook secret is OPTIONAL (Harbor doesn't provide one)
     HARBOR_WEBHOOK_SECRET: Optional[SecretStr] = Field(None, env="HARBOR_WEBHOOK_SECRET")
-    
+
     # Commodity & Forex API Keys (Optional - improves rate limits)
     ALPHA_VANTAGE_API_KEY: Optional[SecretStr] = None  # Free: 500 req/day
     TWELVE_DATA_API_KEY: Optional[SecretStr] = None     # Free: 800 req/day
