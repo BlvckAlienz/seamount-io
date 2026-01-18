@@ -54,6 +54,11 @@ const ASSET_GROUPS = {
   tron: [
     { value: 'TRX', label: 'TRON (TRX)', icon: '⚡', description: 'High-throughput blockchain' },
     { value: 'USDT_TRON', label: 'Tether (Tron)', icon: '₮', description: 'USDT on Tron' },
+  ],
+  solana: [ 
+    { value: 'SOL', label: 'Solana (SOL)', icon: '◎', description: 'Ultra-fast blockchain' },
+    { value: 'USDT_SOLANA', label: 'Tether (Solana)', icon: '₮', description: 'USDT on Solana' },
+    { value: 'USDC_SOLANA', label: 'USD Coin (Solana)', icon: '◎', description: 'USDC on Solana' },
   ]
 };
 
@@ -62,7 +67,8 @@ const ALL_ASSETS = [
   ...ASSET_GROUPS.bitcoin,
   ...ASSET_GROUPS.ethereum,
   ...ASSET_GROUPS.polygon,
-  ...ASSET_GROUPS.tron
+  ...ASSET_GROUPS.tron,
+  ...ASSET_GROUPS.solana
 ];
 
 const CHAIN_NAMES: { [key: string]: string } = {
@@ -70,7 +76,8 @@ const CHAIN_NAMES: { [key: string]: string } = {
   'bitcoin': '🟠 Bitcoin',
   'ethereum': '🔵 Ethereum',
   'polygon': '🟣 Polygon',
-  'tron': '🔴 Tron'
+  'tron': '🔴 Tron',
+  'solana': '🟣 Solana'
 };
 
 // ============================================================================
@@ -81,7 +88,8 @@ const ADDRESS_PATTERNS: { [key: string]: RegExp } = {
   bitcoin: /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$/,
   ethereum: /^0x[a-fA-F0-9]{40}$/,
   polygon: /^0x[a-fA-F0-9]{40}$/,
-  tron: /^T[A-Za-z1-9]{33}$/
+  tron: /^T[A-Za-z1-9]{33}$/,
+  solana: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
 };
 
 // ============================================================================

@@ -6,6 +6,7 @@ import { X, TrendingUp, ArrowDownLeft, ExternalLink, Activity, RefreshCw, Chevro
 import toast from 'react-hot-toast';
 import { apiClient } from '../../config/api';
 import LivePriceChart from './LivePriceChart';
+import { ArrowUpRight, Download } from 'lucide-react'; // Add to existing lucide imports
 
 interface WalletDetailModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface WalletDetailModalProps {
   address: string;
   balance: number;
   onOpenFundModal: () => void;  // ✅ NEW PROP
+  onOpenWithdrawModal: () => void;  // ✅ ADD
+  onOpenReceiveModal: () => void;   // ✅ ADD
 }
 
 interface AssetPriceData {
@@ -480,6 +483,49 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     });
   };
 
+  const handleSellAsset = () => {
+    if (!selectedAsset) {
+      toast.error('Please select an asset first');
+      return;
+    }
+    
+    // Store selected asset for WithdrawModal
+    sessionStorage.setItem('preselected_asset', selectedAsset);
+    
+    // Close this modal
+    onClose();
+    
+    // Open WithdrawModal (passed via props)
+    onOpenWithdrawModal();
+    
+    toast.success(`Opening withdrawal options for ${selectedAsset}`, {
+      duration: 2000,
+      icon: '💸'
+    });
+  };
+
+const handleReceiveAsset = () => {
+  if (!selectedAsset) {
+    toast.error('Please select an asset first');
+    return;
+  }
+  
+  // Store selected asset and chain for ReceiveModal
+  sessionStorage.setItem('receive_asset', selectedAsset);
+  sessionStorage.setItem('receive_chain', chain);
+  
+  // Close this modal
+  onClose();
+  
+  // Open ReceiveModal (passed via props)
+  onOpenReceiveModal();
+  
+  toast.success(`Ready to receive ${selectedAsset}`, {
+    duration: 2000,
+    icon: '📥'
+  });
+};
+
   const getExplorerUrl = (chain: string, address: string) => {
     const explorers: { [key: string]: string } = {
       bitcoin: `https://blockstream.info/address/${address}`,
@@ -632,13 +678,32 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
                       {renderPriceDisplay(selectedAssetData)}
                     </div>
                   </div>
-                  <button
-                    onClick={handleBuyAsset}
-                    className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50 text-sm sm:text-base"
-                  >
-                    <ArrowDownLeft className="w-5 h-5" />
-                    Buy {selectedAssetData.symbol}
-                  </button>
+                  {/* Action Buttons - Buy, Sell, Receive */}
+                  <div className="flex gap-3 flex-wrap">
+                    <button
+                      onClick={handleBuyAsset}
+                      className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-green-500/50 text-sm sm:text-base"
+                    >
+                      <ArrowDownLeft className="w-5 h-5" />
+                      Buy
+                    </button>
+                    
+                    <button
+                      onClick={handleSellAsset}
+                      className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-red-500/50 text-sm sm:text-base"
+                    >
+                      <ArrowUpRight className="w-5 h-5" />
+                      Sell
+                    </button>
+                    
+                    <button
+                      onClick={handleReceiveAsset}
+                      className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 text-sm sm:text-base"
+                    >
+                      <Download className="w-5 h-5" />
+                      Receive
+                    </button>
+                  </div>
                 </div>
 
                 {/* Live Price Chart */}

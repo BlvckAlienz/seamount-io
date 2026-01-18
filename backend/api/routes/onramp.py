@@ -14,6 +14,7 @@ import logging
 from backend.dependencies import get_current_user, get_db_service, get_audit_service
 from backend.services.payment_providers.paystack import PaystackProvider
 from backend.services.payment_providers.flutterwave import FlutterwaveProvider
+from backend.services.payment_providers.harbor import HarborProvider
 from backend.services.cashramp_service import CashrampService
 from backend.services.payment_providers.pretium import PretiumProvider
 from backend.services.revenue_tracking_service import RevenueTrackingService
@@ -251,9 +252,87 @@ async def initialize_onramp(
                     
             except Exception as flutterwave_error:
                 logger.warning(f"⚠️ Flutterwave (TIER 2) failed: {flutterwave_error}")
-                # Fall through to Cashramp
+                # Fall through to Harbor
         
-        # 🥉 TIER 3: CASHRAMP (P2P - CURRENTLY UNDER MAINTENANCE)
+        # ============================================================================
+        # 🏛️ TIER 3: HARBOR (SANDBOX FALLBACK - MULTI-CHAIN DELIVERY)
+        # ============================================================================
+        if not checkout_url and payment_method in ["auto", "harbor"]:
+            try:
+                # Only use Harbor if:
+                # 1. User wants non-Algorand delivery (blockchain != 'algorand')
+                # 2. OR explicitly requested Harbor
+                # 3. AND Harbor is available (sandbox mode check)
+                
+                should_use_harbor = (
+                    blockchain != 'algorand' or  # User needs non-Algo delivery
+                    payment_method == "harbor"    # Explicitly requested
+                )
+                
+                if should_use_harbor:
+                    logger.info(f"🏛️ TIER 3: Attempting Harbor (Sandbox): {amount} {currency} → {crypto_asset}")
+                    
+                    # Import Harbor provider
+                    from backend.services.payment_providers.harbor import HarborProvider
+                    harbor = HarborProvider(settings)
+                    
+                    # Check if sandbox mode
+                    if harbor.is_sandbox:
+                        logger.warning(f"⚠️ Harbor is in SANDBOX mode - use for testing only")
+                    
+                    # Create/get customer (Harbor requires customer_uuid)
+                    customer_result = await harbor.create_customer(
+                        first_name=current_user.get('first_name', 'User'),
+                        last_name=current_user.get('last_name', ''),
+                        email=current_user['email'],
+                        phone_number=current_user.get('phone', '000-000-0000'),
+                        description=f"Seamount user {current_user['id'][:8]}"
+                    )
+                    
+                    if not customer_result.get('success'):
+                        raise Exception(f"Harbor customer creation failed: {customer_result.get('error')}")
+                    
+                    customer_uuid = customer_result['customer_uuid']
+                    logger.info(f"✅ Harbor customer: {customer_uuid}")
+                    
+                    # Initialize on-ramp
+                    harbor_result = await harbor.initialize_onramp(
+                        amount_fiat=amount,
+                        currency=currency,
+                        crypto_asset=crypto_asset,
+                        blockchain=blockchain,
+                        wallet_address=wallet_address,
+                        customer_uuid=customer_uuid,
+                        tx_ref=f"HARBOR_{current_user['id'][:8]}_{int(datetime.now().timestamp())}",
+                        metadata={
+                            'user_id': current_user['id'],
+                            'source': 'seamount_onramp'
+                        }
+                    )
+                    
+                    if harbor_result and harbor_result.get('success'):
+                        provider = "harbor_sandbox" if harbor.is_sandbox else "harbor"
+                        
+                        # Harbor may return transfer_instructions instead of checkout_url
+                        checkout_url = (
+                            harbor_result.get('checkout_url') or
+                            harbor_result.get('payment_url') or
+                            harbor_result.get('transfer_instructions', {}).get('payment_url')
+                        )
+                        
+                        if checkout_url:
+                            logger.info(f"✅ Harbor (TIER 3) initialized: {checkout_url}")
+                        else:
+                            # No URL = manual transfer instructions
+                            logger.warning(f"⚠️ Harbor returned no checkout URL (manual transfer mode)")
+                    else:
+                        raise Exception(harbor_result.get('error', 'Harbor initialization failed'))
+                        
+            except Exception as harbor_error:
+                logger.warning(f"⚠️ Harbor (TIER 3) failed: {harbor_error}")
+                # Continue to next tier (Cashramp)
+
+        # 🥉 TIER 4: CASHRAMP (P2P - CURRENTLY UNDER MAINTENANCE)
         if not checkout_url and payment_method in ["auto", "cashramp"]:
             try:
                 logger.info(f"🔵 TIER 3: Attempting Cashramp (P2P): {amount} {currency}")
