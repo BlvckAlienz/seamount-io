@@ -19,7 +19,8 @@ class WalletCreationService:
     'bitcoin',      # ✅ Available via @tetherto/wdk-wallet-btc
     'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
     'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
-    'tron'        # ✅ Available via @tetherto/wdk-wallet-tron
+    'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
+    'solana'        # ✅ Available via @tetherto/wdk-wallet-solana
 ]
     
     def __init__(self, db_service, algorand_service, wdk_client):
@@ -249,13 +250,13 @@ class WalletCreationService:
     async def retry_missing_wallets(self, user_id: str, specific_chains: Optional[List[str]] = None) -> Dict[str, any]:
         """Smart retry: Actually creates missing wallets with proper error handling"""
         try:
-            # 🔥 NUCLEAR FIX: HARDCODE ONLY 5 SUPPORTED CHAINS
-            SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
+            # 🔥 HARDCODE ALL 6 SUPPORTED CHAINS
+            SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
             
             current_status = await self.get_wallet_status(user_id)
             missing_chains = current_status['summary']['missing_chains']
             
-            # 🔥 CRITICAL: FILTER OUT ANY NON-SUPPORTED CHAINS
+            # 🔥 FILTER OUT ANY NON-SUPPORTED CHAINS
             missing_chains = [chain for chain in missing_chains if chain in SUPPORTED_CHAINS]
             
             logger.info(f"🔄 FILTERED missing_chains: {missing_chains}")
