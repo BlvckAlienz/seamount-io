@@ -25,6 +25,7 @@ import { WithdrawModal } from '@/components/wallet/WithdrawModal';
 import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
+import ReceiveModal from '@/components/wallet/ReceiveModal';  // ✅ ADD THIS
 import { formatCurrencyUSD } from '@/utils/formatters';
 
 // KYC Banner Component
@@ -99,6 +100,7 @@ const DashboardPage = () => {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showEarnModal, setShowEarnModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);  // ✅ ADD THIS
   
   const AUTO_CREATED_CHAINS = [
     { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
@@ -323,6 +325,8 @@ const DashboardPage = () => {
           address={multiChainWallets[selectedChain]?.address || ''}
           balance={calculateChainBalance(selectedChain)}
           onOpenFundModal={() => setShowFundModal(true)}
+          onOpenWithdrawModal={() => setShowWithdrawModal(true)}  // ✅ ADD THIS
+          onOpenReceiveModal={() => setShowReceiveModal(true)}    // ✅ ADD THIS
         />
       )}
       <FundWalletModal open={showFundModal} onOpenChange={setShowFundModal} />
@@ -330,6 +334,25 @@ const DashboardPage = () => {
       <SendForm open={showSendModal} onOpenChange={setShowSendModal} />
       <SwapModal open={showSwapModal} onOpenChange={setShowSwapModal} />
       <EarnModal open={showEarnModal} onOpenChange={setShowEarnModal} />
+      <ReceiveModal 
+        isOpen={showReceiveModal} 
+        onClose={() => {
+          setShowReceiveModal(false);
+          console.log('🔍 Debug - Closing ReceiveModal');
+        }}
+        preselectedChain={selectedChain || undefined}
+        walletAddresses={(() => {
+          const addresses = Object.fromEntries(
+            Object.entries(multiChainWallets).map(([chain, data]: [string, any]) => [
+              chain,
+              data?.address || ''
+            ])
+          );
+          console.log('🔍 Debug - Wallet addresses being passed:', addresses);
+          console.log('🔍 Debug - Preselected chain:', selectedChain);
+          return addresses;
+        })()}
+      />
     </div>
   );
 };

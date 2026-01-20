@@ -96,7 +96,9 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   chainName,
   address,
   balance,
-  onOpenFundModal  // ✅ NEW PROP
+  onOpenFundModal,
+  onOpenWithdrawModal,  // ✅ ADD THIS
+  onOpenReceiveModal    // ✅ ADD THIS
 }) => {
   const [selectedAsset, setSelectedAsset] = useState<string>('');
   const [priceData, setPriceData] = useState<AssetPriceData[]>([]);
