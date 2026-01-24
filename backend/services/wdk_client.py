@@ -97,7 +97,7 @@ class WDKClient:
         self.settings = get_settings()
         
         # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
-        CORRECT_URL = "https://seamount-wdk.onrender.com"
+        CORRECT_URL = "https://seamount-wdk-ne5i.onrender.com"
         WRONG_URL_PATTERN = "seamount-wdk-ne5i"
         
         self.base_url = self.settings.WDK_SERVICE_URL
@@ -112,7 +112,7 @@ class WDKClient:
             logger.error(f"   This is the OLD Render service URL!")
             self.base_url = CORRECT_URL
             logger.warning(f"✅ AUTO-CORRECTED to: {self.base_url}")
-            logger.warning("   UPDATE YOUR .env FILE: WDK_SERVICE_URL=https://seamount-wdk.onrender.com")
+            logger.warning("   UPDATE YOUR .env FILE: WDK_SERVICE_URL=https://seamount-wdk-ne5i.onrender.com")
         
         logger.info(f"🎯 WDK Service URL configured: {self.base_url}")
 
