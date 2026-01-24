@@ -69,24 +69,24 @@ class EnhancedOracleService:
         
         # 🚨 MISSION CRITICAL: UPDATED TO DEC 2025 LIVE MARKET PRICES WITH CORRECT UNITS
         self.commodity_ranges = {
-            # Precious Metals (DEC 2025 ACTUAL PRICES - from your logs)
-            'XAU': {'min': Decimal('4000'), 'max': Decimal('5000'), 'name': 'Gold', 'unit': 'oz'},        # ACTUAL: $4,371.5
-            'XAG': {'min': Decimal('60'), 'max': Decimal('80'), 'name': 'Silver', 'unit': 'oz'},          # ACTUAL: $66.595
-            'XPT': {'min': Decimal('1800'), 'max': Decimal('2200'), 'name': 'Platinum', 'unit': 'oz'},    # ACTUAL: $1,941.7
-            'XPD': {'min': Decimal('1600'), 'max': Decimal('2000'), 'name': 'Palladium', 'unit': 'oz'},   # ACTUAL: $1,734.5
+            # Precious Metals - WIDE RANGES (allow for market volatility)
+            'XAU': {'min': Decimal('2000'), 'max': Decimal('8000'), 'name': 'Gold', 'unit': 'oz'},        # Screen shows $4,979
+            'XAG': {'min': Decimal('20'), 'max': Decimal('200'), 'name': 'Silver', 'unit': 'oz'},         # Screen shows $101
+            'XPT': {'min': Decimal('500'), 'max': Decimal('5000'), 'name': 'Platinum', 'unit': 'oz'},     # Screen shows $2,741
+            'XPD': {'min': Decimal('500'), 'max': Decimal('5000'), 'name': 'Palladium', 'unit': 'oz'},    # Screen shows $2,027
             
-            # Industrial Metals (per metric ton - Yahoo Finance needs conversion)
-            'COPP': {'min': Decimal('7000'), 'max': Decimal('12000'), 'name': 'Copper', 'unit': 'ton'},   # ~$8,500/ton
-            'NICK': {'min': Decimal('10000'), 'max': Decimal('25000'), 'name': 'Nickel', 'unit': 'ton'},  # ~$15,000/ton
-            'ALUM': {'min': Decimal('2000'), 'max': Decimal('3000'), 'name': 'Aluminum', 'unit': 'ton'},  # ~$2,500/ton
-            'ZINC': {'min': Decimal('2000'), 'max': Decimal('4000'), 'name': 'Zinc', 'unit': 'ton'},      # ~$2,500/ton
+            # Industrial Metals - WIDE RANGES (per metric ton)
+            'COPP': {'min': Decimal('5000'), 'max': Decimal('25000'), 'name': 'Copper', 'unit': 'ton'},   # Screen shows $13,113
+            'NICK': {'min': Decimal('8000'), 'max': Decimal('30000'), 'name': 'Nickel', 'unit': 'ton'},   # Screen shows $14,820
+            'ALUM': {'min': Decimal('1500'), 'max': Decimal('5000'), 'name': 'Aluminum', 'unit': 'ton'},  # Should be ~$2,500
+            'ZINC': {'min': Decimal('1500'), 'max': Decimal('6000'), 'name': 'Zinc', 'unit': 'ton'},      # Should be ~$2,900
             
-            # Critical Minerals (per metric ton)
-            'LITH': {'min': Decimal('10000'), 'max': Decimal('30000'), 'name': 'Lithium', 'unit': 'ton'},
-            'COBT': {'min': Decimal('20000'), 'max': Decimal('50000'), 'name': 'Cobalt', 'unit': 'ton'},
-            'MANG': {'min': Decimal('1000'), 'max': Decimal('3000'), 'name': 'Manganese', 'unit': 'ton'},
-            'GRPH': {'min': Decimal('500'), 'max': Decimal('2000'), 'name': 'Graphite', 'unit': 'ton'},
-            'TANT': {'min': Decimal('50000'), 'max': Decimal('150000'), 'name': 'Tantalum', 'unit': 'ton'},
+            # Critical Minerals - WIDE RANGES (per metric ton)
+            'LITH': {'min': Decimal('5000'), 'max': Decimal('40000'), 'name': 'Lithium', 'unit': 'ton'},
+            'COBT': {'min': Decimal('15000'), 'max': Decimal('80000'), 'name': 'Cobalt', 'unit': 'ton'},
+            'MANG': {'min': Decimal('500'), 'max': Decimal('5000'), 'name': 'Manganese', 'unit': 'ton'},
+            'GRPH': {'min': Decimal('300'), 'max': Decimal('3000'), 'name': 'Graphite', 'unit': 'ton'},
+            'TANT': {'min': Decimal('30000'), 'max': Decimal('200000'), 'name': 'Tantalum', 'unit': 'ton'},
         }
 
         # Asset mapping for different APIs
@@ -145,16 +145,38 @@ class EnhancedOracleService:
     
     def _validate_commodity_price(self, commodity_symbol: str, price: Decimal, source: str) -> bool:
         """
-        TODO: Re-enable validation when we have accurate market data
-        For now, accept all positive prices from Yahoo Finance
+        Validate commodity prices - PERMISSIVE to allow for extreme market moves
+        Only rejects prices that are CLEARLY broken (10x outside range)
         """
         if price <= 0:
-            logger.warning(f"Rejected non-positive price for {commodity_symbol}: ${price}")
+            logger.error(f"❌ REJECTED: {commodity_symbol} ${price} from {source} (non-positive)")
             return False
         
-        # Accept all positive prices during free tier operation
-        logger.debug(f"✅ ACCEPTED: {commodity_symbol} ${price} from {source}")
-        return True
+        expected = self.commodity_ranges.get(commodity_symbol)
+        if not expected:
+            # If no range defined, accept any positive price
+            logger.warning(f"⚠️ No validation range for {commodity_symbol}, accepting ${price} from {source}")
+            return True
+        
+        min_price = expected['min']
+        max_price = expected['max']
+        
+        # PERMISSIVE: Allow 10x deviation (for black swan events)
+        lower_bound = min_price * Decimal('0.1')  # 10x below min
+        upper_bound = max_price * Decimal('10.0') # 10x above max
+        
+        if lower_bound <= price <= upper_bound:
+            # Additional sanity check: reject if >1000x expected midpoint
+            midpoint = (min_price + max_price) / 2
+            if price > midpoint * 1000 or price < midpoint / 1000:
+                logger.error(f"🚨 REJECTED EXTREME OUTLIER: {commodity_symbol} ${price} from {source} (>1000x from midpoint ${midpoint})")
+                return False
+                
+            logger.debug(f"✅ ACCEPTED: {commodity_symbol} ${price} from {source} (range: ${min_price}-${max_price})")
+            return True
+        else:
+            logger.error(f"❌ REJECTED: {commodity_symbol} ${price} from {source} (expected: ${min_price}-${max_price}, bounds: ${lower_bound}-${upper_bound})")
+            return False
     
     async def get_asset_price(self, asset_name: str) -> Tuple[Decimal, Dict]:
         """
@@ -687,17 +709,17 @@ class EnhancedOracleService:
         # Best for: All metals (XAU, XAG, XPT, XPD, COPP, ALUM, ZINC, NICK)
         # ============================================================================
         yahoo_ticker_map = {
-            # Precious Metals (price per troy oz - NO multiplier needed)
+            # Precious Metals (already in USD/oz - NO conversion)
             'XAU': {'ticker': 'GC=F', 'multiplier': Decimal('1'), 'unit': 'USD per troy ounce'},
             'XAG': {'ticker': 'SI=F', 'multiplier': Decimal('1'), 'unit': 'USD per troy ounce'},
             'XPT': {'ticker': 'PL=F', 'multiplier': Decimal('1'), 'unit': 'USD per troy ounce'},
             'XPD': {'ticker': 'PA=F', 'multiplier': Decimal('1'), 'unit': 'USD per troy ounce'},
             
-            # Industrial Metals (Yahoo returns per pound, convert to metric ton)
-            'COPP': {'ticker': 'HG=F', 'multiplier': Decimal('2204.62'), 'unit': 'USD per metric ton'},  # lbs to tons
-            'ALUM': {'ticker': 'ALI=F', 'multiplier': Decimal('2204.62'), 'unit': 'USD per metric ton'}, # lbs to tons
-            'ZINC': {'ticker': 'ZN=F', 'multiplier': Decimal('2204.62'), 'unit': 'USD per metric ton'},  # lbs to tons
-            'NICK': {'ticker': 'NICK', 'multiplier': Decimal('1'), 'unit': 'USD per metric ton'},        # Stock symbol
+            # Industrial Metals - CRITICAL: Check Yahoo's actual quote units
+            'COPP': {'ticker': 'HG=F', 'multiplier': Decimal('2204.62'), 'unit': 'USD per metric ton'},  # USD/lb → USD/ton
+            'ALUM': {'ticker': 'ALI=F', 'multiplier': Decimal('1'), 'unit': 'USD per metric ton'},       # 🚨 ALREADY IN USD/TON
+            'ZINC': {'ticker': 'ZN=F', 'multiplier': Decimal('1'), 'unit': 'USD per metric ton'},        # 🚨 ALREADY IN USD/TON  
+            'NICK': {'ticker': 'NI=F', 'multiplier': Decimal('1'), 'unit': 'USD per metric ton'},        # 🚨 USE FUTURES TICKER
         }
         
         yahoo_config = yahoo_ticker_map.get(commodity_symbol)
@@ -1008,63 +1030,72 @@ class EnhancedOracleService:
                 logger.warning(f"⚠️ LME Zinc reference failed: {e}")
 
         # ============================================================================
-        # 🚨 EMERGENCY FALLBACK - USE LAST KNOWN REFERENCE PRICES
+        # 🚨 EMERGENCY FALLBACK - USE LAST SUCCESSFUL DB PRICE
         # ============================================================================
-        emergency_prices = {
-            # Precious Metals (per troy oz)
-            'XAU': Decimal('2150.00'),
-            'XAG': Decimal('26.50'),
-            'XPT': Decimal('950.00'),
-            'XPD': Decimal('1050.00'),
+
+        # Try to get last known good price from database (last 24h)
+        async def _get_emergency_price_from_db(self, commodity_symbol: str) -> Optional[Decimal]:
+            """Fetch last successful price from DB within 24 hours"""
+            try:
+                query = """
+                    SELECT rate 
+                    FROM public.price_history 
+                    WHERE currency_pair = $1
+                    AND timestamp > NOW() - INTERVAL '24 hours'
+                    AND confidence > 0.8
+                    ORDER BY timestamp DESC 
+                    LIMIT 1
+                """
+                result = await self.db_service.db.fetchrow(
+                    query, 
+                    f"{commodity_symbol}/USD"
+                )
+                
+                if result and result['rate']:
+                    price = Decimal(str(result['rate']))
+                    logger.warning(f"📊 Using last DB price for {commodity_symbol}: ${price}")
+                    return price
+                    
+            except Exception as e:
+                logger.error(f"Failed to fetch emergency price from DB: {e}")
             
-            # Industrial Metals (per metric ton)
-            'COPP': Decimal('8500.00'),
-            'ALUM': Decimal('2500.00'),
-            'ZINC': Decimal('2500.00'),
-            'NICK': Decimal('15000.00'),
-            
-            # Critical Minerals
-            'LITH': Decimal('13500.00'),
-            'COBT': Decimal('27000.00'),
-            'MANG': Decimal('1900.00'),
-            'GRPH': Decimal('950.00'),
-            'TANT': Decimal('85000.00'),
+            return None
+
+        # If DB fails, use WIDE market ranges (will accept almost any reasonable price)
+        emergency_price_calculation = {
+            # Use midpoint of validation ranges as absolute last resort
+            'XAU': (self.commodity_ranges['XAU']['min'] + self.commodity_ranges['XAU']['max']) / 2,
+            'XAG': (self.commodity_ranges['XAG']['min'] + self.commodity_ranges['XAG']['max']) / 2,
+            'XPT': (self.commodity_ranges['XPT']['min'] + self.commodity_ranges['XPT']['max']) / 2,
+            'XPD': (self.commodity_ranges['XPD']['min'] + self.commodity_ranges['XPD']['max']) / 2,
+            'COPP': (self.commodity_ranges['COPP']['min'] + self.commodity_ranges['COPP']['max']) / 2,
+            'ALUM': (self.commodity_ranges['ALUM']['min'] + self.commodity_ranges['ALUM']['max']) / 2,
+            'ZINC': (self.commodity_ranges['ZINC']['min'] + self.commodity_ranges['ZINC']['max']) / 2,
+            'NICK': (self.commodity_ranges['NICK']['min'] + self.commodity_ranges['NICK']['max']) / 2,
+            'LITH': (self.commodity_ranges['LITH']['min'] + self.commodity_ranges['LITH']['max']) / 2,
+            'COBT': (self.commodity_ranges['COBT']['min'] + self.commodity_ranges['COBT']['max']) / 2,
+            'MANG': (self.commodity_ranges['MANG']['min'] + self.commodity_ranges['MANG']['max']) / 2,
+            'GRPH': (self.commodity_ranges['GRPH']['min'] + self.commodity_ranges['GRPH']['max']) / 2,
+            'TANT': (self.commodity_ranges['TANT']['min'] + self.commodity_ranges['TANT']['max']) / 2,
         }
 
-        if commodity_symbol in emergency_prices:
-            price = emergency_prices[commodity_symbol]
-            logger.critical(f"🚨 USING EMERGENCY FALLBACK for {commodity_symbol}: ${price}")
-            
-            metadata = {
+        # FIRST: Try database
+        db_price = await self._get_emergency_price_from_db(commodity_symbol)
+        if db_price:
+            return db_price, {
                 'timestamp': datetime.now().isoformat(),
-                'source': 'emergency_fallback',
-                'confidence': 0.60,
+                'source': 'emergency_db_fallback',
+                'confidence': 0.70,
                 'unit': 'USD per troy ounce' if commodity_symbol in ['XAU', 'XAG', 'XPT', 'XPD'] else 'USD per metric ton',
                 'symbol': commodity_symbol,
                 'live': False,
-                'warning': 'All live sources failed - using emergency reference price'
+                'warning': 'Using last successful DB price (within 24h)'
             }
-            
-            self.rate_cache[cache_key] = {
-                'price': price,
-                'metadata': metadata,
-                'timestamp': datetime.now()
-            }
-            
-            return price, metadata
 
-        # If we get here, nothing worked
-        logger.critical(f"🚨 CRITICAL: ALL SOURCES FAILED for {commodity_symbol}")
-        # Instead of raising an error, return 0 to prevent crashing
-        return Decimal('0.00'), {
-            'timestamp': datetime.now().isoformat(),
-            'source': 'failed',
-            'confidence': 0.0,
-            'unit': 'unknown',
-            'symbol': commodity_symbol,
-            'live': False,
-            'error': f'Could not fetch price for {commodity_symbol}'
-        }
+        # LAST RESORT: Use calculated midpoint
+        if commodity_symbol in emergency_price_calculation:
+            price = emergency_price_calculation[commodity_symbol]
+            logger.critical(f"🚨 ABSOLUTE LAST RESORT for {commodity_symbol}: ${price} (calculated midpoint)")
     
     # ============================================================================
     # 🌍 CROSS-RATES (BTC/NGN, ETH/ZAR, etc.)

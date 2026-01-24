@@ -722,4 +722,39 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"[DB] Error closing database connections: {str(e)}")
 
+    async def get_last_successful_price(self, currency_pair: str, hours: int = 24) -> Optional[Dict[str, Any]]:
+        """
+        Get last successful price from price_history within N hours
+        Used for emergency fallback when all APIs fail
+        """
+        try:
+            query = """
+                SELECT 
+                    rate,
+                    source,
+                    confidence,
+                    timestamp
+                FROM public.price_history 
+                WHERE currency_pair = $1
+                AND timestamp > NOW() - INTERVAL '%s hours'
+                AND confidence > 0.7
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """ % hours
+            
+            result = await self.db.fetchrow(query, currency_pair)
+            
+            if result:
+                return {
+                    'rate': Decimal(str(result['rate'])),
+                    'source': result['source'],
+                    'confidence': result['confidence'],
+                    'timestamp': result['timestamp']
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get last successful price for {currency_pair}: {e}")
+        
+        return None
+
 SuperDatabaseService = DatabaseService
