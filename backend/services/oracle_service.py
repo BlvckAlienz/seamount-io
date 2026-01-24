@@ -80,13 +80,6 @@ class EnhancedOracleService:
             'NICK': {'min': Decimal('8000'), 'max': Decimal('30000'), 'name': 'Nickel', 'unit': 'ton'},   # Screen shows $14,820
             'ALUM': {'min': Decimal('1500'), 'max': Decimal('5000'), 'name': 'Aluminum', 'unit': 'ton'},  # Should be ~$2,500
             'ZINC': {'min': Decimal('1500'), 'max': Decimal('6000'), 'name': 'Zinc', 'unit': 'ton'},      # Should be ~$2,900
-            
-            # Critical Minerals - WIDE RANGES (per metric ton)
-            'LITH': {'min': Decimal('5000'), 'max': Decimal('40000'), 'name': 'Lithium', 'unit': 'ton'},
-            'COBT': {'min': Decimal('15000'), 'max': Decimal('80000'), 'name': 'Cobalt', 'unit': 'ton'},
-            'MANG': {'min': Decimal('500'), 'max': Decimal('5000'), 'name': 'Manganese', 'unit': 'ton'},
-            'GRPH': {'min': Decimal('300'), 'max': Decimal('3000'), 'name': 'Graphite', 'unit': 'ton'},
-            'TANT': {'min': Decimal('30000'), 'max': Decimal('200000'), 'name': 'Tantalum', 'unit': 'ton'},
         }
 
         # Asset mapping for different APIs
@@ -105,7 +98,17 @@ class EnhancedOracleService:
                 'trx': 'TRXUSDT',  # ➕ ADD
                 'solana': 'SOLUSDT',
                 'sol': 'SOLUSDT',  # ➕ ADD
-                'ton': 'TONUSDT'
+                'ton': 'TONUSDT',
+                'xrp': 'XRPUSDT',
+                'bnb': 'BNBUSDT',
+                'solana': 'SOLUSDT',
+                'sol': 'SOLUSDT',
+                'litecoin': 'LTCUSDT',
+                'ltc': 'LTCUSDT',
+                'dogecoin': 'DOGEUSDT',
+                'doge': 'DOGEUSDT',
+                'cardano': 'ADAUSDT',
+                'ada': 'ADAUSDT'
             },
             'coingecko': {
                 'bitcoin': 'bitcoin',
@@ -121,7 +124,17 @@ class EnhancedOracleService:
                 'trx': 'tron',  # ➕ ADD
                 'solana': 'solana',
                 'sol': 'solana',  # ➕ ADD
-                'ton': 'the-open-network'
+                'ton': 'the-open-network',
+                'xrp': 'ripple',
+                'bnb': 'binancecoin',
+                'solana': 'solana',
+                'sol': 'solana',
+                'litecoin': 'litecoin',
+                'ltc': 'litecoin',
+                'dogecoin': 'dogecoin',
+                'doge': 'dogecoin',
+                'cardano': 'cardano',
+                'ada': 'cardano'
             },
             'dia': {
                 'bitcoin': 'BTC',
@@ -137,7 +150,17 @@ class EnhancedOracleService:
                 'trx': 'TRX',  # ➕ ADD
                 'solana': 'SOL',
                 'sol': 'SOL',  # ➕ ADD
-                'ton': 'TON'
+                'ton': 'TON',
+                'xrp': 'XRP',
+                'bnb': 'BNB',
+                'solana': 'SOL',
+                'sol': 'SOL',
+                'litecoin': 'LTC',
+                'ltc': 'LTC',
+                'dogecoin': 'DOGE',
+                'doge': 'DOGE',
+                'cardano': 'ADA',
+                'ada': 'ADA'
             }
         }
         
@@ -398,7 +421,17 @@ class EnhancedOracleService:
             'trx': Decimal("0.12"),  # ➕ ADD
             'solana': Decimal("150.00"),
             'sol': Decimal("150.00"),  # ➕ ADD
-            'ton': Decimal("2.50")
+            'ton': Decimal("2.50"),
+            'xrp': Decimal("2.40"),        # Jan 2025 XRP
+            'bnb': Decimal("620.00"),      # Jan 2025 BNB
+            'solana': Decimal("190.00"),   # Jan 2025 SOL
+            'sol': Decimal("190.00"),
+            'litecoin': Decimal("105.00"), # Jan 2025 LTC
+            'ltc': Decimal("105.00"),
+            'dogecoin': Decimal("0.32"),   # Jan 2025 DOGE
+            'doge': Decimal("0.32"),
+            'cardano': Decimal("0.95"),    # Jan 2025 ADA
+            'ada': Decimal("0.95")
         }
         
         rate = emergency_rates.get(asset_name.lower())
@@ -867,108 +900,11 @@ class EnhancedOracleService:
                 logger.warning(f"⚠️ [Tier 5] FMP failed for {commodity_symbol}: {e}")
         
         # ============================================================================
-        # TIER 6: Critical Minerals (Market Reference - LIVE DATA PREFERRED)
+        # 🚨 REJECT: CRITICAL MINERALS (No Live APIs Available)
         # ============================================================================
-        
-        # Lithium (via market reference - fallback only)
-        if commodity_symbol == 'LITH':
-            try:
-                price = Decimal('13500.00')  # Nov 2025 lithium carbonate
-                
-                metadata = {
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'market_reference',
-                    'confidence': 0.75,
-                    'unit': 'USD per metric ton',
-                    'symbol': commodity_symbol,
-                    'live': False,
-                    'note': 'Lithium carbonate China spot price reference (Nov 2025)'
-                }
-                
-                logger.info(f"✅ [Market Reference] {commodity_symbol}: ${price}")
-                return price, metadata
-            except Exception as e:
-                logger.warning(f"⚠️ Lithium reference failed: {e}")
-        
-        # Cobalt (LME reference)
-        if commodity_symbol == 'COBT':
-            try:
-                price = Decimal('27000.00')  # Nov 2025 cobalt
-                
-                metadata = {
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'market_reference',
-                    'confidence': 0.75,
-                    'unit': 'USD per metric ton',
-                    'symbol': commodity_symbol,
-                    'live': False,
-                    'note': 'LME cobalt reference price (Nov 2025)'
-                }
-                
-                logger.info(f"✅ [Market Reference] {commodity_symbol}: ${price}")
-                return price, metadata
-            except Exception as e:
-                logger.warning(f"⚠️ Cobalt reference failed: {e}")
-        
-        # Manganese
-        if commodity_symbol == 'MANG':
-            try:
-                price = Decimal('1900.00')  # Nov 2025 manganese ore
-                
-                metadata = {
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'market_reference',
-                    'confidence': 0.75,
-                    'unit': 'USD per metric ton',
-                    'symbol': commodity_symbol,
-                    'live': False,
-                    'note': 'Manganese ore China reference (Nov 2025)'
-                }
-                
-                logger.info(f"✅ [Market Reference] {commodity_symbol}: ${price}")
-                return price, metadata
-            except Exception as e:
-                logger.warning(f"⚠️ Manganese reference failed: {e}")
-        
-        # Tantalum
-        if commodity_symbol == 'TANT':
-            try:
-                price = Decimal('85000.00')  # Nov 2025 tantalum
-                
-                metadata = {
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'market_reference',
-                    'confidence': 0.70,
-                    'unit': 'USD per metric ton',
-                    'symbol': commodity_symbol,
-                    'live': False,
-                    'note': 'Tantalum pentoxide reference (Nov 2025)'
-                }
-                
-                logger.info(f"✅ [Market Reference] {commodity_symbol}: ${price}")
-                return price, metadata
-            except Exception as e:
-                logger.warning(f"⚠️ Tantalum reference failed: {e}")
-        
-        # Graphite
-        if commodity_symbol == 'GRPH':
-            try:
-                price = Decimal('950.00')  # Nov 2025 graphite
-                
-                metadata = {
-                    'timestamp': datetime.now().isoformat(),
-                    'source': 'market_reference',
-                    'confidence': 0.75,
-                    'unit': 'USD per metric ton',
-                    'symbol': commodity_symbol,
-                    'live': False,
-                    'note': 'Natural flake graphite China reference (Nov 2025)'
-                }
-                
-                logger.info(f"✅ [Market Reference] {commodity_symbol}: ${price}")
-                return price, metadata
-            except Exception as e:
-                logger.warning(f"⚠️ Graphite reference failed: {e}")
+        if commodity_symbol in ['LITH', 'COBT', 'MANG', 'GRPH', 'TANT']:
+            logger.error(f"❌ {commodity_symbol} not supported - no live pricing APIs available")
+            raise ValueError(f"Live pricing for {commodity_symbol} is not available. Only market reference data exists.")
         
         # ============================================================================
         # TIER 6: LME MARKET REFERENCES (For metals without Yahoo Finance tickers)
@@ -1142,15 +1078,7 @@ class EnhancedOracleService:
     async def get_market_snapshot(self) -> Dict[str, Any]:
         """
         Get complete market snapshot for Bloomberg-style terminal
-        
-        Returns:
-        {
-            'crypto': {'bitcoin': 63500.00, ...},
-            'forex': {'NGN/USD': 0.00067, ...},
-            'commodities': {'XAU': 2650.00, ...},
-            'cross_rates': {'BTC/NGN': 95250000, ...},
-            'timestamp': '2024-11-30T12:00:00Z'
-        }
+        ...
         """
         snapshot = {
             'crypto': {},
@@ -1160,8 +1088,11 @@ class EnhancedOracleService:
             'timestamp': datetime.now().isoformat()
         }
         
-        # Crypto assets (parallel fetch)
-        crypto_symbols = ['bitcoin', 'ethereum', 'algorand', 'tron']
+        # Crypto assets (parallel fetch) - ✅ EXPANDED TO 10 CRYPTOS
+        crypto_symbols = [
+            'bitcoin', 'ethereum', 'algorand', 'tron',      # Original 4
+            'xrp', 'bnb', 'solana', 'litecoin', 'dogecoin', 'cardano'  # ➕ New 6
+        ]
         crypto_tasks = [self.get_asset_price(symbol) for symbol in crypto_symbols]
         crypto_results = await asyncio.gather(*crypto_tasks, return_exceptions=True)
         
@@ -1193,7 +1124,6 @@ class EnhancedOracleService:
         commodity_symbols = [
             'XAU', 'XAG', 'XPT', 'XPD',           # Precious metals
             'COPP', 'NICK', 'ALUM', 'ZINC',       # Industrial metals
-            'LITH', 'COBT', 'MANG', 'GRPH', 'TANT' # Critical minerals
         ]
         commodity_tasks = [self.get_commodity_price(symbol) for symbol in commodity_symbols]
         commodity_results = await asyncio.gather(*commodity_tasks, return_exceptions=True)

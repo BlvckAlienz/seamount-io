@@ -109,7 +109,7 @@ const MarketTerminal: React.FC = () => {
         <h2 className="text-xl font-semibold mb-3 flex items-center">
           <span className="mr-2">💰</span> Cryptocurrencies
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {Object.entries(cryptoData).map(([asset, price]) => (
             <div key={asset} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
               <div className="text-gray-400 text-sm uppercase">{asset}</div>
@@ -184,30 +184,6 @@ const MarketTerminal: React.FC = () => {
                 <div className={`text-sm mt-1 ${isLive ? 'text-green-400' : 'text-yellow-400'}`}>
                   {isLive ? '● Live (Yahoo Finance)' : '◐ Daily (LME Reference)'}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Critical Minerals */}
-      <section className="mb-6">
-        <h2 className="text-xl font-semibold mb-3 flex items-center">
-          <span className="mr-2">🔋</span> Critical Minerals (Battery Metals)
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {['LITH', 'COBT', 'MANG', 'GRPH', 'TANT'].map((symbol) => {
-            const names = { LITH: 'Lithium', COBT: 'Cobalt', MANG: 'Manganese', GRPH: 'Graphite', TANT: 'Tantalum' };
-            const price = commoditiesData[symbol] || 0;
-            
-            return (
-              <div key={symbol} className="bg-gradient-to-br from-purple-900/30 to-gray-800 rounded-lg p-4 border border-purple-700/50">
-                <div className="text-purple-400 text-sm font-semibold">{names[symbol as keyof typeof names]}</div>
-                <div className="text-xl font-bold mt-1">
-                  ${price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">per metric ton</div>
-                <div className="text-gray-400 text-sm mt-1">◐ Market Reference</div>
               </div>
             );
           })}

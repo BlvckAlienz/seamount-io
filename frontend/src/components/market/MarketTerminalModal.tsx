@@ -105,7 +105,6 @@ const MarketTerminalModal: React.FC<MarketTerminalModalProps> = ({ isOpen, onClo
           {[
             { id: 'precious', label: '🏆 Precious Metals', icon: '🏆' },
             { id: 'industrial', label: '⚙️ Industrial', icon: '⚙️' },
-            { id: 'critical', label: '🔋 Battery Metals', icon: '🔋' },
             { id: 'crypto', label: '💰 Crypto', icon: '💰' },
             { id: 'forex', label: '🌍 Forex', icon: '🌍' }
           ].map(tab => (
@@ -195,27 +194,6 @@ const MarketTerminalModal: React.FC<MarketTerminalModalProps> = ({ isOpen, onClo
                         <div className="text-xs text-gray-500 mt-2">
                           {isLive ? 'Source: Yahoo Finance' : 'Source: LME Reference'}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 🔋 CRITICAL MINERALS TAB */}
-              {activeTab === 'critical' && marketData && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  {['LITH', 'COBT', 'MANG', 'GRPH', 'TANT'].map(symbol => {
-                    const names = { LITH: 'Lithium', COBT: 'Cobalt', MANG: 'Manganese', GRPH: 'Graphite', TANT: 'Tantalum' };
-                    const price = marketData.commodities[symbol];
-                    
-                    return (
-                      <div key={symbol} className="bg-gradient-to-br from-purple-900/30 to-gray-800 rounded-xl p-4 border border-purple-700/50 hover:shadow-lg hover:shadow-purple-500/20 transition-all">
-                        <div className="text-purple-400 font-bold mb-2">{names[symbol as keyof typeof names]}</div>
-                        <div className="text-2xl font-bold text-white mb-1">
-                          ${price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </div>
-                        <div className="text-xs text-gray-400">per metric ton</div>
-                        <div className="text-xs text-gray-500 mt-2">Market Reference</div>
                       </div>
                     );
                   })}
