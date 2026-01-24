@@ -42,13 +42,11 @@ const Sidebar: React.FC = () => {
   // 🚨 ALL NAV ITEMS (includes business-only features)
   const allNavItems: NavItem[] = [
     { label: 'Wallets', icon: Wallet, path: '/dashboard' },
-    { label: 'Meter Xpress', icon: Zap, path: '/meter-xpress', badge: 'NEW', individualOnly: true },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
     { label: 'Collateral', icon: Lock, path: '/collateral', badge: 'NEW', businessOnly: true },
     { label: 'Audit & Tax', icon: Receipt, path: '/compliance', businessOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
-    { label: 'Predictions', icon: Target, path: '/predictions', individualOnly: true },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
