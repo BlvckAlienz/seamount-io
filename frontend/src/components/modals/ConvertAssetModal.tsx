@@ -23,6 +23,23 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
   const [quantity, setQuantity] = useState('');
   const [pricePerUnit, setPricePerUnit] = useState('');
   const [isin, setIsin] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+    
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   // Result state
   const [conversionResult, setConversionResult] = useState<any>(null);
@@ -37,14 +54,28 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
       setLoading(true);
       setStep(2); // Show loading step
       
-      const response = await apiClient.post('/api/v1/tokenization/convert-asset', {
-        custodian_id: custodianId,
-        symbol: symbol.toUpperCase(),
-        name: name || symbol,
-        quantity: parseInt(quantity),
-        price_per_unit: parseFloat(pricePerUnit),
-        isin: isin || undefined,
-      });
+      // ✅ Build FormData with all fields
+      const formData = new FormData();
+      formData.append('custodian_id', custodianId);
+      formData.append('symbol', symbol.toUpperCase());
+      formData.append('name', name || symbol);
+      formData.append('quantity', quantity);
+      formData.append('price_per_unit', pricePerUnit);
+      
+      if (isin) {
+        formData.append('isin', isin);
+      }
+      
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+      
+      // ✅ Send multipart/form-data request
+      const response = await apiClient.post(
+        '/api/v1/tokenization/convert-asset',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
 
       if (response.data.success) {
         setConversionResult(response.data.data);
@@ -200,6 +231,37 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 ISIN Code (Optional)
               </label>
+            
+            {/* Asset Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Asset Image (Optional)
+              </label>
+              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-green-500 transition-colors">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="asset-image-upload"
+                />
+                <label htmlFor="asset-image-upload" className="cursor-pointer">
+                  {imagePreview ? (
+                    <img 
+                      src={imagePreview} 
+                      alt="Asset preview" 
+                      className="max-h-48 mx-auto rounded-lg"
+                    />
+                  ) : (
+                    <div className="text-gray-400">
+                      <Upload className="h-12 w-12 mx-auto mb-2" />
+                      <p>Click to upload property image</p>
+                      <p className="text-xs mt-1">Max 5MB • JPG, PNG, WebP</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+            </div>
               <input
                 type="text"
                 value={isin}

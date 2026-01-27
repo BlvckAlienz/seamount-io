@@ -4,12 +4,14 @@ Seamount Tokenization API Routes
 Exposes FinP2P-inspired asset tokenization, DVP trading, and repo markets
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Form, File, UploadFile
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from decimal import Decimal
 from datetime import datetime
 import logging
+import uuid
+from pathlib import Path
 
 from backend.dependencies import (
     get_current_user,
@@ -92,64 +94,57 @@ def get_protocol_service(
 
 @router.post("/convert-asset")
 async def convert_asset(
-    request: TokenizeAssetRequest,
+    custodian_id: str = Form(...),
+    symbol: str = Form(...),
+    quantity: int = Form(...),
+    price_per_unit: float = Form(...),
+    name: Optional[str] = Form(None),
+    isin: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
     protocol: SeamountProtocol = Depends(get_protocol_service)
 ):
-    """
-    🏦 Convert Traditional Asset to Digital Twin
-    
-    **Flow:**
-    1. Verify custody with custodian (CSCS/NSE)
-    2. Create Algorand ASA
-    3. Lock physical shares
-    4. Issue digital tokens
-    
-    **Example:**
-```json
-    {
-      "custodian_id": "uuid-custodian",
-      "symbol": "DANGCEM",
-      "quantity": 1000,
-      "price_per_unit": 450.00
-    }
-```
-    """
+    """Convert traditional asset with optional image upload"""
     try:
-        logger.info(f"🔄 Tokenization request from user {current_user['id']}: {request.symbol}")
+        # 1️⃣ Handle image upload (if provided)
+        image_url = None
+        if image:
+            # Validate file type
+            if image.content_type not in ['image/jpeg', 'image/png', 'image/webp']:
+                raise HTTPException(400, "Invalid image format")
+            
+            # Generate unique filename
+            file_ext = Path(image.filename).suffix
+            filename = f"{uuid.uuid4()}{file_ext}"
+            
+            # Save to Supabase Storage
+            storage = get_db_service().supabase.storage
+            bucket = storage.from_('asset-images')
+            
+            image_bytes = await image.read()
+            upload_result = bucket.upload(filename, image_bytes)
+            
+            # Get public URL
+            image_url = bucket.get_public_url(filename)
         
-        # Execute tokenization
+        # 2️⃣ Tokenize asset
         result = await protocol.tokenize_asset(
             user_id=current_user['id'],
-            custodian_id=request.custodian_id,
+            custodian_id=custodian_id,
             asset_details={
-                'symbol': request.symbol,
-                'name': request.name or request.symbol,
-                'quantity': request.quantity,
-                'isin': request.isin,
-                'price_per_unit': float(request.price_per_unit)
+                'symbol': symbol.upper(),
+                'name': name or symbol,
+                'quantity': quantity,
+                'price_per_unit': price_per_unit,
+                'isin': isin,
+                'image_url': image_url  # ✅ Store image URL
             }
         )
         
-        if not result['success']:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Tokenization failed'))
-        
-        return {
-            "success": True,
-            "message": f"Successfully tokenized {request.quantity} shares of {request.symbol}",
-            "data": {
-                "asset_id": result['asset_id'],
-                "algorand_asa_id": result['algorand_asa_id'],
-                "digital_twin_address": result['digital_twin_address'],
-                "custody_reference": result['custody_reference']
-            }
-        }
-        
-    except HTTPException:
-        raise
+        return result
     except Exception as e:
-        logger.error(f"❌ Tokenization failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Conversion failed: {e}")
+        raise HTTPException(500, str(e))
 
 # ============================================================================
 # ENDPOINT 2: PUBLISH SECONDARY OFFER
@@ -401,19 +396,19 @@ async def get_my_assets(
 
 @router.get("/offers")
 async def get_offers(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
-    status: str = Query("published", description="Offer status"),
+    symbol: Optional[str] = Query(None),
+    status: str = Query("published"),
     db_service: DatabaseService = Depends(get_db_service)
 ):
-    """📊 List Available Secondary Market Offers"""
+    """List offers (auto-filter expired)"""
     try:
         query = db_service.supabase.table('asset_offers')\
-            .select('*, tokenized_assets(symbol, name)')
+            .select('*, tokenized_assets(symbol, name, image_url)')\
+            .eq('status', status)\
+            .gt('expires_at', datetime.utcnow().isoformat())  # ✅ Filter expired
         
         if symbol:
             query = query.eq('tokenized_assets.symbol', symbol)
-        
-        query = query.eq('status', status)
         
         result = query.execute()
         
@@ -422,10 +417,8 @@ async def get_offers(
             "count": len(result.data) if result.data else 0,
             "offers": result.data or []
         }
-        
     except Exception as e:
-        logger.error(f"❌ Offer listing failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
 
 # ============================================================================
 # ENDPOINT 7: LIST USER'S REPO TRADES
@@ -516,3 +509,41 @@ async def admin_update_price(
     except Exception as e:
         logger.error(f"❌ Price update failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/my-purchases")
+async def get_my_purchases(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db_service: DatabaseService = Depends(get_db_service)
+):
+    """Get user's purchased assets"""
+    try:
+        # Fetch from trade_history
+        trades = db_service.supabase.table('trade_history')\
+            .select('*, tokenized_assets(symbol, name, image_url, current_price_usd)')\
+            .eq('buyer_id', current_user['id'])\
+            .execute()
+        
+        # Calculate P&L
+        assets = []
+        for trade in (trades.data or []):
+            asset = trade['tokenized_assets']
+            purchase_price = trade['total_value']
+            current_value = trade['quantity'] * asset['current_price_usd']
+            
+            assets.append({
+                'id': trade['asset_id'],
+                'symbol': asset['symbol'],
+                'name': asset['name'],
+                'image_url': asset.get('image_url'),
+                'quantity': trade['quantity'],
+                'purchase_price': purchase_price,
+                'current_value': current_value,
+                'purchased_at': trade['settled_at']
+            })
+        
+        return {
+            'success': True,
+            'assets': assets
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))

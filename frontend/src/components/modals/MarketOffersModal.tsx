@@ -59,6 +59,33 @@ export const MarketOffersModal: React.FC<MarketOffersModalProps> = ({
     }
   };
 
+  const CountdownTimer: React.FC<{ expiresAt: string }> = ({ expiresAt }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+    
+    useEffect(() => {
+      const timer = setInterval(() => {
+        const now = new Date().getTime();
+        const expiry = new Date(expiresAt).getTime();
+        const diff = expiry - now;
+        
+        if (diff <= 0) {
+          setTimeLeft('Expired');
+          clearInterval(timer);
+          return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        
+        setTimeLeft(days > 0 ? `${days}d ${hours}h` : `${hours}h`);
+      }, 1000);
+      
+      return () => clearInterval(timer);
+    }, [expiresAt]);
+    
+    return <span className={timeLeft === 'Expired' ? 'text-red-400' : ''}>{timeLeft}</span>;
+  };
+
   const handleBuy = async () => {
     if (!selectedOffer) return;
 
@@ -151,6 +178,16 @@ export const MarketOffersModal: React.FC<MarketOffersModalProps> = ({
                       setShowBuyModal(true);
                     }}
                   >
+
+                    {/* Asset Image */}
+                    {offer.tokenized_assets?.image_url && (
+                      <img 
+                        src={offer.tokenized_assets.image_url} 
+                        alt={offer.tokenized_assets.symbol}
+                        className="w-full h-48 object-cover rounded-lg mb-4"
+                      />
+                    )}
+
                     {/* Asset Info */}
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -190,10 +227,10 @@ export const MarketOffersModal: React.FC<MarketOffersModalProps> = ({
                       </span>
                     </div>
 
-                    {/* Expiry */}
+                    {/* Live Countdown Timer */}
                     <div className="flex items-center gap-1 text-xs text-gray-500">
                       <Clock className="h-3 w-3" />
-                      Expires: {new Date(offer.expires_at).toLocaleDateString()}
+                      <CountdownTimer expiresAt={offer.expires_at} />
                     </div>
 
                     {/* Buy Button */}
