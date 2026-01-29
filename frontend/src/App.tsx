@@ -42,6 +42,7 @@ import TokenizationMarketPage from './pages/TokenizationMarketPage';
 import CollateralPage from './pages/CollateralPage';
 import PredictionMarketsPage from './pages/PredictionMarketsPage';
 import MarketTerminal from './components/market/MarketTerminal';
+import MyAssetsPage from '@/pages/MyAssetsPage';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -133,6 +134,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/my-assets" 
+          element={
+            <ProtectedRoute>
+              <MyAssetsPage />
             </ProtectedRoute>
           } 
         />

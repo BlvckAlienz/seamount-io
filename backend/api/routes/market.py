@@ -264,7 +264,44 @@ async def get_cross_rate(
             detail=f"Could not fetch cross-rate: {str(e)}"
         )
 
-
+@router.get("/algo-price")
+async def get_algo_price(
+    oracle_service: EnhancedOracleService = Depends(get_oracle_service)
+):
+    """
+    💱 GET LIVE ALGO/USD PRICE
+    
+    Uses 3-tier oracle (Binance → CoinGecko → DIA)
+    Cached for 5 minutes
+    
+    Response:
+    {
+        "success": true,
+        "price": 0.1234,
+        "currency": "USD",
+        "source": "binance",
+        "confidence": 0.95,
+        "timestamp": "2026-01-27T12:00:00Z"
+    }
+    """
+    try:
+        price, metadata = await oracle_service.get_asset_price('algorand')
+        
+        return {
+            "success": True,
+            "price": float(price),
+            "currency": "USD",
+            "source": metadata.get('source'),
+            "confidence": metadata.get('confidence'),
+            "timestamp": metadata.get('timestamp')
+        }
+    except Exception as e:
+        logger.error(f"ALGO price fetch failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not fetch ALGO price: {str(e)}"
+        )
+    
 # ✅ SEPARATE ROUTER FOR QUOTA (not under /market)
 quota_router = APIRouter(prefix="/quota", tags=["API Quota"])
 

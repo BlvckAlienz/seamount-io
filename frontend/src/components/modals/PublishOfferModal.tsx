@@ -21,7 +21,7 @@ export const PublishOfferModal: React.FC<PublishOfferModalProps> = ({
   const [selectedAsset, setSelectedAsset] = useState('');
   const [quantity, setQuantity] = useState('');
   const [pricePerUnit, setPricePerUnit] = useState('');
-  const [paymentNetwork, setPaymentNetwork] = useState('usdc_circle');
+  const [paymentNetwork, setPaymentNetwork] = useState('algorand_native');  // ✅ Changed from 'usdc_circle'
   const [expiresInHours, setExpiresInHours] = useState('168'); // 7 days default
 
   // Calculated values
@@ -170,17 +170,36 @@ export const PublishOfferModal: React.FC<PublishOfferModalProps> = ({
           {/* Payment Network */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Payment Network
+              Payment Network <span className="text-green-400 text-xs">(Settlement Currency)</span>
             </label>
             <select
               value={paymentNetwork}
               onChange={(e) => setPaymentNetwork(e.target.value)}
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
             >
-              <option value="usdc_circle">USDC (Circle)</option>
-              <option value="usdt_tron">USDT (Tron)</option>
-              <option value="nibss_nip">NIBSS NIP (NGN)</option>
+              {/* ✅ LIVE: Algorand */}
+              <optgroup label="✅ Live Networks">
+                <option value="algorand_native">Algorand (ALGO) - Native</option>
+              </optgroup>
+              
+              {/* 🚧 SANDBOX: Coming Soon */}
+              <optgroup label="🚧 Sandbox (Not Yet Available)">
+                <option value="usdc_circle" disabled>USDC (Circle) - Sandbox</option>
+                <option value="usdc_polygon" disabled>USDC (Polygon) - Sandbox</option>
+                <option value="usdt_erc20" disabled>USDT (Ethereum) - Sandbox</option>
+                <option value="usdt_tron" disabled>USDT (Tron) - Sandbox</option>
+                <option value="nibss_nip" disabled>NIBSS NIP (NGN) - Sandbox</option>
+                <option value="papss" disabled>PAPSS (NGN) - Sandbox</option>
+              </optgroup>
             </select>
+            
+            <div className="mt-2 flex items-start gap-2 text-xs">
+              <span className="text-green-400">✓</span>
+              <p className="text-gray-400">
+                Currently using <span className="text-green-400 font-medium">Algorand blockchain</span> for instant atomic settlements (2-4 seconds).
+                Additional payment networks coming soon.
+              </p>
+            </div>
           </div>
 
           {/* Expiry */}

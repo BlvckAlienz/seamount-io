@@ -46,6 +46,13 @@ const TradingPage = () => {
   const [offers, setOffers] = useState<AssetOffer[]>([]);
   const [filteredOffers, setFilteredOffers] = useState<AssetOffer[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<AssetOffer | null>(null);
+  const [userAlgoBalance, setUserAlgoBalance] = useState<number>(0);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+
+  // ✅ Live ALGO/USD price state
+  const [algoUsdPrice, setAlgoUsdPrice] = useState<number>(0.12); // Fallback
+  const [priceLoading, setPriceLoading] = useState(true);
+  const [priceSource, setPriceSource] = useState<string>('');
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,6 +127,36 @@ const TradingPage = () => {
     }
   }, []);
 
+  // Fetch live ALGO/USD price on mount and every 5 minutes
+  useEffect(() => {
+    const fetchAlgoPrice = async () => {
+      try {
+        setPriceLoading(true);
+        const response = await apiClient.get('/api/v1/market/algo-price');
+        
+        if (response.data.success) {
+          setAlgoUsdPrice(response.data.price);
+          setPriceSource(response.data.source);
+          logger.info(`💱 Live ALGO price: $${response.data.price} (${response.data.source})`);
+        }
+      } catch (error) {
+        console.error('Failed to fetch ALGO price:', error);
+        setAlgoUsdPrice(0.12); // Use fallback
+        setPriceSource('fallback');
+      } finally {
+        setPriceLoading(false);
+      }
+    };
+    
+    fetchAlgoPrice();
+    
+    // Refresh every 5 minutes (matches oracle cache)
+    const interval = setInterval(fetchAlgoPrice, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const ALGO_PER_USD = 1 / algoUsdPrice;
+
   // Initial load
   useEffect(() => {
     if (user && !authLoading) {
@@ -133,6 +170,28 @@ const TradingPage = () => {
       return () => clearInterval(refreshInterval);
     }
   }, [user, authLoading, fetchOffers]);
+  
+  // Fetch user's ALGO balance when modal opens
+  useEffect(() => {
+    if (showBuyModal && selectedOffer) {
+      fetchAlgoBalance();
+    }
+  }, [showBuyModal, selectedOffer]);
+
+  const fetchAlgoBalance = async () => {
+    try {
+      setBalanceLoading(true);
+      const response = await apiClient.get('/api/v1/wallet/balance/algorand');
+      if (response.data.success) {
+        setUserAlgoBalance(response.data.balance); // in ALGO
+      }
+    } catch (error) {
+      console.error('Failed to fetch ALGO balance:', error);
+      setUserAlgoBalance(0);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
 
   // Apply filters and sorting
   useEffect(() => {
@@ -373,7 +432,7 @@ const TradingPage = () => {
               </button>
               
               <button
-                onClick={() => navigate('/tokenization/my-assets')}
+                onClick={() => navigate('/my-assets')}  // ✅ Changed route
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium transition-colors"
               >
                 My Assets
@@ -791,10 +850,93 @@ const TradingPage = () => {
                     Estimated completion: 2-4 minutes.
                   </div>
                 </div>
+
+                {/* ✅ EXCHANGE RATE & BALANCE CHECK - ADD THIS ENTIRE BLOCK */}
+                <div className="bg-gray-800/30 rounded-xl p-4">
+                  {/* Exchange Rate Display */}
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-700">
+                    <span className="text-xs text-gray-400">Exchange Rate</span>
+                    {priceLoading ? (
+                      <span className="text-xs text-gray-400 animate-pulse">Fetching...</span>
+                    ) : (
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-white">
+                          1 ALGO = ${algoUsdPrice.toFixed(4)} USD
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Source: {priceSource} {priceSource !== 'fallback' && <span className="text-green-400">● Live</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                {/* Balance Check */}
+                {(() => {
+                  const MIN_BALANCE = 0.1;
+                  const TX_FEE = 0.002;
+                  const requiredAlgo = (selectedOffer.total_value * ALGO_PER_USD) + MIN_BALANCE + TX_FEE;
+                  const hasEnoughBalance = userAlgoBalance >= requiredAlgo;
+                  const shortageAlgo = Math.max(0, requiredAlgo - userAlgoBalance);
+                  const shortageUSD = shortageAlgo * algoUsdPrice;
+
+                  return (
+                    <>
+                      {/* Balance Display */}
+                      <div className="space-y-2 mb-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-400">Your ALGO Balance:</span>
+                          <span className={`text-sm font-medium ${hasEnoughBalance ? 'text-green-400' : 'text-red-400'}`}>
+                            {balanceLoading ? (
+                              <span className="animate-pulse">Loading...</span>
+                            ) : (
+                              <>
+                                {userAlgoBalance.toFixed(3)} ALGO
+                                <span className="text-xs text-gray-500 ml-2">
+                                  (${(userAlgoBalance * algoUsdPrice).toFixed(2)})
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-400">Required ALGO:</span>
+                          <span className="text-sm font-medium text-white">
+                            {requiredAlgo.toFixed(3)} ALGO
+                            <span className="text-xs text-gray-500 ml-2">
+                              (${(requiredAlgo * algoUsdPrice).toFixed(2)})
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Shortage Warning */}
+                      {!hasEnoughBalance && (
+                        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="h-4 w-4 text-red-400" />
+                            <span className="text-sm font-semibold text-red-400">Insufficient Balance</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mb-2">
+                            You need {shortageAlgo.toFixed(3)} more ALGO (≈ ${shortageUSD.toFixed(2)} USD)
+                          </div>
+                          <button
+                            onClick={() => window.open('https://www.moonpay.com/buy/algo', '_blank')}
+                            className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                          >
+                            Buy ALGO with Card →
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setShowBuyModal(false);
@@ -807,13 +949,18 @@ const TradingPage = () => {
                 </button>
                 <button
                   onClick={handleBuyConfirm}
-                  disabled={buyLoading}
+                  disabled={buyLoading || !hasEnoughBalance}
                   className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {buyLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       Executing DVP...
+                    </>
+                  ) : !hasEnoughBalance ? (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      Insufficient ALGO
                     </>
                   ) : (
                     'Confirm Purchase'

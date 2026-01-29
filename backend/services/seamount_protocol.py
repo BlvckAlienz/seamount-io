@@ -159,7 +159,11 @@ class SeamountProtocol:
         self.algorand = algorand_service
         self.audit = audit_service
         
-        logger.info("✅ Seamount Protocol initialized")
+        # ✅ Initialize oracle service for live pricing
+        from backend.services.oracle_service import EnhancedOracleService
+        self.oracle = EnhancedOracleService(db_service)
+        
+        logger.info("✅ Seamount Protocol initialized with live price oracle")
 
     def _enum_to_str(self, enum_value) -> str:
         """Safely convert enum to string (handles both Enum and str)"""
@@ -421,9 +425,82 @@ class SeamountProtocol:
             
             buyer_address = buyer_wallet.data['algorand_address']
             seller_address = seller_wallet.data['algorand_address']
-            
+
             # ================================================================
-            # STEP 3: Get Algorand ASA ID
+            # STEP 2.5: FETCH LIVE ALGO/USD PRICE & CHECK BALANCE
+            # ================================================================
+            logger.info(f"💱 Fetching live ALGO/USD exchange rate...")
+
+            try:
+                # ✅ Use existing oracle service (3-tier fallback built-in)
+                algo_usd_price = await self.oracle.get_algorand_price()
+                usd_per_algo = algo_usd_price
+                algo_per_usd = Decimal('1') / usd_per_algo
+                
+                logger.info(f"✅ Live Rate: 1 ALGO = ${usd_per_algo} USD")
+                logger.info(f"   Inverse: 1 USD = {algo_per_usd:.4f} ALGO")
+                
+            except Exception as price_err:
+                # Fallback already handled by oracle's emergency_rates
+                logger.error(f"⚠️ Price fetch failed, oracle using fallback: {price_err}")
+                usd_per_algo = Decimal("0.12")
+                algo_per_usd = Decimal("8.33")
+
+            # Calculate required ALGO
+            payment_amount_algo = total_value_usd * algo_per_usd
+            min_account_balance = Decimal('0.1')
+            transaction_fee = Decimal('0.002')  # 0.001 × 2 txns
+            total_algo_required = payment_amount_algo + min_account_balance + transaction_fee
+
+            logger.info(f"💰 Settlement Calculation:")
+            logger.info(f"   Asset Price: ${total_value_usd} USD")
+            logger.info(f"   Payment: {payment_amount_algo:.3f} ALGO")
+            logger.info(f"   Total Required: {total_algo_required:.3f} ALGO")
+
+            # ================================================================
+            # PRE-FLIGHT BALANCE CHECK
+            # ================================================================
+            buyer_account_info = await self.algorand.get_account_info(buyer_address)
+
+            if not buyer_account_info:
+                raise ValueError(
+                    f"❌ Buyer account not found on Algorand.\n\n"
+                    f"📍 Your Wallet: {buyer_address}\n\n"
+                    f"To activate, send at least 0.1 ALGO to this address.\n"
+                    f"🔗 Get ALGO: https://www.moonpay.com/buy/algo or https://www.coinbase.com/price/algorand"
+                )
+
+            buyer_balance_microalgos = buyer_account_info.get('amount', 0)
+            buyer_balance_algo = Decimal(buyer_balance_microalgos) / Decimal('1_000_000')
+
+            logger.info(f"   Buyer Balance: {buyer_balance_algo:.3f} ALGO (${buyer_balance_algo * usd_per_algo:.2f} USD)")
+
+            # ✅ BLOCK TRANSACTION IF INSUFFICIENT FUNDS
+            if buyer_balance_algo < total_algo_required:
+                shortage_algo = total_algo_required - buyer_balance_algo
+                shortage_usd = shortage_algo * usd_per_algo
+                
+                error_msg = (
+                    f"💰 INSUFFICIENT ALGO BALANCE\n\n"
+                    f"Your Balance: {buyer_balance_algo:.3f} ALGO (${buyer_balance_algo * usd_per_algo:.2f} USD)\n"
+                    f"Required: {total_algo_required:.3f} ALGO (${total_algo_required * usd_per_algo:.2f} USD)\n\n"
+                    f"Breakdown:\n"
+                    f"  • Payment: {payment_amount_algo:.3f} ALGO (${total_value_usd} USD)\n"
+                    f"  • Minimum Balance: {min_account_balance} ALGO\n"
+                    f"  • Transaction Fees: {transaction_fee} ALGO\n\n"
+                    f"⚠️ You need {shortage_algo:.3f} more ALGO (${shortage_usd:.2f} USD)\n\n"
+                    f"📍 Wallet: {buyer_address}\n"
+                    f"💳 Buy ALGO: https://www.moonpay.com/buy/algo\n"
+                    f"💱 Current Rate: 1 ALGO = ${usd_per_algo} USD"
+                )
+                
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+
+            logger.info(f"✅ Buyer has sufficient balance ({buyer_balance_algo:.3f} ALGO)")
+
+            # ================================================================
+            # STEP 3: Get Algorand ASA ID (continue existing code)
             # ================================================================
             asset_result = self.db.supabase.table('tokenized_assets')\
                 .select('asset_id, symbol')\
@@ -445,26 +522,24 @@ class SeamountProtocol:
             # STEP 4: Build Atomic Transaction Group
             # ================================================================
             from algosdk.transaction import PaymentTxn, AssetTransferTxn, assign_group_id
-            
+
             params = self.algorand.algod_client.suggested_params()
-            
-            # Convert USD to microAlgos (SIMPLIFIED: 1 USD = 0.1 ALGO for MVP)
-            # TODO: Replace with real-time ALGO/USD oracle
-            algo_per_usd = Decimal('0.1')
-            payment_amount_algo = total_value_usd * algo_per_usd
+
+            # ✅ Convert USD to microAlgos using LIVE price
             payment_amount_microalgos = int(payment_amount_algo * Decimal('1_000_000'))
-            
-            logger.info(f"💰 Payment: ${total_value_usd} = {payment_amount_algo} ALGO ({payment_amount_microalgos} microAlgos)")
-            
+
+            logger.info(f"💰 Final Payment: ${total_value_usd} USD = {payment_amount_algo:.3f} ALGO ({payment_amount_microalgos} microAlgos)")
+            logger.info(f"💱 Rate Used: 1 ALGO = ${usd_per_algo} USD")
+
             # Transaction 1: Payment (Buyer → Seller)
             txn_payment = PaymentTxn(
                 sender=buyer_address,
                 sp=params,
                 receiver=seller_address,
-                amt=payment_amount_microalgos,
+                amt=payment_amount_microalgos,  # ✅ Correct amount
                 note=f"DVP:{offer_id}".encode()
             )
-            
+
             # Transaction 2: Asset Transfer (Seller → Buyer)
             txn_asset = AssetTransferTxn(
                 sender=seller_address,
@@ -474,11 +549,11 @@ class SeamountProtocol:
                 index=algorand_asa_id,
                 note=f"DVP:{offer_id}".encode()
             )
-            
-            # 🔐 ATOMIC GROUP: Both transactions succeed together or both fail
+
+            # 🔐 ATOMIC GROUP
             txns = [txn_payment, txn_asset]
             assign_group_id(txns)
-            
+
             logger.info(f"🔐 Created atomic transfer group (2 transactions)")
             
             # ================================================================

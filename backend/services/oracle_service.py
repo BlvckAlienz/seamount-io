@@ -412,8 +412,8 @@ class EnhancedOracleService:
             'btc': Decimal("63500.00"),  # ➕ ADD
             'ethereum': Decimal("2650.00"),
             'eth': Decimal("2650.00"),  # ➕ ADD
-            'algorand': Decimal("0.18"),
-            'algo': Decimal("0.18"),  # ➕ ADD
+            'algorand': Decimal("0.12"),  # ✅ Updated Jan 2025
+            'algo': Decimal("0.12"),      # ✅ Updated Jan 2025
             'tether': Decimal("1.00"),
             'usdt': Decimal("1.00"),  # ➕ ADD
             'matic': Decimal("0.75"),

@@ -31,12 +31,19 @@ class SendPaymentRequest(BaseModel):
 class SingleChainCreateRequest(BaseModel):
     chain: str
 
-# âœ… ADD LOGGER
-logger = logging.getLogger(__name__)
-
 from backend.dependencies import get_current_user, get_multi_chain_wallet_service
 from backend.services.multi_chain_wallet_service import MultiChainWalletService
 from backend.dependencies import get_db_service
+
+from backend.dependencies import (
+    get_current_user,
+    get_db_service,
+    get_algorand_service
+)
+from backend.services.database_service import DatabaseService
+from backend.services.algorand_service import AlgorandService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wallet", tags=["Multi-Chain Wallet"])
 
@@ -671,3 +678,69 @@ async def get_connected_wallets(
             "count": 0,
             "error": str(e)
         }
+    
+@router.get("/balance/algorand")
+async def get_algorand_balance(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db_service: DatabaseService = Depends(get_db_service),
+    algorand_service: AlgorandService = Depends(get_algorand_service)
+):
+    """
+    Get user's Algorand wallet balance
+    
+    Returns:
+        {
+            "success": true,
+            "balance": 237500.101,  // in ALGO
+            "balance_usd": 28500.01,  // approximate USD value
+            "address": "...",
+            "status": "active"
+        }
+    """
+    try:
+        # Get user's Algorand address
+        wallet = db_service.supabase.table('user_wallets')\
+            .select('algorand_address')\
+            .eq('user_id', current_user['id'])\
+            .single()\
+            .execute()
+        
+        if not wallet.data:
+            raise HTTPException(404, "Algorand wallet not found")
+        
+        address = wallet.data['algorand_address']
+        
+        # Get account info from Algorand
+        account_info = await algorand_service.get_account_info(address)
+        
+        if not account_info:
+            return {
+                'success': True,
+                'balance': 0,
+                'balance_usd': 0,
+                'address': address,
+                'status': 'not_activated'
+            }
+        
+        # Convert microAlgos to ALGO
+        balance_microalgos = account_info.get('amount', 0)
+        balance_algo = balance_microalgos / 1_000_000
+        
+        # ✅ CORRECT PRICING
+        USD_PER_ALGO = 0.12  # TODO: Use real-time oracle
+        balance_usd = balance_algo * USD_PER_ALGO
+        
+        return {
+            'success': True,
+            'balance': balance_algo,
+            'balance_usd': round(balance_usd, 2),
+            'address': address,
+            'status': 'active',
+            'exchange_rate': USD_PER_ALGO
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Balance fetch failed: {e}")
+        raise HTTPException(500, str(e))

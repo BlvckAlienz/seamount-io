@@ -1,6 +1,6 @@
 // File: frontend/src/components/modals/ConvertAssetModal.tsx
 import React, { useState } from 'react';
-import { X, RefreshCw, AlertTriangle, Check } from 'lucide-react';
+import { X, RefreshCw, AlertTriangle, Check, Upload } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 
@@ -148,22 +148,49 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
             {/* Custodian Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Custodian <span className="text-red-400">*</span>
+                Market Participant / Custodian <span className="text-red-400">*</span>
               </label>
               <select
                 value={custodianId}
                 onChange={(e) => setCustodianId(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 transition-colors"
               >
-                <option value="mock-custodian-stanbic">Stanbic IBTC (Mock)</option>
-                <option value="mock-custodian-cscs">CSCS Nigeria (Mock)</option>
-                <option value="mock-custodian-nse">NSE Direct (Mock)</option>
-                <option value="mock-custodian-broker">Broker-Dealer</option>
-                <option value="mock-custodian-developer">Real-Estate Developer</option>
-                <option value="mock-custodian-auctioner">Auction House</option>
-                <option value="mock-custodian-company">Private Company</option>
-                <option value="mock-custodian-others">Others</option>
+                <option value="">Select participant type...</option>
+                
+                {/* Infrastructure & Regulatory */}
+                <optgroup label="🏦 Infrastructure & Regulatory">
+                  <option value="csd">Central Securities Depository (CSD)</option>
+                  <option value="exchange">Exchange / Trading Venue</option>
+                  <option value="regulator">Regulator / Policy Authority</option>
+                  <option value="clearing">Clearing / Settlement / Payments Infrastructure</option>
+                </optgroup>
+                
+                {/* Financial Intermediaries */}
+                <optgroup label="💼 Financial Intermediaries">
+                  <option value="broker">Broker / Dealer</option>
+                  <option value="custodian">Custodian / Global Custodian</option>
+                  <option value="asset-manager">Asset Manager / Pension / Insurance</option>
+                </optgroup>
+                
+                {/* Issuers & Service Providers */}
+                <optgroup label="🏢 Issuers & Service Providers">
+                  <option value="issuer">Issuer</option>
+                  <option value="registrar">Registrar / Trustee</option>
+                  <option value="fintech">Fintech / Market Infrastructure Provider</option>
+                  <option value="consultant">Consultant / Advisory</option>
+                </optgroup>
+                
+                {/* Alternative Asset Classes */}
+                <optgroup label="🏗️ Alternative Assets">
+                  <option value="real-estate-developer">Real Estate Developer</option>
+                  <option value="auction-house">Auction House</option>
+                  <option value="private-company">Private Company</option>
+                </optgroup>
               </select>
+              
+              <p className="text-xs text-gray-500 mt-2">
+                Select the type of entity holding or issuing the asset
+              </p>
             </div>
 
             {/* Asset Symbol */}
