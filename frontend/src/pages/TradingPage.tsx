@@ -137,7 +137,7 @@ const TradingPage = () => {
         if (response.data.success) {
           setAlgoUsdPrice(response.data.price);
           setPriceSource(response.data.source);
-          logger.info(`💱 Live ALGO price: $${response.data.price} (${response.data.source})`);
+          console.log(`💱 Live ALGO price: $${response.data.price} (${response.data.source})`); // ✅ FIXED
         }
       } catch (error) {
         console.error('Failed to fetch ALGO price:', error);
@@ -156,6 +156,16 @@ const TradingPage = () => {
   }, []);
 
   const ALGO_PER_USD = 1 / algoUsdPrice;
+
+  // ✅ Calculate balance check for modal (moved outside IIFE to fix scope)
+  const MIN_BALANCE = 0.1;
+  const TX_FEE = 0.002;
+  const requiredAlgo = selectedOffer 
+    ? (selectedOffer.total_value * ALGO_PER_USD) + MIN_BALANCE + TX_FEE 
+    : 0;
+  const hasEnoughBalance = userAlgoBalance >= requiredAlgo;
+  const shortageAlgo = Math.max(0, requiredAlgo - userAlgoBalance);
+  const shortageUSD = shortageAlgo * algoUsdPrice;
 
   // Initial load
   useEffect(() => {
@@ -663,6 +673,21 @@ const TradingPage = () => {
                         : 'border-gray-700/50 hover:border-blue-500/50'
                     }`}
                   >
+                    {/* ✅ Asset Image Display */}
+                    {offer.tokenized_assets?.image_url && (
+                      <div className="mb-4 -mx-4 -mt-4">
+                        <img 
+                          src={offer.tokenized_assets.image_url} 
+                          alt={offer.tokenized_assets.symbol || 'Asset'}
+                          className="w-full h-48 object-cover rounded-t-xl"
+                          onError={(e) => {
+                            // Hide image if it fails to load
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+
                     {/* 🎀 Ribbon for own listings */}
                     {isOwnListing && (
                       <div className="absolute -top-2 -right-8 rotate-45 z-10">
@@ -871,16 +896,8 @@ const TradingPage = () => {
                   </div>
 
                 {/* Balance Check */}
-                {(() => {
-                  const MIN_BALANCE = 0.1;
-                  const TX_FEE = 0.002;
-                  const requiredAlgo = (selectedOffer.total_value * ALGO_PER_USD) + MIN_BALANCE + TX_FEE;
-                  const hasEnoughBalance = userAlgoBalance >= requiredAlgo;
-                  const shortageAlgo = Math.max(0, requiredAlgo - userAlgoBalance);
-                  const shortageUSD = shortageAlgo * algoUsdPrice;
-
-                  return (
-                    <>
+                {/* ✅ Variables now calculated at component level */}
+                <>
                       {/* Balance Display */}
                       <div className="space-y-2 mb-3">
                         <div className="flex justify-between items-center">
@@ -929,8 +946,7 @@ const TradingPage = () => {
                         </div>
                       )}
                     </>
-                  );
-                })()}
+                    {/* ✅ Removed IIFE - variables now in component scope */}
               </div>
 
             </div>
