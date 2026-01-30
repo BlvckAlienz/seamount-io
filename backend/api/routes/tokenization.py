@@ -396,17 +396,18 @@ async def get_my_assets(
 
 @router.get("/offers")
 async def get_offers(
-    symbol: Optional[str] = Query(None),
-    status: str = Query("published"),
+    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    status: str = Query("published", description="Offer status"),
     db_service: DatabaseService = Depends(get_db_service)
 ):
-    """List offers (auto-filter expired)"""
+    """📊 List Available Secondary Market Offers"""
     try:
-        query = db_service.supabase.table('asset_offers')\
-            .select('*, tokenized_assets(symbol, name, image_url)')\
-            .eq('status', status)\
+        query = (
+            db_service.supabase.table('asset_offers')
+            .select('*, tokenized_assets(symbol, name, image_url, isin, asset_type, asset_id)')
+            .eq('status', status)
             .gt('expires_at', datetime.utcnow().isoformat())  # ✅ Filter expired
-        
+        )
         if symbol:
             query = query.eq('tokenized_assets.symbol', symbol)
         

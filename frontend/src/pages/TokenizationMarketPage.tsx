@@ -150,6 +150,21 @@ const TokenizationMarketPage = () => {
                             <div>
                               <div className="text-white font-medium">{asset.symbol}</div>
                               <div className="text-xs text-gray-400">{asset.name}</div>
+                              
+                              {/* ✅ ADD: Explorer Link */}
+                              {asset.asset_id && (
+                                <a
+                                  href={`https://explorer.perawallet.app/asset/${asset.asset_id}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                                >
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                  ASA {asset.asset_id}
+                                </a>
+                              )}
                             </div>
                           </td>
                           <td className="py-4 px-4">
@@ -191,6 +206,21 @@ const TokenizationMarketPage = () => {
                         <div>
                           <h3 className="text-white font-bold text-lg">{asset.symbol}</h3>
                           <p className="text-gray-400 text-sm">{asset.name}</p>
+                          
+                          {/* ✅ ADD: Explorer Link for Mobile */}
+                          {asset.asset_id && (
+                            <a
+                              href={`https://explorer.perawallet.app/asset/${asset.asset_id}/`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                            >
+                              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              View on Explorer
+                            </a>
+                          )}
                         </div>
                         <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">
                           On-Chain
