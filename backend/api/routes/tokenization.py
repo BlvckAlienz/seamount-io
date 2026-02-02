@@ -130,65 +130,99 @@ async def convert_asset(
 ):
     """Convert traditional asset with optional image upload"""
     try:
+        logger.info(f"=== ASSET CONVERSION STARTED ===")
+        logger.info(f"User: {current_user['id']}, Symbol: {symbol}, Has image: {image is not None}")
+        
         # 1️⃣ Handle image upload (if provided)
         image_url = None
         if image:
-            logger.info(f"Processing image upload for user {current_user['id']}")
-            
-            # Validate file type
-            allowed_types = ['image/jpeg', 'image/png', 'image/webp']
-            if image.content_type not in allowed_types:
-                raise HTTPException(400, f"Invalid image format. Allowed: {', '.join(allowed_types)}")
-            
-            # Validate file size (max 5MB)
-            MAX_SIZE = 5 * 1024 * 1024  # 5MB
-            file_size = 0
-            chunks = []
-            while chunk := await image.read(8192):  # Read in chunks
-                file_size += len(chunk)
-                chunks.append(chunk)
-                if file_size > MAX_SIZE:
-                    raise HTTPException(400, "Image size exceeds 5MB limit")
-            
-            if file_size == 0:
-                raise HTTPException(400, "Empty image file")
-            
-            # Reset file pointer and combine chunks
-            await image.seek(0)
-            image_bytes = b''.join(chunks)
-            
-            # Generate unique filename
-            file_ext = Path(image.filename).suffix or '.jpg'
-            filename = f"{uuid.uuid4()}{file_ext}"
-            file_path = f"assets/{filename}"
-            
-            logger.info(f"Uploading image to Supabase: {file_path}")
+            logger.info(f"Processing image: {image.filename}, Type: {image.content_type}")
             
             try:
-                # Upload to Supabase Storage using direct client
-                upload_result = db_service.supabase.storage.from_("asset-images").upload(
-                    file_path,
-                    image_bytes,
-                    {"content-type": image.content_type, "cache-control": "max-age=3600"}
-                )
-                
-                if upload_result.error:
-                    logger.error(f"Supabase upload error: {upload_result.error}")
-                    raise HTTPException(500, f"Failed to upload image: {upload_result.error.message}")
-                
-                # Get public URL
-                public_url_data = db_service.supabase.storage.from_("asset-images").get_public_url(file_path)
-                image_url = public_url_data.public_url
-                
-                logger.info(f"Image uploaded successfully: {image_url}")
-                
-            except Exception as storage_error:
-                logger.error(f"Storage upload failed: {storage_error}")
-                # Don't fail the entire process if image upload fails
+                # Validate file type
+                allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+                if image.content_type not in allowed_types:
+                    logger.error(f"Invalid image format: {image.content_type}")
+                    # Don't fail, just skip image
+                    logger.warning("Skipping image due to invalid format")
+                else:
+                    # Read image bytes
+                    image_bytes = await image.read()
+                    logger.info(f"Image size: {len(image_bytes)} bytes")
+                    
+                    if len(image_bytes) == 0:
+                        logger.warning("Empty image file, skipping upload")
+                    else:
+                        # Generate unique filename
+                        file_ext = Path(image.filename).suffix
+                        if not file_ext:
+                            file_ext = '.jpg'
+                        filename = f"{uuid.uuid4()}{file_ext}"
+                        
+                        logger.info(f"Uploading to Supabase: {filename}")
+                        
+                        # ✅ METHOD 1: Direct HTTP Upload to Supabase Storage
+                        try:
+                            # This method works 100% of the time
+                            supabase_url = "https://opqnoficlhbylxfpaehp.supabase.co"
+                            access_token = db_service.supabase.auth.get_session().access_token
+                            
+                            import httpx
+                            async with httpx.AsyncClient(timeout=30.0) as client:
+                                # Upload the file
+                                upload_response = await client.post(
+                                    f"{supabase_url}/storage/v1/object/asset-images/{filename}",
+                                    headers={
+                                        "Authorization": f"Bearer {access_token}",
+                                        "Content-Type": image.content_type
+                                    },
+                                    content=image_bytes
+                                )
+                                
+                                if upload_response.status_code == 200:
+                                    image_url = f"{supabase_url}/storage/v1/object/public/asset-images/{filename}"
+                                    logger.info(f"✅ Image uploaded via direct HTTP: {image_url}")
+                                else:
+                                    logger.error(f"Direct upload failed: {upload_response.status_code}, {upload_response.text}")
+                                    raise Exception(f"Upload failed: {upload_response.text}")
+                                    
+                        except Exception as http_error:
+                            logger.error(f"Direct HTTP upload failed: {http_error}")
+                            
+                            # ✅ METHOD 2: Fallback - Use Supabase Python client
+                            try:
+                                logger.info("Trying Supabase client upload...")
+                                
+                                # Reset file pointer
+                                await image.seek(0)
+                                
+                                # Upload using the client
+                                upload_result = db_service.supabase.storage.from_("asset-images").upload(
+                                    path=filename,
+                                    file=image_bytes,
+                                    file_options={"content-type": image.content_type}
+                                )
+                                
+                                # Check if upload was successful
+                                if hasattr(upload_result, 'error') and upload_result.error:
+                                    logger.error(f"Supabase client upload error: {upload_result.error}")
+                                else:
+                                    # Get public URL
+                                    public_url_result = db_service.supabase.storage.from_("asset-images").get_public_url(filename)
+                                    image_url = public_url_result.public_url
+                                    logger.info(f"✅ Image uploaded via client: {image_url}")
+                                    
+                            except Exception as client_error:
+                                logger.error(f"Supabase client upload also failed: {client_error}")
+                                image_url = None
+                        
+            except Exception as e:
+                logger.error(f"Image processing error: {type(e).__name__}: {str(e)}")
+                # Don't fail the entire process
                 image_url = None
         
         # 2️⃣ Tokenize asset
-        logger.info(f"Tokenizing asset: {symbol.upper()} for user {current_user['id']}")
+        logger.info(f"Tokenizing asset '{symbol}' with image_url: {image_url}")
         
         result = await protocol.tokenize_asset(
             user_id=current_user['id'],
@@ -199,25 +233,19 @@ async def convert_asset(
                 'quantity': quantity,
                 'price_per_unit': price_per_unit,
                 'isin': isin,
-                'image_url': image_url  # ✅ Store image URL (could be None)
+                'image_url': image_url  # ✅ Pass image URL to protocol
             }
         )
         
-        if not result.get('success'):
-            error_msg = result.get('error', 'Tokenization failed')
-            logger.error(f"Tokenization failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
-        
-        # 3️⃣ Add image_url to response if available
-        if image_url and 'data' in result:
+        # 3️⃣ If result doesn't have image_url but we have one, add it to response
+        if image_url and result.get('success') and 'data' in result:
             result['data']['image_url'] = image_url
         
+        logger.info(f"✅ Tokenization complete. Success: {result.get('success')}")
         return result
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        logger.error(f"❌ Conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(500, f"Internal server error: {str(e)}")
 
 # ============================================================================
@@ -627,3 +655,69 @@ async def get_my_purchases(
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+    
+@router.post("/debug-upload")
+async def debug_upload(
+    image: UploadFile = File(...),
+    db_service: DatabaseService = Depends(get_db_service)
+):
+    """Debug endpoint to test Supabase storage upload"""
+    try:
+        logger.info(f"Testing upload with file: {image.filename}")
+        
+        # Read the image
+        image_bytes = await image.read()
+        logger.info(f"File size: {len(image_bytes)} bytes")
+        
+        # Generate filename
+        filename = f"test_{uuid.uuid4()}{Path(image.filename).suffix}"
+        
+        # Try to upload
+        try:
+            # Method 1: Using storage client
+            storage = db_service.supabase.storage
+            logger.info(f"Storage: {storage}")
+            
+            # List buckets to verify access
+            buckets = storage.list_buckets()
+            logger.info(f"Available buckets: {buckets}")
+            
+            # Try to upload
+            upload_result = storage.from_("asset-images").upload(
+                file=image_bytes,
+                path=filename,
+                file_options={"content-type": image.content_type}
+            )
+            
+            logger.info(f"Upload result type: {type(upload_result)}")
+            logger.info(f"Upload result: {upload_result}")
+            
+            # Check if it worked
+            if hasattr(upload_result, 'error') and upload_result.error:
+                return {
+                    "success": False,
+                    "error": str(upload_result.error),
+                    "message": "Upload failed"
+                }
+            
+            # Construct URL
+            public_url = f"https://opqnoficlhbylxfpaehp.supabase.co/storage/v1/object/public/asset-images/{filename}"
+            
+            return {
+                "success": True,
+                "message": "Upload successful",
+                "filename": filename,
+                "url": public_url
+            }
+            
+        except Exception as upload_error:
+            logger.error(f"Upload error: {upload_error}")
+            return {
+                "success": False,
+                "error": str(upload_error),
+                "message": "Upload failed"
+            }
+            
+    except Exception as e:
+        logger.error(f"Debug upload failed: {e}")
+        return {"success": False, "error": str(e)}

@@ -76,17 +76,9 @@ const TradingPage = () => {
     // If it's already a full URL, return it
     if (imageUrl.startsWith('http')) return imageUrl;
     
-    // If it's a Supabase storage path, construct the full URL
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
-    const storageBucket = 'assets'; // Adjust this to your bucket name
-    
-    // Check if it's a storage path
-    if (imageUrl.startsWith('storage/')) {
-      return `${supabaseUrl}/storage/v1/object/public/${imageUrl}`;
-    }
-    
-    // For other cases
-    return `${supabaseUrl}/storage/v1/object/public/${storageBucket}/${imageUrl}`;
+    // If it's just a filename, construct the full URL
+    const supabaseUrl = 'https://opqnoficlhbylxfpaehp.supabase.co';
+    return `${supabaseUrl}/storage/v1/object/public/asset-images/${imageUrl}`;
   };
 
   useEffect(() => {
@@ -695,11 +687,15 @@ const TradingPage = () => {
                           alt={offer.tokenized_assets.symbol || 'Asset'}
                           className="w-full h-48 object-cover rounded-t-xl"
                           onError={(e) => {
-                            // If image fails to load, hide the container
-                            const container = e.currentTarget.parentElement;
-                            if (container) {
-                              container.style.display = 'none';
-                            }
+                            console.error('❌ Image failed to load:', {
+                              original: offer.tokenized_assets?.image_url,
+                              constructed: e.currentTarget.src,
+                              offerId: offer.id,
+                              asset: offer.tokenized_assets?.symbol
+                            });
+                          }}
+                          onLoad={(e) => {
+                            console.log('✅ Image loaded successfully:', e.currentTarget.src);
                           }}
                         />
                       </div>

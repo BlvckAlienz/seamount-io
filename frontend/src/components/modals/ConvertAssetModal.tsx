@@ -54,7 +54,7 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
       setLoading(true);
       setStep(2); // Show loading step
       
-      // ✅ Build FormData with all fields
+      // ✅ Create FormData with all fields
       const formData = new FormData();
       formData.append('custodian_id', custodianId);
       formData.append('symbol', symbol.toUpperCase());
@@ -72,32 +72,26 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
         if (imageFile.size > 5 * 1024 * 1024) {
           toast.error('Image must be under 5MB');
           setStep(1);
+          setLoading(false);
           return;
         }
         
         // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (!allowedTypes.includes(imageFile.type)) {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(imageFile.type.toLowerCase())) {
           toast.error('Invalid image format. Use JPEG, PNG, or WebP');
           setStep(1);
+          setLoading(false);
           return;
         }
         
         formData.append('image', imageFile);
-        console.log('Added image to formData:', imageFile.name, imageFile.size, 'bytes');
+        console.log('✅ Image attached:', imageFile.name, `${(imageFile.size / 1024).toFixed(1)}KB`);
       }
       
-      // ✅ Log FormData contents for debugging
-      console.log('FormData entries:');
-      for (let [key, value] of formData.entries()) {
-        if (key === 'image') {
-          console.log(`  ${key}:`, (value as File).name, (value as File).size, 'bytes');
-        } else {
-          console.log(`  ${key}:`, value);
-        }
-      }
+      // ✅ Send request with timeout
+      console.log('📤 Sending tokenization request...');
       
-      // ✅ Send multipart/form-data request
       const response = await apiClient.post(
         '/api/v1/tokenization/convert-asset',
         formData,
@@ -105,34 +99,36 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
           headers: { 
             'Content-Type': 'multipart/form-data' 
           },
-          timeout: 30000 // 30 second timeout for image upload
+          timeout: 60000 // 60 second timeout for large images
         }
       );
 
+      console.log('📥 Response received:', response.data);
+      
       if (response.data.success) {
         setConversionResult(response.data.data);
         setStep(3); // Show success step
         toast.success('Asset tokenized successfully!');
         
-        // ✅ Log the response including image URL
-        console.log('Tokenization successful:', {
-          asset_id: response.data.data?.asset_id,
-          image_url: response.data.data?.image_url,
-          full_response: response.data
-        });
+        // Log the image URL if available
+        if (response.data.data?.image_url) {
+          console.log('🖼️ Image URL in response:', response.data.data.image_url);
+        }
       } else {
         toast.error(response.data.message || 'Conversion failed');
         setStep(1);
       }
     } catch (error: any) {
-      console.error('Conversion failed:', error);
+      console.error('❌ Conversion failed:', error);
       
-      // Provide more specific error messages
+      // Provide user-friendly error messages
       let errorMessage = 'Failed to convert asset';
-      if (error.response?.status === 413) {
-        errorMessage = 'File too large. Please use an image under 5MB';
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Try a smaller image or check your connection.';
+      } else if (error.response?.status === 413) {
+        errorMessage = 'File too large. Please use an image under 5MB.';
       } else if (error.response?.status === 415) {
-        errorMessage = 'Invalid file format. Please use JPEG, PNG, or WebP';
+        errorMessage = 'Invalid file format. Please use JPEG, PNG, or WebP.';
       } else if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       } else if (error.message) {
@@ -145,7 +141,7 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
       setLoading(false);
     }
   };
-
+  
   const handleClose = () => {
     setStep(1);
     setConversionResult(null);
