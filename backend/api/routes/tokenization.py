@@ -125,32 +125,71 @@ async def convert_asset(
     isin: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    protocol: SeamountProtocol = Depends(get_protocol_service)
+    protocol: SeamountProtocol = Depends(get_protocol_service),
+    db_service: DatabaseService = Depends(get_db_service)
 ):
     """Convert traditional asset with optional image upload"""
     try:
         # 1️⃣ Handle image upload (if provided)
         image_url = None
         if image:
+            logger.info(f"Processing image upload for user {current_user['id']}")
+            
             # Validate file type
-            if image.content_type not in ['image/jpeg', 'image/png', 'image/webp']:
-                raise HTTPException(400, "Invalid image format")
+            allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+            if image.content_type not in allowed_types:
+                raise HTTPException(400, f"Invalid image format. Allowed: {', '.join(allowed_types)}")
+            
+            # Validate file size (max 5MB)
+            MAX_SIZE = 5 * 1024 * 1024  # 5MB
+            file_size = 0
+            chunks = []
+            while chunk := await image.read(8192):  # Read in chunks
+                file_size += len(chunk)
+                chunks.append(chunk)
+                if file_size > MAX_SIZE:
+                    raise HTTPException(400, "Image size exceeds 5MB limit")
+            
+            if file_size == 0:
+                raise HTTPException(400, "Empty image file")
+            
+            # Reset file pointer and combine chunks
+            await image.seek(0)
+            image_bytes = b''.join(chunks)
             
             # Generate unique filename
-            file_ext = Path(image.filename).suffix
+            file_ext = Path(image.filename).suffix or '.jpg'
             filename = f"{uuid.uuid4()}{file_ext}"
+            file_path = f"assets/{filename}"
             
-            # Save to Supabase Storage
-            storage = get_db_service().supabase.storage
-            bucket = storage.from_('asset-images')
+            logger.info(f"Uploading image to Supabase: {file_path}")
             
-            image_bytes = await image.read()
-            upload_result = bucket.upload(filename, image_bytes)
-            
-            # Get public URL
-            image_url = bucket.get_public_url(filename)
+            try:
+                # Upload to Supabase Storage using direct client
+                upload_result = db_service.supabase.storage.from_("asset-images").upload(
+                    file_path,
+                    image_bytes,
+                    {"content-type": image.content_type, "cache-control": "max-age=3600"}
+                )
+                
+                if upload_result.error:
+                    logger.error(f"Supabase upload error: {upload_result.error}")
+                    raise HTTPException(500, f"Failed to upload image: {upload_result.error.message}")
+                
+                # Get public URL
+                public_url_data = db_service.supabase.storage.from_("asset-images").get_public_url(file_path)
+                image_url = public_url_data.public_url
+                
+                logger.info(f"Image uploaded successfully: {image_url}")
+                
+            except Exception as storage_error:
+                logger.error(f"Storage upload failed: {storage_error}")
+                # Don't fail the entire process if image upload fails
+                image_url = None
         
         # 2️⃣ Tokenize asset
+        logger.info(f"Tokenizing asset: {symbol.upper()} for user {current_user['id']}")
+        
         result = await protocol.tokenize_asset(
             user_id=current_user['id'],
             custodian_id=custodian_id,
@@ -160,14 +199,26 @@ async def convert_asset(
                 'quantity': quantity,
                 'price_per_unit': price_per_unit,
                 'isin': isin,
-                'image_url': image_url  # ✅ Store image URL
+                'image_url': image_url  # ✅ Store image URL (could be None)
             }
         )
         
+        if not result.get('success'):
+            error_msg = result.get('error', 'Tokenization failed')
+            logger.error(f"Tokenization failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        # 3️⃣ Add image_url to response if available
+        if image_url and 'data' in result:
+            result['data']['image_url'] = image_url
+        
         return result
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Conversion failed: {e}")
-        raise HTTPException(500, str(e))
+        logger.error(f"Conversion failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(500, f"Internal server error: {str(e)}")
 
 # ============================================================================
 # ENDPOINT 2: PUBLISH SECONDARY OFFER

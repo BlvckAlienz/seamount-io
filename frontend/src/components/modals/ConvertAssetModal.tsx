@@ -66,28 +66,80 @@ export const ConvertAssetModal: React.FC<ConvertAssetModalProps> = ({
         formData.append('isin', isin);
       }
       
+      // ✅ Add image file if selected
       if (imageFile) {
+        // Validate file size (max 5MB)
+        if (imageFile.size > 5 * 1024 * 1024) {
+          toast.error('Image must be under 5MB');
+          setStep(1);
+          return;
+        }
+        
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(imageFile.type)) {
+          toast.error('Invalid image format. Use JPEG, PNG, or WebP');
+          setStep(1);
+          return;
+        }
+        
         formData.append('image', imageFile);
+        console.log('Added image to formData:', imageFile.name, imageFile.size, 'bytes');
+      }
+      
+      // ✅ Log FormData contents for debugging
+      console.log('FormData entries:');
+      for (let [key, value] of formData.entries()) {
+        if (key === 'image') {
+          console.log(`  ${key}:`, (value as File).name, (value as File).size, 'bytes');
+        } else {
+          console.log(`  ${key}:`, value);
+        }
       }
       
       // ✅ Send multipart/form-data request
       const response = await apiClient.post(
         '/api/v1/tokenization/convert-asset',
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        { 
+          headers: { 
+            'Content-Type': 'multipart/form-data' 
+          },
+          timeout: 30000 // 30 second timeout for image upload
+        }
       );
 
       if (response.data.success) {
         setConversionResult(response.data.data);
         setStep(3); // Show success step
         toast.success('Asset tokenized successfully!');
+        
+        // ✅ Log the response including image URL
+        console.log('Tokenization successful:', {
+          asset_id: response.data.data?.asset_id,
+          image_url: response.data.data?.image_url,
+          full_response: response.data
+        });
       } else {
         toast.error(response.data.message || 'Conversion failed');
         setStep(1);
       }
     } catch (error: any) {
       console.error('Conversion failed:', error);
-      toast.error(error.response?.data?.detail || 'Failed to convert asset');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to convert asset';
+      if (error.response?.status === 413) {
+        errorMessage = 'File too large. Please use an image under 5MB';
+      } else if (error.response?.status === 415) {
+        errorMessage = 'Invalid file format. Please use JPEG, PNG, or WebP';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       setStep(1);
     } finally {
       setLoading(false);

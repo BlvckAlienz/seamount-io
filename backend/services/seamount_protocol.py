@@ -260,9 +260,12 @@ class SeamountProtocol:
             if not asa_result['success']:
                 raise Exception(f"ASA creation failed: {asa_result['error']}")
             
-            logger.info(f"🔍 DEBUG: About to create asset_record...")
+            logger.info(f"✅ ASA created: ID {asa_result['asa_id']} for asset {asset_details['symbol']}")
 
             # STEP 3: Record tokenized asset in database
+            logger.info(f"🔍 DEBUG: About to create asset_record...")
+            
+            # ✅ IMPORTANT: Include image_url in asset_record
             asset_record = {
                 'id': str(uuid.uuid4()),
                 'user_id': user_id,
@@ -279,17 +282,22 @@ class SeamountProtocol:
                 'asset_id': asa_result['asa_id'],
                 'current_price_usd': asset_details.get('price_per_unit', 0),
                 'status': 'active',
-                'verified_at': datetime.utcnow().isoformat()
+                'verified_at': datetime.utcnow().isoformat(),
+                'image_url': asset_details.get('image_url')  # ✅ CRITICAL: Add this line
             }
             
-            logger.info(f"🔍 DEBUG: asset_record created, attempting insert...")
+            logger.info(f"🔍 DEBUG: asset_record created with image_url: {asset_details.get('image_url')}")
+            logger.info(f"🔍 DEBUG: attempting insert...")
+            
             # Insert into tokenized_assets table
             insert_result = self.db.supabase.table('tokenized_assets').insert(asset_record).execute()
             
             logger.info(f"🔍 DEBUG: Insert successful, checking result...")
-
+            
             if not insert_result.data:
                 raise Exception("Failed to save tokenized asset record")
+            
+            logger.info(f"✅ Asset saved to database with ID: {asset_record['id']}, image_url: {asset_record['image_url']}")
 
             # STEP 4: Audit trail (wrapped in try-except to avoid blocking)
             try:
