@@ -721,3 +721,53 @@ async def debug_upload(
     except Exception as e:
         logger.error(f"Debug upload failed: {e}")
         return {"success": False, "error": str(e)}
+    
+@router.post("/force-update-image")
+async def force_update_image(
+    asset_id: str = Form(...),
+    image_url: str = Form(...),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db_service: DatabaseService = Depends(get_db_service)
+):
+    """Force update an asset's image_url"""
+    try:
+        logger.info(f"🛠️ Force updating image_url for asset {asset_id}")
+        
+        # Verify user owns the asset
+        asset = db_service.supabase.table('tokenized_assets')\
+            .select('id, user_id')\
+            .eq('id', asset_id)\
+            .eq('user_id', current_user['id'])\
+            .single()\
+            .execute()
+        
+        if not asset.data:
+            raise HTTPException(403, "Asset not found or not owned by user")
+        
+        # Update the image_url
+        update_result = db_service.supabase.table('tokenized_assets')\
+            .update({'image_url': image_url})\
+            .eq('id', asset_id)\
+            .execute()
+        
+        logger.info(f"📊 Update result: {update_result}")
+        
+        # Verify update
+        updated = db_service.supabase.table('tokenized_assets')\
+            .select('id, symbol, image_url')\
+            .eq('id', asset_id)\
+            .single()\
+            .execute()
+        
+        return {
+            'success': True,
+            'message': 'Image URL updated',
+            'asset_id': asset_id,
+            'image_url': updated.data.get('image_url') if updated.data else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Force update failed: {e}")
+        raise HTTPException(500, str(e))

@@ -263,9 +263,8 @@ class SeamountProtocol:
             logger.info(f"✅ ASA created: ID {asa_result['asa_id']} for asset {asset_details['symbol']}")
 
             # STEP 3: Record tokenized asset in database
-            logger.info(f"🔍 DEBUG: About to create asset_record...")
+            logger.info(f"🔍 DEBUG: Creating asset_record with image_url: {asset_details.get('image_url')}")
             
-            # ✅ IMPORTANT: Include image_url in asset_record
             asset_record = {
                 'id': str(uuid.uuid4()),
                 'user_id': user_id,
@@ -276,18 +275,19 @@ class SeamountProtocol:
                 'custodian_id': custodian_id,
                 'custodian_reference': custody_verified['custody_reference'],
                 'total_supply': asset_details['quantity'],
-                'custody_balance': asset_details['quantity'],  # Physical shares locked at custodian
-                'on_chain_balance': asset_details['quantity'],  # Digital twin minted to user
+                'custody_balance': asset_details['quantity'],
+                'on_chain_balance': asset_details['quantity'],
                 'blockchain': 'algorand',
                 'asset_id': asa_result['asa_id'],
                 'current_price_usd': asset_details.get('price_per_unit', 0),
                 'status': 'active',
                 'verified_at': datetime.utcnow().isoformat(),
-                'image_url': asset_details.get('image_url')  # ✅ CRITICAL: Add this line
+                # ✅ CRITICAL: Make sure this line exists and is correct
+                'image_url': asset_details.get('image_url')  # This MUST be here
             }
             
-            logger.info(f"🔍 DEBUG: asset_record created with image_url: {asset_details.get('image_url')}")
-            logger.info(f"🔍 DEBUG: attempting insert...")
+            logger.info(f"✅ DEBUG: asset_record created with keys: {list(asset_record.keys())}")
+            logger.info(f"✅ DEBUG: image_url in record: {asset_record.get('image_url')}")
             
             # Insert into tokenized_assets table
             insert_result = self.db.supabase.table('tokenized_assets').insert(asset_record).execute()
@@ -331,6 +331,7 @@ class SeamountProtocol:
                 'algorand_asa_id': asa_result['asa_id'],
                 'digital_twin_address': asa_result['creator_address'],
                 'custody_reference': custody_verified['custody_reference'],
+                'image_url': asset_record.get('image_url'),  # ✅ Add this line
                 'message': f"Successfully tokenized {asset_details['quantity']} shares of {asset_details['symbol']}"
             }
 
