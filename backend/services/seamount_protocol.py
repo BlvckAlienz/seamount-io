@@ -357,7 +357,8 @@ class SeamountProtocol:
         self,
         offer_id: str,
         buyer_id: str,
-        payment_network: str = "algorand"  # Changed default to algorand
+        payment_network: str = "algorand",  # Changed default to algorand
+        quantity: Optional[int] = None  # Add this parameter
     ) -> Dict[str, Any]:
         """
         🔐 ATOMIC DVP SETTLEMENT (Production-Ready)
@@ -402,8 +403,18 @@ class SeamountProtocol:
                 raise ValueError("Cannot buy your own asset")
             
             seller_id = offer_data['seller_id']
-            quantity = offer_data['quantity']
-            total_value_usd = Decimal(str(offer_data['total_value']))
+            quantity_to_buy = quantity if quantity is not None else offer_data['quantity']
+
+            # Validate that requested quantity is available
+            if quantity_to_buy > offer_data['quantity']:
+                raise ValueError(f"Requested quantity ({quantity_to_buy}) exceeds available quantity ({offer_data['quantity']})")
+
+            # Calculate total value based on the requested quantity
+            price_per_unit = Decimal(str(offer_data['price_per_unit']))
+            total_value_usd = price_per_unit * Decimal(str(quantity_to_buy))
+
+            # Use quantity_to_buy instead of quantity variable
+            quantity = quantity_to_buy
             
             # ================================================================
             # STEP 2: Get Wallet Addresses
@@ -545,9 +556,9 @@ class SeamountProtocol:
                 sender=seller_address,
                 sp=params,
                 receiver=buyer_address,
-                amt=quantity,
+                amt=quantity_to_buy,  # Use quantity_to_buy
                 index=algorand_asa_id,
-                note=f"DVP:{offer_id}".encode()
+                note=f"DVP:{offer_id}:{quantity_to_buy}".encode()
             )
 
             # 🔐 ATOMIC GROUP
@@ -594,14 +605,46 @@ class SeamountProtocol:
             settlement_id = str(uuid.uuid4())
             end_time = datetime.utcnow()
             settlement_time = (end_time - start_time).total_seconds()
-            
-            # Mark offer as sold
-            self.db.supabase.table('asset_offers').update({
-                'status': 'sold',
-                'buyer_id': buyer_id,
-                'sold_at': end_time.isoformat()
-            }).eq('id', offer_id).execute()
-            
+
+            # After successful settlement, update the offer based on quantity purchased:
+            if quantity_to_buy < offer_data['quantity']:
+                # Partial purchase - update the offer with remaining quantity
+                remaining_quantity = offer_data['quantity'] - quantity_to_buy
+                remaining_total_value = Decimal(str(offer_data['price_per_unit'])) * remaining_quantity
+                
+                self.db.supabase.table('asset_offers').update({
+                    'quantity': remaining_quantity,
+                    'total_value': float(remaining_total_value),
+                    'updated_at': end_time.isoformat()
+                }).eq('id', offer_id).execute()
+                
+                # Record the sold portion for auditing
+                sold_offer_id = str(uuid.uuid4())
+                self.db.supabase.table('sold_offer_parts').insert({
+                    'id': sold_offer_id,
+                    'original_offer_id': offer_id,
+                    'quantity_sold': quantity_to_buy,
+                    'buyer_id': buyer_id,
+                    'sold_at': end_time.isoformat()
+                }).execute()
+            else:
+                # Full purchase - mark as sold
+                self.db.supabase.table('asset_offers').update({
+                    'status': 'sold',
+                    'buyer_id': buyer_id,
+                    'sold_at': end_time.isoformat()
+                }).eq('id', offer_id).execute()
+                
+                # Also create a new record for the sold portion?
+                sold_offer_id = str(uuid.uuid4())
+                self.db.supabase.table('sold_offer_parts').insert({
+                    'id': sold_offer_id,
+                    'original_offer_id': offer_id,
+                    'quantity_sold': quantity_to_buy,
+                    'buyer_id': buyer_id,
+                    'sold_at': end_time.isoformat()
+                }).execute()
+
             # Record trade in history
             self.db.supabase.table('trade_history').insert({
                 'id': settlement_id,
@@ -609,7 +652,7 @@ class SeamountProtocol:
                 'buyer_id': buyer_id,
                 'seller_id': seller_id,
                 'asset_id': offer_data['asset_id'],
-                'quantity': quantity,
+                'quantity': quantity_to_buy,  # Use quantity_to_buy
                 'price_per_unit': float(offer_data['price_per_unit']),
                 'total_value': float(total_value_usd),
                 'settlement_tx': tx_id,

@@ -50,7 +50,8 @@ class PublishOfferRequest(BaseModel):
 class ExecuteTradeRequest(BaseModel):
     """Request to buy tokenized asset (DVP)"""
     offer_id: str = Field(..., description="Offer UUID to execute")
-    payment_network: str = Field(default="usdc_circle", description="Payment method")
+    payment_network: str = Field(default="algorand", description="Payment method")
+    quantity: Optional[int] = Field(None, description="Quantity to purchase (defaults to full offer)")
 
 class CreateRepoRequest(BaseModel):
     """Request to create repo trade (collateralized loan)"""
@@ -88,6 +89,28 @@ def get_protocol_service(
         audit_service=audit_service
     )
 
+@router.get("/partial-purchases")
+async def get_partial_purchases(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db_service: DatabaseService = Depends(get_db_service)
+):
+    """📋 Get user's partial purchases from sold_offer_parts"""
+    try:
+        partial_purchases = db_service.supabase.table('sold_offer_parts')\
+            .select('*, asset_offers(asset_id, tokenized_assets(*))')\
+            .eq('buyer_id', current_user['id'])\
+            .execute()
+        
+        return {
+            "success": True,
+            "count": len(partial_purchases.data) if partial_purchases.data else 0,
+            "partial_purchases": partial_purchases.data or []
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch partial purchases: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # ============================================================================
 # ENDPOINT 1: TOKENIZE ASSET (Convert Traditional → Digital Twin)
 # ============================================================================
@@ -249,16 +272,21 @@ async def execute_trade(
 ):
     """
     💱 Execute Trade with Atomic DVP Settlement
-    ...
+    
+    **Parameters:**
+    - `offer_id`: The offer to purchase
+    - `payment_network`: Payment method (default: algorand)
+    - `quantity`: Optional quantity to purchase (for partial purchases)
     """
     try:
-        logger.info(f"🔄 DVP trade execution: User {current_user['id']} buying offer {request.offer_id}")
+        logger.info(f"🔄 DVP trade execution: User {current_user['id']} buying offer {request.offer_id}, quantity: {request.quantity}")
         
         # Execute DVP settlement
         result = await protocol.execute_dvp_settlement(
             offer_id=request.offer_id,
             buyer_id=current_user['id'],
-            payment_network=request.payment_network
+            payment_network=request.payment_network,
+            quantity=request.quantity  # ✅ Pass quantity parameter
         )
         
         if not result['success']:

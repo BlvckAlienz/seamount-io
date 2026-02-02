@@ -45,6 +45,7 @@ const TradingPage = () => {
   const [selectedOffer, setSelectedOffer] = useState<AssetOffer | null>(null);
   const [userAlgoBalance, setUserAlgoBalance] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState(true);
+  const [purchaseQuantity, setPurchaseQuantity] = useState<number>(1); // New state for quantity selection
 
   const [algoUsdPrice, setAlgoUsdPrice] = useState<number>(0.12);
   const [priceLoading, setPriceLoading] = useState(true);
@@ -67,6 +68,26 @@ const TradingPage = () => {
     averagePrice: 0,
     recentTrades: 0
   });
+
+  // Helper function to get image URL
+  const getImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return '';
+    
+    // If it's already a full URL, return it
+    if (imageUrl.startsWith('http')) return imageUrl;
+    
+    // If it's a Supabase storage path, construct the full URL
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+    const storageBucket = 'assets'; // Adjust this to your bucket name
+    
+    // Check if it's a storage path
+    if (imageUrl.startsWith('storage/')) {
+      return `${supabaseUrl}/storage/v1/object/public/${imageUrl}`;
+    }
+    
+    // For other cases
+    return `${supabaseUrl}/storage/v1/object/public/${storageBucket}/${imageUrl}`;
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -148,8 +169,9 @@ const TradingPage = () => {
   const MIN_BALANCE = 0.1;
   const TX_FEE = 0.002;
   
-  const requiredAlgo = selectedOffer 
-    ? (selectedOffer.total_value * ALGO_PER_USD) + MIN_BALANCE + TX_FEE 
+  // Calculate required ALGO based on selected quantity
+  const requiredAlgo = selectedOffer && purchaseQuantity > 0 
+    ? (selectedOffer.price_per_unit * purchaseQuantity * ALGO_PER_USD) + MIN_BALANCE + TX_FEE 
     : 0;
   const hasEnoughBalance = userAlgoBalance >= requiredAlgo;
   const shortageAlgo = Math.max(0, requiredAlgo - userAlgoBalance);
@@ -170,6 +192,8 @@ const TradingPage = () => {
   useEffect(() => {
     if (showBuyModal && selectedOffer) {
       fetchAlgoBalance();
+      // Reset purchase quantity to 1 when modal opens
+      setPurchaseQuantity(1);
     }
   }, [showBuyModal, selectedOffer]);
 
@@ -273,11 +297,12 @@ const TradingPage = () => {
     }
 
     setSelectedOffer(offer);
+    setPurchaseQuantity(1); // Reset to minimum
     setShowBuyModal(true);
   };
 
   const handleBuyConfirm = async () => {
-    if (!selectedOffer || !user) return;
+    if (!selectedOffer || !user || purchaseQuantity <= 0) return;
 
     try {
       setBuyLoading(true);
@@ -285,6 +310,7 @@ const TradingPage = () => {
       const response = await apiClient.post('/api/v1/tokenization/execute-trade', {
         offer_id: selectedOffer.id,
         payment_network: selectedOffer.payment_network,
+        quantity: purchaseQuantity  // Send the selected quantity
       });
 
       if (response.data.success) {
@@ -296,7 +322,24 @@ const TradingPage = () => {
           { duration: 5000 }
         );
         
-        setOffers(prev => prev.filter(o => o.id !== selectedOffer.id));
+        // Update offers list
+        if (purchaseQuantity === selectedOffer.quantity) {
+          // Full purchase - remove the offer
+          setOffers(prev => prev.filter(o => o.id !== selectedOffer.id));
+        } else {
+          // Partial purchase - update the offer quantity
+          setOffers(prev => prev.map(o => {
+            if (o.id === selectedOffer.id) {
+              return {
+                ...o,
+                quantity: o.quantity - purchaseQuantity,
+                total_value: o.price_per_unit * (o.quantity - purchaseQuantity)
+              };
+            }
+            return o;
+          }));
+        }
+        
         setShowBuyModal(false);
         setSelectedOffer(null);
         
@@ -648,11 +691,15 @@ const TradingPage = () => {
                     {offer.tokenized_assets?.image_url && (
                       <div className="mb-4 -mx-4 -mt-4">
                         <img 
-                          src={offer.tokenized_assets.image_url} 
+                          src={getImageUrl(offer.tokenized_assets.image_url)} 
                           alt={offer.tokenized_assets.symbol || 'Asset'}
                           className="w-full h-48 object-cover rounded-t-xl"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
+                            // If image fails to load, hide the container
+                            const container = e.currentTarget.parentElement;
+                            if (container) {
+                              container.style.display = 'none';
+                            }
                           }}
                         />
                       </div>
@@ -731,7 +778,7 @@ const TradingPage = () => {
                     <div className="space-y-3 mb-4">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-gray-800/30 rounded-lg p-3">
-                          <div className="text-xs text-gray-400 mb-1">Quantity</div>
+                          <div className="text-xs text-gray-400 mb-1">Available</div>
                           <div className="text-base font-bold text-white">{offer.quantity.toLocaleString()}</div>
                         </div>
                         <div className="bg-gray-800/30 rounded-lg p-3">
@@ -813,6 +860,20 @@ const TradingPage = () => {
               
               {/* Asset Details */}
               <div className="space-y-4 mb-6">
+                {/* Asset Image in Modal */}
+                {selectedOffer.tokenized_assets?.image_url && (
+                  <div className="bg-gray-800/50 rounded-xl overflow-hidden">
+                    <img 
+                      src={getImageUrl(selectedOffer.tokenized_assets.image_url)} 
+                      alt={selectedOffer.tokenized_assets.symbol || 'Asset'}
+                      className="w-full h-48 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div className="bg-gray-800/50 rounded-xl p-4">
                   <div className="text-sm text-gray-400 mb-1">Asset</div>
                   <div className="text-lg font-bold text-white">
@@ -840,17 +901,54 @@ const TradingPage = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 rounded-xl p-4">
-                    <div className="text-sm text-gray-400 mb-1">Quantity</div>
-                    <div className="text-lg font-bold text-white">
-                      {selectedOffer.quantity.toLocaleString()}
-                    </div>
+                {/* Quantity Selection */}
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <div className="text-sm text-gray-400 mb-2">Purchase Quantity</div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setPurchaseQuantity(Math.max(1, purchaseQuantity - 1))}
+                      disabled={purchaseQuantity <= 1}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedOffer.quantity}
+                      value={purchaseQuantity}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (!isNaN(value) && value >= 1 && value <= selectedOffer.quantity) {
+                          setPurchaseQuantity(value);
+                        }
+                      }}
+                      className="flex-1 px-3 py-1 bg-gray-900 border border-gray-700 rounded text-white text-center"
+                    />
+                    <button
+                      onClick={() => setPurchaseQuantity(Math.min(selectedOffer.quantity, purchaseQuantity + 1))}
+                      disabled={purchaseQuantity >= selectedOffer.quantity}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white"
+                    >
+                      +
+                    </button>
                   </div>
+                  <div className="text-xs text-gray-400 mt-2 text-center">
+                    Available: {selectedOffer.quantity.toLocaleString()} units
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-800/50 rounded-xl p-4">
                     <div className="text-sm text-gray-400 mb-1">Price/Unit</div>
                     <div className="text-lg font-bold text-white">
                       {formatCurrencyWithDecimals(selectedOffer.price_per_unit)}
+                    </div>
+                  </div>
+                  <div className="bg-gray-800/50 rounded-xl p-4">
+                    <div className="text-sm text-gray-400 mb-1">Subtotal</div>
+                    <div className="text-lg font-bold text-white">
+                      {formatCurrencyUSD(selectedOffer.price_per_unit * purchaseQuantity)}
                     </div>
                   </div>
                 </div>
@@ -858,7 +956,7 @@ const TradingPage = () => {
                 <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
                   <div className="text-sm text-gray-400 mb-1">Total Cost</div>
                   <div className="text-2xl font-bold text-white">
-                    {formatCurrencyUSD(selectedOffer.total_value)}
+                    {formatCurrencyUSD(selectedOffer.price_per_unit * purchaseQuantity)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     Payment via {getPaymentNetworkLabel(selectedOffer.payment_network)}
@@ -977,7 +1075,7 @@ const TradingPage = () => {
                       Insufficient ALGO
                     </>
                   ) : (
-                    'Confirm Purchase'
+                    `Buy ${purchaseQuantity} Units`
                   )}
                 </button>
               </div>
