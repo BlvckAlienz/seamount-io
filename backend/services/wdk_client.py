@@ -649,6 +649,7 @@ class WDKClient:
         # ═════════════════════════════════════════════════════════════════════
         # TIER 2: Your WDK Service (Optional Middle Layer)
         # ═════════════════════════════════════════════════════════════════════
+        # Only use for native assets, not for tokens (returns 0 for tokens)
         try:
             logger.debug(f"📡 TIER 2: Trying your WDK Service...")
             
@@ -671,9 +672,18 @@ class WDKClient:
                         result = await response.json()
                         
                         if result.get('success'):
-                            logger.info(f"✅ TIER 2 SUCCESS: Balance from WDK Service")
-                            result['source'] = 'wdk_service'
-                            return result
+                            balance_str = result.get('balance', '0')
+                            balance_decimal = Decimal(balance_str)
+                            
+                            # 🚨 CRITICAL FIX: Only accept TIER 2 for token queries if balance > 0
+                            # WDK service returns 0 for all token queries, so we must continue to TIER 3
+                            if asset and balance_decimal == 0:
+                                logger.info(f"⚠️ TIER 2 returned 0 balance for {asset}, continuing to TIER 3...")
+                                # Don't return - let it fall through to TIER 3
+                            else:
+                                logger.info(f"✅ TIER 2 SUCCESS: {balance_str} {asset or 'native'} from WDK Service")
+                                result['source'] = 'wdk_service'
+                                return result
         except Exception as e:
             logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
         
