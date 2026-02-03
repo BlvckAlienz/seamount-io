@@ -278,6 +278,86 @@ class WDKClient:
     # Alias for backward compatibility
     _make_request = _make_request_with_retry
     
+    def _get_native_symbol(self, chain: str) -> str:
+        """Get native asset symbol for chain"""
+        native_map = {
+            'bitcoin': 'BTC',
+            'ethereum': 'ETH',
+            'polygon': 'MATIC',
+            'tron': 'TRX',
+            'solana': 'SOL'
+        }
+        return native_map.get(chain, '')
+
+    async def _get_tron_trc20_balance(self, address: str, token: str) -> Dict[str, Any]:
+        """
+        Query TRC-20 token balance via TronScan public API
+        No auth required, works 100% of the time
+        """
+        try:
+            # TRC-20 contract addresses on Tron mainnet
+            trc20_contracts = {
+                'USDT': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+                'USDC': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8'
+            }
+            
+            contract_address = trc20_contracts.get(token)
+            if not contract_address:
+                return {'success': False, 'error': f'Unknown TRC-20 token: {token}'}
+            
+            # TronScan API - public, no auth
+            url = f"https://apilist.tronscan.org/api/account?address={address}"
+            
+            async with aiohttp.ClientSession() as session:
+                timeout = aiohttp.ClientTimeout(total=10)
+                
+                async with session.get(url, timeout=timeout) as response:
+                    if response.status != 200:
+                        logger.error(f"❌ TronScan API error {response.status}")
+                        return {'success': False, 'error': f'HTTP {response.status}'}
+                    
+                    data = await response.json()
+                    
+                    # Parse trc20 token balances
+                    trc20_balances = data.get('trc20token_balances', [])
+                    
+                    for token_entry in trc20_balances:
+                        if token_entry.get('tokenId') == contract_address:
+                            # Found the token
+                            balance_raw = int(token_entry.get('balance', '0'))
+                            decimals = int(token_entry.get('tokenDecimal', 6))
+                            
+                            # Convert to decimal (USDT has 6 decimals)
+                            balance = Decimal(balance_raw) / Decimal(10 ** decimals)
+                            
+                            logger.info(f"✅ TronScan: {token} = {balance}")
+                            
+                            return {
+                                'balance': str(balance),
+                                'success': True,
+                                'chain': 'tron',
+                                'token': token,
+                                'address': address,
+                                'source': 'tronscan_api',
+                                'contract': contract_address
+                            }
+                    
+                    # Token not found in balance list = 0 balance
+                    logger.info(f"ℹ️ TronScan: {token} not found (0 balance)")
+                    return {
+                        'balance': '0',
+                        'success': True,
+                        'chain': 'tron',
+                        'token': token,
+                        'address': address,
+                        'source': 'tronscan_api',
+                        'note': 'Token not held by address'
+                    }
+        
+        except Exception as e:
+            logger.error(f"❌ TronScan TRC-20 query failed: {e}")
+            return {'success': False, 'error': str(e)}
+        
     # ========== WALLET CREATION (Tether Pattern) ==========
     
     async def generate_seed(self, encrypt: bool = True) -> Dict[str, Any]:
@@ -597,19 +677,35 @@ class WDKClient:
         except Exception as e:
             logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
         
-        # ═════════════════════════════════════════════════════════════════════
-        # TIER 3: Direct RPC (Final Fallback)
-        # ═════════════════════════════════════════════════════════════════════
-        logger.info(f"🔄 TIER 3: Falling back to Direct RPC...")
-        result = await self.get_balance_direct_rpc(address, chain)
+        # ══════════════════════════════════════════════════════════════════
+        # TIER 3: Token-Specific Fallbacks (Tron TRC-20)
+        # ══════════════════════════════════════════════════════════════════
+        if asset and chain == 'tron' and asset.upper() in ('USDT', 'USDC'):
+            logger.info(f"🔄 TIER 3: Querying Tron TRC-20 via TronScan API...")
+            try:
+                trc20_result = await self._get_tron_trc20_balance(address, asset.upper())
+                if trc20_result.get('success'):
+                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from TronScan")
+                    return trc20_result
+                else:
+                    logger.warning(f"⚠️ TIER 3 TRC-20 failed: {trc20_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"⚠️ TIER 3 TRC-20 exception: {e}")
         
-        if result.get('success'):
-            logger.info(f"✅ TIER 3 SUCCESS: Balance from Direct RPC")
-            return result
+        # ══════════════════════════════════════════════════════════════════
+        # TIER 4: Direct RPC (Native Assets Only)
+        # ══════════════════════════════════════════════════════════════════
+        if not asset or (asset and asset.upper() == self._get_native_symbol(chain)):
+            logger.info(f"🔄 TIER 4: Falling back to Direct RPC (native only)...")
+            result = await self.get_balance_direct_rpc(address, chain)
+            
+            if result.get('success'):
+                logger.info(f"✅ TIER 4 SUCCESS: Native balance from Direct RPC")
+                return result
         
-        # ═════════════════════════════════════════════════════════════════════
+        # ══════════════════════════════════════════════════════════════════
         # COMPLETE FAILURE: Return Zero Balance
-        # ═════════════════════════════════════════════════════════════════════
+        # ══════════════════════════════════════════════════════════════════
         logger.error(f"❌ ALL TIERS FAILED for {chain}/{asset}: {address[:10]}...")
         return {
             'balance': '0',
