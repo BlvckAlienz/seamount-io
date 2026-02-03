@@ -277,7 +277,16 @@ class MultiChainWalletService:
         return result
 
     # ========== BALANCE QUERIES ==========
-    
+
+    # Which tokens to query per chain (beyond native asset)
+    CHAIN_TOKEN_MAP = {
+        'tron':     ['USDT'],
+        'ethereum': ['USDT', 'USDC'],
+        'polygon':  ['USDT', 'USDC'],
+        'solana':   ['USDT', 'USDC'],
+        'bitcoin':  [],  # No token support
+    }
+
     def _get_native_asset(self, chain: str) -> str:
         """Get native asset for chain"""
         native_map = {
@@ -286,40 +295,37 @@ class MultiChainWalletService:
             'polygon': 'MATIC',
             'tron': 'TRX',
             'algorand': 'ALGO',
-            'solana': 'SOL'  # ✅ ADD THIS
+            'solana': 'SOL'
         }
         return native_map.get(chain, 'UNKNOWN')
 
     async def get_user_balances(self, user_id: str) -> Dict[str, Any]:
-        """Get unified balance view across ALL chains"""
+        """Get unified balance view across ALL chains (native + tokens)"""
         try:
             balances = {}
             total_usd = Decimal('0')
-            
-            # 1. Get Algorand balances
+
+            # 1. Get Algorand balances (unchanged)
             try:
                 algo_wallet = self.db.supabase.table('user_wallets')\
                     .select('algorand_address')\
                     .eq('user_id', user_id)\
                     .execute()
-                
+
                 if algo_wallet.data and len(algo_wallet.data) > 0:
                     algo_address = algo_wallet.data[0].get('algorand_address')
-                    
+
                     if algo_address:
-                        # Query Algorand account
                         account_info = await self.algorand.get_account_info(algo_address)
-                        
+
                         if account_info:
-                            # Native ALGO balance
                             algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
-                            
-                            # ✅ BONUS FIX: ALWAYS report balance (even if 0)
+
                             try:
                                 algo_price = await self.oracle.get_algorand_price()
                                 balances['ALGO'] = {
-                                    'asset': 'ALGO',  # ✅ FIX 1: Add asset field
-                                    'symbol': 'ALGO',  # ✅ FIX 2: Add symbol field (for compatibility)
+                                    'asset': 'ALGO',
+                                    'symbol': 'ALGO',
                                     'balance': float(algo_balance),
                                     'chain': 'algorand',
                                     'usd_value': float(algo_balance * algo_price)
@@ -335,7 +341,6 @@ class MultiChainWalletService:
                                     'usd_value': 0.0
                                 }
                         else:
-                            # ✅ NEW: Account exists but no data (0 balance)
                             logger.info(f"ℹ️ Algorand account {algo_address[:10]}... has 0 balance")
                             balances['ALGO'] = {
                                 'asset': 'ALGO',
@@ -344,10 +349,9 @@ class MultiChainWalletService:
                                 'chain': 'algorand',
                                 'usd_value': 0.0
                             }
-            
+
             except Exception as algo_err:
                 logger.warning(f"⚠️ Algorand balance query failed: {algo_err}")
-                # ✅ NEW: Still report 0 balance on error (prevents "No balance found" errors)
                 balances['ALGO'] = {
                     'asset': 'ALGO',
                     'symbol': 'ALGO',
@@ -356,75 +360,102 @@ class MultiChainWalletService:
                     'usd_value': 0.0,
                     'error': str(algo_err)
                 }
-            
-            # 2. Get WDK chain balances
+
+            # 2. Get WDK chain balances — NATIVE + TOKENS
             try:
                 wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
                     .select('blockchain, address')\
                     .eq('user_id', user_id)\
                     .execute()
-                
+
                 if wdk_wallets.data and len(wdk_wallets.data) > 0:
                     for wallet in wdk_wallets.data:
                         chain = wallet['blockchain']
                         address = wallet['address']
-                        
+
+                        # ── 2A: Native asset ──────────────────────────────────
+                        native_asset = self._get_native_asset(chain)
                         try:
-                            # Query balance from WDK
-                            balance_data = await self.wdk.get_balance(address, chain)
-                            balance = Decimal(str(balance_data.get('balance', 0)))
-                            
-                            # ✅ BONUS FIX: ALWAYS report balance (even if 0)
-                            native_asset = self._get_native_asset(chain)
-                            
+                            native_data = await self.wdk.get_balance(address, chain, asset=None)
+                            native_balance = Decimal(str(native_data.get('balance', 0)))
+
                             try:
-                                # Get price from oracle
-                                price, price_metadata = await self.oracle.get_asset_price(native_asset.lower())
-                                usd_value = balance * price
-                                
-                                balances[native_asset] = {
-                                    'asset': native_asset,  # ✅ FIX 1: Add asset field
-                                    'symbol': native_asset,  # ✅ FIX 2: Add symbol field
-                                    'balance': float(balance),
-                                    'chain': chain,
-                                    'usd_value': float(usd_value)
-                                }
-                                total_usd += usd_value
-                                
-                            except Exception as price_error:
-                                logger.warning(f"⚠️ Price lookup failed for {chain}: {price_error}")
-                                balances[native_asset] = {
-                                    'asset': native_asset,
-                                    'symbol': native_asset,
-                                    'balance': float(balance),
-                                    'chain': chain,
-                                    'usd_value': 0.0
-                                }
-                        
-                        # Update the balance query section (around line 207-250)
-                        except Exception as balance_err:
-                            logger.error(f"❌ Balance query failed for {chain}: {balance_err}")
-                            # ✅ NEW: Still report 0 balance on error
-                            native_asset = self._get_native_asset(chain)
+                                price, _ = await self.oracle.get_asset_price(native_asset.lower())
+                                native_usd = native_balance * price
+                            except Exception:
+                                native_usd = Decimal('0')
+                                logger.warning(f"⚠️ Price lookup failed for {native_asset}")
+
+                            balances[native_asset] = {
+                                'asset': native_asset,
+                                'symbol': native_asset,
+                                'balance': float(native_balance),
+                                'chain': chain,
+                                'usd_value': float(native_usd)
+                            }
+                            total_usd += native_usd
+
+                        except Exception as native_err:
+                            logger.error(f"❌ Native balance failed for {chain}: {native_err}")
                             balances[native_asset] = {
                                 'asset': native_asset,
                                 'symbol': native_asset,
                                 'balance': 0.0,
                                 'chain': chain,
                                 'usd_value': 0.0,
-                                'error': str(balance_err)
+                                'error': str(native_err)
                             }
-            
+
+                        # ── 2B: Token assets (USDT, USDC, etc.) ───────────────
+                        # 🚨 THIS IS THE FIX. Previously this entire block was missing.
+                        tokens_to_query = self.CHAIN_TOKEN_MAP.get(chain, [])
+
+                        for token in tokens_to_query:
+                            # Chain-qualified key prevents USDT collisions across chains
+                            balance_key = f"{token}_{chain.upper()}"
+
+                            try:
+                                # Passing asset=token triggers Tether Indexer in wdk_client
+                                token_data = await self.wdk.get_balance(address, chain, asset=token)
+                                token_balance = Decimal(str(token_data.get('balance', 0)))
+
+                                # Stablecoins: peg = 1 USD, no oracle needed
+                                if token in ('USDT', 'USDC'):
+                                    token_usd = token_balance
+                                else:
+                                    try:
+                                        price, _ = await self.oracle.get_asset_price(token.lower())
+                                        token_usd = token_balance * price
+                                    except Exception:
+                                        token_usd = Decimal('0')
+
+                                if token_balance > 0:
+                                    balances[balance_key] = {
+                                        'asset': token,
+                                        'symbol': token,
+                                        'balance': float(token_balance),
+                                        'chain': chain,
+                                        'usd_value': float(token_usd)
+                                    }
+                                    total_usd += token_usd
+                                    logger.info(f"✅ {token} on {chain}: {token_balance} (${token_usd})")
+                                else:
+                                    logger.debug(f"ℹ️ {token} on {chain}: 0 balance, skipping")
+
+                            except Exception as token_err:
+                                # Non-fatal: one token failing doesn't kill the whole response
+                                logger.warning(f"⚠️ Token balance failed for {token} on {chain}: {token_err}")
+
             except Exception as wdk_err:
                 logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
-            
+
             # 3. Format response
             assets_list = sorted(
                 balances.values(),
                 key=lambda x: x.get('usd_value', 0),
                 reverse=True
             )
-            
+
             return {
                 'success': True,
                 'total_usd': float(total_usd),
@@ -432,7 +463,7 @@ class MultiChainWalletService:
                 'asset_count': len(balances),
                 'timestamp': datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"❌ Balance query failed: {e}")
             return {
