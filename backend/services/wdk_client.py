@@ -28,6 +28,110 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time = None
         self.chain_status = {}  # Per-chain health tracking
+
+        # Rate limit tracking
+        self._rate_limit_hits = {
+            'ethereum': 0,
+            'polygon': 0,
+            'tron': 0,
+            'solana': 0
+        }
+        self._last_rate_limit_reset = datetime.now()
+    
+    async def _track_rate_limit(self, chain: str, hit: bool = False):
+        """Track rate limit hits and auto-reset counters"""
+        if hit:
+            self._rate_limit_hits[chain] = self._rate_limit_hits.get(chain, 0) + 1
+            logger.warning(f"🚨 Rate limit hit on {chain}. Total hits: {self._rate_limit_hits[chain]}")
+        
+        # Reset counters every hour
+        if (datetime.now() - self._last_rate_limit_reset).seconds > 3600:
+            for chain_key in self._rate_limit_hits:
+                self._rate_limit_hits[chain_key] = 0
+            self._last_rate_limit_reset = datetime.now()
+            logger.info("🔄 Rate limit counters reset")
+    
+    def get_rate_limit_stats(self) -> Dict[str, Any]:
+        """Get current rate limit statistics"""
+        return {
+            'hits': self._rate_limit_hits,
+            'keys_available': {
+                'ethereum': len(self._get_available_etherscan_keys()),
+                'polygon': len(self._get_available_etherscan_keys())
+            },
+            'next_reset': (self._last_rate_limit_reset + timedelta(hours=1)).isoformat(),
+            'circuit_breaker': self.circuit_breaker.state
+        }
+    
+    # ========== ETHERSCAN/POLYGONSCAN API KEY ROTATION ==========
+    
+    def _get_etherscan_api_key(self, chain: str) -> str:
+        """
+        Rotate through Etherscan API keys for rate limiting
+        Supports both Ethereum and Polygon (Polygonscan uses Etherscan API V2)
+        
+        Rotation strategy:
+        - Separate key index per chain to avoid collisions
+        - Round-robin rotation for each request
+        - Returns empty string if no keys configured
+        """
+        # Map chain to key list index tracker
+        if not hasattr(self, '_etherscan_key_indices'):
+            self._etherscan_key_indices = {}
+        
+        # Initialize index for this chain
+        if chain not in self._etherscan_key_indices:
+            self._etherscan_key_indices[chain] = 0
+        
+        # Get available keys from environment
+        available_keys = []
+        
+        # Try to get keys from settings
+        try:
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
+        except Exception as e:
+            logger.warning(f"⚠️ Error reading Etherscan API keys: {e}")
+        
+        # Fallback to single key if available
+        if not available_keys and hasattr(self.settings, 'ETHERSCAN_API_KEY'):
+            try:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY.get_secret_value())
+            except:
+                pass
+        
+        if not available_keys:
+            logger.warning(f"⚠️ No Etherscan API keys configured for {chain}")
+            return ""
+        
+        # Get next key in rotation (round-robin)
+        current_idx = self._etherscan_key_indices[chain]
+        selected_key = available_keys[current_idx % len(available_keys)]
+        
+        # Increment for next call
+        self._etherscan_key_indices[chain] = (current_idx + 1) % len(available_keys)
+        
+        # Log which key we're using (first 8 chars only for security)
+        key_suffix = selected_key[-8:] if len(selected_key) > 8 else selected_key
+        logger.debug(f"🔑 Using Etherscan key [{current_idx % len(available_keys) + 1}/{len(available_keys)}] for {chain}: ...{key_suffix}")
+        
+        return selected_key
+    
+    def _get_etherscan_base_url(self, chain: str) -> str:
+        """
+        Get the correct Etherscan API base URL for each chain
+        Both use Etherscan API V2, but different domains
+        """
+        if chain == 'ethereum':
+            return "https://api.etherscan.io/api"
+        elif chain == 'polygon':
+            return "https://api.polygonscan.com/api"
+        else:
+            raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
     
     def can_execute(self, chain=None):
         """Check if requests can execute (with automatic recovery)"""
@@ -357,6 +461,231 @@ class WDKClient:
         except Exception as e:
             logger.error(f"❌ TronScan TRC-20 query failed: {e}")
             return {'success': False, 'error': str(e)}
+
+    async def _get_evm_erc20_balance(self, address: str, token: str, chain: str) -> Dict[str, Any]:
+        """
+        Unified ERC-20 token balance query for Ethereum and Polygon
+        Uses Etherscan API V2 with key rotation for rate limiting
+        
+        Args:
+            address: Wallet address
+            token: Token symbol (USDT, USDC)
+            chain: 'ethereum' or 'polygon'
+        """
+        try:
+            # ERC-20 contract addresses by chain
+            erc20_contracts = {
+                'ethereum': {
+                    'USDT': '0xdac17f958d2ee523a2206206994597c13d831ec7',
+                    'USDC': '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
+                },
+                'polygon': {
+                    'USDT': '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
+                    'USDC': '0x2791bca1f2de4661ed88a30c99a7a9449aa84174'
+                }
+            }
+            
+            chain_contracts = erc20_contracts.get(chain)
+            if not chain_contracts:
+                return {'success': False, 'error': f'Unsupported chain for ERC-20: {chain}'}
+            
+            contract_address = chain_contracts.get(token.upper())
+            if not contract_address:
+                return {'success': False, 'error': f'Unknown ERC-20 token for {chain}: {token}'}
+            
+            # Get rotating API key and base URL
+            api_key = self._get_etherscan_api_key(chain)
+            base_url = self._get_etherscan_base_url(chain)
+            
+            # Build API request URL
+            api_key_param = f"&apikey={api_key}" if api_key else ""
+            url = f"{base_url}?module=account&action=tokenbalance" \
+                  f"&contractaddress={contract_address}&address={address}&tag=latest{api_key_param}"
+            
+            logger.debug(f"🔗 {chain.capitalize()} ERC-20 API URL: {base_url} (key: {'yes' if api_key else 'no'})")
+            
+            async with aiohttp.ClientSession() as session:
+                timeout = aiohttp.ClientTimeout(total=10)
+                
+                async with session.get(url, timeout=timeout) as response:
+                    if response.status != 200:
+                        logger.error(f"❌ {chain.capitalize()}scan API error {response.status}")
+                        return {
+                            'success': False, 
+                            'error': f'HTTP {response.status}',
+                            'chain': chain
+                        }
+                    
+                    data = await response.json()
+                    
+                    # Check API response status
+                    if data.get('status') == '1' and data.get('message') == 'OK':
+                        # API returns balance in raw units (no decimals)
+                        balance_raw = int(data.get('result', '0'))
+                        
+                        # Determine decimals based on chain and token
+                        decimals = 6  # USDT/USDC have 6 decimals on both chains
+                        balance = Decimal(balance_raw) / Decimal(10 ** decimals)
+                        
+                        logger.info(f"✅ {chain.capitalize()}scan: {token} = {balance}")
+                        
+                        return {
+                            'balance': str(balance),
+                            'success': True,
+                            'chain': chain,
+                            'token': token,
+                            'address': address,
+                            'source': f'{chain}scan_api',
+                            'contract': contract_address,
+                            'api_key_used': 'yes' if api_key else 'no'
+                        }
+                    else:
+                        # Handle API errors
+                        error_msg = data.get('message', 'Unknown error')
+                        result = data.get('result')
+                        
+                        # Check for rate limiting
+                        if 'rate limit' in error_msg.lower() or (result and 'rate limit' in str(result).lower()):
+                            logger.warning(f"⚠️ {chain.capitalize()}scan rate limit hit: {error_msg}")
+                            # Try with next key immediately (if we have multiple keys)
+                            if api_key and len(self._get_available_etherscan_keys()) > 1:
+                                logger.info(f"🔄 Retrying {chain} {token} with next API key...")
+                                # Force rotate to next key for this chain
+                                if chain in self._etherscan_key_indices:
+                                    self._etherscan_key_indices[chain] = (
+                                        self._etherscan_key_indices[chain] + 1
+                                    ) % len(self._get_available_etherscan_keys())
+                        
+                        # Return 0 balance for non-rate-limit errors (token not held)
+                        if 'No transactions found' in str(result) or 'Invalid address' in error_msg:
+                            logger.debug(f"ℹ️ {chain.capitalize()}: {token} not held by address")
+                            return {
+                                'balance': '0',
+                                'success': True,
+                                'chain': chain,
+                                'token': token,
+                                'address': address,
+                                'source': f'{chain}scan_api',
+                                'note': 'Token not held by address'
+                            }
+                        
+                        logger.warning(f"⚠️ {chain.capitalize()}scan API error: {error_msg} - Result: {result}")
+                        return {
+                            'balance': '0',
+                            'success': False,
+                            'error': error_msg,
+                            'chain': chain,
+                            'api_response': data
+                        }
+        
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ {chain.capitalize()}scan API timeout for {token}")
+            return {
+                'success': False, 
+                'error': f'{chain.capitalize()}scan API timeout',
+                'chain': chain
+            }
+        except Exception as e:
+            logger.error(f"❌ {chain.capitalize()} ERC-20 query failed: {e}")
+            return {'success': False, 'error': str(e), 'chain': chain}
+    
+    def _get_available_etherscan_keys(self) -> List[str]:
+        """Helper to get list of available API keys"""
+        available_keys = []
+        try:
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
+        except Exception:
+            pass
+        return available_keys
+
+async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[str, Any]:
+    """
+    Query SPL token balance via Solana RPC
+    Uses getTokenAccountsByOwner to find token account
+    """
+    try:
+        # SPL token mint addresses on Solana mainnet
+        spl_token_mints = {
+            'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+        }
+        
+        mint_address = spl_token_mints.get(token)
+        if not mint_address:
+            return {'success': False, 'error': f'Unknown SPL token: {token}'}
+        
+        # Solana RPC endpoint
+        solana_rpc = getattr(self.settings, 'SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+        
+        # Build RPC request for getTokenAccountsByOwner
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getTokenAccountsByOwner",
+            "params": [
+                address,
+                {"mint": mint_address},
+                {"encoding": "jsonParsed"}
+            ]
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            headers = {"Content-Type": "application/json"}
+            timeout = aiohttp.ClientTimeout(total=15)
+            
+            async with session.post(solana_rpc, json=payload, headers=headers, timeout=timeout) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Parse response to find token balance
+                    token_accounts = data.get('result', {}).get('value', [])
+                    
+                    if token_accounts and len(token_accounts) > 0:
+                        # Get the first token account (should be only one for this mint)
+                        account_info = token_accounts[0].get('account', {}).get('data', {}).get('parsed', {}).get('info', {})
+                        token_amount = account_info.get('tokenAmount', {})
+                        
+                        amount_raw = int(token_amount.get('amount', '0'))
+                        decimals = int(token_amount.get('decimals', 6))
+                        
+                        balance = Decimal(amount_raw) / Decimal(10 ** decimals)
+                        
+                        logger.info(f"✅ Solana RPC: {token} = {balance}")
+                        
+                        return {
+                            'balance': str(balance),
+                            'success': True,
+                            'chain': 'solana',
+                            'token': token,
+                            'address': address,
+                            'source': 'solana_rpc',
+                            'mint': mint_address
+                        }
+                    else:
+                        # No token account found = 0 balance
+                        logger.info(f"ℹ️ Solana: {token} not found (0 balance)")
+                        return {
+                            'balance': '0',
+                            'success': True,
+                            'chain': 'solana',
+                            'token': token,
+                            'address': address,
+                            'source': 'solana_rpc',
+                            'note': 'No token account found'
+                        }
+                else:
+                    error_text = await response.text()
+                    logger.error(f"❌ Solana RPC error {response.status}: {error_text[:200]}")
+                    return {'success': False, 'error': f'HTTP {response.status}'}
+        
+    except Exception as e:
+        logger.error(f"❌ Solana SPL token query failed: {e}")
+        return {'success': False, 'error': str(e)}
         
     # ========== WALLET CREATION (Tether Pattern) ==========
     
@@ -557,6 +886,23 @@ class WDKClient:
         logger.info(f"🔍 Balance query: {chain} / {asset or 'native'} / {address[:10]}...")
         
         # ═════════════════════════════════════════════════════════════════════
+        # CIRCUIT BREAKER: Allow token queries even if circuit breaker is open
+        # ═════════════════════════════════════════════════════════════════════
+        if not self.circuit_breaker.can_execute(chain=chain):
+            # For token queries, try to bypass circuit breaker
+            if asset and asset.upper() in ('USDT', 'USDC'):
+                logger.warning(f"⚠️ Circuit breaker open for {chain}, but attempting token query anyway...")
+            else:
+                logger.warning(f"⚠️ Circuit breaker open for {chain}, skipping balance query")
+                return {
+                    'balance': '0',
+                    'success': False,
+                    'error': f'Circuit breaker open for {chain}',
+                    'chain': chain,
+                    'fallback': True
+                }
+        
+        # ═════════════════════════════════════════════════════════════════════
         # DETERMINE ASSET TYPE
         # ═════════════════════════════════════════════════════════════════════
         native_assets = {
@@ -649,7 +995,6 @@ class WDKClient:
         # ═════════════════════════════════════════════════════════════════════
         # TIER 2: Your WDK Service (Optional Middle Layer)
         # ═════════════════════════════════════════════════════════════════════
-        # Only use for native assets, not for tokens (returns 0 for tokens)
         try:
             logger.debug(f"📡 TIER 2: Trying your WDK Service...")
             
@@ -688,8 +1033,10 @@ class WDKClient:
             logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
         
         # ══════════════════════════════════════════════════════════════════
-        # TIER 3: Token-Specific Fallbacks (Tron TRC-20)
+        # TIER 3: Chain-Specific Fallbacks
         # ══════════════════════════════════════════════════════════════════
+        
+        # 3A: Tron TRC-20 Tokens
         if asset and chain == 'tron' and asset.upper() in ('USDT', 'USDC'):
             logger.info(f"🔄 TIER 3: Querying Tron TRC-20 via TronScan API...")
             try:
@@ -702,8 +1049,47 @@ class WDKClient:
             except Exception as e:
                 logger.warning(f"⚠️ TIER 3 TRC-20 exception: {e}")
         
+        # 3B: Ethereum ERC-20 Tokens
+        if asset and chain == 'ethereum' and asset.upper() in ('USDT', 'USDC'):
+            logger.info(f"🔄 TIER 3: Querying Ethereum ERC-20 via Etherscan API...")
+            try:
+                erc20_result = await self._get_evm_erc20_balance(address, asset.upper(), 'ethereum')
+                if erc20_result.get('success'):
+                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Etherscan")
+                    return erc20_result
+                else:
+                    logger.warning(f"⚠️ TIER 3 ERC-20 failed: {erc20_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
+        
+        # 3C: Polygon ERC-20 Tokens
+        if asset and chain == 'polygon' and asset.upper() in ('USDT', 'USDC'):
+            logger.info(f"🔄 TIER 3: Querying Polygon ERC-20 via Polygonscan API...")
+            try:
+                polygon_result = await self._get_evm_erc20_balance(address, asset.upper(), 'polygon')
+                if polygon_result.get('success'):
+                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Polygonscan")
+                    return polygon_result
+                else:
+                    logger.warning(f"⚠️ TIER 3 ERC-20 failed: {polygon_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
+        
+        # 3D: Solana SPL Tokens
+        if asset and chain == 'solana' and asset.upper() in ('USDT', 'USDC'):
+            logger.info(f"🔄 TIER 3: Querying Solana SPL token via Solana RPC...")
+            try:
+                solana_result = await self._get_solana_spl_token_balance(address, asset.upper())
+                if solana_result.get('success'):
+                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Solana RPC")
+                    return solana_result
+                else:
+                    logger.warning(f"⚠️ TIER 3 SPL token failed: {solana_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"⚠️ TIER 3 SPL token exception: {e}")
+        
         # ══════════════════════════════════════════════════════════════════
-        # TIER 4: Direct RPC (Native Assets Only)
+        # TIER 4: Direct RPC (Native Assets Only) - Fallback
         # ══════════════════════════════════════════════════════════════════
         if not asset or (asset and asset.upper() == self._get_native_symbol(chain)):
             logger.info(f"🔄 TIER 4: Falling back to Direct RPC (native only)...")

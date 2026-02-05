@@ -13,6 +13,8 @@ from pydantic import SecretStr, computed_field, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 
+from pydantic import SecretStr
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -606,6 +608,14 @@ class Settings(BaseSettings):
     SUPABASE_JWKS_URI: str = Field(default="https://your-supabase-url.supabase.co/auth/v1/jwks")
     SUPABASE_JWT_ISSUER: str = Field(default="https://your-supabase-url.supabase.co")
 
+    # Etherscan API Keys (Rotation Pool)
+    ETHERSCAN_API_KEY_1: Optional[SecretStr] = None
+    ETHERSCAN_API_KEY_2: Optional[SecretStr] = None
+    ETHERSCAN_API_KEY_3: Optional[SecretStr] = None
+    
+    # Legacy single key (for backward compatibility)
+    ETHERSCAN_API_KEY: Optional[SecretStr] = None
+    
     # KYC Configuration
     KYC_THRESHOLD_USD: Decimal = Field(
         default=Decimal("5000.00"),
