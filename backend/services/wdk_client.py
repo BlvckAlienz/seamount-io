@@ -603,89 +603,89 @@ class WDKClient:
             pass
         return available_keys
 
-async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[str, Any]:
-    """
-    Query SPL token balance via Solana RPC
-    Uses getTokenAccountsByOwner to find token account
-    """
-    try:
-        # SPL token mint addresses on Solana mainnet
-        spl_token_mints = {
-            'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-            'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
-        }
-        
-        mint_address = spl_token_mints.get(token)
-        if not mint_address:
-            return {'success': False, 'error': f'Unknown SPL token: {token}'}
-        
-        # Solana RPC endpoint
-        solana_rpc = getattr(self.settings, 'SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
-        
-        # Build RPC request for getTokenAccountsByOwner
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getTokenAccountsByOwner",
-            "params": [
-                address,
-                {"mint": mint_address},
-                {"encoding": "jsonParsed"}
-            ]
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            headers = {"Content-Type": "application/json"}
-            timeout = aiohttp.ClientTimeout(total=15)
+    async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[str, Any]:
+        """
+        Query SPL token balance via Solana RPC
+        Uses getTokenAccountsByOwner to find token account
+        """
+        try:
+            # SPL token mint addresses on Solana mainnet
+            spl_token_mints = {
+                'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+                'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+            }
             
-            async with session.post(solana_rpc, json=payload, headers=headers, timeout=timeout) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    
-                    # Parse response to find token balance
-                    token_accounts = data.get('result', {}).get('value', [])
-                    
-                    if token_accounts and len(token_accounts) > 0:
-                        # Get the first token account (should be only one for this mint)
-                        account_info = token_accounts[0].get('account', {}).get('data', {}).get('parsed', {}).get('info', {})
-                        token_amount = account_info.get('tokenAmount', {})
+            mint_address = spl_token_mints.get(token)
+            if not mint_address:
+                return {'success': False, 'error': f'Unknown SPL token: {token}'}
+            
+            # Solana RPC endpoint
+            solana_rpc = getattr(self.settings, 'SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com')
+            
+            # Build RPC request for getTokenAccountsByOwner
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "getTokenAccountsByOwner",
+                "params": [
+                    address,
+                    {"mint": mint_address},
+                    {"encoding": "jsonParsed"}
+                ]
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                headers = {"Content-Type": "application/json"}
+                timeout = aiohttp.ClientTimeout(total=15)
+                
+                async with session.post(solana_rpc, json=payload, headers=headers, timeout=timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
                         
-                        amount_raw = int(token_amount.get('amount', '0'))
-                        decimals = int(token_amount.get('decimals', 6))
+                        # Parse response to find token balance
+                        token_accounts = data.get('result', {}).get('value', [])
                         
-                        balance = Decimal(amount_raw) / Decimal(10 ** decimals)
-                        
-                        logger.info(f"✅ Solana RPC: {token} = {balance}")
-                        
-                        return {
-                            'balance': str(balance),
-                            'success': True,
-                            'chain': 'solana',
-                            'token': token,
-                            'address': address,
-                            'source': 'solana_rpc',
-                            'mint': mint_address
-                        }
+                        if token_accounts and len(token_accounts) > 0:
+                            # Get the first token account (should be only one for this mint)
+                            account_info = token_accounts[0].get('account', {}).get('data', {}).get('parsed', {}).get('info', {})
+                            token_amount = account_info.get('tokenAmount', {})
+                            
+                            amount_raw = int(token_amount.get('amount', '0'))
+                            decimals = int(token_amount.get('decimals', 6))
+                            
+                            balance = Decimal(amount_raw) / Decimal(10 ** decimals)
+                            
+                            logger.info(f"✅ Solana RPC: {token} = {balance}")
+                            
+                            return {
+                                'balance': str(balance),
+                                'success': True,
+                                'chain': 'solana',
+                                'token': token,
+                                'address': address,
+                                'source': 'solana_rpc',
+                                'mint': mint_address
+                            }
+                        else:
+                            # No token account found = 0 balance
+                            logger.info(f"ℹ️ Solana: {token} not found (0 balance)")
+                            return {
+                                'balance': '0',
+                                'success': True,
+                                'chain': 'solana',
+                                'token': token,
+                                'address': address,
+                                'source': 'solana_rpc',
+                                'note': 'No token account found'
+                            }
                     else:
-                        # No token account found = 0 balance
-                        logger.info(f"ℹ️ Solana: {token} not found (0 balance)")
-                        return {
-                            'balance': '0',
-                            'success': True,
-                            'chain': 'solana',
-                            'token': token,
-                            'address': address,
-                            'source': 'solana_rpc',
-                            'note': 'No token account found'
-                        }
-                else:
-                    error_text = await response.text()
-                    logger.error(f"❌ Solana RPC error {response.status}: {error_text[:200]}")
-                    return {'success': False, 'error': f'HTTP {response.status}'}
-        
-    except Exception as e:
-        logger.error(f"❌ Solana SPL token query failed: {e}")
-        return {'success': False, 'error': str(e)}
+                        error_text = await response.text()
+                        logger.error(f"❌ Solana RPC error {response.status}: {error_text[:200]}")
+                        return {'success': False, 'error': f'HTTP {response.status}'}
+            
+        except Exception as e:
+            logger.error(f"❌ Solana SPL token query failed: {e}")
+            return {'success': False, 'error': str(e)}
         
     # ========== WALLET CREATION (Tether Pattern) ==========
     
@@ -1621,7 +1621,7 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
                         'error': str(e),
                         'chain': 'tron'
                     }
-                
+            
             # ╔═══════════════════════════════════════════════════════════════════════════════════════
             # SOLANA (✅ NEW)
             # ╚═══════════════════════════════════════════════════════════════════════════════════════
@@ -1743,7 +1743,7 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
                         'error': str(e),
                         'chain': 'solana'
                     }
-                
+            
             # ╔═══════════════════════════════════════════════════════════════
             # UNSUPPORTED CHAIN
             # ╚═══════════════════════════════════════════════════════════════
@@ -1763,7 +1763,7 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
                 'success': False,
                 'error': f'Direct RPC error: {str(e)}',
                 'chain': chain
-            }  
+            }
         
     async def get_balances_multi_chain(
         self, 
