@@ -886,23 +886,6 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
         logger.info(f"🔍 Balance query: {chain} / {asset or 'native'} / {address[:10]}...")
         
         # ═════════════════════════════════════════════════════════════════════
-        # CIRCUIT BREAKER: Allow token queries even if circuit breaker is open
-        # ═════════════════════════════════════════════════════════════════════
-        if not self.circuit_breaker.can_execute(chain=chain):
-            # For token queries, try to bypass circuit breaker
-            if asset and asset.upper() in ('USDT', 'USDC'):
-                logger.warning(f"⚠️ Circuit breaker open for {chain}, but attempting token query anyway...")
-            else:
-                logger.warning(f"⚠️ Circuit breaker open for {chain}, skipping balance query")
-                return {
-                    'balance': '0',
-                    'success': False,
-                    'error': f'Circuit breaker open for {chain}',
-                    'chain': chain,
-                    'fallback': True
-                }
-        
-        # ═════════════════════════════════════════════════════════════════════
         # DETERMINE ASSET TYPE
         # ═════════════════════════════════════════════════════════════════════
         native_assets = {
@@ -1033,10 +1016,8 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
             logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
         
         # ══════════════════════════════════════════════════════════════════
-        # TIER 3: Chain-Specific Fallbacks
+        # TIER 3: Token-Specific Fallbacks (Tron TRC-20)
         # ══════════════════════════════════════════════════════════════════
-        
-        # 3A: Tron TRC-20 Tokens
         if asset and chain == 'tron' and asset.upper() in ('USDT', 'USDC'):
             logger.info(f"🔄 TIER 3: Querying Tron TRC-20 via TronScan API...")
             try:
@@ -1049,47 +1030,8 @@ async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[
             except Exception as e:
                 logger.warning(f"⚠️ TIER 3 TRC-20 exception: {e}")
         
-        # 3B: Ethereum ERC-20 Tokens
-        if asset and chain == 'ethereum' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Ethereum ERC-20 via Etherscan API...")
-            try:
-                erc20_result = await self._get_evm_erc20_balance(address, asset.upper(), 'ethereum')
-                if erc20_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Etherscan")
-                    return erc20_result
-                else:
-                    logger.warning(f"⚠️ TIER 3 ERC-20 failed: {erc20_result.get('error')}")
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
-        
-        # 3C: Polygon ERC-20 Tokens
-        if asset and chain == 'polygon' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Polygon ERC-20 via Polygonscan API...")
-            try:
-                polygon_result = await self._get_evm_erc20_balance(address, asset.upper(), 'polygon')
-                if polygon_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Polygonscan")
-                    return polygon_result
-                else:
-                    logger.warning(f"⚠️ TIER 3 ERC-20 failed: {polygon_result.get('error')}")
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
-        
-        # 3D: Solana SPL Tokens
-        if asset and chain == 'solana' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Solana SPL token via Solana RPC...")
-            try:
-                solana_result = await self._get_solana_spl_token_balance(address, asset.upper())
-                if solana_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Solana RPC")
-                    return solana_result
-                else:
-                    logger.warning(f"⚠️ TIER 3 SPL token failed: {solana_result.get('error')}")
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 SPL token exception: {e}")
-        
         # ══════════════════════════════════════════════════════════════════
-        # TIER 4: Direct RPC (Native Assets Only) - Fallback
+        # TIER 4: Direct RPC (Native Assets Only)
         # ══════════════════════════════════════════════════════════════════
         if not asset or (asset and asset.upper() == self._get_native_symbol(chain)):
             logger.info(f"🔄 TIER 4: Falling back to Direct RPC (native only)...")
