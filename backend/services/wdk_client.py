@@ -63,76 +63,6 @@ class CircuitBreaker:
             'circuit_breaker': self.circuit_breaker.state
         }
     
-    # ========== ETHERSCAN/POLYGONSCAN API KEY ROTATION ==========
-    
-    def _get_etherscan_api_key(self, chain: str) -> str:
-        """
-        Rotate through Etherscan API keys for rate limiting
-        Supports both Ethereum and Polygon (Polygonscan uses Etherscan API V2)
-        
-        Rotation strategy:
-        - Separate key index per chain to avoid collisions
-        - Round-robin rotation for each request
-        - Returns empty string if no keys configured
-        """
-        # Map chain to key list index tracker
-        if not hasattr(self, '_etherscan_key_indices'):
-            self._etherscan_key_indices = {}
-        
-        # Initialize index for this chain
-        if chain not in self._etherscan_key_indices:
-            self._etherscan_key_indices[chain] = 0
-        
-        # Get available keys from environment
-        available_keys = []
-        
-        # Try to get keys from settings
-        try:
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
-        except Exception as e:
-            logger.warning(f"⚠️ Error reading Etherscan API keys: {e}")
-        
-        # Fallback to single key if available
-        if not available_keys and hasattr(self.settings, 'ETHERSCAN_API_KEY'):
-            try:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY.get_secret_value())
-            except:
-                pass
-        
-        if not available_keys:
-            logger.warning(f"⚠️ No Etherscan API keys configured for {chain}")
-            return ""
-        
-        # Get next key in rotation (round-robin)
-        current_idx = self._etherscan_key_indices[chain]
-        selected_key = available_keys[current_idx % len(available_keys)]
-        
-        # Increment for next call
-        self._etherscan_key_indices[chain] = (current_idx + 1) % len(available_keys)
-        
-        # Log which key we're using (first 8 chars only for security)
-        key_suffix = selected_key[-8:] if len(selected_key) > 8 else selected_key
-        logger.debug(f"🔑 Using Etherscan key [{current_idx % len(available_keys) + 1}/{len(available_keys)}] for {chain}: ...{key_suffix}")
-        
-        return selected_key
-    
-    def _get_etherscan_base_url(self, chain: str) -> str:
-        """
-        Get the correct Etherscan API base URL for each chain
-        Both use Etherscan API V2, but different domains
-        """
-        if chain == 'ethereum':
-            return "https://api.etherscan.io/api"
-        elif chain == 'polygon':
-            return "https://api.polygonscan.com/api"
-        else:
-            raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
-    
     def can_execute(self, chain=None):
         """Check if requests can execute (with automatic recovery)"""
         
@@ -588,20 +518,6 @@ class WDKClient:
         except Exception as e:
             logger.error(f"❌ {chain.capitalize()} ERC-20 query failed: {e}")
             return {'success': False, 'error': str(e), 'chain': chain}
-    
-    def _get_available_etherscan_keys(self) -> List[str]:
-        """Helper to get list of available API keys"""
-        available_keys = []
-        try:
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
-            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
-                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
-        except Exception:
-            pass
-        return available_keys
 
     async def _get_solana_spl_token_balance(self, address: str, token: str) -> Dict[str, Any]:
         """
@@ -686,6 +602,90 @@ class WDKClient:
         except Exception as e:
             logger.error(f"❌ Solana SPL token query failed: {e}")
             return {'success': False, 'error': str(e)}
+
+    # ========== ETHERSCAN/POLYGONSCAN API KEY ROTATION ==========
+    
+    def _get_etherscan_api_key(self, chain: str) -> str:
+        """
+        Rotate through Etherscan API keys for rate limiting
+        Supports both Ethereum and Polygon (Polygonscan uses Etherscan API V2)
+        
+        Rotation strategy:
+        - Separate key index per chain to avoid collisions
+        - Round-robin rotation for each request
+        - Returns empty string if no keys configured
+        """
+        # Map chain to key list index tracker
+        if not hasattr(self, '_etherscan_key_indices'):
+            self._etherscan_key_indices = {}
+        
+        # Initialize index for this chain
+        if chain not in self._etherscan_key_indices:
+            self._etherscan_key_indices[chain] = 0
+        
+        # Get available keys from environment
+        available_keys = []
+        
+        # Try to get keys from settings
+        try:
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
+        except Exception as e:
+            logger.warning(f"⚠️ Error reading Etherscan API keys: {e}")
+        
+        # Fallback to single key if available
+        if not available_keys and hasattr(self.settings, 'ETHERSCAN_API_KEY'):
+            try:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY.get_secret_value())
+            except:
+                pass
+        
+        if not available_keys:
+            logger.warning(f"⚠️ No Etherscan API keys configured for {chain}")
+            return ""
+        
+        # Get next key in rotation (round-robin)
+        current_idx = self._etherscan_key_indices[chain]
+        selected_key = available_keys[current_idx % len(available_keys)]
+        
+        # Increment for next call
+        self._etherscan_key_indices[chain] = (current_idx + 1) % len(available_keys)
+        
+        # Log which key we're using (first 8 chars only for security)
+        key_suffix = selected_key[-8:] if len(selected_key) > 8 else selected_key
+        logger.debug(f"🔑 Using Etherscan key [{current_idx % len(available_keys) + 1}/{len(available_keys)}] for {chain}: ...{key_suffix}")
+        
+        return selected_key
+    
+    def _get_etherscan_base_url(self, chain: str) -> str:
+        """
+        Get the correct Etherscan API base URL for each chain
+        Both use Etherscan API V2, but different domains
+        """
+        if chain == 'ethereum':
+            return "https://api.etherscan.io/api"
+        elif chain == 'polygon':
+            return "https://api.polygonscan.com/api"
+        else:
+            raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
+    
+    def _get_available_etherscan_keys(self) -> List[str]:
+        """Helper to get list of available API keys"""
+        available_keys = []
+        try:
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_1') and self.settings.ETHERSCAN_API_KEY_1:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_1.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_2') and self.settings.ETHERSCAN_API_KEY_2:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_2.get_secret_value())
+            if hasattr(self.settings, 'ETHERSCAN_API_KEY_3') and self.settings.ETHERSCAN_API_KEY_3:
+                available_keys.append(self.settings.ETHERSCAN_API_KEY_3.get_secret_value())
+        except Exception:
+            pass
+        return available_keys
         
     # ========== WALLET CREATION (Tether Pattern) ==========
     
