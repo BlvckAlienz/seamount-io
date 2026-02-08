@@ -906,7 +906,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
             <a href="#services" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Services</a>
-            <a href="#entrepreneurs" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Founders</a>
+            <a href="#how-it-works" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">How It Works</a>
             <a href="#calculator" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Calculator</a>
             <a href="#business" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Business</a>
           </nav>
@@ -1057,43 +1057,162 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* Women & MSME Success Stories Section */}
-      <section id="entrepreneurs" className="py-16 px-3 sm:px-6 bg-gradient-to-r from-purple-50 to-pink-50 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-16 px-3 sm:px-6 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        <FloatingCrypto count={8} section="how-it-works" />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
-              Built for <span className="gradient-text">Founders</span>
+              How It <span className="gradient-text">Works</span>
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Traditional credit tests fail SMEs. We flip the model.
+              Get started in minutes. From signup to your first transaction.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <div className="text-4xl mb-4">📱</div>
-              <h3 className="text-xl font-bold mb-3">Digital-First Access</h3>
-              <p className="text-gray-600">
-                For many in remote areas, a phone = access + inclusion. No gatekeepers, no bias.
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {/* Step 1: Sign Up & KYC */}
+            <motion.div 
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-blue-300"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                  1
+                </div>
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Users className="h-8 w-8 text-blue-500" />
+                </motion.div>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">Sign Up & Verify</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Create your account in 2 minutes. Complete KYC now or skip and verify later—your choice.
               </p>
-            </div>
+              <div className="flex items-center gap-2 text-xs text-blue-600 font-medium">
+                <CheckCircle className="h-4 w-4" />
+                <span>Email verification required</span>
+              </div>
+            </motion.div>
 
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <div className="text-4xl mb-4">🏪</div>
-              <h3 className="text-xl font-bold mb-3">SMEs Become Visible</h3>
-              <p className="text-gray-600">
-                We use transaction data, cash flow, trade behavior, not credit committees.
+            {/* Step 2: Multi-Chain Wallets */}
+            <motion.div 
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-purple-300"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                  2
+                </div>
+                <motion.div
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                >
+                  <Wallet className="h-8 w-8 text-purple-500" />
+                </motion.div>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">6 Smart Wallets Created</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Instantly get wallets on Algorand, Bitcoin, Ethereum, Polygon, Tron, and Solana—ready to use.
               </p>
-            </div>
+              <div className="grid grid-cols-3 gap-1 mt-3">
+                {['ALGO', 'BTC', 'ETH', 'POL', 'TRX', 'SOL'].map((chain, idx) => (
+                  <div 
+                    key={chain} 
+                    className="text-xs font-semibold text-center py-1 bg-purple-50 rounded text-purple-700"
+                    style={{ animationDelay: `${idx * 0.1}s` }}
+                  >
+                    {chain}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
 
-            <div className="bg-white rounded-2xl p-8 shadow-lg">
-              <div className="text-4xl mb-4">👩‍🚀</div>
-              <h3 className="text-xl font-bold mb-3">Bypass Broken Systems</h3>
-              <p className="text-gray-600">
-                Entrepreneurs access growth capital without permission. Equity crowdfunding = structural shift.
+            {/* Step 3: Fund Your Wallets */}
+            <motion.div 
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-green-300"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                  3
+                </div>
+                <motion.div
+                  animate={{ y: [0, -5, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <CreditCard className="h-8 w-8 text-green-500" />
+                </motion.div>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">Fund with Local Fiat</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Deposit using Paystack or Flutterwave. Naira, Cedi, Shillings—we support local currencies.
               </p>
-            </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Paystack</span>
+                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Flutterwave</span>
+              </div>
+            </motion.div>
+
+            {/* Step 4: Trade & Withdraw */}
+            <motion.div 
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-orange-300"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.4 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                  4
+                </div>
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <TrendingUp className="h-8 w-8 text-orange-500" />
+                </motion.div>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">Trade & Withdraw</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Buy digital assets, earn yields, swap tokens. Withdraw anytime back to local fiat—seamlessly.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-orange-600 font-medium">
+                <Sparkles className="h-4 w-4" />
+                <span>Instant off-ramps available</span>
+              </div>
+            </motion.div>
           </div>
+
+          {/* Call to Action */}
+          <motion.div 
+            className="text-center mt-12"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.5 }}
+          >
+            <button 
+              onClick={() => onOpenAuth('register')} 
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+            >
+              Get Started Now <ArrowRight className="inline h-5 w-5 ml-2" />
+            </button>
+            <p className="mt-4 text-sm text-gray-600">
+              Join thousands using Seamount for borderless payments
+            </p>
+          </motion.div>
         </div>
       </section>
 
@@ -1642,7 +1761,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Building an <span className="gradient-text">Ownership Economy</span> for Everyone
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                Join the platform where women founders and MSMEs are the default users, not an afterthought.
+                Join the platform where freelancers and SMEs are the default users, not an afterthought.
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 
