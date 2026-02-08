@@ -427,10 +427,14 @@ class WDKClient:
             api_key = self._get_etherscan_api_key(chain)
             base_url = self._get_etherscan_base_url(chain)
             
-            # Build API request URL
-            api_key_param = f"&apikey={api_key}" if api_key else ""
-            url = f"{base_url}?module=account&action=tokenbalance" \
-                  f"&contractaddress={contract_address}&address={address}&tag=latest{api_key_param}"
+            # Build API request URL for V2
+            # Note: V2 uses the same parameters but different base URL
+            if api_key:
+                url = f"{base_url}/api?module=account&action=tokenbalance" \
+                    f"&contractaddress={contract_address}&address={address}&tag=latest&apikey={api_key}"
+            else:
+                url = f"{base_url}/api?module=account&action=tokenbalance" \
+                    f"&contractaddress={contract_address}&address={address}&tag=latest"
             
             logger.debug(f"🔗 {chain.capitalize()} ERC-20 API URL: {base_url} (key: {'yes' if api_key else 'no'})")
             
@@ -667,9 +671,9 @@ class WDKClient:
         Both use Etherscan API V2, but different domains
         """
         if chain == 'ethereum':
-            return "https://api.etherscan.io/api"
+            return "https://api.etherscan.io/v2"
         elif chain == 'polygon':
-            return "https://api.polygonscan.com/api"
+            return "https://api.polygonscan.com/v2"
         else:
             raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
     
