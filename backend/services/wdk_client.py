@@ -437,26 +437,16 @@ class WDKClient:
             if not chain_id:
                 return {'success': False, 'error': f'Chain ID not configured for {chain}'}
             
-            # ✅ CORRECT: Different API formats for Ethereum vs Polygon
-            if chain == 'ethereum':
-                # Etherscan V2 API requires chainid parameter
-                if api_key:
-                    url = f"{base_url}/api?module=account&action=tokenbalance" \
-                          f"&contractaddress={contract_address}&address={address}&tag=latest" \
-                          f"&chainid=1&apikey={api_key}"
-                else:
-                    url = f"{base_url}/api?module=account&action=tokenbalance" \
-                          f"&contractaddress={contract_address}&address={address}&tag=latest" \
-                          f"&chainid=1"
-            else:  # polygon
-                # Polygonscan standard API (no chainid, different structure)
-                if api_key:
-                    url = f"{base_url}?module=account&action=tokenbalance" \
-                          f"&contractaddress={contract_address}&address={address}&tag=latest" \
-                          f"&apikey={api_key}"
-                else:
-                    url = f"{base_url}?module=account&action=tokenbalance" \
-                          f"&contractaddress={contract_address}&address={address}&tag=latest"
+            # ✅ UNIFIED V2 API for both Ethereum and Polygon
+            # Both use the same V2 API format, just different chainid
+            if api_key:
+                url = f"{base_url}/api?module=account&action=tokenbalance" \
+                      f"&contractaddress={contract_address}&address={address}&tag=latest" \
+                      f"&chainid={chain_id}&apikey={api_key}"
+            else:
+                url = f"{base_url}/api?module=account&action=tokenbalance" \
+                      f"&contractaddress={contract_address}&address={address}&tag=latest" \
+                      f"&chainid={chain_id}"
             
             logger.debug(f"🔗 {chain.capitalize()} ERC-20 API V2 URL: {url[:80]}...")
             
@@ -690,12 +680,12 @@ class WDKClient:
     def _get_etherscan_base_url(self, chain: str) -> str:
         """
         Get the correct Etherscan API base URL for each chain
-        Note: Polygonscan uses different API structure than Etherscan!
+        BOTH Etherscan and Polygonscan use V2 API now!
         """
         if chain == 'ethereum':
             return "https://api.etherscan.io/v2"  # Etherscan V2
         elif chain == 'polygon':
-            return "https://api.polygonscan.com/api"  # Polygonscan API (no /v2!)
+            return "https://api.polygonscan.com/v2"  # Polygonscan V2 (same as Etherscan!)
         else:
             raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
     
