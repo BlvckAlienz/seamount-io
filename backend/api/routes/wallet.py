@@ -744,3 +744,35 @@ async def get_algorand_balance(
     except Exception as e:
         logger.error(f"Balance fetch failed: {e}")
         raise HTTPException(500, str(e))
+    
+@router.post("/debug/balance/{chain}")
+async def debug_balance_query(
+    chain: str,
+    request: Dict[str, Any],
+    current_user: dict = Depends(get_current_user),
+    wallet_service: MultiChainWalletService = Depends(get_multi_chain_wallet_service)
+):
+    """Debug endpoint to trace balance queries"""
+    try:
+        address = request.get('address')
+        asset = request.get('asset')
+        
+        # Direct WDK query
+        wdk_result = await wallet_service.wdk.get_balance(address, chain, asset)
+        
+        # Also try direct TRC-20 query for Tron
+        tron_result = None
+        if chain == 'tron' and asset in ['USDT', 'USDT_TRON']:
+            tron_result = await wallet_service.wdk._get_tron_trc20_balance(address, 'USDT')
+        
+        return {
+            'success': True,
+            'wdk_result': wdk_result,
+            'tron_direct_result': tron_result,
+            'address': address,
+            'chain': chain,
+            'asset': asset
+        }
+    except Exception as e:
+        logger.error(f"Debug query failed: {e}")
+        return {'success': False, 'error': str(e)}

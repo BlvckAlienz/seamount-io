@@ -792,19 +792,7 @@ class MultiChainWalletService:
         amount: Decimal, 
         chain: str
     ) -> Dict:
-        """
-        Send transaction via WDK chains (Bitcoin, Ethereum, Polygon, Tron, Solana)
-        
-        FLOW:
-        1. Get wallet credentials from database
-        2. Call WDK client with encrypted seed
-        3. Return transaction result
-        
-        SAFETY:
-        - Does NOT touch Algorand logic (separate method: _send_via_algorand)
-        - Validates wallet exists before attempting send
-        - Handles all WDK errors gracefully
-        """
+        """Send transaction via WDK chains"""
         
         # Get wallet credentials
         wallet = self.db.supabase.table('multi_chain_addresses')\
@@ -819,9 +807,19 @@ class MultiChainWalletService:
         from_address = wallet.data[0]['address']
         encrypted_seed = wallet.data[0]['encrypted_seed']
         
-        logger.info(f"🔒 Sending {amount} {asset} via WDK on {chain}")
+        # 🔥 CRITICAL FIX: Normalize asset name for WDK
+        wdk_asset = asset
+        if chain == 'tron' and asset in ['USDT', 'USDT_TRON']:
+            wdk_asset = 'USDT'  # WDK expects just 'USDT' for Tron
+        elif chain == 'ethereum' and asset == 'USDT_ETH':
+            wdk_asset = 'USDT'
+        elif chain == 'polygon' and asset == 'USDT_POLYGON':
+            wdk_asset = 'USDT'
+        
+        logger.info(f"🔒 Sending {amount} {wdk_asset} via WDK on {chain}")
         logger.info(f"   From: {from_address[:10]}...")
         logger.info(f"   To: {recipient[:10]}...")
+        logger.info(f"   Asset (normalized): {wdk_asset}")
         
         # Execute transaction via WDK
         try:
@@ -829,10 +827,10 @@ class MultiChainWalletService:
                 from_address=from_address,
                 to_address=recipient,
                 amount=amount,
-                asset=asset,
+                asset=wdk_asset,  # ✅ Use normalized asset name
                 chain=chain,
                 encrypted_seed=encrypted_seed,
-                enable_gasless=True  # Enable for supported chains (Polygon)
+                enable_gasless=True
             )
             
             if not result.get('success'):
@@ -850,16 +848,21 @@ class MultiChainWalletService:
         except Exception as wdk_error:
             logger.error(f"❌ WDK send failed: {wdk_error}")
             
-            # Re-raise with user-friendly message
+            # Enhanced error parsing
             error_msg = str(wdk_error)
             
-            # Parse specific errors
-            if 'UTXO' in error_msg or 'Bitcoin' in error_msg:
-                error_msg = "Bitcoin sends coming soon! Use Ethereum or Polygon for now."
-            elif 'Insufficient' in error_msg:
-                error_msg = f"Insufficient {asset} balance or gas fees."
-            elif 'Invalid address' in error_msg:
-                error_msg = f"Invalid {chain} address format."
+            if 'insufficient balance' in error_msg.lower():
+                # Check actual balance
+                try:
+                    balance_data = await self.wdk.get_balance(
+                        address=from_address,
+                        chain=chain,
+                        asset=wdk_asset if wdk_asset != 'TRX' else None
+                    )
+                    actual_balance = Decimal(str(balance_data.get('balance', 0)))
+                    error_msg = f"Insufficient {asset} balance. Available: {actual_balance}, Attempted: {amount}"
+                except:
+                    error_msg = f"Insufficient {asset} balance"
             
             raise Exception(error_msg)
     

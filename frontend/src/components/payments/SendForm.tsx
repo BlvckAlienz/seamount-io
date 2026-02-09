@@ -95,7 +95,22 @@ const ADDRESS_PATTERNS: { [key: string]: RegExp } = {
 // ============================================================================
 // GET CHAIN FROM ASSET
 // ============================================================================
+// Update the getChainFromAsset function:
 const getChainFromAsset = (assetValue: string): string => {
+  // Handle chain-suffixed assets
+  if (assetValue.includes('_')) {
+    const chainPart = assetValue.split('_')[1]?.toLowerCase();
+    const chainMap: { [key: string]: string } = {
+      'tron': 'tron',
+      'eth': 'ethereum',
+      'polygon': 'polygon',
+      'solana': 'solana',
+      'algo': 'algorand'
+    };
+    return chainMap[chainPart] || 'algorand';
+  }
+  
+  // Legacy mapping
   for (const [chain, assets] of Object.entries(ASSET_GROUPS)) {
     if (assets.some(a => a.value === assetValue)) {
       return chain;
