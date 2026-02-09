@@ -427,16 +427,28 @@ class WDKClient:
             api_key = self._get_etherscan_api_key(chain)
             base_url = self._get_etherscan_base_url(chain)
             
-            # Build API request URL for V2
-            # Note: V2 uses the same parameters but different base URL
+            # ✅ FIX: Chain IDs for V2 API
+            chain_id_map = {
+                'ethereum': '1',    # Ethereum Mainnet
+                'polygon': '137'    # Polygon Mainnet
+            }
+            
+            chain_id = chain_id_map.get(chain)
+            if not chain_id:
+                return {'success': False, 'error': f'Chain ID not configured for {chain}'}
+            
+            # ✅ FIX: Correct V2 API endpoint format
+            # V2 API requires chainid parameter and uses /v2/api endpoint
             if api_key:
                 url = f"{base_url}/api?module=account&action=tokenbalance" \
-                    f"&contractaddress={contract_address}&address={address}&tag=latest&apikey={api_key}"
+                      f"&contractaddress={contract_address}&address={address}&tag=latest" \
+                      f"&chainid={chain_id}&apikey={api_key}"
             else:
                 url = f"{base_url}/api?module=account&action=tokenbalance" \
-                    f"&contractaddress={contract_address}&address={address}&tag=latest"
+                      f"&contractaddress={contract_address}&address={address}&tag=latest" \
+                      f"&chainid={chain_id}"
             
-            logger.debug(f"🔗 {chain.capitalize()} ERC-20 API URL: {base_url} (key: {'yes' if api_key else 'no'})")
+            logger.debug(f"🔗 {chain.capitalize()} ERC-20 API V2 URL: {url[:80]}...")
             
             async with aiohttp.ClientSession() as session:
                 timeout = aiohttp.ClientTimeout(total=10)
@@ -461,7 +473,7 @@ class WDKClient:
                         decimals = 6  # USDT/USDC have 6 decimals on both chains
                         balance = Decimal(balance_raw) / Decimal(10 ** decimals)
                         
-                        logger.info(f"✅ {chain.capitalize()}scan: {token} = {balance}")
+                        logger.info(f"✅ {chain.capitalize()}scan V2: {token} = {balance}")
                         
                         return {
                             'balance': str(balance),
@@ -469,7 +481,7 @@ class WDKClient:
                             'chain': chain,
                             'token': token,
                             'address': address,
-                            'source': f'{chain}scan_api',
+                            'source': f'{chain}scan_api_v2',
                             'contract': contract_address,
                             'api_key_used': 'yes' if api_key else 'no'
                         }
@@ -499,7 +511,7 @@ class WDKClient:
                                 'chain': chain,
                                 'token': token,
                                 'address': address,
-                                'source': f'{chain}scan_api',
+                                'source': f'{chain}scan_api_v2',
                                 'note': 'Token not held by address'
                             }
                         
@@ -671,9 +683,9 @@ class WDKClient:
         Both use Etherscan API V2, but different domains
         """
         if chain == 'ethereum':
-            return "https://api.etherscan.io/v2"
+            return "https://api.etherscan.io/v2"  # ✅ V2 base URL
         elif chain == 'polygon':
-            return "https://api.polygonscan.com/v2"
+            return "https://api.polygonscan.com/v2"  # ✅ V2 base URL
         else:
             raise ValueError(f"Unsupported chain for Etherscan API: {chain}")
     
