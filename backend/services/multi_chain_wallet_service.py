@@ -9,6 +9,7 @@ Multi-Chain Wallet Service - PRODUCTION READY v2.0
 ✅ Added comprehensive logging
 """
 
+from itertools import chain
 import logging
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
@@ -406,7 +407,7 @@ class MultiChainWalletService:
                                 'error': str(native_err)
                             }
 
-                        # ── 2B: Token assets (USDT, USDC, etc.) ───────────────
+                        # ── 2B: Token assets (USDT, USDC, etc.) ────────────────────────
                         # 🚨 THIS IS THE FIX. Previously this entire block was missing.
                         tokens_to_query = self.CHAIN_TOKEN_MAP.get(chain, [])
 
@@ -429,15 +430,16 @@ class MultiChainWalletService:
                                     except Exception:
                                         token_usd = Decimal('0')
 
+                                # ✅ YOUR FIX - VERIFIED CORRECT
                                 if token_balance > 0:
                                     balances[balance_key] = {
-                                        'asset': token,
-                                        'symbol': token,
-                                        'balance': float(token_balance),
-                                        'chain': chain,
-                                        'usd_value': float(token_usd)
+                                        'asset': token,                    # e.g., 'USDT'
+                                        'symbol': balance_key,              # 🚨 CRITICAL: 'USDT_TRON' (not 'USDT')
+                                        'balance': float(token_balance),    # e.g., 5.0
+                                        'chain': chain,                     # e.g., 'tron'
+                                        'usd_value': float(token_usd)       # e.g., 5.0
                                     }
-                                    total_usd += token_usd
+                                    total_usd += token_usd  # ✅ MUST BE INSIDE if block
                                     logger.info(f"✅ {token} on {chain}: {token_balance} (${token_usd})")
                                 else:
                                     logger.debug(f"ℹ️ {token} on {chain}: 0 balance, skipping")

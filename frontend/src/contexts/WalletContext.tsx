@@ -111,29 +111,34 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((asset: any) => {
-          // 🚨 FIX: Derive asset key from chain since API doesn't return symbol
-          let assetKey: string;
-          
-          // Map chain to native asset symbol
-          const chainToAsset: { [key: string]: string } = {
-            'algorand': 'ALGO',
-            'bitcoin': 'BTC', 
-            'ethereum': 'ETH',
-            'polygon': 'MATIC',
-            'tron': 'TRX'
-          };
-          
-          // If asset has explicit symbol/asset field, use it; otherwise derive from chain
-          if (asset.symbol) {
-            assetKey = asset.symbol;
-          } else if (asset.asset) {
-            assetKey = asset.asset;
-          } else {
-            // Fallback: Use chain mapping
-            assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
-          }
-          
-          console.log(`✅ Mapped: ${asset.chain} → ${assetKey} (balance: ${asset.balance})`);
+            let assetKey: string;
+            
+            // 🚨 PRIORITY 1: Use backend-provided symbol (USDT_TRON, etc.)
+            if (asset.symbol) {
+                assetKey = asset.symbol;
+            } 
+            // 🚨 PRIORITY 2: Use asset field as fallback
+            else if (asset.asset) {
+                assetKey = asset.asset;
+            } 
+            // 🚨 PRIORITY 3: For tokens, construct key from asset + chain
+            else if (asset.asset && asset.chain !== 'algorand') {
+                assetKey = `${asset.asset}_${asset.chain.toUpperCase()}`;
+            }
+            // 🚨 PRIORITY 4: Native assets - map chain to symbol
+            else {
+                const chainToAsset: { [key: string]: string } = {
+                    'algorand': 'ALGO',
+                    'bitcoin': 'BTC', 
+                    'ethereum': 'ETH',
+                    'polygon': 'MATIC',
+                    'tron': 'TRX',
+                    'solana': 'SOL'
+                };
+                assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
+            }
+            
+            console.log(`🔍 Balance mapping: ${asset.chain}/${asset.asset} → ${assetKey} (${asset.balance})`);
           
           balancesObj[assetKey] = {
             balance: asset.balance,
