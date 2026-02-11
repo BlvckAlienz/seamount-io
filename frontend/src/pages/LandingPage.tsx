@@ -201,7 +201,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'wallets'
     },
     tokenization: {
-      title: "🗝️ Asset Tokenization & Crowdfunding",
+      title: "🗝️ Asset Tokenization",
       description: "Transform assets into digital securities and raise capital from private markets",
       features: [
         "Raise capital through fractional ownership",
@@ -215,7 +215,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'tokenization'
     },
     prediction: {
-      title: "👩‍🚀 Founder Marketplace",
+      title: "👩‍🚀 Crowdfunding",
       description: "Raise capital from a global pool of investors",
       features: [
         "List your business for equity crowdfunding",
@@ -248,12 +248,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
   const faqs = [
     { 
       question: "What assets can be tokenized on Seamount?", 
-      answer: "We support tokenization of securities, real estate, private equities/shares, infrastructure (data centers, power grids, etc.), commodities, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
+      answer: "We support tokenization of public and private company shares, real estate, infrastructure (data centers, power grids, etc.), commodities, industrial machinery/equipment, art, and intellectual property. Each asset issuer undergoes rigorous due diligence including incorporation docs, tax certificates, audited accounts, and regulatory compliance checks before listing." 
 
     },
     { 
-      question: "How do you assess creditworthiness for SMEs without formal financials?", 
-      answer: "We use transaction data from your bank statements, cash flow patterns, trade behavior, and market engagement. This alternative data approach makes SMEs visible and financeable without requiring extensive financial history or collateral." 
+      question: "How does your investment service work?", 
+      answer: "Seamount operates investment services through licensed fund managers and partners. All investment products are managed by third-party licensed entities. Past performance does not guarantee future results." 
     },
     {
       question: "Is Seamount regulated?",
@@ -1593,7 +1593,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   {[
                     {
                       icon: "🏢",
-                      title: "Asset Tokenization & Crowdfunding",
+                      title: "Asset Tokenization",
                       description: "Convert public and private company shares into 24/7 tradeable digital securities"
                     },
                     {
@@ -1761,7 +1761,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Building an <span className="gradient-text">Ownership Economy</span> for Everyone
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                Join the platform where freelancers and SMEs are the default users, not an afterthought.
+                Join the platform where entrepreneurs and SMEs are the default users, not an afterthought.
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 
@@ -1770,7 +1770,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Start Your Journey Today
               </button>
               <p className="mt-6 text-sm text-gray-500">
-                Already part of the revolution?{' '}
+                Already part of the tribe?{' '}
                 <button onClick={() => onOpenAuth('login')} className="text-blue-600 hover:underline font-semibold">
                   Sign In
                 </button>
@@ -1789,7 +1789,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain rounded-lg" />
                 <span className="text-xl font-bold text-white">Seamount</span>
               </div>
-              <p className="text-gray-400 text-sm">Where women entrepreneurs and MSMEs become the economy's engine</p>
+              <p className="text-gray-400 text-sm">Where entrepreneurs and SMEs become the economy's engine</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
