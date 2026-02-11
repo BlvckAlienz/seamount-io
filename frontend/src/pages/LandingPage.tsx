@@ -1575,10 +1575,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 text-gray-900 px-2">
-              Find Your Next <span className="gradient-text">Deal</span>
+              Join the Move <span className="gradient-text">On-Chain</span>
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Founder? Unlock capital. Investor? Find opportunities.
+              Unlock permissionless 24/7 access to decentralized finance.
             </p>
           </div>
           
@@ -1594,17 +1594,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     {
                       icon: "🏢",
                       title: "Asset Tokenization & Crowdfunding",
-                      description: "Convert real estate or private equity into digital securities and raise capital"
+                      description: "Convert public and private company shares into 24/7 tradeable digital securities"
                     },
                     {
                       icon: "💸",
                       title: "Digital Treasury",
-                      description: "24/7 global payments with multi-currency support and yield generation"
+                      description: "Working capital management with 24/7 global payments, FX support, and yield generation"
                     },
                     {
                       icon: "🎯",
                       title: "Market Intelligence",
-                      description: "View deals and African SMEs with clarity and transparency"
+                      description: "Market data, on-chain analytics, and actionable insights to optimize your DeFi strategy"
                     },
                     {
                       icon: "📊",
