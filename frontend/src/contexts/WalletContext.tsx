@@ -110,40 +110,40 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Convert assets array to object keyed by asset symbol
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
-        response.assets?.forEach((asset: any) => {
-            let assetKey: string;
-            
-            // 🚨 PRIORITY 1: Use backend-provided symbol (USDT_TRON, etc.)
-            if (asset.symbol) {
-                assetKey = asset.symbol;
-            } 
-            // 🚨 PRIORITY 2: Use asset field as fallback
-            else if (asset.asset) {
-                assetKey = asset.asset;
-            } 
-            // 🚨 PRIORITY 3: For tokens, construct key from asset + chain
-            else if (asset.asset && asset.chain !== 'algorand') {
-                assetKey = `${asset.asset}_${asset.chain.toUpperCase()}`;
-            }
-            // 🚨 PRIORITY 4: Native assets - map chain to symbol
-            else {
-                const chainToAsset: { [key: string]: string } = {
-                    'algorand': 'ALGO',
-                    'bitcoin': 'BTC', 
-                    'ethereum': 'ETH',
-                    'polygon': 'MATIC',
-                    'tron': 'TRX',
-                    'solana': 'SOL'
-                };
-                assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
-            }
-            
-            console.log(`🔍 Balance mapping: ${asset.chain}/${asset.asset} → ${assetKey} (${asset.balance})`);
+        response.assets?.forEach((assetData: any) => {
+          let assetKey: string;
+          
+          // 🚨 PRIORITY 1: Use backend-provided symbol field (e.g., 'USDT_TRON', 'ALGO')
+          if (assetData.symbol) {
+            assetKey = assetData.symbol;
+          } 
+          // 🚨 PRIORITY 2: Use asset field
+          else if (assetData.asset) {
+            assetKey = assetData.asset;
+          }
+          // 🚨 PRIORITY 3: For tokens without symbol, construct from asset + chain
+          else if (assetData.asset && assetData.chain && assetData.chain !== 'algorand') {
+            assetKey = `${assetData.asset}_${assetData.chain.toUpperCase()}`;
+          }
+          // 🚨 PRIORITY 4: Native assets - map chain to symbol
+          else {
+            const chainToAsset: { [key: string]: string } = {
+              'algorand': 'ALGO',
+              'bitcoin': 'BTC', 
+              'ethereum': 'ETH',
+              'polygon': 'MATIC',
+              'tron': 'TRX',
+              'solana': 'SOL'
+            };
+            assetKey = chainToAsset[assetData.chain] || assetData.chain.toUpperCase();
+          }
+          
+          console.log(`🔍 Balance mapping: ${assetData.chain}/${assetData.asset || 'native'} → ${assetKey} = ${assetData.balance}`);
           
           balancesObj[assetKey] = {
-            balance: asset.balance,
-            chain: asset.chain,
-            usd_value: asset.usd_value
+            balance: assetData.balance,
+            chain: assetData.chain,
+            usd_value: assetData.usd_value
           };
         });
         
