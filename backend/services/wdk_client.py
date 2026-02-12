@@ -1210,7 +1210,6 @@ class WDKClient:
         
         Supports: Bitcoin, Ethereum, Polygon, Tron, Solana
         """
-        
         try:
             # ═══════════════════════════════════════════════════════════════
             # BITCOIN - Uses Blockchain.info API
@@ -1354,6 +1353,65 @@ class WDKClient:
                         else:
                             logger.error(f"❌ TronGrid returned {response.status}")
                             return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
+            
+            # ═══════════════════════════════════════════════════════════════
+            # SOLANA - Uses Solana RPC
+            # ═══════════════════════════════════════════════════════════════
+            elif chain == 'solana':
+                if not self.settings.SOLANA_RPC_URL:
+                    logger.error("❌ No Solana RPC URL configured")
+                    return {'balance': '0', 'success': False, 'error': 'No Solana RPC'}
+                
+                url = self.settings.SOLANA_RPC_URL
+                
+                async with aiohttp.ClientSession() as session:
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "getBalance",
+                        "params": [address]
+                    }
+                    timeout = aiohttp.ClientTimeout(total=15)
+                    
+                    async with session.post(url, json=payload, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            balance_lamports = data.get('result', {}).get('value', 0)
+                            balance_sol = Decimal(balance_lamports) / Decimal('1000000000')
+                            
+                            logger.info(f"✅ SOL balance: {balance_sol}")
+                            return {
+                                'balance': str(balance_sol),
+                                'success': True,
+                                'chain': 'solana',
+                                'source': 'solana_rpc'
+                            }
+                        else:
+                            logger.error(f"❌ Solana RPC returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
+            
+            else:
+                # Unsupported chain
+                logger.warning(f"⚠️ Chain {chain} not supported in Direct RPC")
+                return {
+                    'balance': '0',
+                    'success': False,
+                    'error': f'Chain {chain} not supported',
+                    'chain': chain
+                }
+        
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ Direct RPC timeout for {chain}")
+            return {'balance': '0', 'success': False, 'error': 'RPC timeout', 'chain': chain}
+        
+        except Exception as e:
+            logger.error(f"❌ Direct RPC failed for {chain}: {e}")
+            return {
+                'balance': '0',
+                'success': False,
+                'error': f'Direct RPC error: {str(e)}',
+                'chain': chain
+            }
             
             # ═══════════════════════════════════════════════════════════════
             # SOLANA - Uses Solana RPC
