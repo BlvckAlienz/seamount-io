@@ -1,12 +1,12 @@
 # File: backend/services/multi_chain_wallet_service.py
 """
 Multi-Chain Wallet Service - PRODUCTION READY v2.0
-✅ Fixed all duplications
-✅ Removed unsupported chains (arbitrum, ton)
-✅ Added Solana support
-✅ Added robust error handling
-✅ Fixed asset key normalization
-✅ Added comprehensive logging
+âœ… Fixed all duplications
+âœ… Removed unsupported chains (arbitrum, ton)
+âœ… Added Solana support
+âœ… Added robust error handling
+âœ… Fixed asset key normalization
+âœ… Added comprehensive logging
 """
 
 from itertools import chain
@@ -45,19 +45,19 @@ class MultiChainWalletService:
         'USDT_ETH': 'ethereum',
         'USDT_POLYGON': 'polygon',
         'USDT_TRON': 'tron',
-        'USDT_SOLANA': 'solana',  # ✅ NEW
+        'USDT_SOLANA': 'solana',  # âœ… NEW
         
         # Native chain assets
         'BTC': 'bitcoin',
         'ETH': 'ethereum',
         'MATIC': 'polygon',
         'TRX': 'tron',
-        'SOL': 'solana',  # ✅ NEW
+        'SOL': 'solana',  # âœ… NEW
         
         # USDC variants
         'USDC_ETH': 'ethereum',
         'USDC_POLYGON': 'polygon',
-        'USDC_SOLANA': 'solana'  # ✅ NEW
+        'USDC_SOLANA': 'solana'  # âœ… NEW
     }
     
     # Algorand Asset IDs (ASA)
@@ -81,7 +81,7 @@ class MultiChainWalletService:
         self.oracle = oracle_service
         self.wdk = WDKClient()
         
-        logger.info("✅ MultiChainWalletService initialized")
+        logger.info("âœ… MultiChainWalletService initialized")
 
     # ========== WALLET CREATION ==========
     
@@ -105,7 +105,7 @@ class MultiChainWalletService:
                     return result.data[0].get('address')
             return None
         except Exception as e:
-            logger.error(f"❌ Error getting user address for {chain}: {e}")
+            logger.error(f"âŒ Error getting user address for {chain}: {e}")
             return None
 
     async def create_single_chain_wallet(self, user_id: str, chain: str) -> Dict[str, Any]:
@@ -114,7 +114,7 @@ class MultiChainWalletService:
             # Check if wallet already exists
             existing_address = self._get_user_address(user_id, chain)
             if existing_address:
-                logger.info(f"ℹ️ Wallet already exists for {chain}: {existing_address[:10]}...")
+                logger.info(f"â„¹ï¸ Wallet already exists for {chain}: {existing_address[:10]}...")
                 return {
                     'success': True,
                     'address': existing_address,
@@ -140,7 +140,7 @@ class MultiChainWalletService:
                     wallet_data, on_conflict='user_id'
                 ).execute()
                 
-                logger.info(f"✅ Algorand wallet created: {algo_address[:10]}...")
+                logger.info(f"âœ… Algorand wallet created: {algo_address[:10]}...")
                 return {'success': True, 'address': algo_address, 'chain': chain}
             
             else:
@@ -155,7 +155,7 @@ class MultiChainWalletService:
                 encryption_service = SeedEncryptionService()
                 encrypted_seed = encryption_service.encrypt_seed(plaintext_seed)
                 
-                logger.info(f"🔐 Generated and encrypted seed for {chain}")
+                logger.info(f"ðŸ” Generated and encrypted seed for {chain}")
                 
                 # Create wallet via WDK
                 wdk_result = await self.wdk.create_wallet(
@@ -178,7 +178,7 @@ class MultiChainWalletService:
                     'created_at': datetime.utcnow().isoformat()
                 }, on_conflict='user_id,blockchain').execute()
                 
-                logger.info(f"✅ {chain.upper()} wallet created: {wallet_data['address'][:10]}...")
+                logger.info(f"âœ… {chain.upper()} wallet created: {wallet_data['address'][:10]}...")
                 return {
                     'success': True,
                     'address': wallet_data['address'],
@@ -187,7 +187,7 @@ class MultiChainWalletService:
                 }
                     
         except Exception as e:
-            logger.error(f"❌ Single chain wallet creation failed for {chain}: {e}")
+            logger.error(f"âŒ Single chain wallet creation failed for {chain}: {e}")
             return {'success': False, 'error': str(e), 'chain': chain}
 
     async def create_wallet_for_user(
@@ -218,7 +218,7 @@ class MultiChainWalletService:
                 raise Exception(algo_result.get('error', 'Algorand wallet creation failed'))
                 
         except Exception as e:
-            logger.error(f"❌ Algorand wallet failed: {e}")
+            logger.error(f"âŒ Algorand wallet failed: {e}")
             result['errors'].append(f"Algorand: {str(e)}")
             return result
         
@@ -229,46 +229,46 @@ class MultiChainWalletService:
             # Default: All supported WDK chains
             wdk_chains = ['bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
         
-        # 🔍 DEBUG LOGGING (temporary)
-        logger.info(f"🔍 DEBUG: Input chains = {chains}")
-        logger.info(f"🔍 DEBUG: self.SUPPORTED_CHAINS = {self.SUPPORTED_CHAINS}")
-        logger.info(f"🔍 DEBUG: wdk_chains = {wdk_chains}")
-        logger.info(f"🔍 DEBUG: About to create {len(wdk_chains)} WDK wallets")
+        # ðŸ” DEBUG LOGGING (temporary)
+        logger.info(f"ðŸ” DEBUG: Input chains = {chains}")
+        logger.info(f"ðŸ” DEBUG: self.SUPPORTED_CHAINS = {self.SUPPORTED_CHAINS}")
+        logger.info(f"ðŸ” DEBUG: wdk_chains = {wdk_chains}")
+        logger.info(f"ðŸ” DEBUG: About to create {len(wdk_chains)} WDK wallets")
         
         # 3. Create WDK wallets sequentially
         for chain in wdk_chains:
             try:
-                logger.info(f"🔨 ATTEMPTING {chain.upper()} wallet creation...")
+                logger.info(f"ðŸ”¨ ATTEMPTING {chain.upper()} wallet creation...")
                 
                 chain_result = await self.create_single_chain_wallet(user_id, chain)
                 
-                # 🚨 CRITICAL: Log FULL response (not just success/fail)
-                logger.info(f"📦 {chain.upper()} creation result: {chain_result}")
+                # ðŸš¨ CRITICAL: Log FULL response (not just success/fail)
+                logger.info(f"ðŸ“¦ {chain.upper()} creation result: {chain_result}")
                 
                 if chain_result.get('success'):
                     result['wallets'][chain] = {
                         'address': chain_result['address'],
                         'created_at': chain_result.get('created_at', datetime.utcnow().isoformat())
                     }
-                    logger.info(f"✅ {chain.upper()} wallet: {chain_result['address'][:10]}...")
+                    logger.info(f"âœ… {chain.upper()} wallet: {chain_result['address'][:10]}...")
                 else:
                     error_msg = chain_result.get('error', 'Unknown error')
-                    logger.error(f"❌ {chain.upper()} creation FAILED: {error_msg}")
+                    logger.error(f"âŒ {chain.upper()} creation FAILED: {error_msg}")
                     result['errors'].append(f"{chain}: {error_msg}")
                     
-                    # 🚨 NEW: Raise exception if critical chain fails
+                    # ðŸš¨ NEW: Raise exception if critical chain fails
                     if chain == 'solana' and chains and 'solana' in chains:
                         raise Exception(f"Solana wallet creation failed: {error_msg}")
                         
             except Exception as e:
                 error_details = str(e)
-                logger.error(f"❌ {chain} wallet creation EXCEPTION: {error_details}")
+                logger.error(f"âŒ {chain} wallet creation EXCEPTION: {error_details}")
                 logger.error(f"   Exception type: {type(e).__name__}")
                 logger.error(f"   Full traceback:", exc_info=True)
                 
                 result['errors'].append(f"{chain}: {error_details}")
                 
-                # 🚨 NEW: Re-raise if explicitly requested chain
+                # ðŸš¨ NEW: Re-raise if explicitly requested chain
                 if chains and chain in chains:
                     raise Exception(f"{chain.upper()} wallet creation failed: {error_details}")
         
@@ -333,7 +333,7 @@ class MultiChainWalletService:
                                 }
                                 total_usd += algo_balance * algo_price
                             except Exception as price_err:
-                                logger.warning(f"⚠️ Price lookup failed for ALGO: {price_err}")
+                                logger.warning(f"âš ï¸ Price lookup failed for ALGO: {price_err}")
                                 balances['ALGO'] = {
                                     'asset': 'ALGO',
                                     'symbol': 'ALGO',
@@ -342,7 +342,7 @@ class MultiChainWalletService:
                                     'usd_value': 0.0
                                 }
                         else:
-                            logger.info(f"ℹ️ Algorand account {algo_address[:10]}... has 0 balance")
+                            logger.info(f"â„¹ï¸ Algorand account {algo_address[:10]}... has 0 balance")
                             balances['ALGO'] = {
                                 'asset': 'ALGO',
                                 'symbol': 'ALGO',
@@ -352,7 +352,7 @@ class MultiChainWalletService:
                             }
 
             except Exception as algo_err:
-                logger.warning(f"⚠️ Algorand balance query failed: {algo_err}")
+                logger.warning(f"âš ï¸ Algorand balance query failed: {algo_err}")
                 balances['ALGO'] = {
                     'asset': 'ALGO',
                     'symbol': 'ALGO',
@@ -362,7 +362,7 @@ class MultiChainWalletService:
                     'error': str(algo_err)
                 }
 
-            # 2. Get WDK chain balances — NATIVE + TOKENS
+            # 2. Get WDK chain balances â€” NATIVE + TOKENS
             try:
                 wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
                     .select('blockchain, address')\
@@ -374,7 +374,7 @@ class MultiChainWalletService:
                         chain = wallet['blockchain']
                         address = wallet['address']
 
-                        # ── 2A: Native asset ──────────────────────────────────
+                        # â”€â”€ 2A: Native asset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         native_asset = self._get_native_asset(chain)
                         try:
                             native_data = await self.wdk.get_balance(address, chain, asset=None)
@@ -385,7 +385,7 @@ class MultiChainWalletService:
                                 native_usd = native_balance * price
                             except Exception:
                                 native_usd = Decimal('0')
-                                logger.warning(f"⚠️ Price lookup failed for {native_asset}")
+                                logger.warning(f"âš ï¸ Price lookup failed for {native_asset}")
 
                             balances[native_asset] = {
                                 'asset': native_asset,
@@ -397,7 +397,7 @@ class MultiChainWalletService:
                             total_usd += native_usd
 
                         except Exception as native_err:
-                            logger.error(f"❌ Native balance failed for {chain}: {native_err}")
+                            logger.error(f"âŒ Native balance failed for {chain}: {native_err}")
                             balances[native_asset] = {
                                 'asset': native_asset,
                                 'symbol': native_asset,
@@ -407,8 +407,8 @@ class MultiChainWalletService:
                                 'error': str(native_err)
                             }
 
-                        # ── 2B: Token assets (USDT, USDC, etc.) ────────────────────────
-                        # 🚨 THIS IS THE FIX. Previously this entire block was missing.
+                        # â”€â”€ 2B: Token assets (USDT, USDC, etc.) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                        # ðŸš¨ THIS IS THE FIX. Previously this entire block was missing.
                         tokens_to_query = self.CHAIN_TOKEN_MAP.get(chain, [])
 
                         for token in tokens_to_query:
@@ -430,26 +430,26 @@ class MultiChainWalletService:
                                     except Exception:
                                         token_usd = Decimal('0')
 
-                                # ✅ YOUR FIX - VERIFIED CORRECT
+                                # âœ… YOUR FIX - VERIFIED CORRECT
                                 if token_balance > 0:
                                     balances[balance_key] = {
                                         'asset': token,                    # e.g., 'USDT'
-                                        'symbol': balance_key,              # 🚨 CRITICAL: 'USDT_TRON' (not 'USDT')
+                                        'symbol': balance_key,              # ðŸš¨ CRITICAL: 'USDT_TRON' (not 'USDT')
                                         'balance': float(token_balance),    # e.g., 5.0
                                         'chain': chain,                     # e.g., 'tron'
                                         'usd_value': float(token_usd)       # e.g., 5.0
                                     }
-                                    total_usd += token_usd  # ✅ MUST BE INSIDE if block
-                                    logger.info(f"✅ {token} on {chain}: {token_balance} (${token_usd})")
+                                    total_usd += token_usd  # âœ… MUST BE INSIDE if block
+                                    logger.info(f"âœ… {token} on {chain}: {token_balance} (${token_usd})")
                                 else:
-                                    logger.debug(f"ℹ️ {token} on {chain}: 0 balance, skipping")
+                                    logger.debug(f"â„¹ï¸ {token} on {chain}: 0 balance, skipping")
 
                             except Exception as token_err:
                                 # Non-fatal: one token failing doesn't kill the whole response
-                                logger.warning(f"⚠️ Token balance failed for {token} on {chain}: {token_err}")
+                                logger.warning(f"âš ï¸ Token balance failed for {token} on {chain}: {token_err}")
 
             except Exception as wdk_err:
-                logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
+                logger.warning(f"âš ï¸ WDK balance query failed: {wdk_err}")
 
             # 3. Format response
             assets_list = sorted(
@@ -467,7 +467,7 @@ class MultiChainWalletService:
             }
 
         except Exception as e:
-            logger.error(f"❌ Balance query failed: {e}")
+            logger.error(f"âŒ Balance query failed: {e}")
             return {
                 'success': False,
                 'total_usd': 0.0,
@@ -501,13 +501,13 @@ class MultiChainWalletService:
             if not recipient or len(recipient.strip()) < 20:
                 raise Exception("Invalid recipient address format")
             
-            logger.info(f"💸 Initiating send: {amount} {asset} to {recipient[:10]}...")
+            logger.info(f"ðŸ’¸ Initiating send: {amount} {asset} to {recipient[:10]}...")
             
             # ============================================================================
             # STEP 2: AUTO-ROUTE TO OPTIMAL CHAIN
             # ============================================================================
             optimal_chain = await self.auto_route_transaction(asset, amount, recipient)
-            logger.info(f"🔀 Auto-routed {asset} to {optimal_chain}")
+            logger.info(f"ðŸ”€ Auto-routed {asset} to {optimal_chain}")
             
             # ============================================================================
             # STEP 3: CALCULATE FEES
@@ -531,12 +531,12 @@ class MultiChainWalletService:
                 
                 if not wallet_check.data or len(wallet_check.data) == 0:
                     raise Exception(
-                        "❌ NO WALLET FOUND\n\n"
+                        "âŒ NO WALLET FOUND\n\n"
                         "You don't have an Algorand wallet yet.\n"
                         "Please create a wallet first by clicking 'Create Wallet' in the dashboard."
                     )
                 
-                logger.info(f"✅ Algorand wallet verified for user {user_id}")
+                logger.info(f"âœ… Algorand wallet verified for user {user_id}")
             
             # ============================================================================
             # STEP 5: EXECUTE BLOCKCHAIN TRANSACTION
@@ -546,7 +546,7 @@ class MultiChainWalletService:
             else:
                 result = await self._send_via_wdk(user_id, recipient, asset, amount, optimal_chain)
             
-            logger.info(f"✅ Blockchain transaction successful: {result['tx_id']}")
+            logger.info(f"âœ… Blockchain transaction successful: {result['tx_id']}")
             
             # ============================================================================
             # STEP 6: RECORD TRANSACTION (NON-FATAL IF FAILS)
@@ -582,7 +582,7 @@ class MultiChainWalletService:
                 
                 if response.data:
                     transaction_id = response.data[0].get('id')
-                    logger.info(f"✅ Transaction recorded in DB: {transaction_id}")
+                    logger.info(f"âœ… Transaction recorded in DB: {transaction_id}")
                     
                     # Record fee owed (for batch collection)
                     try:
@@ -600,12 +600,12 @@ class MultiChainWalletService:
                         fee_insert = self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
                         
                         if fee_insert.data:
-                            logger.info(f"💰 Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
+                            logger.info(f"ðŸ’° Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
                         else:
-                            logger.warning(f"⚠️ Fee insert returned no data (non-fatal)")
+                            logger.warning(f"âš ï¸ Fee insert returned no data (non-fatal)")
                             
                     except Exception as fee_err:
-                        logger.error(f"❌ Failed to record fee owed (non-fatal): {fee_err}")
+                        logger.error(f"âŒ Failed to record fee owed (non-fatal): {fee_err}")
                 
                 # Track revenue (for analytics)
                 try:
@@ -625,20 +625,20 @@ class MultiChainWalletService:
                             'fee_status': 'pending_collection'
                         }
                     )
-                    logger.info(f"📊 Revenue tracked successfully")
+                    logger.info(f"ðŸ“Š Revenue tracked successfully")
                 except Exception as rev_err:
-                    logger.error(f"❌ Revenue tracking failed (non-fatal): {rev_err}")
+                    logger.error(f"âŒ Revenue tracking failed (non-fatal): {rev_err}")
                     
             except Exception as db_err:
                 # Non-fatal: blockchain transaction already succeeded
-                logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
+                logger.error(f"âŒ Database logging failed (transaction still succeeded on chain): {db_err}")
             
             # ============================================================================
             # STEP 7: RETURN SUCCESS RESPONSE
             # ============================================================================
             return {
                 'success': True,
-                'message': f'Payment sent! Your {asset} will arrive shortly. ✔',
+                'message': f'Payment sent! Your {asset} will arrive shortly. âœ”',
                 'transaction_id': result['tx_id'],
                 'amount': float(amount),
                 'asset': asset,
@@ -649,7 +649,7 @@ class MultiChainWalletService:
         except Exception as e:
             # Catch ANY error in the entire transaction flow
             error_msg = str(e)
-            logger.error(f"❌ Payment failed for user {user_id}: {error_msg}")
+            logger.error(f"âŒ Payment failed for user {user_id}: {error_msg}")
             
             return {
                 'success': False,
@@ -665,9 +665,9 @@ class MultiChainWalletService:
         Updated to include Solana support
         """
         
-        logger.info(f"🔀 Auto-routing: {asset} (amount: {amount})")
+        logger.info(f"ðŸ”€ Auto-routing: {asset} (amount: {amount})")
         
-        # ✅ Handle chain-suffixed assets first (e.g., USDT_ETH → ethereum)
+        # âœ… Handle chain-suffixed assets first (e.g., USDT_ETH â†’ ethereum)
         if "_" in asset:
             parts = asset.split("_")
             chain_suffix = parts[1].lower()
@@ -677,59 +677,59 @@ class MultiChainWalletService:
                 "eth": "ethereum",
                 "polygon": "polygon",
                 "tron": "tron",
-                "solana": "solana"  # ✅ NEW
+                "solana": "solana"  # âœ… NEW
             }
             
             routed_chain = chain_map.get(chain_suffix)
             if routed_chain:
-                logger.info(f"✅ Routed {asset} → {routed_chain} (explicit chain suffix)")
+                logger.info(f"âœ… Routed {asset} â†’ {routed_chain} (explicit chain suffix)")
                 return routed_chain
         
         # Native Algorand assets
         if asset in ['ALGO', 'USDCa', 'goBTC', 'goETH']:
-            logger.info(f"✅ Routed {asset} → algorand (native)")
+            logger.info(f"âœ… Routed {asset} â†’ algorand (native)")
             return 'algorand'
         
         # Bitcoin
         if asset == 'BTC':
-            logger.info(f"✅ Routed {asset} → bitcoin")
+            logger.info(f"âœ… Routed {asset} â†’ bitcoin")
             return 'bitcoin'
         
         # Ethereum
         if asset == 'ETH':
-            logger.info(f"✅ Routed {asset} → ethereum")
+            logger.info(f"âœ… Routed {asset} â†’ ethereum")
             return 'ethereum'
         
         # Polygon
         if asset == 'MATIC':
-            logger.info(f"✅ Routed {asset} → polygon")
+            logger.info(f"âœ… Routed {asset} â†’ polygon")
             return 'polygon'
         
         # Tron
         if asset == 'TRX':
-            logger.info(f"✅ Routed {asset} → tron")
+            logger.info(f"âœ… Routed {asset} â†’ tron")
             return 'tron'
         
-        # Solana (✅ NEW)
+        # Solana (âœ… NEW)
         if asset == 'SOL':
-            logger.info(f"✅ Routed {asset} → solana")
+            logger.info(f"âœ… Routed {asset} â†’ solana")
             return 'solana'
         
-        # ✅ USDT routing (optimized for 6 chains)
+        # âœ… USDT routing (optimized for 6 chains)
         if asset == 'USDT':
             if amount < Decimal('500'):
-                logger.info(f"✅ Routed USDT → polygon (gasless, amount < $500)")
+                logger.info(f"âœ… Routed USDT â†’ polygon (gasless, amount < $500)")
                 return 'polygon'  # Gasless for small amounts
             elif amount < Decimal('5000'):
-                logger.info(f"✅ Routed USDT → solana (lowest fees, amount < $5000)")
-                return 'solana'  # ✅ NEW: Lowest fees for medium amounts
+                logger.info(f"âœ… Routed USDT â†’ solana (lowest fees, amount < $5000)")
+                return 'solana'  # âœ… NEW: Lowest fees for medium amounts
             else:
-                logger.info(f"✅ Routed USDT → tron (best liquidity, amount ≥ $5000)")
+                logger.info(f"âœ… Routed USDT â†’ tron (best liquidity, amount â‰¥ $5000)")
                 return 'tron'  # Best for large amounts
         
         # Fallback to ASSET_CHAIN_MAP
         fallback_chain = self.ASSET_CHAIN_MAP.get(asset, 'algorand')
-        logger.warning(f"⚠️ Using fallback routing: {asset} → {fallback_chain}")
+        logger.warning(f"âš ï¸ Using fallback routing: {asset} â†’ {fallback_chain}")
         return fallback_chain
     
     async def _send_via_algorand(
@@ -751,33 +751,33 @@ class MultiChainWalletService:
         if not wallet.data or len(wallet.data) == 0:
             raise Exception("Algorand wallet not found")
         
-        # ✅ FIX: Decrypt private key before using
+        # âœ… FIX: Decrypt private key before using
         from backend.services.seed_encryption_service import SeedEncryptionService
         encryption_service = SeedEncryptionService()
         
         encrypted_key = wallet.data[0]['algorand_private_key']
         try:
             decrypted_private_key = encryption_service.decrypt_seed(encrypted_key)
-            logger.info(f"🔓 Successfully decrypted private key for user {user_id}")
+            logger.info(f"ðŸ”“ Successfully decrypted private key for user {user_id}")
         except Exception as decrypt_err:
-            logger.error(f"❌ Private key decryption failed: {decrypt_err}")
+            logger.error(f"âŒ Private key decryption failed: {decrypt_err}")
             raise Exception(f"Failed to decrypt wallet credentials: {decrypt_err}")
         
-        # ✅ Handle both plain and chain-suffixed asset keys
+        # âœ… Handle both plain and chain-suffixed asset keys
         lookup_key = asset.split('_')[0] if '_' in asset else asset
         asset_id = self.ALGORAND_ASSET_IDS.get(lookup_key)
         
         if asset_id is None:
             available_assets = ', '.join(self.ALGORAND_ASSET_IDS.keys())
             error_msg = f"Asset '{asset}' not supported on Algorand. Available: {available_assets}"
-            logger.error(f"❌ {error_msg}")
+            logger.error(f"âŒ {error_msg}")
             raise Exception(error_msg)
         
-        logger.info(f"📍 Sending {amount} {asset} (ASA ID: {asset_id}) on Algorand")
+        logger.info(f"ðŸ“ Sending {amount} {asset} (ASA ID: {asset_id}) on Algorand")
         
         # Execute transaction with DECRYPTED key
         tx_id = await self.algorand.transfer_asset(
-            sender_private_key=decrypted_private_key,  # ✅ NOW USING DECRYPTED KEY
+            sender_private_key=decrypted_private_key,  # âœ… NOW USING DECRYPTED KEY
             receiver_address=recipient,
             asset_id=asset_id,
             amount=amount,
@@ -809,7 +809,7 @@ class MultiChainWalletService:
         from_address = wallet.data[0]['address']
         encrypted_seed = wallet.data[0]['encrypted_seed']
         
-        # 🔥 CRITICAL FIX: Normalize asset name for WDK
+        # ðŸ”¥ CRITICAL FIX: Normalize asset name for WDK
         wdk_asset = asset
         if chain == 'tron' and asset in ['USDT', 'USDT_TRON']:
             wdk_asset = 'USDT'  # WDK expects just 'USDT' for Tron
@@ -818,7 +818,7 @@ class MultiChainWalletService:
         elif chain == 'polygon' and asset == 'USDT_POLYGON':
             wdk_asset = 'USDT'
         
-        logger.info(f"🔒 Sending {amount} {wdk_asset} via WDK on {chain}")
+        logger.info(f"ðŸ”’ Sending {amount} {wdk_asset} via WDK on {chain}")
         logger.info(f"   From: {from_address[:10]}...")
         logger.info(f"   To: {recipient[:10]}...")
         logger.info(f"   Asset (normalized): {wdk_asset}")
@@ -829,7 +829,7 @@ class MultiChainWalletService:
                 from_address=from_address,
                 to_address=recipient,
                 amount=amount,
-                asset=wdk_asset,  # ✅ Use normalized asset name
+                asset=wdk_asset,  # âœ… Use normalized asset name
                 chain=chain,
                 encrypted_seed=encrypted_seed,
                 enable_gasless=True
@@ -838,7 +838,7 @@ class MultiChainWalletService:
             if not result.get('success'):
                 raise Exception(result.get('error', f'{chain} transaction failed'))
             
-            logger.info(f"✅ WDK transaction successful: {result['tx_id']}")
+            logger.info(f"âœ… WDK transaction successful: {result['tx_id']}")
             
             return {
                 'tx_id': result['tx_id'],
@@ -848,7 +848,7 @@ class MultiChainWalletService:
             }
             
         except Exception as wdk_error:
-            logger.error(f"❌ WDK send failed: {wdk_error}")
+            logger.error(f"âŒ WDK send failed: {wdk_error}")
             
             # Enhanced error parsing
             error_msg = str(wdk_error)

@@ -62,9 +62,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // FETCH WALLETS
   // ============================================================================
   const fetchWallets = useCallback(async () => {
-    // ✅ CRITICAL: Only fetch if authenticated
+    // âœ… CRITICAL: Only fetch if authenticated
     if (!user) {
-      console.log('ℹ️ WalletContext: User not authenticated, skipping wallet fetch');
+      console.log('â„¹ï¸ WalletContext: User not authenticated, skipping wallet fetch');
       setLoading(false);
       return;
     }
@@ -77,9 +77,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setWallets(response.wallets || {});
       }
     } catch (error: any) {
-      // ✅ Handle 403 gracefully (expected when not authenticated)
+      // âœ… Handle 403 gracefully (expected when not authenticated)
       if (error?.response?.status === 403) {
-        console.log('ℹ️ Wallet fetch returned 403 (not authenticated)');
+        console.log('â„¹ï¸ Wallet fetch returned 403 (not authenticated)');
         setWallets({}); // Clear state, no error toast
       } else {
         // Real errors (500, network issues, etc.)
@@ -95,9 +95,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // FETCH BALANCES
   // ============================================================================
   const fetchBalances = useCallback(async () => {
-    // ✅ CRITICAL: Only fetch if authenticated
+    // âœ… CRITICAL: Only fetch if authenticated
     if (!user) {
-      console.log('ℹ️ WalletContext: User not authenticated, skipping balance fetch');
+      console.log('â„¹ï¸ WalletContext: User not authenticated, skipping balance fetch');
       setLoading(false);
       return;
     }
@@ -110,40 +110,35 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Convert assets array to object keyed by asset symbol
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
-        response.assets?.forEach((assetData: any) => {
+        response.assets?.forEach((asset: any) => {
+          // ðŸš¨ FIX: Derive asset key from chain since API doesn't return symbol
           let assetKey: string;
           
-          // 🚨 PRIORITY 1: Use backend-provided symbol field (e.g., 'USDT_TRON', 'ALGO')
-          if (assetData.symbol) {
-            assetKey = assetData.symbol;
-          } 
-          // 🚨 PRIORITY 2: Use asset field
-          else if (assetData.asset) {
-            assetKey = assetData.asset;
-          }
-          // 🚨 PRIORITY 3: For tokens without symbol, construct from asset + chain
-          else if (assetData.asset && assetData.chain && assetData.chain !== 'algorand') {
-            assetKey = `${assetData.asset}_${assetData.chain.toUpperCase()}`;
-          }
-          // 🚨 PRIORITY 4: Native assets - map chain to symbol
-          else {
-            const chainToAsset: { [key: string]: string } = {
-              'algorand': 'ALGO',
-              'bitcoin': 'BTC', 
-              'ethereum': 'ETH',
-              'polygon': 'MATIC',
-              'tron': 'TRX',
-              'solana': 'SOL'
-            };
-            assetKey = chainToAsset[assetData.chain] || assetData.chain.toUpperCase();
+          // Map chain to native asset symbol
+          const chainToAsset: { [key: string]: string } = {
+            'algorand': 'ALGO',
+            'bitcoin': 'BTC', 
+            'ethereum': 'ETH',
+            'polygon': 'MATIC',
+            'tron': 'TRX'
+          };
+          
+          // If asset has explicit symbol/asset field, use it; otherwise derive from chain
+          if (asset.symbol) {
+            assetKey = asset.symbol;
+          } else if (asset.asset) {
+            assetKey = asset.asset;
+          } else {
+            // Fallback: Use chain mapping
+            assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
           }
           
-          console.log(`🔍 Balance mapping: ${assetData.chain}/${assetData.asset || 'native'} → ${assetKey} = ${assetData.balance}`);
+          console.log(`âœ… Mapped: ${asset.chain} â†’ ${assetKey} (balance: ${asset.balance})`);
           
           balancesObj[assetKey] = {
-            balance: assetData.balance,
-            chain: assetData.chain,
-            usd_value: assetData.usd_value
+            balance: asset.balance,
+            chain: asset.chain,
+            usd_value: asset.usd_value
           };
         });
         
@@ -151,9 +146,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setTotalBalanceUSD(response.total_usd || 0);
       }
     } catch (error: any) {
-      // ✅ Handle 403 gracefully (expected when not authenticated)
+      // âœ… Handle 403 gracefully (expected when not authenticated)
       if (error?.response?.status === 403) {
-        console.log('ℹ️ Balance fetch returned 403 (not authenticated)');
+        console.log('â„¹ï¸ Balance fetch returned 403 (not authenticated)');
         setBalances({});
         setTotalBalanceUSD(0);
       } else {
@@ -221,17 +216,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // ============================================================================
   useEffect(() => {
     if (user) {
-      console.log('✅ WalletContext: User authenticated, loading wallet data...');
+      console.log('âœ… WalletContext: User authenticated, loading wallet data...');
       refreshAll();
     } else {
-      console.log('ℹ️ WalletContext: User not authenticated, skipping wallet fetch');
+      console.log('â„¹ï¸ WalletContext: User not authenticated, skipping wallet fetch');
       setLoading(false);
       // Clear state when logged out
       setWallets({});
       setBalances({});
       setTotalBalanceUSD(0);
     }
-  }, [user]); // ← Changed from [] to [user]
+  }, [user]); // â† Changed from [] to [user]
 
   // ============================================================================
   // CONTEXT VALUE
