@@ -362,73 +362,94 @@ class MultiChainWalletService:
                     'error': str(algo_err)
                 }
 
-            # ══════════════════════════════════════════════════════════════════
-            # 2. Get WDK chain balances (Bitcoin, Ethereum, Polygon, Tron, Solana)
-            # ══════════════════════════════════════════════════════════════════
+            # 2. Get WDK chain balances — NATIVE + TOKENS
             try:
                 wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
                     .select('blockchain, address')\
                     .eq('user_id', user_id)\
                     .execute()
-                
+
                 if wdk_wallets.data and len(wdk_wallets.data) > 0:
                     for wallet in wdk_wallets.data:
                         chain = wallet['blockchain']
                         address = wallet['address']
-                        
+
+                        # ── 2A: Native asset ──────────────────────────────────
+                        native_asset = self._get_native_asset(chain)
                         try:
-                            # 🚨 CRITICAL: Query balance using Direct RPC (not WDK service)
-                            balance_result = await self.wdk.get_balance_direct_rpc(
-                                address=address,
-                                chain=chain
-                            )
-                            
-                            if not balance_result.get('success'):
-                                logger.warning(f"⚠️ Balance query failed for {chain}: {balance_result.get('error')}")
-                                continue
-                            
-                            balance = Decimal(str(balance_result.get('balance', '0')))
-                            
-                            if balance > 0:
-                                native_asset = self._get_native_asset(chain)
-                                
-                                try:
-                                    # Map chain to oracle asset name
-                                    oracle_map = {
-                                        'bitcoin': 'bitcoin',
-                                        'ethereum': 'ethereum',
-                                        'polygon': 'matic-network',
-                                        'tron': 'tron',
-                                        'solana': 'solana'
+                            native_data = await self.wdk.get_balance(address, chain, asset=None)
+                            native_balance = Decimal(str(native_data.get('balance', 0)))
+
+                            try:
+                                price, _ = await self.oracle.get_asset_price(native_asset.lower())
+                                native_usd = native_balance * price
+                            except Exception:
+                                native_usd = Decimal('0')
+                                logger.warning(f"⚠️ Price lookup failed for {native_asset}")
+
+                            balances[native_asset] = {
+                                'asset': native_asset,
+                                'symbol': native_asset,
+                                'balance': float(native_balance),
+                                'chain': chain,
+                                'usd_value': float(native_usd)
+                            }
+                            total_usd += native_usd
+
+                        except Exception as native_err:
+                            logger.error(f"❌ Native balance failed for {chain}: {native_err}")
+                            balances[native_asset] = {
+                                'asset': native_asset,
+                                'symbol': native_asset,
+                                'balance': 0.0,
+                                'chain': chain,
+                                'usd_value': 0.0,
+                                'error': str(native_err)
+                            }
+
+                        # ── 2B: Token assets (USDT, USDC, etc.) ────────────────────────
+                        # 🚨 THIS IS THE FIX. Previously this entire block was missing.
+                        tokens_to_query = self.CHAIN_TOKEN_MAP.get(chain, [])
+
+                        for token in tokens_to_query:
+                            # Chain-qualified key prevents USDT collisions across chains
+                            balance_key = f"{token}_{chain.upper()}"
+
+                            try:
+                                # Passing asset=token triggers Tether Indexer in wdk_client
+                                token_data = await self.wdk.get_balance(address, chain, asset=token)
+                                token_balance = Decimal(str(token_data.get('balance', 0)))
+
+                                # Stablecoins: peg = 1 USD, no oracle needed
+                                if token in ('USDT', 'USDC'):
+                                    token_usd = token_balance
+                                else:
+                                    try:
+                                        price, _ = await self.oracle.get_asset_price(token.lower())
+                                        token_usd = token_balance * price
+                                    except Exception:
+                                        token_usd = Decimal('0')
+
+                                # ✅ YOUR FIX - VERIFIED CORRECT
+                                if token_balance > 0:
+                                    balances[balance_key] = {
+                                        'asset': token,                    # e.g., 'USDT'
+                                        'symbol': balance_key,              # 🚨 CRITICAL: 'USDT_TRON' (not 'USDT')
+                                        'balance': float(token_balance),    # e.g., 5.0
+                                        'chain': chain,                     # e.g., 'tron'
+                                        'usd_value': float(token_usd)       # e.g., 5.0
                                     }
-                                    
-                                    oracle_id = oracle_map.get(chain, chain)
-                                    price, _ = await self.oracle.get_asset_price(oracle_id)
-                                    usd_value = balance * price
-                                    
-                                    balances[native_asset] = {
-                                        'balance': float(balance),
-                                        'chain': chain,
-                                        'usd_value': float(usd_value)
-                                    }
-                                    total_usd += usd_value
-                                    
-                                    logger.info(f"✅ {native_asset} balance: {balance} (${usd_value:.2f})")
-                                    
-                                except Exception as price_error:
-                                    logger.warning(f"⚠️ Price lookup failed for {chain}: {price_error}")
-                                    balances[native_asset] = {
-                                        'balance': float(balance),
-                                        'chain': chain,
-                                        'usd_value': 0.0
-                                    }
-                        
-                        except Exception as balance_err:
-                            logger.error(f"❌ Balance query failed for {chain}: {balance_err}")
-                            continue
+                                    total_usd += token_usd  # ✅ MUST BE INSIDE if block
+                                    logger.info(f"✅ {token} on {chain}: {token_balance} (${token_usd})")
+                                else:
+                                    logger.debug(f"ℹ️ {token} on {chain}: 0 balance, skipping")
+
+                            except Exception as token_err:
+                                # Non-fatal: one token failing doesn't kill the whole response
+                                logger.warning(f"⚠️ Token balance failed for {token} on {chain}: {token_err}")
 
             except Exception as wdk_err:
-                logger.warning(f"⚠️ WDK balance query section failed: {wdk_err}")
+                logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
 
             # 3. Format response
             assets_list = sorted(
