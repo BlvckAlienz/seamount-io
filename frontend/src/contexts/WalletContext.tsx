@@ -111,34 +111,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const balancesObj: { [asset: string]: WalletBalance } = {};
         
         response.assets?.forEach((assetData: any) => {
-          let assetKey: string;
+          // 🚨 CRITICAL: Backend now returns 'symbol' field - use it directly!
+          const assetKey = assetData.symbol || assetData.asset || 'UNKNOWN';
           
-          // 🚨 PRIORITY 1: Use backend-provided symbol field (e.g., 'USDT_TRON', 'ALGO')
-          if (assetData.symbol) {
-            assetKey = assetData.symbol;
-          } 
-          // 🚨 PRIORITY 2: Use asset field
-          else if (assetData.asset) {
-            assetKey = assetData.asset;
-          }
-          // 🚨 PRIORITY 3: For tokens without symbol, construct from asset + chain
-          else if (assetData.asset && assetData.chain && assetData.chain !== 'algorand') {
-            assetKey = `${assetData.asset}_${assetData.chain.toUpperCase()}`;
-          }
-          // 🚨 PRIORITY 4: Native assets - map chain to symbol
-          else {
-            const chainToAsset: { [key: string]: string } = {
-              'algorand': 'ALGO',
-              'bitcoin': 'BTC', 
-              'ethereum': 'ETH',
-              'polygon': 'MATIC',
-              'tron': 'TRX',
-              'solana': 'SOL'
-            };
-            assetKey = chainToAsset[assetData.chain] || assetData.chain.toUpperCase();
-          }
-          
-          console.log(`🔍 Balance mapping: ${assetData.chain}/${assetData.asset || 'native'} → ${assetKey} = ${assetData.balance}`);
+          console.log(`✅ Balance loaded: ${assetKey} = ${assetData.balance} (${assetData.chain})`);
           
           balancesObj[assetKey] = {
             balance: assetData.balance,
