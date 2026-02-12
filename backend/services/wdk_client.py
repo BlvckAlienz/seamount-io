@@ -884,16 +884,14 @@ class WDKClient:
         address: str, 
         chain: str,
         asset: str = None,
-        use_indexer: bool = True
-    ) -> Dict[str, Any]:
+        use_indexer: bool = False  # 🚨 Changed default to False
+    ) -> Decimal:
         """
-        Get balance with intelligent routing based on asset type:
+        Get balance for address on specific chain
         
-        NATIVE ASSETS (ETH, BTC, TRX, MATIC, SOL):
-        → Direct RPC (Alchemy, TronGrid, Blockchain.info, Solana RPC)
-        
-        TOKEN ASSETS (USDT, USDC, XAUT):
-        → Try Tether Indexer → Fallback to Direct RPC
+        Strategy:
+        1. For NATIVE assets (BTC, ETH, MATIC, TRX, SOL) → Use Direct RPC
+        2. For TOKENS (USDT, USDC) → Try Indexer, fallback to Direct RPC
         """
         
         if chain not in self.SUPPORTED_CHAINS:
@@ -901,209 +899,41 @@ class WDKClient:
         
         logger.info(f"🔍 Balance query: {chain} / {asset or 'native'} / {address[:10]}...")
         
-        # ═════════════════════════════════════════════════════════════════════
-        # DETERMINE ASSET TYPE
-        # ═════════════════════════════════════════════════════════════════════
-        native_assets = {
-            'ethereum': 'ETH',
-            'bitcoin': 'BTC',
-            'tron': 'TRX',
-            'polygon': 'MATIC',
-            'solana': 'SOL'
-        }
-        
-        # Map asset names to Tether Indexer token identifiers
-        tether_token_map = {
-            'USDT': 'usdt',
-            'USDT_ETH': 'usdt',
-            'USDT_POLYGON': 'usdt',
-            'USDT_TRON': 'usdt',
-            'USDT_SOLANA': 'usdt',
-            'USDC': 'usdt',  # Tether only indexes USDT, not USDC
-            'XAUT': 'xaut',
-            'goBTC': 'btc'
-        }
-        
-        # Determine if querying native or token
-        is_native = (
-            not asset or 
-            asset.upper() == native_assets.get(chain, '').upper()
-        )
-        
-        # ═════════════════════════════════════════════════════════════════════
-        # PATH 1: NATIVE ASSETS → Direct RPC Only
-        # ═════════════════════════════════════════════════════════════════════
-        if is_native:
-            logger.info(f"🎯 Native asset detected ({native_assets.get(chain)}) - using Direct RPC")
+        # ═══════════════════════════════════════════════════════════════
+        # NATIVE ASSET - Always use Direct RPC
+        # ═══════════════════════════════════════════════════════════════
+        if asset is None:
+            logger.info(f"📊 Querying NATIVE asset for {chain}")
             result = await self.get_balance_direct_rpc(address, chain)
             
-            if result and result.get('success'):  # ✅ Check if result is not None
-                return result
-            else:
-                # Graceful degradation
-                return {
-                    'balance': '0',
-                    'success': False,
-                    'chain': chain,
-                    'address': address,
-                    'error': 'Direct RPC failed for native asset',
-                    'source': 'fallback'
-                }
-        
-        # ═════════════════════════════════════════════════════════════════════
-        # PATH 2: TOKEN ASSETS → Try Tether Indexer First
-        # ═════════════════════════════════════════════════════════════════════
-        token_identifier = tether_token_map.get(asset.upper() if asset else None)
-        
-        if use_indexer and self.indexer_url and token_identifier:
-            try:
-                logger.info(f"📡 TIER 1: Querying Tether Indexer for {token_identifier} on {chain}...")
-                
-                # ✅ CORRECT Tether API endpoint
-                endpoint = f'/api/v1/{chain}/{token_identifier}/{address}/token-balances'
-                
-                result = await self._make_request(
-                    'GET', 
-                    endpoint,
-                    use_indexer=True,
-                    max_retries=1  # Fail fast
-                )
-                
-                # Parse Tether's response format
-                if result.get('tokenBalance'):
-                    token_balance = result['tokenBalance']
-                    balance_amount = token_balance.get('amount', '0')
-                    
-                    logger.info(f"✅ TIER 1 SUCCESS: {token_identifier} balance from Tether Indexer")
-                    
-                    return {
-                        'balance': balance_amount,
-                        'success': True,
-                        'chain': chain,
-                        'token': token_identifier,
-                        'address': address,
-                        'source': 'tether_indexer',
-                        'raw': result
-                    }
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 1 FAILED: {str(e)[:100]}...")
-        else:
-            if not token_identifier:
-                logger.debug(f"⚠️ Token {asset} not supported by Tether Indexer")
-        
-        # ═════════════════════════════════════════════════════════════════════
-        # TIER 2: Your WDK Service (Optional Middle Layer)
-        # ═════════════════════════════════════════════════════════════════════
-        try:
-            logger.debug(f"📡 TIER 2: Trying your WDK Service...")
-            
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.base_url}/wallet/balance"
-                params = {
-                    'chain': chain,
-                    'address': address,
-                    'asset': asset or 'native'
-                }
-                headers = {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
-                }
-                
-                timeout = aiohttp.ClientTimeout(total=10)
-                
-                async with session.get(url, params=params, headers=headers, timeout=timeout) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        
-                        if result.get('success'):
-                            balance_str = result.get('balance', '0')
-                            balance_decimal = Decimal(balance_str)
-                            
-                            # 🚨 CRITICAL FIX: Only accept TIER 2 for token queries if balance > 0
-                            # WDK service returns 0 for all token queries, so we must continue to TIER 3
-                            if asset and balance_decimal == 0:
-                                logger.info(f"⚠️ TIER 2 returned 0 balance for {asset}, continuing to TIER 3...")
-                                # Don't return - let it fall through to TIER 3
-                            else:
-                                logger.info(f"✅ TIER 2 SUCCESS: {balance_str} {asset or 'native'} from WDK Service")
-                                result['source'] = 'wdk_service'
-                                return result
-        except Exception as e:
-            logger.debug(f"⚠️ TIER 2 FAILED: {str(e)[:50]}...")
-        
-        # ══════════════════════════════════════════════════════════════════
-        # TIER 3: Chain-Specific Fallbacks
-        # ══════════════════════════════════════════════════════════════════
-        
-        # 3A: Tron TRC-20 Tokens
-        if asset and chain == 'tron' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Tron TRC-20 via TronScan API...")
-            try:
-                trc20_result = await self._get_tron_trc20_balance(address, asset.upper())
-                if trc20_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from TronScan")
-                    return trc20_result
-                else:
-                    logger.warning(f"⚠️ TIER 3 TRC-20 failed: {trc20_result.get('error')}")
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 TRC-20 exception: {e}")
-        
-        # ✅ NEW: Ethereum ERC-20 Tokens
-        if asset and chain == 'ethereum' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Ethereum ERC-20 via Etherscan API...")
-            try:
-                erc20_result = await self._get_evm_erc20_balance(address, asset.upper(), 'ethereum')
-                if erc20_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Etherscan")
-                    return erc20_result
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
-        
-        # ✅ NEW: Polygon ERC-20 Tokens
-        if asset and chain == 'polygon' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Polygon ERC-20 via Polygonscan API...")
-            try:
-                polygon_result = await self._get_evm_erc20_balance(address, asset.upper(), 'polygon')
-                if polygon_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Polygonscan")
-                    return polygon_result
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 ERC-20 exception: {e}")
-        
-        # ✅ NEW: Solana SPL Tokens
-        if asset and chain == 'solana' and asset.upper() in ('USDT', 'USDC'):
-            logger.info(f"🔄 TIER 3: Querying Solana SPL token via Solana RPC...")
-            try:
-                solana_result = await self._get_solana_spl_token_balance(address, asset.upper())
-                if solana_result.get('success'):
-                    logger.info(f"✅ TIER 3 SUCCESS: {asset} from Solana RPC")
-                    return solana_result
-            except Exception as e:
-                logger.warning(f"⚠️ TIER 3 SPL token exception: {e}")
-        
-        # ══════════════════════════════════════════════════════════════════
-        # TIER 4: Direct RPC (Native Assets Only) - Fallback
-        # ══════════════════════════════════════════════════════════════════
-        if not asset or (asset and asset.upper() == self._get_native_symbol(chain)):
-            logger.info(f"🔄 TIER 4: Falling back to Direct RPC (native only)...")
-            result = await self.get_balance_direct_rpc(address, chain)
             if result.get('success'):
-                logger.info(f"✅ TIER 4 SUCCESS: Native balance from Direct RPC")
-                return result
+                return Decimal(str(result.get('balance', '0')))
+            else:
+                logger.error(f"❌ Direct RPC failed: {result.get('error')}")
+                return Decimal('0')
         
-        # ══════════════════════════════════════════════════════════════════
-        # COMPLETE FAILURE: Return Zero Balance
-        # ══════════════════════════════════════════════════════════════════
-        logger.error(f"❌ ALL TIERS FAILED for {chain}/{asset}: {address[:10]}...")
-        return {
-            'balance': '0',
-            'success': False,
-            'chain': chain,
-            'address': address,
-            'asset': asset,
-            'error': 'All balance query methods exhausted',
-            'source': 'complete_failure'
-        }
+        # ═══════════════════════════════════════════════════════════════
+        # TOKEN ASSET - Try Indexer first, then fallback
+        # ═══════════════════════════════════════════════════════════════
+        else:
+            logger.info(f"🪙 Querying TOKEN {asset} on {chain}")
+            
+            # Try Tether Indexer if available
+            if use_indexer and self.indexer_url:
+                try:
+                    result = await self._make_request(
+                        'GET', 
+                        f'/v1/balance/{chain}/{address}',
+                        use_indexer=True
+                    )
+                    return Decimal(str(result.get('balance', '0')))
+                except Exception as e:
+                    logger.warning(f"⚠️ Indexer failed: {e}, using fallback")
+            
+            # Fallback: For now, return 0 for tokens
+            # TODO: Implement Etherscan/Polygonscan token balance queries
+            logger.warning(f"⚠️ Token balance query not fully implemented for {asset} on {chain}")
+            return Decimal('0')
     
     async def send_transaction(
         self,
@@ -1370,22 +1200,21 @@ class WDKClient:
             raise ValueError(f"Chain {chain} not implemented yet")
     
     async def get_balance_direct_rpc(
-        self,
-        address: str,
+        self, 
+        address: str, 
         chain: str
     ) -> Dict[str, Any]:
         """
-        TIER 3: Direct blockchain RPC queries
-        Works for ALL assets (native + tokens)
-        Slowest but most reliable
+        Query balance directly from blockchain RPC nodes
+        BYPASSES the WDK service entirely
+        
+        Supports: Bitcoin, Ethereum, Polygon, Tron, Solana
         """
         
         try:
-            logger.info(f"🔄 Direct RPC: {chain} / {address[:10]}...")
-            
-            # ╔═══════════════════════════════════════════════════════════════
-            # BITCOIN
-            # ╚═══════════════════════════════════════════════════════════════
+            # ═══════════════════════════════════════════════════════════════
+            # BITCOIN - Uses Blockchain.info API
+            # ═══════════════════════════════════════════════════════════════
             if chain == 'bitcoin':
                 async with aiohttp.ClientSession() as session:
                     url = f"https://blockchain.info/balance?active={address}"
@@ -1402,13 +1231,15 @@ class WDKClient:
                                 'balance': str(balance_btc),
                                 'success': True,
                                 'chain': 'bitcoin',
-                                'source': 'blockchain.info',
-                                'address': address
+                                'source': 'blockchain.info'
                             }
+                        else:
+                            logger.error(f"❌ Blockchain.info returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
             
-            # ╔═══════════════════════════════════════════════════════════════
-            # ETHEREUM
-            # ╚═══════════════════════════════════════════════════════════════
+            # ═══════════════════════════════════════════════════════════════
+            # ETHEREUM - Uses Alchemy RPC
+            # ═══════════════════════════════════════════════════════════════
             elif chain == 'ethereum':
                 if not self.settings.ALCHEMY_API_KEY_ETHEREUM:
                     logger.error("❌ No Alchemy API key for Ethereum")
@@ -1437,13 +1268,15 @@ class WDKClient:
                                 'balance': str(balance_eth),
                                 'success': True,
                                 'chain': 'ethereum',
-                                'source': 'alchemy',
-                                'address': address
+                                'source': 'alchemy'
                             }
+                        else:
+                            logger.error(f"❌ Alchemy ETH returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
             
-            # ╔═══════════════════════════════════════════════════════════════
-            # POLYGON
-            # ╚═══════════════════════════════════════════════════════════════
+            # ═══════════════════════════════════════════════════════════════
+            # POLYGON - Uses Alchemy Polygon RPC
+            # ═══════════════════════════════════════════════════════════════
             elif chain == 'polygon':
                 if not self.settings.ALCHEMY_API_KEY_POLYGON:
                     logger.error("❌ No Alchemy API key for Polygon")
@@ -1466,30 +1299,12 @@ class WDKClient:
                             try:
                                 data = await response.json()
                                 
-                                # ✅ CRITICAL FIX: Handle null or missing data
-                                if not data or 'result' not in data:
-                                    logger.warning(f"⚠️ Polygon API returned invalid data: {data}")
-                                    return {
-                                        'balance': '0',
-                                        'success': True,  # Still success, just 0 balance
-                                        'chain': 'polygon',
-                                        'source': 'alchemy',
-                                        'address': address,
-                                        'note': 'Account has 0 balance'
-                                    }
+                                # Handle null or missing result
+                                result = data.get('result', '0x0')
+                                if result is None or result == '0x':
+                                    result = '0x0'
                                 
-                                balance_hex = data.get('result', '0x0')
-                                
-                                # ✅ FIX: Handle '0x' or empty hex value
-                                if balance_hex == '0x' or balance_hex == '0x0':
-                                    balance_wei = 0
-                                else:
-                                    try:
-                                        balance_wei = int(balance_hex, 16)
-                                    except ValueError:
-                                        logger.error(f"❌ Invalid hex value from Polygon: {balance_hex}")
-                                        balance_wei = 0
-                                
+                                balance_wei = int(result, 16)
                                 balance_matic = Decimal(balance_wei) / Decimal('1000000000000000000')
                                 
                                 logger.info(f"✅ MATIC balance: {balance_matic}")
@@ -1497,302 +1312,106 @@ class WDKClient:
                                     'balance': str(balance_matic),
                                     'success': True,
                                     'chain': 'polygon',
-                                    'source': 'alchemy',
-                                    'address': address
+                                    'source': 'alchemy'
                                 }
-                                
-                            except (ValueError, KeyError) as parse_error:
-                                logger.error(f"❌ Failed to parse Polygon response: {parse_error}")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'chain': 'polygon',
-                                    'error': f'JSON parse error: {parse_error}',
-                                    'address': address
-                                }
+                            except (ValueError, TypeError) as parse_err:
+                                logger.error(f"❌ Polygon balance parse error: {parse_err}")
+                                return {'balance': '0', 'success': False, 'error': f'Parse error: {parse_err}'}
                         else:
-                            # Non-200 response
-                            error_text = await response.text()
-                            logger.error(f"❌ Polygon API error {response.status}: {error_text[:200]}")
-                            return {
-                                'balance': '0',
-                                'success': False,
-                                'chain': 'polygon',
-                                'error': f'API error {response.status}',
-                                'address': address
-                            }
+                            logger.error(f"❌ Alchemy Polygon returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
             
-            # ╔═══════════════════════════════════════════════════════════════════════════════════════
-            # TRON - BULLETPROOF IMPLEMENTATION
-            # ╚═══════════════════════════════════════════════════════════════════════════════════════
+            # ═══════════════════════════════════════════════════════════════
+            # TRON - Uses TronGrid API
+            # ═══════════════════════════════════════════════════════════════
             elif chain == 'tron':
-                try:
-                    logger.info(f"🔍 Querying Tron balance for {address[:10]}...")
+                if not self.settings.TRONGRID_API_KEY:
+                    logger.error("❌ No TronGrid API key")
+                    return {'balance': '0', 'success': False, 'error': 'No TronGrid key'}
+                
+                api_key = self.settings.TRONGRID_API_KEY.get_secret_value()
+                url = f"https://api.trongrid.io/v1/accounts/{address}"
+                
+                async with aiohttp.ClientSession() as session:
+                    headers = {'TRON-PRO-API-KEY': api_key}
+                    timeout = aiohttp.ClientTimeout(total=15)
                     
-                    async with aiohttp.ClientSession() as session:
-                        url = f"https://api.trongrid.io/v1/accounts/{address}"
-                        headers = {
-                            "Accept": "application/json"
-                        }
-                        
-                        # Add API key if configured
-                        if self.settings.TRON_API_KEY:
-                            api_key = self.settings.TRON_API_KEY.get_secret_value()
-                            headers["TRON-PRO-API-KEY"] = api_key
-                            logger.debug(f"🔑 Using Tron API key: {api_key[:10]}...")
+                    async with session.get(url, headers=headers, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            
+                            # TronGrid returns balance in Sun (1 TRX = 1,000,000 Sun)
+                            balance_sun = data.get('data', [{}])[0].get('balance', 0)
+                            balance_trx = Decimal(balance_sun) / Decimal('1000000')
+                            
+                            logger.info(f"✅ TRX balance: {balance_trx}")
+                            return {
+                                'balance': str(balance_trx),
+                                'success': True,
+                                'chain': 'tron',
+                                'source': 'trongrid'
+                            }
                         else:
-                            logger.warning("⚠️ No TRON_API_KEY configured - using public endpoint (rate limited)")
-                        
-                        timeout = aiohttp.ClientTimeout(total=15)
-                        
-                        async with session.get(url, headers=headers, timeout=timeout) as response:
-                            response_text = await response.text()
-                            
-                            logger.info(f"📡 TronGrid response status: {response.status}")
-                            
-                            if response.status == 200:
-                                try:
-                                    data = await response.json() if response.content_type == 'application/json' else None
-                                    
-                                    if not data:
-                                        logger.error(f"❌ TronGrid returned non-JSON response: {response_text[:200]}")
-                                        return {
-                                            'balance': '0',
-                                            'success': False,
-                                            'error': 'Invalid JSON response from TronGrid',
-                                            'chain': 'tron'
-                                        }
-                                    
-                                    # TronGrid returns: {"data": [{"address": "...", "balance": 1000000, ...}]}
-                                    accounts = data.get('data', [])
-                                    
-                                    if not accounts or len(accounts) == 0:
-                                        # Account exists but has no balance (new account)
-                                        logger.info(f"ℹ️ Tron account {address[:10]}... exists but has 0 balance")
-                                        return {
-                                            'balance': '0',
-                                            'success': True,
-                                            'chain': 'tron',
-                                            'source': 'trongrid',
-                                            'address': address
-                                        }
-                                    
-                                    # Extract balance (in SUN, 1 TRX = 1,000,000 SUN)
-                                    account_data = accounts[0]
-                                    balance_sun = account_data.get('balance', 0)
-                                    balance_trx = Decimal(balance_sun) / Decimal('1000000')
-                                    
-                                    logger.info(f"✅ TRX balance: {balance_trx} TRX ({balance_sun} SUN)")
-                                    
-                                    return {
-                                        'balance': str(balance_trx),
-                                        'success': True,
-                                        'chain': 'tron',
-                                        'source': 'trongrid',
-                                        'address': address,
-                                        'raw_balance_sun': balance_sun
-                                    }
-                                    
-                                except (ValueError, KeyError) as parse_err:
-                                    logger.error(f"❌ Failed to parse TronGrid response: {parse_err}")
-                                    logger.error(f"   Raw response: {response_text[:500]}")
-                                    return {
-                                        'balance': '0',
-                                        'success': False,
-                                        'error': f'JSON parse error: {parse_err}',
-                                        'chain': 'tron'
-                                    }
-                            
-                            elif response.status == 404:
-                                # Account doesn't exist on Tron network yet
-                                logger.info(f"ℹ️ Tron account {address[:10]}... not found (404)")
-                                return {
-                                    'balance': '0',
-                                    'success': True,
-                                    'chain': 'tron',
-                                    'source': 'trongrid',
-                                    'address': address,
-                                    'note': 'Account not activated yet'
-                                }
-                            
-                            elif response.status == 429:
-                                # Rate limit hit
-                                logger.error(f"⚠️ TronGrid rate limit exceeded (429)")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': 'Rate limit exceeded - add TRON_API_KEY to .env',
-                                    'chain': 'tron'
-                                }
-                            
-                            elif response.status in [500, 502, 503, 504]:
-                                # TronGrid server error
-                                logger.error(f"❌ TronGrid server error: {response.status}")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': f'TronGrid service unavailable ({response.status})',
-                                    'chain': 'tron'
-                                }
-                            
-                            else:
-                                # Other HTTP errors
-                                logger.error(f"❌ TronGrid unexpected status {response.status}: {response_text[:200]}")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': f'HTTP {response.status}',
-                                    'chain': 'tron'
-                                }
-                
-                except asyncio.TimeoutError:
-                    logger.error(f"⏱️ TronGrid timeout for {address[:10]}...")
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': 'TronGrid API timeout',
-                        'chain': 'tron'
-                    }
-                
-                except aiohttp.ClientError as http_err:
-                    logger.error(f"❌ TronGrid HTTP error: {http_err}")
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': f'Network error: {http_err}',
-                        'chain': 'tron'
-                    }
-                
-                except Exception as e:
-                    logger.error(f"❌ Unexpected error querying Tron balance: {e}", exc_info=True)
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': str(e),
-                        'chain': 'tron'
-                    }
+                            logger.error(f"❌ TronGrid returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
             
-            # ╔═══════════════════════════════════════════════════════════════════════════════════════
-            # SOLANA (✅ NEW)
-            # ╚═══════════════════════════════════════════════════════════════════════════════════════
+            # ═══════════════════════════════════════════════════════════════
+            # SOLANA - Uses Solana RPC
+            # ═══════════════════════════════════════════════════════════════
             elif chain == 'solana':
-                try:
-                    logger.info(f"🔍 Querying Solana balance for {address[:10]}...")
+                if not self.settings.SOLANA_RPC_URL:
+                    logger.error("❌ No Solana RPC URL configured")
+                    return {'balance': '0', 'success': False, 'error': 'No Solana RPC'}
+                
+                url = self.settings.SOLANA_RPC_URL
+                
+                async with aiohttp.ClientSession() as session:
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "getBalance",
+                        "params": [address]
+                    }
+                    timeout = aiohttp.ClientTimeout(total=15)
                     
-                    # Solana RPC endpoint (public or from config)
-                    solana_rpc = self.settings.SOLANA_RPC_URL if hasattr(self.settings, 'SOLANA_RPC_URL') else "https://api.mainnet-beta.solana.com"
-                    
-                    async with aiohttp.ClientSession() as session:
-                        headers = {
-                            "Content-Type": "application/json"
-                        }
-                        
-                        # Solana RPC request format
-                        payload = {
-                            "jsonrpc": "2.0",
-                            "id": 1,
-                            "method": "getBalance",
-                            "params": [address]
-                        }
-                        
-                        timeout = aiohttp.ClientTimeout(total=15)
-                        
-                        async with session.post(solana_rpc, json=payload, headers=headers, timeout=timeout) as response:
-                            response_text = await response.text()
+                    async with session.post(url, json=payload, timeout=timeout) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            balance_lamports = data.get('result', {}).get('value', 0)
+                            balance_sol = Decimal(balance_lamports) / Decimal('1000000000')
                             
-                            logger.info(f"📡 Solana RPC response status: {response.status}")
-                            
-                            if response.status == 200:
-                                try:
-                                    data = await response.json() if response.content_type == 'application/json' else None
-                                    
-                                    if not data or 'result' not in data:
-                                        logger.error(f"❌ Solana RPC returned invalid response: {response_text[:200]}")
-                                        return {
-                                            'balance': '0',
-                                            'success': False,
-                                            'error': 'Invalid JSON response from Solana RPC',
-                                            'chain': 'solana'
-                                        }
-                                    
-                                    # Extract balance (in lamports, 1 SOL = 1,000,000,000 lamports)
-                                    balance_lamports = data['result'].get('value', 0)
-                                    balance_sol = Decimal(balance_lamports) / Decimal('1000000000')
-                                    
-                                    logger.info(f"✅ SOL balance: {balance_sol} SOL ({balance_lamports} lamports)")
-                                    
-                                    return {
-                                        'balance': str(balance_sol),
-                                        'success': True,
-                                        'chain': 'solana',
-                                        'source': 'solana_rpc',
-                                        'address': address,
-                                        'raw_balance_lamports': balance_lamports
-                                    }
-                                    
-                                except (ValueError, KeyError) as parse_err:
-                                    logger.error(f"❌ Failed to parse Solana response: {parse_err}")
-                                    logger.error(f"   Raw response: {response_text[:500]}")
-                                    return {
-                                        'balance': '0',
-                                        'success': False,
-                                        'error': f'JSON parse error: {parse_err}',
-                                        'chain': 'solana'
-                                    }
-                            
-                            elif response.status == 429:
-                                logger.error(f"⚠️ Solana RPC rate limit exceeded (429)")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': 'Rate limit exceeded - add SOLANA_RPC_URL to .env',
-                                    'chain': 'solana'
-                                }
-                            
-                            elif response.status in [500, 502, 503, 504]:
-                                logger.error(f"❌ Solana RPC server error: {response.status}")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': f'Solana RPC service unavailable ({response.status})',
-                                    'chain': 'solana'
-                                }
-                            
-                            else:
-                                logger.error(f"❌ Solana RPC unexpected status {response.status}: {response_text[:200]}")
-                                return {
-                                    'balance': '0',
-                                    'success': False,
-                                    'error': f'HTTP {response.status}',
-                                    'chain': 'solana'
-                                }
-                
-                except asyncio.TimeoutError:
-                    logger.error(f"⏱️ Solana RPC timeout for {address[:10]}...")
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': 'Solana RPC timeout',
-                        'chain': 'solana'
-                    }
-                
-                except aiohttp.ClientError as http_err:
-                    logger.error(f"❌ Solana RPC HTTP error: {http_err}")
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': f'Network error: {http_err}',
-                        'chain': 'solana'
-                    }
-                
-                except Exception as e:
-                    logger.error(f"❌ Unexpected error querying Solana balance: {e}", exc_info=True)
-                    return {
-                        'balance': '0',
-                        'success': False,
-                        'error': str(e),
-                        'chain': 'solana'
-                    }
+                            logger.info(f"✅ SOL balance: {balance_sol}")
+                            return {
+                                'balance': str(balance_sol),
+                                'success': True,
+                                'chain': 'solana',
+                                'source': 'solana_rpc'
+                            }
+                        else:
+                            logger.error(f"❌ Solana RPC returned {response.status}")
+                            return {'balance': '0', 'success': False, 'error': f'HTTP {response.status}'}
+            
+            else:
+                logger.warning(f"⚠️ Chain {chain} not supported in Direct RPC")
+                return {
+                    'balance': '0',
+                    'success': False,
+                    'error': f'Chain {chain} not supported',
+                    'chain': chain
+                }
+        
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ Direct RPC timeout for {chain}")
+            return {'balance': '0', 'success': False, 'error': 'RPC timeout'}
+        
+        except Exception as e:
+            logger.error(f"❌ Direct RPC failed for {chain}: {e}")
+            return {
+                'balance': '0',
+                'success': False,
+                'error': f'RPC error: {str(e)}',
+                'chain': chain
+            }
             
             # ╔═══════════════════════════════════════════════════════════════
             # UNSUPPORTED CHAIN
