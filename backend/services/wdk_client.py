@@ -1258,58 +1258,68 @@ class WDKClient:
             # Determine if native TRX or TRC-20 token
             is_native = (asset == 'TRX')
             
-            if is_native:
-                # Native TRX transfer
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'amount_sun': int(amount * 1_000_000),  # TRX to sun
-                    'chain': 'tron'
-                }
-                
-                endpoint = '/wallet/tron/send'
-                
-            else:
-                # TRC-20 token transfer (USDT)
-                from backend.config import get_settings
-                settings = get_settings()
-                
-                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
-                if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for Tron")
-                
-                token_address = asset_config.get('contract_address')
-                if not token_address:
-                    raise Exception(f"No contract address for {asset} on Tron")
-                
-                decimals = asset_config.get('decimals', 6)
-                amount_base = int(amount * (10 ** decimals))
-                
-                payload = {
-                    'plaintext_seed': plaintext_seed,
-                    'from_address': from_address,
-                    'to_address': to_address,
-                    'contractAddress': token_address,
-                    'amount': str(amount_base),
-                    'chain': 'tron'
-                }
-                
-                endpoint = '/wallet/tron/send-token'
-            
             try:
-                result = await self._make_request('POST', endpoint, data=payload)
-                
-                if not result.get('success'):
-                    raise Exception(result.get('error', 'Tron transaction failed'))
-                
-                return {
-                    'tx_id': result['tx_hash'],
-                    'chain': 'tron',
-                    'fee': result.get('energy_used', 0),
-                    'success': True
-                }
-                
+                if is_native:
+                    # Native TRX transfer
+                    payload = {
+                        'plaintext_seed': plaintext_seed,
+                        'from_address': from_address,
+                        'to_address': to_address,
+                        'amount_sun': int(amount * 1_000_000),  # TRX to sun
+                        'chain': 'tron'
+                    }
+                    endpoint = '/wallet/tron/send'
+                    
+                    result = await self._make_request('POST', endpoint, data=payload)
+                    
+                    if not result.get('success'):
+                        raise Exception(result.get('error', 'Tron transaction failed'))
+                    
+                    return {
+                        'tx_id': result['tx_hash'],
+                        'chain': 'tron',
+                        'fee': result.get('energy_used', 0),
+                        'success': True
+                    }
+                    
+                else:
+                    # TRC-20 token transfer (USDT)
+                    from backend.config import get_settings
+                    settings = get_settings()
+                    
+                    asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
+                    if not asset_config:
+                        raise Exception(f"Asset {asset} not configured for Tron")
+                    
+                    token_address = asset_config.get('contract_address')
+                    if not token_address:
+                        raise Exception(f"No contract address for {asset} on Tron")
+                    
+                    decimals = asset_config.get('decimals', 6)
+                    amount_base = int(amount * (10 ** decimals))
+                    
+                    # ✅ FIX: Remove from_address and chain – only required fields
+                    payload = {
+                        'plaintext_seed': plaintext_seed,
+                        'to_address': to_address,           # use to_address (parameter)
+                        'token_address': token_address,
+                        'amount': str(amount_base)
+                    }
+                    
+                    endpoint = '/wallet/tron/send-token'
+                    
+                    result = await self._make_request('POST', endpoint, data=payload)
+                    
+                    if not result.get('success'):
+                        raise Exception(result.get('error', 'Tron transaction failed'))
+                    
+                    return {
+                        'tx_id': result['tx_hash'],
+                        'chain': 'tron',
+                        'fee': result.get('energy_used', 0),
+                        'success': True
+                    }
+                    
             except Exception as tron_error:
                 logger.error(f"❌ Tron transaction failed: {tron_error}")
                 raise
