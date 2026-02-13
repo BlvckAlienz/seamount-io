@@ -128,7 +128,15 @@ interface SendFormProps {
 }
 
 export function SendForm({ open, onOpenChange }: SendFormProps) {
-  const { balances, sendTransaction, loading: walletLoading } = useWallet();
+  const { balances, sendTransaction, loading: walletLoading, fetchBalances } = useWallet();
+
+  useEffect(() => {
+    if (open) {
+      console.log('📢 SendForm opened – triggering balance refresh');
+      fetchBalances();
+    }
+  }, [open, fetchBalances]);
+  console.log('🔥 SendForm balances:', balances);
   
   // Form state
   const [recipient, setRecipient] = useState('');

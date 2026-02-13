@@ -93,75 +93,99 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // ============================================================================
   // FETCH BALANCES
-  // ============================================================================
+  // ===========================================================================
+
   const fetchBalances = useCallback(async () => {
-    // âœ… CRITICAL: Only fetch if authenticated
     if (!user) {
-      console.log('â„¹ï¸ WalletContext: User not authenticated, skipping balance fetch');
-      setLoading(false);
+      console.log('ℹ️ fetchBalances: No user, skipping');
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
+      console.log('🔍 fetchBalances: Calling API...');
       const response = await api.get<any>('/api/v1/wallet/balances');
       
-      if (response.success) {
-        // Convert assets array to object keyed by asset symbol
-        const balancesObj: { [asset: string]: WalletBalance } = {};
-        
-        response.assets?.forEach((asset: any) => {
-          // ðŸš¨ FIX: Derive asset key from chain since API doesn't return symbol
-          let assetKey: string;
-          
-          // Map chain to native asset symbol
-          const chainToAsset: { [key: string]: string } = {
-            'algorand': 'ALGO',
-            'bitcoin': 'BTC', 
-            'ethereum': 'ETH',
-            'polygon': 'MATIC',
-            'tron': 'TRX'
-          };
-          
-          // If asset has explicit symbol/asset field, use it; otherwise derive from chain
-          if (asset.symbol) {
-            assetKey = asset.symbol;
-          } else if (asset.asset) {
-            assetKey = asset.asset;
-          } else {
-            // Fallback: Use chain mapping
-            assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
-          }
-          
-          console.log(`âœ… Mapped: ${asset.chain} â†’ ${assetKey} (balance: ${asset.balance})`);
-          
-          balancesObj[assetKey] = {
-            balance: asset.balance,
-            chain: asset.chain,
-            usd_value: asset.usd_value
-          };
-        });
-        
-        setBalances(balancesObj);
-        setTotalBalanceUSD(response.total_usd || 0);
+      // Log the FULL raw response for debugging
+      console.log('🔥 fetchBalances: Raw API response:', response);
+
+      // Handle different possible response structures
+      let success = false;
+      let assets = [];
+      let total_usd = 0;
+
+      if (response?.success === true) {
+        // Standard: { success: true, assets: [...], total_usd: ... }
+        success = true;
+        assets = response.assets || [];
+        total_usd = response.total_usd || 0;
+      } else if (response?.data?.success === true) {
+        // Wrapped: { data: { success: true, assets: [...] } }
+        success = true;
+        assets = response.data.assets || [];
+        total_usd = response.data.total_usd || 0;
+      } else {
+        console.warn('⚠️ fetchBalances: Unexpected response format', response);
       }
-          console.log('🔥 WalletContext processed balances:', balancesObj);
-          
-    } catch (error: any) {
-      // âœ… Handle 403 gracefully (expected when not authenticated)
-      if (error?.response?.status === 403) {
-        console.log('â„¹ï¸ Balance fetch returned 403 (not authenticated)');
+
+      if (!success) {
+        console.error('❌ fetchBalances: API reported failure', response);
         setBalances({});
         setTotalBalanceUSD(0);
-      } else {
-        // Real errors (500, network issues, etc.)
-        console.error('Failed to fetch balances:', error);
-        toast.error('Failed to load balances');
+        return;
       }
+
+      // Transform assets into balances object
+      const balancesObj: { [asset: string]: WalletBalance } = {};
+      
+      if (!Array.isArray(assets)) {
+        console.error('❌ fetchBalances: assets is not an array', assets);
+        setBalances({});
+        setTotalBalanceUSD(0);
+        return;
+      }
+
+      console.log(`📦 fetchBalances: Received ${assets.length} assets`);
+
+      assets.forEach((asset: any, index: number) => {
+        // Determine the asset key (symbol or asset field, fallback to chain)
+        let assetKey = asset.symbol || asset.asset;
+        if (!assetKey) {
+          // Fallback: map chain to native asset symbol
+          const chainToAsset: { [key: string]: string } = {
+            algorand: 'ALGO',
+            bitcoin: 'BTC',
+            ethereum: 'ETH',
+            polygon: 'MATIC',
+            tron: 'TRX',
+            solana: 'SOL'
+          };
+          assetKey = chainToAsset[asset.chain] || asset.chain.toUpperCase();
+          console.warn(`⚠️ Asset ${index} missing symbol/asset, using fallback: ${assetKey}`);
+        }
+
+        console.log(`  → Mapping: ${asset.chain} → ${assetKey} (balance: ${asset.balance})`);
+
+        balancesObj[assetKey] = {
+          balance: asset.balance || 0,
+          chain: asset.chain,
+          usd_value: asset.usd_value || 0
+        };
+      });
+
+      console.log('✅ fetchBalances: Final balancesObj:', balancesObj);
+
+      // Update state
+      setBalances(balancesObj);
+      setTotalBalanceUSD(total_usd);
+    } catch (error) {
+      console.error('❌ fetchBalances: Exception caught', error);
+      setBalances({});
+      setTotalBalanceUSD(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   // ============================================================================
   // SEND TRANSACTION
