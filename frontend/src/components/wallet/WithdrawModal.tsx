@@ -197,7 +197,7 @@ const MOBILE_PROVIDER_NAMES: { [key: string]: string } = {
 export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   // Core state
   const [amount, setAmount] = useState('')
-  const [asset, setAsset] = useState('USDT_ALGO')
+  const [asset, setAsset] = useState('ALGO')
   const [currency, setCurrency] = useState('NGN')
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -446,9 +446,8 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   }
 
   const getAssetSymbol = (assetKey: string) => {
-    const asset = ALL_ASSETS.find(a => a.backend_key === assetKey)
-    return asset?.value.split('_')[0] || assetKey
-  }
+  return assetKey.split('_')[0];   // "USDT_TRON" → "USDT", "ALGO" → "ALGO"
+}
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -485,7 +484,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     {assets.map((a) => (
                       <SelectItem 
                         key={a.backend_key} 
-                        value={a.backend_key}
+                        value={a.value}
                         className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
                       >
                         <div className="flex items-center gap-2">

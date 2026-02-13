@@ -306,7 +306,7 @@ class MultiChainWalletService:
             balances = {}
             total_usd = Decimal('0')
 
-            # 1. Get Algorand balances (unchanged)
+            # 1. Get Algorand balances (native + ASAs)
             try:
                 algo_wallet = self.db.supabase.table('user_wallets')\
                     .select('algorand_address')\
@@ -320,8 +320,8 @@ class MultiChainWalletService:
                         account_info = await self.algorand.get_account_info(algo_address)
 
                         if account_info:
+                            # --- Native ALGO ---
                             algo_balance = Decimal(str(account_info.get('amount', 0))) / Decimal('1000000')
-
                             try:
                                 algo_price = await self.oracle.get_algorand_price()
                                 balances['ALGO'] = {
@@ -333,7 +333,7 @@ class MultiChainWalletService:
                                 }
                                 total_usd += algo_balance * algo_price
                             except Exception as price_err:
-                                logger.warning(f"âš ï¸ Price lookup failed for ALGO: {price_err}")
+                                logger.warning(f"⚠️ Price lookup failed for ALGO: {price_err}")
                                 balances['ALGO'] = {
                                     'asset': 'ALGO',
                                     'symbol': 'ALGO',
@@ -341,8 +341,50 @@ class MultiChainWalletService:
                                     'chain': 'algorand',
                                     'usd_value': 0.0
                                 }
+
+                            # --- ASA Tokens (USDCa, USDT, goBTC, goETH) ---
+                            asset_map = {
+                                31566704: ('USDCa', 6),
+                                312769: ('USDT', 6),
+                                386192725: ('goBTC', 8),
+                                386195940: ('goETH', 8)
+                            }
+
+                            for asset_info in account_info.get('assets', []):
+                                asset_id = asset_info.get('asset-id')
+                                amount_raw = Decimal(str(asset_info.get('amount', 0)))
+
+                                if asset_id in asset_map:
+                                    symbol, decimals = asset_map[asset_id]
+                                    balance = amount_raw / (Decimal('10') ** decimals)
+
+                                    if balance > 0:
+                                        try:
+                                            price, _ = await self.oracle.get_asset_price(symbol.lower())
+                                            usd_value = balance * price
+                                            balances[symbol] = {
+                                                'asset': symbol,
+                                                'symbol': symbol,
+                                                'balance': float(balance),
+                                                'chain': 'algorand',
+                                                'usd_value': float(usd_value)
+                                            }
+                                            total_usd += usd_value
+                                        except Exception as price_err:
+                                            logger.warning(f"⚠️ Price lookup failed for {symbol}: {price_err}")
+                                            balances[symbol] = {
+                                                'asset': symbol,
+                                                'symbol': symbol,
+                                                'balance': float(balance),
+                                                'chain': 'algorand',
+                                                'usd_value': 0.0
+                                            }
+                                    else:
+                                        # Include zero‑balance entries? (optional)
+                                        pass
+
                         else:
-                            logger.info(f"â„¹ï¸ Algorand account {algo_address[:10]}... has 0 balance")
+                            logger.info(f"ℹ️ Algorand account {algo_address[:10]}... has 0 balance")
                             balances['ALGO'] = {
                                 'asset': 'ALGO',
                                 'symbol': 'ALGO',
@@ -352,7 +394,7 @@ class MultiChainWalletService:
                             }
 
             except Exception as algo_err:
-                logger.warning(f"âš ï¸ Algorand balance query failed: {algo_err}")
+                logger.warning(f"⚠️ Algorand balance query failed: {algo_err}")
                 balances['ALGO'] = {
                     'asset': 'ALGO',
                     'symbol': 'ALGO',
@@ -362,7 +404,7 @@ class MultiChainWalletService:
                     'error': str(algo_err)
                 }
 
-            # 2. Get WDK chain balances â€” NATIVE + TOKENS
+            # 2. Get WDK chain balances — NATIVE + TOKENS (unchanged)
             try:
                 wdk_wallets = self.db.supabase.table('multi_chain_addresses')\
                     .select('blockchain, address')\
@@ -374,7 +416,7 @@ class MultiChainWalletService:
                         chain = wallet['blockchain']
                         address = wallet['address']
 
-                        # â”€â”€ 2A: Native asset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                        # Native asset
                         native_asset = self._get_native_asset(chain)
                         try:
                             native_data = await self.wdk.get_balance(address, chain, asset=None)
@@ -385,7 +427,7 @@ class MultiChainWalletService:
                                 native_usd = native_balance * price
                             except Exception:
                                 native_usd = Decimal('0')
-                                logger.warning(f"âš ï¸ Price lookup failed for {native_asset}")
+                                logger.warning(f"⚠️ Price lookup failed for {native_asset}")
 
                             balances[native_asset] = {
                                 'asset': native_asset,
@@ -397,7 +439,7 @@ class MultiChainWalletService:
                             total_usd += native_usd
 
                         except Exception as native_err:
-                            logger.error(f"âŒ Native balance failed for {chain}: {native_err}")
+                            logger.error(f"❌ Native balance failed for {chain}: {native_err}")
                             balances[native_asset] = {
                                 'asset': native_asset,
                                 'symbol': native_asset,
@@ -407,20 +449,16 @@ class MultiChainWalletService:
                                 'error': str(native_err)
                             }
 
-                        # â”€â”€ 2B: Token assets (USDT, USDC, etc.) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                        # ðŸš¨ THIS IS THE FIX. Previously this entire block was missing.
+                        # Token assets (USDT, USDC)
                         tokens_to_query = self.CHAIN_TOKEN_MAP.get(chain, [])
 
                         for token in tokens_to_query:
-                            # Chain-qualified key prevents USDT collisions across chains
                             balance_key = f"{token}_{chain.upper()}"
 
                             try:
-                                # Passing asset=token triggers Tether Indexer in wdk_client
                                 token_data = await self.wdk.get_balance(address, chain, asset=token)
                                 token_balance = Decimal(str(token_data.get('balance', 0)))
 
-                                # Stablecoins: peg = 1 USD, no oracle needed
                                 if token in ('USDT', 'USDC'):
                                     token_usd = token_balance
                                 else:
@@ -430,26 +468,24 @@ class MultiChainWalletService:
                                     except Exception:
                                         token_usd = Decimal('0')
 
-                                # âœ… YOUR FIX - VERIFIED CORRECT
                                 if token_balance > 0:
                                     balances[balance_key] = {
-                                        'asset': token,                    # e.g., 'USDT'
-                                        'symbol': balance_key,              # ðŸš¨ CRITICAL: 'USDT_TRON' (not 'USDT')
-                                        'balance': float(token_balance),    # e.g., 5.0
-                                        'chain': chain,                     # e.g., 'tron'
-                                        'usd_value': float(token_usd)       # e.g., 5.0
+                                        'asset': token,
+                                        'symbol': balance_key,
+                                        'balance': float(token_balance),
+                                        'chain': chain,
+                                        'usd_value': float(token_usd)
                                     }
-                                    total_usd += token_usd  # âœ… MUST BE INSIDE if block
-                                    logger.info(f"âœ… {token} on {chain}: {token_balance} (${token_usd})")
+                                    total_usd += token_usd
+                                    logger.info(f"✅ {token} on {chain}: {token_balance} (${token_usd})")
                                 else:
-                                    logger.debug(f"â„¹ï¸ {token} on {chain}: 0 balance, skipping")
+                                    logger.debug(f"ℹ️ {token} on {chain}: 0 balance, skipping")
 
                             except Exception as token_err:
-                                # Non-fatal: one token failing doesn't kill the whole response
-                                logger.warning(f"âš ï¸ Token balance failed for {token} on {chain}: {token_err}")
+                                logger.warning(f"⚠️ Token balance failed for {token} on {chain}: {token_err}")
 
             except Exception as wdk_err:
-                logger.warning(f"âš ï¸ WDK balance query failed: {wdk_err}")
+                logger.warning(f"⚠️ WDK balance query failed: {wdk_err}")
 
             # 3. Format response
             assets_list = sorted(
@@ -467,7 +503,7 @@ class MultiChainWalletService:
             }
 
         except Exception as e:
-            logger.error(f"âŒ Balance query failed: {e}")
+            logger.error(f"❌ Balance query failed: {e}")
             return {
                 'success': False,
                 'total_usd': 0.0,
