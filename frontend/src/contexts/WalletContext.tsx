@@ -145,6 +145,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setBalances(balancesObj);
         setTotalBalanceUSD(response.total_usd || 0);
       }
+          console.log('🔥 WalletContext processed balances:', balancesObj);
+          
     } catch (error: any) {
       // âœ… Handle 403 gracefully (expected when not authenticated)
       if (error?.response?.status === 403) {

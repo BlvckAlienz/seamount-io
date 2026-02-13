@@ -6,6 +6,7 @@
  * ✅ Multi-currency support (10+ African countries)
  * ✅ Live quotes with proper error handling
  * ✅ Paystack fallback for bank verification
+ * ✅ Uses global wallet balances (no local fetch)
  */
 
 import { useState, useEffect } from 'react'
@@ -26,52 +27,40 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
 import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2, Building2, Smartphone, Info } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-
-interface WithdrawModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+import { useWallet } from '@/contexts/WalletContext'
 
 // ========== SUPPORTED ASSETS (ALL CHAINS) ==========
 const ASSET_GROUPS = {
   algorand: [
-    { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ⱥ', backend_key: 'ALGO' },
-    { value: 'USDT', label: 'Tether (Algorand)', icon: '₮', backend_key: 'USDT_ALGO' },
-    { value: 'USDCa', label: 'USD Coin (USDCa)', icon: '◎', backend_key: 'USDCa' },
-    { value: 'goBTC', label: 'Wrapped Bitcoin', icon: '₿', backend_key: 'goBTC' },
-    { value: 'goETH', label: 'Wrapped Ethereum', icon: 'Ξ', backend_key: 'goETH' },
+    { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ⱥ' },
+    { value: 'USDT', label: 'Tether (Algorand)', icon: '₮' },
+    { value: 'USDCa', label: 'USD Coin (USDCa)', icon: '◎' },
+    { value: 'goBTC', label: 'Wrapped Bitcoin', icon: '₿' },
+    { value: 'goETH', label: 'Wrapped Ethereum', icon: 'Ξ' },
   ],
   bitcoin: [
-    { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿', backend_key: 'BTC' },
+    { value: 'BTC', label: 'Bitcoin (BTC)', icon: '₿' },
   ],
   ethereum: [
-    { value: 'ETH', label: 'Ethereum (ETH)', icon: 'Ξ', backend_key: 'ETH' },
-    { value: 'USDT_ETH', label: 'Tether (Ethereum)', icon: '₮', backend_key: 'USDT_ETH' },
-    { value: 'USDC_ETH', label: 'USD Coin (Ethereum)', icon: '◎', backend_key: 'USDC_ETH' },
+    { value: 'ETH', label: 'Ethereum (ETH)', icon: 'Ξ' },
+    { value: 'USDT_ETH', label: 'Tether (Ethereum)', icon: '₮' },
+    { value: 'USDC_ETH', label: 'USD Coin (Ethereum)', icon: '◎' },
   ],
   polygon: [
-    { value: 'MATIC', label: 'Polygon (MATIC)', icon: '▶', backend_key: 'MATIC' },
-    { value: 'USDT_POLYGON', label: 'Tether (Polygon)', icon: '₮', backend_key: 'USDT_POLYGON' },
-    { value: 'USDC_POLYGON', label: 'USD Coin (Polygon)', icon: '◎', backend_key: 'USDC_POLYGON' },
+    { value: 'MATIC', label: 'Polygon (MATIC)', icon: '▶' },
+    { value: 'USDT_POLYGON', label: 'Tether (Polygon)', icon: '₮' },
+    { value: 'USDC_POLYGON', label: 'USD Coin (Polygon)', icon: '◎' },
   ],
   tron: [
-    { value: 'TRX', label: 'TRON (TRX)', icon: '⚡', backend_key: 'TRX' },
-    { value: 'USDT_TRON', label: 'Tether (Tron)', icon: '₮', backend_key: 'USDT_TRON' },
+    { value: 'TRX', label: 'TRON (TRX)', icon: '⚡' },
+    { value: 'USDT_TRON', label: 'Tether (Tron)', icon: '₮' },
   ],
   solana: [
-    { value: 'SOL', label: 'Solana (SOL)', icon: '◎', backend_key: 'SOL' },
-    { value: 'USDT_SOLANA', label: 'Tether (Solana)', icon: '₮', backend_key: 'USDT_SOLANA' },
-    { value: 'USDC_SOLANA', label: 'USD Coin (Solana)', icon: '◎', backend_key: 'USDC_SOLANA' },
+    { value: 'SOL', label: 'Solana (SOL)', icon: '◎' },
+    { value: 'USDT_SOLANA', label: 'Tether (Solana)', icon: '₮' },
+    { value: 'USDC_SOLANA', label: 'USD Coin (Solana)', icon: '◎' },
   ]
 }
-
-const ALL_ASSETS = [
-  ...ASSET_GROUPS.algorand,
-  ...ASSET_GROUPS.bitcoin,
-  ...ASSET_GROUPS.ethereum,
-  ...ASSET_GROUPS.polygon,
-  ...ASSET_GROUPS.tron
-]
 
 const CHAIN_NAMES: { [key: string]: string } = {
   'algorand': '🟢 Algorand',
@@ -197,7 +186,7 @@ const MOBILE_PROVIDER_NAMES: { [key: string]: string } = {
 export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   // Core state
   const [amount, setAmount] = useState('')
-  const [asset, setAsset] = useState('ALGO')
+  const [asset, setAsset] = useState('ALGO')  // default to ALGO (always present)
   const [currency, setCurrency] = useState('NGN')
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -218,49 +207,15 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [mobileNumber, setMobileNumber] = useState('')
 
   const { session } = useAuth()
+  const { balances } = useWallet()  // ✅ Get balances from global context
 
-  // ✅ Fetch balance from API (no new dependencies)
-  const [availableBalance, setAvailableBalance] = useState<number>(0)
-  
-  useEffect(() => {
-    const fetchBalance = async () => {
-      if (!open || !session) return
-      
-      try {
-        const response = await api.get('/api/v1/wallet/balances')
-        
-        if (response?.success && response?.assets) {
-          // Find balance for selected asset
-          const assetBalance = response.assets.find((a: any) => 
-            a.asset === asset || a.symbol === asset || a.chain === asset.toLowerCase()
-          )
-          
-          if (assetBalance) {
-            setAvailableBalance(assetBalance.balance || 0)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch balance:', error)
-        setAvailableBalance(0)
-      }
-    }
-    
-    fetchBalance()
-  }, [open, session, asset])
+  // ✅ Available balance from global state – works for all asset keys
+  const availableBalance = balances[asset]?.balance || 0
 
   // Get selected currency details
   const selectedCurrency = WITHDRAWAL_CURRENCIES.find(c => c.code === currency)
-  // ✅ FIX: Add safe fallbacks
   const supportsMobileMoney = selectedCurrency?.methods?.includes('mobile_money') || false
   const supportsBankTransfer = selectedCurrency?.methods?.includes('bank_transfer') || false
-
-  // 🎯 Debug logging
-  console.log('💳 Payout options:', {
-    currency,
-    supportsMobileMoney,
-    supportsBankTransfer,
-    methods: selectedCurrency?.methods
-  })
 
   // Auto-select payout method based on currency
   useEffect(() => {
@@ -286,33 +241,21 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     setError(null)
 
     try {
-      console.log('🔄 Fetching withdraw quote - Auth status:', session ? 'Authenticated' : 'Unauthenticated')
-
       const endpoint = session ? '/api/v1/offramp/quote' : '/api/v1/offramp/quote/public'
       
       const response = await api.post(endpoint, {
-        crypto_amount: cryptoAmount,  // ✅ Send crypto amount, not fiat
+        crypto_amount: cryptoAmount,
         crypto_asset: asset,
         fiat_currency: currency,
       })
 
-      console.log('✅ Quote response:', response)
-
       if (response?.success) {
         setQuote(response.quote)
-        console.log('🎯 Quote data:', response.quote)
       } else {
-        const errorMsg = response?.error || 'Failed to get quote'
-        setError(errorMsg)
+        setError(response?.error || 'Failed to get quote')
       }
     } catch (err: any) {
-      console.error('💥 Quote fetch error:', err)
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to get quote'
-      
-      if (err.response?.status === 403 && session) {
-        console.log('🔄 Falling back to public endpoint...')
-      }
-      
       setError(errorMsg)
       setQuote(null)
     } finally {
@@ -331,7 +274,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     return () => clearTimeout(timer)
   }, [amount, asset, currency])
 
-  // ✅ FIX: Get key from backend API instead of frontend env
+  // Verify bank account via backend proxy
   const verifyBankAccount = async () => {
     if (!bankAccount || !bankCode || bankAccount.length !== 10) {
       toast.error('Please enter a valid 10-digit account number')
@@ -343,7 +286,6 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     setAccountName(null)
 
     try {
-      // 🎯 USE BACKEND PROXY - keys stay secure on server
       const response = await api.post('/api/v1/bank/verify', {
         account_number: bankAccount,
         bank_code: bankCode
@@ -369,6 +311,11 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     // Validation
     if (!amount || parseFloat(amount) <= 0) {
       toast.error('Please enter a valid amount')
+      return
+    }
+
+    if (parseFloat(amount) > availableBalance) {
+      toast.error(`Insufficient balance. Available: ${availableBalance.toFixed(6)} ${asset.split('_')[0]}`)
       return
     }
 
@@ -446,8 +393,18 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   }
 
   const getAssetSymbol = (assetKey: string) => {
-  return assetKey.split('_')[0];   // "USDT_TRON" → "USDT", "ALGO" → "ALGO"
-}
+    return assetKey.split('_')[0]  // "USDT_TRON" → "USDT", "ALGO" → "ALGO"
+  }
+
+  // Debug: log why button might be disabled (uncomment if needed)
+  // console.log('Button disabled?', {
+  //   loading,
+  //   quote: !!quote,
+  //   bankVerified: accountName,
+  //   mobileDetails: mobileProvider && mobileNumber,
+  //   sufficientBalance: parseFloat(amount) <= availableBalance,
+  //   amountValid: amount && parseFloat(amount) > 0
+  // })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -483,7 +440,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     </div>
                     {assets.map((a) => (
                       <SelectItem 
-                        key={a.backend_key} 
+                        key={a.value} 
                         value={a.value}
                         className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
                       >
@@ -505,12 +462,12 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               Amount to Withdraw
             </Label>
             
-            {/* ✅ Show available balance from API */}
+            {/* Show available balance from global state */}
             {availableBalance > 0 && (
               <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
                 <span className="font-bold text-blue-700 dark:text-blue-300">
-                  {availableBalance.toFixed(4)} {getAssetSymbol(asset)}
+                  {availableBalance.toFixed(6)} {getAssetSymbol(asset)}
                 </span>
               </div>
             )}
@@ -775,13 +732,6 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             </div>
           )}
 
-          {/* Error Display */}
-          {error && (
-            <Alert variant="destructive" className="border-2">
-              <AlertCircle className="h-5 w-5" />
-              <AlertDescription className="font-medium">{error}</AlertDescription>
-            </Alert>
-          )}
           {/* Provider Info Alert */}
           <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
             <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -811,7 +761,15 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
           </Button>
           <Button
             onClick={handleWithdraw}
-            disabled={loading || !quote || (payoutMethod === 'bank_transfer' && !accountName) || (payoutMethod === 'mobile_money' && (!mobileProvider || !mobileNumber))}
+            disabled={
+              loading ||
+              !quote ||
+              !amount ||
+              parseFloat(amount) <= 0 ||
+              parseFloat(amount) > availableBalance ||
+              (payoutMethod === 'bank_transfer' && !accountName) ||
+              (payoutMethod === 'mobile_money' && (!mobileProvider || !mobileNumber))
+            }
             className="h-12 px-8 text-base font-bold bg-red-600 hover:bg-red-700 text-white"
           >
             {loading ? (

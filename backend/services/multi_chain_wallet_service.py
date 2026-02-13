@@ -494,6 +494,10 @@ class MultiChainWalletService:
                 reverse=True
             )
 
+            # After building balances, log the raw response
+            logger.info(f"🔥 FINAL BALANCES DICT: {balances}")
+            logger.info(f"🔥 TOTAL_USD: {total_usd}")
+
             return {
                 'success': True,
                 'total_usd': float(total_usd),

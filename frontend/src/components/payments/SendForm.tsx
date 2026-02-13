@@ -148,6 +148,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   
   // Get available balance
   const availableBalance = balances[asset]?.balance || 0;
+  console.log(`🔥 SendForm: asset=${asset}, balances[asset]=`, balances[asset]);
   const balanceUSD = balances[asset]?.usd_value || 0;
 
   // ============================================================================
