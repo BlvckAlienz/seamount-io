@@ -255,7 +255,12 @@ class WDKClient:
                     'Content-Type': 'application/json',
                     'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
                 }
-                
+                # Log request details (mask sensitive data)
+                safe_data = data.copy() if data else {}
+                if 'plaintext_seed' in safe_data:
+                    safe_data['plaintext_seed'] = '***REDACTED***'
+                logger.debug(f"🔍 WDK request: {method} {url} data={safe_data}")
+
                 async with aiohttp.ClientSession() as session:
                     if method == 'GET':
                         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
@@ -290,7 +295,13 @@ class WDKClient:
                             self.service_healthy = True
                             return result
                             
-            except aiohttp.ClientError as e:
+            except aiohttp.ClientResponseError as e:
+                # Try to read response body
+                try:
+                    body = await e.request_info.response.text()
+                except:
+                    body = "No body"
+                logger.error(f"❌ WDK request failed: {e.status} {e.message} – Body: {body}")
                 last_exception = e
                 logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
@@ -1006,7 +1017,7 @@ class WDKClient:
                 }
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
+                    'X-API-Key': self.api_key
                 }
                 
                 timeout = aiohttp.ClientTimeout(total=10)
@@ -1279,7 +1290,7 @@ class WDKClient:
                     'plaintext_seed': plaintext_seed,
                     'from_address': from_address,
                     'to_address': to_address,
-                    'token_address': token_address,
+                    'contractAddress': token_address,
                     'amount': str(amount_base),
                     'chain': 'tron'
                 }
