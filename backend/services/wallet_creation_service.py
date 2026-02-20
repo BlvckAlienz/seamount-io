@@ -20,14 +20,16 @@ class WalletCreationService:
     'ethereum',     # ✅ Available via @tetherto/wdk-wallet-evm  
     'polygon',      # ✅ Available via @tetherto/wdk-wallet-evm
     'tron',         # ✅ Available via @tetherto/wdk-wallet-tron
-    'solana'        # ✅ Available via @tetherto/wdk-wallet-solana
+    'solana',       # ✅ Available via @tetherto/wdk-wallet-solana
+    'xrp'           # ✅ Custodial — no on-chain wallet per user
 ]
     
-    def __init__(self, db_service, algorand_service, wdk_client):
+    def __init__(self, db_service, algorand_service, wdk_client, xrp_service=None):
         self.db = db_service
         self.algorand_service = algorand_service
         self.wdk_client = wdk_client
-        logger.info("✅ WalletCreationService initialized with 5-chain hard limit")
+        self.xrp_service = xrp_service  # ✅ NEW — custodial XRP
+        logger.info("✅ WalletCreationService initialized with 7-chain support")
     
     async def detect_existing_wallets(self, user_id: str) -> Dict[str, str]:
         """
@@ -62,6 +64,19 @@ class WalletCreationService:
                     if chain in self.SUPPORTED_CHAINS and address:
                         existing_wallets[chain] = address
                         logger.info(f"✅ Detected existing {chain} wallet: {address[:10]}...")
+
+            # ✅ NEW: Check XRP custodial destination tag (separate table)
+            xrp_tag_resp = await asyncio.to_thread(
+                lambda: self.db.supabase.table("xrp_destination_tags")
+                .select("destination_tag, hot_wallet")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            if xrp_tag_resp.data and len(xrp_tag_resp.data) > 0:
+                tag = xrp_tag_resp.data[0]['destination_tag']
+                hot_wallet = xrp_tag_resp.data[0]['hot_wallet']
+                existing_wallets['xrp'] = f"custodial:tag={tag}:wallet={hot_wallet}"
+                logger.info(f"✅ Detected existing XRP custodial tag: {tag}")
             
             logger.info(f"🔍 User {user_id} has {len(existing_wallets)} existing wallets: {list(existing_wallets.keys())}")
             return existing_wallets
@@ -251,7 +266,7 @@ class WalletCreationService:
         """Smart retry: Actually creates missing wallets with proper error handling"""
         try:
             # 🔥 HARDCODE ALL 6 SUPPORTED CHAINS
-            SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana']
+            SUPPORTED_CHAINS = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana', 'xrp']
             
             current_status = await self.get_wallet_status(user_id)
             missing_chains = current_status['summary']['missing_chains']
@@ -287,6 +302,53 @@ class WalletCreationService:
                 try:
                     logger.info(f"🔄 Creating {chain} wallet for user {user_id}")
                     
+                    # ✅ NEW: XRP custodial — assign destination tag, no on-chain wallet
+                    if chain == 'xrp':
+                        try:
+                            tag = await self._assign_xrp_destination_tag(user_id)
+                            hot_wallet = getattr(
+                                self.xrp_service, 'hot_wallet_address', 'NOT_CONFIGURED'
+                            ) if self.xrp_service else 'NOT_CONFIGURED'
+
+                            # Upsert into xrp_destination_tags
+                            await asyncio.to_thread(
+                                lambda: self.db.supabase.table("xrp_destination_tags")
+                                .upsert({
+                                    'user_id': user_id,
+                                    'destination_tag': tag,
+                                    'hot_wallet': hot_wallet,
+                                    'created_at': datetime.utcnow().isoformat(),
+                                }, on_conflict='user_id')
+                                .execute()
+                            )
+
+                            # Update wallet_creation_status tracking table
+                            await asyncio.to_thread(
+                                lambda: self.db.supabase.table("wallet_creation_status")
+                                .update({
+                                    'status': 'success',
+                                    'address': f"custodial:tag={tag}",
+                                    'updated_at': datetime.utcnow().isoformat(),
+                                })
+                                .eq('user_id', user_id)
+                                .eq('chain', 'xrp')
+                                .execute()
+                            )
+
+                            results[chain] = {
+                                'success': True,
+                                'address': f"custodial:tag={tag}",
+                                'destination_tag': tag,
+                                'hot_wallet': hot_wallet,
+                                'type': 'custodial',
+                            }
+                            logger.info(f"✅ XRP custodial tag {tag} assigned to user {user_id}")
+
+                        except Exception as xrp_e:
+                            logger.error(f"❌ XRP tag assignment failed for {user_id}: {xrp_e}")
+                            results[chain] = {'success': False, 'error': str(xrp_e)}
+                        continue  # ← skip the rest of the loop for this chain
+
                     if chain == 'algorand':
                         # Create Algorand wallet
                         wallet_result = await self.algorand_service.create_algorand_wallet(user_id)
@@ -791,4 +853,36 @@ class WalletCreationService:
             
         except Exception as e:
             logger.error(f"Error incrementing retry count: {e}")
+            raise
+
+    async def _assign_xrp_destination_tag(self, user_id: str) -> int:
+        """
+        Assign a unique destination tag to this user for the custodial XRP hot wallet.
+        Tags are auto-incrementing integers starting at 10001.
+        Thread-safe: uses DB MAX() to avoid collisions.
+        """
+        try:
+            # Get current highest tag assigned
+            result = await asyncio.to_thread(
+                lambda: self.db.supabase.table("xrp_destination_tags")
+                .select("destination_tag")
+                .order("destination_tag", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+            if result.data and len(result.data) > 0:
+                next_tag = int(result.data[0]['destination_tag']) + 1
+            else:
+                next_tag = 10001  # Starting tag (reserve 0-10000 for system use)
+
+            # Validate uint32 range
+            if next_tag > 4_294_967_295:
+                raise Exception("Destination tag pool exhausted — contact engineering")
+
+            logger.info(f"✅ Assigned XRP destination tag {next_tag} to user {user_id}")
+            return next_tag
+
+        except Exception as e:
+            logger.error(f"❌ _assign_xrp_destination_tag failed: {e}")
             raise

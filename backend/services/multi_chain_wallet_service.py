@@ -33,6 +33,10 @@ class MultiChainWalletService:
     
     # ========== ASSET-TO-CHAIN MAPPING ==========
     ASSET_CHAIN_MAP = {
+        'RLUSD':    'xrp',
+        'USDC_XRP': 'xrp',
+        'XRP':      'xrp',
+
         # Native Algorand assets
         'ALGO': 'algorand',
         'USDCa': 'algorand',
@@ -45,19 +49,19 @@ class MultiChainWalletService:
         'USDT_ETH': 'ethereum',
         'USDT_POLYGON': 'polygon',
         'USDT_TRON': 'tron',
-        'USDT_SOLANA': 'solana',  # âœ… NEW
+        'USDT_SOLANA': 'solana',  # NEW
         
         # Native chain assets
         'BTC': 'bitcoin',
         'ETH': 'ethereum',
         'MATIC': 'polygon',
         'TRX': 'tron',
-        'SOL': 'solana',  # âœ… NEW
+        'SOL': 'solana',  # NEW
         
         # USDC variants
         'USDC_ETH': 'ethereum',
         'USDC_POLYGON': 'polygon',
-        'USDC_SOLANA': 'solana'  # âœ… NEW
+        'USDC_SOLANA': 'solana'  # NEW
     }
     
     # Algorand Asset IDs (ASA)

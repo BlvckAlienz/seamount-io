@@ -133,10 +133,21 @@ except ImportError as e:
 try:
     from backend.services.oracle_service import OracleService
     oracle_service_available = True
-    logger.info("âœ… Oracle service imported successfully")
+    logger.info("✅ Oracle service imported successfully")
 except ImportError as e:
-    logger.error(f"âŒ Oracle service import error: {e}")
+    logger.error(f"❌ Oracle service import error: {e}")
     oracle_service_available = False
+
+# ===== IMPORT XRP SERVICES =====
+try:
+    from backend.services.xrp_service import XRPService
+    from backend.services.xrp_monitor_service import XRPMonitorService
+    from backend.services.xrp_credential_service import XRPCredentialService
+    xrp_services_available = True
+    logger.info("✅ XRP services imported successfully")
+except ImportError as e:
+    logger.error(f"❌ XRP services import error: {e}")
+    xrp_services_available = False
 
 from backend.api.routes import seed_routes
 from backend.api.routes import wallet_backup_routes
@@ -437,18 +448,99 @@ async def lifespan(app: FastAPI):
                     )
                     logger.info("âœ… Multi-Chain Wallet Service initialized")
                     
-                    # Initialize WalletCreationService
+                    # Initialize XRP Service
+                    xrp_service = None
+                    if xrp_services_available:
+                        try:
+                            xrp_service = XRPService(settings=settings)
+                            logger.info("✅ XRP service initialized")
+
+                            # Run trust line setup check (safe to call repeatedly — idempotent)
+                            # Only needs to run once ever, but won't break if called again
+                            asyncio.create_task(xrp_service.setup_hot_wallet_trust_lines())
+
+                        except Exception as e:
+                            logger.error(f"❌ XRP service initialization failed: {e}")
+                            xrp_service = None
+
+                    # Initialize WalletCreationService (now with XRP)
                     try:
                         from backend.services.wallet_creation_service import WalletCreationService
                         wallet_creation_service = WalletCreationService(
                             db_service=db_service,
                             algorand_service=algorand_service,
-                            wdk_client=multi_chain_wallet_service.wdk  # Use actual WDK client
+                            wdk_client=multi_chain_wallet_service.wdk,
+                            xrp_service=xrp_service,   # ✅ NEW
                         )
-                        logger.info("âœ… WalletCreationService initialized")
+                        logger.info("✅ WalletCreationService initialized (7 chains)")
                     except Exception as e:
-                        logger.warning(f"âš ï¸ WalletCreationService unavailable: {e}")
+                        logger.warning(f"⚠️ WalletCreationService unavailable: {e}")
                         wallet_creation_service = None
+
+                    # Start XRP Deposit Monitor (WebSocket — background task)
+                    if xrp_service and xrp_services_available:
+                        try:
+                            async def on_xrp_deposit(event: dict):
+                                """Route incoming deposits to correct user via destination tag."""
+                                tag = event.get('destination_tag')
+                                symbol = event.get('symbol')
+                                amount = event.get('amount')
+                                tx_hash = event.get('tx_hash')
+
+                                if not tag:
+                                    logger.warning(f"⚠️ XRP deposit with no destination tag: {tx_hash}")
+                                    return
+
+                                try:
+                                    # Look up user by destination tag
+                                    result = supabase_client.table("xrp_destination_tags") \
+                                        .select("user_id") \
+                                        .eq("destination_tag", tag) \
+                                        .execute()
+
+                                    if not result.data:
+                                        logger.warning(f"⚠️ Unknown destination tag {tag} | tx: {tx_hash}")
+                                        return
+
+                                    user_id = result.data[0]['user_id']
+
+                                    # Credit user balance (atomic DB function)
+                                    supabase_client.rpc("update_xrp_balance", {
+                                        "p_user_id": user_id,
+                                        "p_symbol": symbol,
+                                        "p_delta": float(amount),
+                                    }).execute()
+
+                                    # Log transaction
+                                    supabase_client.table("xrp_transactions").insert({
+                                        "user_id": user_id,
+                                        "tx_hash": tx_hash,
+                                        "tx_type": "deposit",
+                                        "symbol": symbol,
+                                        "amount": float(amount),
+                                        "destination_tag": tag,
+                                        "from_address": event.get('from_address'),
+                                        "ledger_index": event.get('ledger_index'),
+                                        "status": "confirmed",
+                                        "created_at": datetime.utcnow().isoformat(),
+                                    }).execute()
+
+                                    logger.info(f"✅ Deposit credited: {amount} {symbol} → user {user_id[:8]}... | tx: {tx_hash}")
+
+                                except Exception as credit_err:
+                                    logger.error(f"❌ Failed to credit deposit tag={tag} tx={tx_hash}: {credit_err}")
+
+                            xrp_monitor = XRPMonitorService(
+                                hot_wallet_address=settings.XRP_HOT_WALLET_ADDRESS,
+                                settings=settings,
+                                on_deposit=on_xrp_deposit,
+                            )
+                            asyncio.create_task(xrp_monitor.start())
+                            app.state.xrp_monitor = xrp_monitor
+                            logger.info("✅ XRP deposit monitor started (WebSocket)")
+
+                        except Exception as e:
+                            logger.error(f"❌ XRP monitor failed to start: {e}")
 
                     # Initialize KYC service
                     kyc_service = KYCService(
@@ -557,10 +649,18 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, 'price_logger'):
         try:
             await app.state.price_logger.stop()
-            logger.info("âœ… Price logger stopped")
+            logger.info("✅ Price logger stopped")
         except Exception as e:
-            logger.error(f"âŒ Failed to stop price logger: {e}")
-    
+            logger.error(f"❌ Failed to stop price logger: {e}")
+
+    # Stop XRP monitor
+    if hasattr(app.state, 'xrp_monitor'):
+        try:
+            await app.state.xrp_monitor.stop()
+            logger.info("✅ XRP deposit monitor stopped")
+        except Exception as e:
+            logger.error(f"❌ Failed to stop XRP monitor: {e}")
+
     logger.info("--- Seamount API Shutting Down ---")
 
 # ===== CREATE FASTAPI APP =====
@@ -1342,15 +1442,18 @@ async def buy_assets(
 # ===== BACKGROUND TASKS =====
 
 async def process_kyc_webhook(payload: Dict[str, Any]):
-    """Background task to process KYC webhook events"""
+    """
+    Background task to process KYC webhook events.
+    Currently handled directly in webhooks.py regfyl_screening_webhook.
+    This stub kept for legacy compatibility and future webhook routing.
+    """
     try:
-        event_type = payload.get("type")
-        applicant_id = payload.get("resource", {}).get("id")
-        
-        logger.info(f"Processing KYC webhook: {event_type} for applicant {applicant_id}")
-        
+        event_type = payload.get("type") or payload.get("checkType")
+        customer_id = payload.get("customerID") or payload.get("resource", {}).get("id")
+        logger.info(f"process_kyc_webhook: type={event_type} customer={customer_id}")
+        # Full logic lives in: backend/api/routes/webhooks.py → regfyl_screening_webhook()
     except Exception as e:
-        logger.error(f"Error in background KYC webhook processing: {e}")
+        logger.error(f"process_kyc_webhook error: {e}")
 
 # ===== GLOBAL EXCEPTION HANDLER =====
 

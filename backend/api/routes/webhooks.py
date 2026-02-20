@@ -357,41 +357,50 @@ async def regfyl_screening_webhook(
                 'role': 'tribe',
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('id', customer_id).execute()
-            
+
+            logger.info(f"✅ KYC approved for user {customer_id}")
+
+            # ✅ NEW: Issue on-chain XRP credential after KYC approval
+            try:
+                from backend.services.xrp_credential_service import XRPCredentialService
+                from datetime import timedelta
+                from backend.config import get_settings
+
+                settings = get_settings()
+                xrp_cred = XRPCredentialService(settings=settings)
+
+                cred_result = await xrp_cred.issue_credential(
+                    subject_address=settings.XRP_HOT_WALLET_ADDRESS,
+                    credential_type="KYC_BASIC",
+                    expiry_days=365,
+                )
+
+                supabase.table("xrp_credentials").insert({
+                    "user_id": customer_id,
+                    "credential_type": "KYC_BASIC",
+                    "on_chain": cred_result.get("success", False),
+                    "tx_hash": cred_result.get("tx_hash"),
+                    "issuer_address": settings.XRP_ADMIN_WALLET_ADDRESS,
+                    "subject_address": settings.XRP_HOT_WALLET_ADDRESS,
+                    "expires_at": (datetime.utcnow() + timedelta(days=365)).isoformat(),
+                    "created_at": datetime.utcnow().isoformat(),
+                }).execute()
+
+                logger.info(f"✅ On-chain XRP credential issued for user {customer_id} | tx: {cred_result.get('tx_hash')}")
+
+            except Exception as cred_error:
+                # ⚠️ Non-fatal: credential failure must NOT block KYC approval
+                logger.error(f"⚠️ On-chain credential failed (non-fatal) for {customer_id}: {cred_error}")
+
         return {"success": True, "message": "Webhook processed"}
         
     except Exception as e:
         logger.error(f"[Regfyl Webhook] Error: {e}")
         return {"success": False, "error": str(e)}
         
-        # Update user compliance status using EXISTING compliance_checks table
-        supabase = get_supabase_client()
-        
-        compliance_data = {
-            "user_id": customer_id,
-            "check_type": "regfyl_screening",
-            "provider": "regfyl",
-            "status": callback_result['status'],
-            "reference_id": callback_result['reference'],
-            "risk_level": callback_result['risk_level'],
-            "metadata": json.dumps({
-                "action_required": callback_result['action_required'],
-                "callback_data": payload
-            }),
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Use UPSERT with compliance_checks table
-        supabase.table("compliance_checks").upsert(compliance_data).execute()
-        
-        logger.info(f"Regfyl screening callback processed for user {customer_id}: {callback_result['status']}")
-        
-        return {"status": "success", "message": "Screening callback processed"}
-        
     except Exception as e:
         logger.error(f"Regfyl screening webhook failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Webhook processing failed")
+        return {"success": False, "error": str(e)}
 
 @router.post("/regfyl/id-verification")
 async def regfyl_id_verification_webhook(request: Request):
