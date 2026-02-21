@@ -112,9 +112,9 @@ from backend.models import UserRole
 # Import services individually with fallbacks
 try:
     from backend.services.multi_chain_wallet_service import MultiChainWalletService
-    logger.info("âœ… MultiChainWalletService imported")
+    logger.info("✅ MultiChainWalletService imported")
 except ImportError as e:
-    logger.error(f"âŒ MultiChainWalletService import failed: {e}")
+    logger.error(f"❌ MultiChainWalletService import failed: {e}")
     MultiChainWalletService = None
 
 try:
@@ -124,9 +124,9 @@ try:
     from backend.services.database_service import DatabaseService
     from backend.services.audit_service import AuditService
     services_available = True
-    logger.info("âœ… Core services imported")
+    logger.info("✅ Core services imported")
 except ImportError as e:
-    logger.error(f"âŒ Core services import error: {e}")
+    logger.error(f"❌ Core services import error: {e}")
     services_available = False
 
 # ===== IMPORT ORACLE SERVICE =====
@@ -165,57 +165,57 @@ except ImportError as e:
 try:
     from backend.api.routes import bank_verification
     routers_available['bank_verification'] = bank_verification
-    logger.info("âœ… Bank verification router imported")
+    logger.info("✅ Bank verification router imported")
 except ImportError as e:
-    logger.error(f"âŒ Bank verification router import error: {e}")
+    logger.error(f"❌ Bank verification router import error: {e}")
     routers_available['bank_verification'] = None
 
 try:
     from backend.api.routes.users import router as users_router
     routers_available['users'] = users_router
-    logger.info("âœ… Users router imported")
+    logger.info("✅ Users router imported")
 except ImportError as e:
-    logger.error(f"âŒ Users router import error: {e}")
+    logger.error(f"❌ Users router import error: {e}")
     routers_available['users'] = None
 
 try:
     from backend.api.routes.kyc import router as kyc_router
     routers_available['kyc'] = kyc_router
-    logger.info("âœ… KYC router imported")
+    logger.info("✅ KYC router imported")
 except ImportError as e:
-    logger.error(f"âŒ KYC router import error: {e}")
+    logger.error(f"❌ KYC router import error: {e}")
     routers_available['kyc'] = None
 
 try:
     from backend.api.routes.session import router as session_router
     routers_available['session'] = session_router
-    logger.info("âœ… Session router imported")
+    logger.info("✅ Session router imported")
 except ImportError as e:
-    logger.error(f"âŒ Session router import error: {e}")
+    logger.error(f"❌ Session router import error: {e}")
     routers_available['session'] = None
 
 try:
     from backend.api.routes import wallet
     routers_available['wallet'] = wallet
-    logger.info("âœ… Wallet router imported")
+    logger.info("✅ Wallet router imported")
 except ImportError as e:
-    logger.error(f"âŒ Wallet router import error: {e}")
+    logger.error(f"❌ Wallet router import error: {e}")
     routers_available['wallet'] = None
 
 try:
     from backend.api.routes import oracle
     routers_available['oracle'] = oracle
-    logger.info("âœ… Oracle router imported")
+    logger.info("✅ Oracle router imported")
 except ImportError as e:
-    logger.error(f"âŒ Oracle router import error: {e}")
+    logger.error(f"❌ Oracle router import error: {e}")
     routers_available['oracle'] = None
 
 try:
     from backend.api.routes.licensing import router as licensing_router
     routers_available['licensing'] = licensing_router
-    logger.info("âœ… Licensing router imported")
+    logger.info("✅ Licensing router imported")
 except ImportError as e:
-    logger.error(f"âŒ Licensing router import error: {e}")
+    logger.error(f"❌ Licensing router import error: {e}")
     routers_available['licensing'] = None
 
 try:
@@ -237,9 +237,9 @@ except ImportError as e:
 try:
     from backend.api.routes.payments import router as payments_router
     routers_available['payments'] = payments_router
-    logger.info("âœ… Payments router imported")
+    logger.info("✅ Payments router imported")
 except ImportError as payment_e:
-    logger.error(f"âŒ Payments router import error: {payment_e}")
+    logger.error(f"❌ Payments router import error: {payment_e}")
     from fastapi import APIRouter
     payments_router = APIRouter()
     @payments_router.get("/health")
@@ -250,25 +250,25 @@ except ImportError as payment_e:
 try:
     from backend.api.routes.transactions import router as transactions_router
     routers_available['transactions'] = transactions_router
-    logger.info("âœ… Transactions router imported")
+    logger.info("✅ Transactions router imported")
 except ImportError as e:
-    logger.error(f"âŒ Transactions router import error: {e}")
+    logger.error(f"❌ Transactions router import error: {e}")
     routers_available['transactions'] = None
 
 try:
     from backend.api.routes.onramp import router as onramp_router
     routers_available['onramp'] = onramp_router
-    logger.info("âœ… On-ramp router imported")
+    logger.info("✅ On-ramp router imported")
 except ImportError as e:
-    logger.error(f"âŒ On-ramp router import error: {e}")
+    logger.error(f"❌ On-ramp router import error: {e}")
     routers_available['onramp'] = None
 
 try:
     from backend.api.routes.offramp import router as offramp_router
     routers_available['offramp'] = offramp_router
-    logger.info("âœ… Off-ramp router imported")
+    logger.info("✅ Off-ramp router imported")
 except ImportError as e:
-    logger.error(f"âŒ Off-ramp router import error: {e}")
+    logger.error(f"❌ Off-ramp router import error: {e}")
     routers_available['offramp'] = None
 
 try:
@@ -282,26 +282,34 @@ except ImportError as e:
 try:
     from backend.api.routes.swap_routes import router as swap_router
     routers_available['swap'] = swap_router
-    logger.info("Ã¢Å“â€¦ Swap router imported")
+    logger.info("✅ Swap router imported")
 except ImportError as e:
-    logger.error(f"Ã¢Å’ Swap router import error: {e}")
+    logger.error(f"❌ Swap router import error: {e}")
     routers_available['swap'] = None
 
 try:
     from backend.api.routes.yield_routes import router as yield_router
     routers_available['yield'] = yield_router
-    logger.info("âœ… Yield router imported")
+    logger.info("✅ Yield router imported")
 except ImportError as e:
-    logger.error(f"âŒ Yield router import error: {e}")
+    logger.error(f"❌ Yield router import error: {e}")
     routers_available['yield'] = None
 
 try:
     from backend.api.routes import market
     routers_available['market'] = market
-    logger.info("âœ… Market terminal router imported")
+    logger.info("✅ Market terminal router imported")
 except ImportError as e:
-    logger.error(f"âŒ Market terminal router import error: {e}")
+    logger.error(f"❌ Market terminal router import error: {e}")
     routers_available['market'] = None
+
+try:
+    from backend.api.routes.xrp_routes import router as xrp_router
+    routers_available['xrp'] = xrp_router
+    logger.info("✅ XRP payments router imported")
+except ImportError as e:
+    logger.error(f"❌ XRP payments router import error: {e}")
+    routers_available['xrp'] = None
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
@@ -375,7 +383,7 @@ async def lifespan(app: FastAPI):
     
     try:
         if services_available and dependencies_available:
-            logger.info("âœ… Core services available - proceeding with initialization")
+            logger.info("✅ Core services available - proceeding with initialization")
             settings = get_settings()
             
             # Validate Supabase credentials
@@ -385,7 +393,7 @@ async def lifespan(app: FastAPI):
                         settings.SUPABASE_URL,
                         settings.SUPABASE_SERVICE_KEY.get_secret_value()
                     )
-                    logger.info("âœ… Supabase client created successfully")
+                    logger.info("✅ Supabase client created successfully")
                     
                     # Validate WDK configuration
                     settings.validate_wdk_configuration()
@@ -399,21 +407,21 @@ async def lifespan(app: FastAPI):
                     # Initialize Algorand service
                     from backend.services.algorand_service import AlgorandService
                     algorand_service = AlgorandService(settings)
-                    logger.info("âœ… Algorand service initialized")
+                    logger.info("✅ Algorand service initialized")
                     
                     # Initialize Fee Calculator
                     from backend.services.fee_calculator import FeeCalculatorService
                     fee_calculator = FeeCalculatorService(db_service)
-                    logger.info("âœ… Fee calculator initialized")
+                    logger.info("✅ Fee calculator initialized")
 
                     # Initialize Oracle service
                     oracle_service = None
                     if oracle_service_available:
                         try:
                             oracle_service = OracleService(db_service)
-                            logger.info("âœ… Oracle service initialized")
+                            logger.info("✅ Oracle service initialized")
                         except Exception as e:
-                            logger.error(f"âŒ Oracle service initialization failed: {e}")
+                            logger.error(f"❌ Oracle service initialization failed: {e}")
 
                     # âœ… REPLACE OLD BACKGROUND TASK WITH SMART PRICE LOGGER
                     if oracle_service:
@@ -433,11 +441,11 @@ async def lifespan(app: FastAPI):
                             # Store reference for cleanup
                             app.state.price_logger = price_logger
                             
-                            logger.info("âœ… Intelligent price logger started with tiered refresh rates:")
-                            logger.info("   ðŸ“Š Crypto: 30s | Precious: 5min | Industrial: 15min | Critical: 1hr | Forex: 10min")
+                            logger.info("✅ Intelligent price logger started with tiered refresh rates:")
+                            logger.info("📊 Crypto: 30s | Precious: 5min | Industrial: 15min | Critical: 1hr | Forex: 10min")
                             
                         except Exception as e:
-                            logger.error(f"âŒ Price logger failed to start: {e}")
+                            logger.error(f"❌ Price logger failed to start: {e}")
 
                     # Initialize Multi-Chain Wallet Service (UNIFIED NAME)
                     multi_chain_wallet_service = MultiChainWalletService(
@@ -446,7 +454,7 @@ async def lifespan(app: FastAPI):
                         fee_calculator=fee_calculator,
                         oracle_service=oracle_service
                     )
-                    logger.info("âœ… Multi-Chain Wallet Service initialized")
+                    logger.info("✅ Multi-Chain Wallet Service initialized")
                     
                     # Initialize XRP Service
                     xrp_service = None
@@ -553,9 +561,9 @@ async def lifespan(app: FastAPI):
                     # Test KYC service health
                     try:
                         kyc_health = await kyc_service.health_check()
-                        logger.info(f"âœ… KYC Service health: {kyc_health}")
+                        logger.info(f"✅ KYC Service health: {kyc_health}")
                     except Exception as e:
-                        logger.error(f"âŒ KYC Service health check failed: {e}")
+                        logger.error(f"❌ KYC Service health check failed: {e}")
                     
                     # Register all services with dependency injection
                     initialize_dependencies(
@@ -568,7 +576,7 @@ async def lifespan(app: FastAPI):
                         algorand_service,
                         oracle_service
                     )
-                    logger.info("âœ… All dependencies initialized successfully")
+                    logger.info("✅ All dependencies initialized successfully")
                     
                     # ============================================================================
                     # START FEE COLLECTION SCHEDULER (Background Task)
@@ -579,13 +587,13 @@ async def lifespan(app: FastAPI):
                         scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
                         await scheduler.start()
                         
-                        logger.info("âœ… Fee collection scheduler started (runs daily at 3:00 AM)")
+                        logger.info("✅ Fee collection scheduler started (runs daily at 3:00 AM)")
                         
                         # Store reference for cleanup
                         app.state.fee_scheduler = scheduler
                         
                     except Exception as sched_err:
-                        logger.error(f"âŒ Fee collection scheduler failed to start: {sched_err}")
+                        logger.error(f"❌ Fee collection scheduler failed to start: {sched_err}")
 
                     # Test business model calculations
                     try:
@@ -596,23 +604,22 @@ async def lifespan(app: FastAPI):
                             from_country="nigeria",
                             to_country="kenya"
                         )
-                        logger.info(f"ðŸ’° Business model initialized. Test $1000 cross-border: Fee=${test_calc['total_fee']}, Revenue=${test_calc['net_revenue']}")
+                        logger.info(f"✅ Business model initialized. Test $1000 cross-border: Fee=${test_calc['total_fee']}, Revenue=${test_calc['net_revenue']}")
                     except Exception as e:
-                        logger.warning(f"âš ï¸ Business model validation failed: {e}")
+                        logger.warning(f"⚠️ Business model validation failed: {e}")
                     
                 except Exception as e:
-                    logger.error(f"âŒ Supabase client creation failed: {e}")
+                    logger.error(f"❌ Supabase client creation failed: {e}")
                     supabase_client = None
             else:
-                logger.warning("âŒ Supabase credentials validation failed - operating without database")
+                logger.warning("❌ Supabase credentials validation failed - operating without database")
         else:
-            logger.warning("âŒ Core services not available - operating in limited mode")
+            logger.warning("❌ Core services not available - operating in limited mode")
     
     except Exception as e:
-        logger.critical(f"ðŸ’¥ FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
-        logger.info("ðŸš¨ Continuing with degraded functionality")
-
-        # âœ… START WDK DEPOSIT MONITOR (background task)
+        logger.critical(f"💥 FATAL STARTUP ERROR: {e}\n{traceback.format_exc()}")
+        logger.info("🚨 Continuing with degraded functionality")
+        # START WDK DEPOSIT MONITOR (background task)
         if services_available:
             try:
                 from backend.services.wdk_deposit_monitor import WDKDepositMonitor
@@ -697,7 +704,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ðŸ” Seed Retrieval Routes - ADD HERE
+# Seed Retrieval Routes - ADD HERE
 try:
     from backend.api.routes.seed_routes import router as seed_routes_router
     app.include_router(seed_routes_router)
@@ -705,7 +712,7 @@ try:
 except ImportError as e:
     logger.error(f"Seed routes import error: {e}")
 
-# âœ… ADD this clean registration (only once)
+# ADD this clean registration (only once)
 if routers_available.get('wallet_creation'):
     app.include_router(routers_available['wallet_creation'], prefix="/api/v1", tags=["Wallet Creation"])
     logger.info("Wallet creation routes registered at /api/v1/wallet-creation")
@@ -829,6 +836,10 @@ if routers_available.get('market'):
     # Register main market router (/api/v1/market/...)
     app.include_router(routers_available['market'].router, prefix="/api/v1")
     logger.info("Market terminal router registered at /api/v1/market")
+
+if routers_available.get('xrp'):
+    app.include_router(routers_available['xrp'])
+    logger.info("✅ XRP payments router registered at /api/v1/xrp")
     
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
