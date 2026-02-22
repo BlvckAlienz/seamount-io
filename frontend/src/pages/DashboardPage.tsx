@@ -265,7 +265,7 @@ const DashboardPage = () => {
             </button>
             
             <button 
-              onClick={() => navigate('/xrp')}
+              onClick={() => setShowEarnModal(true)}
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
             >
               <TrendingUp className="h-4 w-4" />
