@@ -103,12 +103,13 @@ const DashboardPage = () => {
   const [showReceiveModal, setShowReceiveModal] = useState(false);  // ✅ ADD THIS
   
   const AUTO_CREATED_CHAINS = [
-    { id: 'algorand', name: 'Algorand', symbol: 'ALGO' },
-    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC' },
-    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH' },
-    { id: 'polygon', name: 'Polygon', symbol: 'MATIC' },
-    { id: 'tron', name: 'TRON', symbol: 'TRX' },
-    { id: 'solana', name: 'Solana', symbol: 'SOL' },
+    { id: 'algorand', name: 'Algorand',   symbol: 'ALGO'  },
+    { id: 'bitcoin',  name: 'Bitcoin',    symbol: 'BTC'   },
+    { id: 'ethereum', name: 'Ethereum',   symbol: 'ETH'   },
+    { id: 'polygon',  name: 'Polygon',    symbol: 'MATIC' },
+    { id: 'tron',     name: 'TRON',       symbol: 'TRX'   },
+    { id: 'solana',   name: 'Solana',     symbol: 'SOL'   },
+    { id: 'xrp',      name: 'XRP Ledger', symbol: 'RLUSD' },  // ✅ NEW
   ];
 
   useEffect(() => {
@@ -264,7 +265,7 @@ const DashboardPage = () => {
             </button>
             
             <button 
-              onClick={() => setShowEarnModal(true)}
+              onClick={() => navigate('/xrp')}
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
             >
               <TrendingUp className="h-4 w-4" />
@@ -293,7 +294,7 @@ const DashboardPage = () => {
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 rounded-2xl p-4 md:p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg md:text-xl font-bold text-white">Multi-Chain Wallets</h2>
-              <span className="text-xs md:text-sm text-gray-400">{createdChains} of 6 created</span>
+              <span className="text-xs md:text-sm text-gray-400">{createdChains} of 7 created</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">

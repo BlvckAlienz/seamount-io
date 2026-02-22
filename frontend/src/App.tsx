@@ -43,6 +43,7 @@ import CollateralPage from './pages/CollateralPage';
 import PredictionMarketsPage from './pages/PredictionMarketsPage';
 import MarketTerminal from './components/market/MarketTerminal';
 import MyAssetsPage from '@/pages/MyAssetsPage';
+import XRPPage from '@/pages/XRPPage';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -208,6 +209,15 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <WalletsPage />
+            </ProtectedRoute>
+          } 
+        />
+        {/* 🌊 XRP Ledger — Payments + Yield Farming */}
+        <Route 
+          path="/xrp" 
+          element={
+            <ProtectedRoute>
+              <XRPPage />
             </ProtectedRoute>
           } 
         />

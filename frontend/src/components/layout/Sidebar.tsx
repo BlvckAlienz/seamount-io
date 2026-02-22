@@ -19,6 +19,7 @@ import {
   Receipt,
   BookOpen,
   Wallet,
+  Waves,
   Zap,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ const Sidebar: React.FC = () => {
   // 🚨 ALL NAV ITEMS (includes business-only features)
   const allNavItems: NavItem[] = [
     { label: 'Wallets', icon: Wallet, path: '/dashboard' },
+    { label: 'XRP Ledger', icon: Waves, path: '/xrp' },
     { label: 'My Assets', icon: Briefcase, path: '/my-assets' },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading' },

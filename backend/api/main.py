@@ -311,6 +311,14 @@ except ImportError as e:
     logger.error(f"❌ XRP payments router import error: {e}")
     routers_available['xrp'] = None
 
+try:
+    from backend.api.routes.xrp_yield_routes import router as xrp_yield_router
+    routers_available['xrp_yield'] = xrp_yield_router
+    logger.info("✅ XRP yield router imported")
+except ImportError as e:
+    logger.error(f"❌ XRP yield router import error: {e}")
+    routers_available['xrp_yield'] = None
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}
@@ -587,6 +595,28 @@ async def lifespan(app: FastAPI):
                         scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
                         await scheduler.start()
                         
+                        # Schedule daily yield distribution at 3:30 AM UTC
+                        async def run_daily_yield():
+                            while True:
+                                try:
+                                    await asyncio.sleep(24 * 3600)  # 24h
+                                    from backend.services.xrp_yield_service import XRPYieldService
+                                    from backend.services.xrp_service import XRPService
+                                    from backend.services.xrp_defi_service import XRPDeFiService
+                                    from backend.services.xrp_payment_service import XRPPaymentService
+                                    _xrp = XRPService(settings=settings)
+                                    _defi = XRPDeFiService(xrp_service=_xrp, settings=settings)
+                                    _pay = XRPPaymentService(supabase_client=supabase_client, xrp_service=_xrp, settings=settings)
+                                    _yield = XRPYieldService(supabase_client=supabase_client, xrp_defi_service=_defi, xrp_payment_service=_pay, settings=settings)
+                                    for pool in ["RLUSD/XRP", "USDC/XRP"]:
+                                        await _yield.distribute_yield(pool=pool)
+                                except Exception as ye:
+                                    logger.error(f"❌ Daily yield distribution failed: {ye}")
+
+                        asyncio.create_task(run_daily_yield())
+                        logger.info("✅ Daily yield distribution task scheduled (24h interval)")
+
+
                         logger.info("✅ Fee collection scheduler started (runs daily at 3:00 AM)")
                         
                         # Store reference for cleanup
@@ -840,6 +870,10 @@ if routers_available.get('market'):
 if routers_available.get('xrp'):
     app.include_router(routers_available['xrp'])
     logger.info("✅ XRP payments router registered at /api/v1/xrp")
+
+if routers_available.get('xrp_yield'):
+    app.include_router(routers_available['xrp_yield'])
+    logger.info("✅ XRP yield router registered at /api/v1/xrp/yield")
     
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):

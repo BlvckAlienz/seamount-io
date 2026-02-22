@@ -1,104 +1,71 @@
 // File: frontend/src/config/api.ts
-// CRITICAL FIX: API base URL configuration
 
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
-// FIXED: Single source of truth for API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://seamount-io-pr8a.onrender.com";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  validateStatus: function (status) {
-    return status < 500;
-  },
+  headers: { 'Content-Type': 'application/json' },
+  validateStatus: (status) => status < 500,
 });
 
-// FIXED: Proper API endpoints for Seamount 2.0
 const API_ENDPOINTS = {
-  AUTH: {
-    RESET_PASSWORD: '/api/v1/auth/reset-password',
-  },
-  LEADS: {
-    BUSINESS_CONTACT: '/api/v1/leads/business-contact',
-  },
-  USER: {
-    PROFILE: '/api/v1/user/profile',
-    PROVISION_WALLETS: '/api/v1/user/provision-wallets', // FIXED: proper endpoint
-  },
-  SESSION: {
-    INITIALIZE: '/api/v1/session/initialize',
-  },
-  CONSENT: {
-    UPDATE: '/api/v1/consent/update',
-  },
-  WALLET: {
-    CREATE: '/api/wallet/create',
-  },
+  AUTH:    { RESET_PASSWORD: '/api/v1/auth/reset-password' },
+  LEADS:   { BUSINESS_CONTACT: '/api/v1/leads/business-contact' },
+  USER:    { PROFILE: '/api/v1/user/profile', PROVISION_WALLETS: '/api/v1/user/provision-wallets' },
+  SESSION: { INITIALIZE: '/api/v1/session/initialize' },
+  CONSENT: { UPDATE: '/api/v1/consent/update' },
+  WALLET:  { CREATE: '/api/wallet/create' },
   KYC: {
     START_VERIFICATION: '/api/v1/kyc/start-verification',
-    CHECK_PROFILE: '/api/v1/kyc/profile-check',
-    GET_STATUS: '/api/v1/kyc/status',
-    SKIP_VERIFICATION: '/api/v1/kyc/skip-verification',
-    REQUIREMENTS: '/api/v1/kyc/requirements',
+    CHECK_PROFILE:      '/api/v1/kyc/profile-check',
+    GET_STATUS:         '/api/v1/kyc/status',
+    SKIP_VERIFICATION:  '/api/v1/kyc/skip-verification',
+    REQUIREMENTS:       '/api/v1/kyc/requirements',
   },
-  portfolio: {
-    SUMMARY: '/api/v1/portfolio/summary', // FIXED: missing endpoint
-  },
+  portfolio: { SUMMARY: '/api/v1/portfolio/summary' },
   TRADING: {
     SWAP: '/api/v1/trading/swap',
-    BUY: '/api/v1/trading/buy',
+    BUY:  '/api/v1/trading/buy',
     SELL: '/api/v1/trading/sell',
-  }
+  },
+  // ✅ NEW: XRP Ledger endpoints (Phases 2 & 3)
+  XRP: {
+    BALANCES:          '/api/v1/xrp/balances',
+    DEPOSIT_INFO:      '/api/v1/xrp/deposit-info',
+    TRANSFER:          '/api/v1/xrp/transfer',
+    WITHDRAW:          '/api/v1/xrp/withdraw',
+    TRANSACTIONS:      '/api/v1/xrp/transactions',
+    HEALTH:            '/api/v1/xrp/health',
+    YIELD_POOLS:       '/api/v1/xrp/yield/pools',
+    YIELD_POSITIONS:   '/api/v1/xrp/yield/positions',
+    YIELD_DEPOSIT:     '/api/v1/xrp/yield/deposit',
+    YIELD_WITHDRAW:    '/api/v1/xrp/yield/withdraw',
+    YIELD_HISTORY:     '/api/v1/xrp/yield/history',
+  },
 };
 
-// Request interceptor
+// Request interceptor — attach Supabase auth token
 apiClient.interceptors.request.use(async (config) => {
-  const fullUrl = `${config.baseURL}${config.url}`;
-  console.log(`[API Request] --> ${config.method?.toUpperCase()} ${fullUrl}`);
-  
+  console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    // ✅ DEBUG: Log full session state (development only)
+    const { data: { session } } = await supabase.auth.getSession();
     if (import.meta.env.DEV) {
-      console.log('[API Auth] Session check:', {
-        hasSession: !!session,
-        hasToken: !!session?.access_token,
-        userId: session?.user?.id,
-        error: error?.message,
-        url: config.url,
-      });
+      console.log('[API Auth] Session check:', { hasSession: !!session, userId: session?.user?.id, url: config.url });
     }
-    
-    const token = session?.access_token;
-    
-    if (token) {
-      if (!config.headers) {
-        config.headers = {} as any;
-      }
-      
-      config.headers['Authorization'] = `Bearer ${token}`;
-      
-      if (import.meta.env.DEV) {
-        console.log(`[API Auth] ✅ Token attached (${token.substring(0, 20)}...) for ${config.url}`);
-      }
+    if (session?.access_token) {
+      if (!config.headers) config.headers = {} as any;
+      config.headers['Authorization'] = `Bearer ${session.access_token}`;
+      if (import.meta.env.DEV) console.log(`[API Auth] ✅ Token attached for ${config.url}`);
     } else {
-      console.error(`[API Auth] ❌ NO TOKEN for ${config.url} - Session:`, session);
+      console.error(`[API Auth] ❌ NO TOKEN for ${config.url}`);
     }
   } catch (error) {
-    console.error('[API Auth Error] Failed to get session:', error);
+    console.error('[API Auth Error]:', error);
   }
-  
-  // ✅ DEBUG: Log final headers (development only)
-  if (import.meta.env.DEV) {
-    console.log('[API Headers]', config.headers);
-  }
-  
   return config;
 }, (error) => {
   console.error('[API Request Error]:', error);
@@ -108,37 +75,32 @@ apiClient.interceptors.request.use(async (config) => {
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    console.log(`[API Response] <-- ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-    console.log(`[API Success] ${response.config.url?.split('/').pop() || 'Unknown'} operation completed`);
+    console.log(`[API Response] <-- ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
-    const config = error.config;
-    const response = error.response;
-    const url = config?.url || 'unknown endpoint';
-    const status = response?.status || 'Network Error';
-    const detail = response?.data?.detail || error.message;
-
-    console.error(`[API Error] <-- ${status} ${config?.method?.toUpperCase()} ${url}`);
-    console.error(`[API Error] Detail: ${detail}`);
-    
+    const url = error.config?.url || 'unknown';
+    const status = error.response?.status || 'Network Error';
+    const detail = error.response?.data?.detail || error.message;
+    console.error(`[API Error] <-- ${status} ${url}: ${detail}`);
     return Promise.reject(error);
   }
 );
 
-// API functions
+// ─── API modules ──────────────────────────────────────────────────────────────
+
 const userAPI = {
-  getProfile: () => apiClient.get(API_ENDPOINTS.USER.PROFILE),
-  updateProfile: (data: any) => apiClient.put(API_ENDPOINTS.USER.PROFILE, data),
-  provisionWallets: () => apiClient.post(API_ENDPOINTS.USER.PROVISION_WALLETS), // FIXED
+  getProfile:      () => apiClient.get(API_ENDPOINTS.USER.PROFILE),
+  updateProfile:   (data: any) => apiClient.put(API_ENDPOINTS.USER.PROFILE, data),
+  provisionWallets:() => apiClient.post(API_ENDPOINTS.USER.PROVISION_WALLETS),
 };
 
 const kycAPI = {
-  checkProfile: () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
-  startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
+  checkProfile:     () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
+  startVerification:() => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
   skipVerification: () => apiClient.post(API_ENDPOINTS.KYC.SKIP_VERIFICATION),
-  getStatus: (userId?: string) => apiClient.get(`${API_ENDPOINTS.KYC.GET_STATUS}${userId ? `/${userId}` : ''}`),
-  getRequirements: () => apiClient.get(API_ENDPOINTS.KYC.REQUIREMENTS),
+  getStatus:        (userId?: string) => apiClient.get(`${API_ENDPOINTS.KYC.GET_STATUS}${userId ? `/${userId}` : ''}`),
+  getRequirements:  () => apiClient.get(API_ENDPOINTS.KYC.REQUIREMENTS),
 };
 
 const walletAPI = {
@@ -146,16 +108,54 @@ const walletAPI = {
 };
 
 const portfolioAPI = {
-  getSummary: () => apiClient.get(API_ENDPOINTS.portfolio.SUMMARY), // NEW
+  getSummary: () => apiClient.get(API_ENDPOINTS.portfolio.SUMMARY),
 };
 
 const tradingAPI = {
-  swap: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SWAP, data), // NEW
-  buy: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.BUY, data), // NEW
-  sell: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SELL, data), // NEW
+  swap: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SWAP, data),
+  buy:  (data: any) => apiClient.post(API_ENDPOINTS.TRADING.BUY, data),
+  sell: (data: any) => apiClient.post(API_ENDPOINTS.TRADING.SELL, data),
 };
 
-// Session initialization
+// ✅ NEW: XRP API module
+const xrpAPI = {
+  // Balances & deposit
+  getBalances:    () => apiClient.get(API_ENDPOINTS.XRP.BALANCES),
+  getDepositInfo: () => apiClient.get(API_ENDPOINTS.XRP.DEPOSIT_INFO),
+
+  // Payments
+  transfer: (data: {
+    recipient_id: string; symbol: string; amount: string; memo?: string;
+  }) => apiClient.post(API_ENDPOINTS.XRP.TRANSFER, data),
+
+  withdraw: (data: {
+    symbol: string; amount: string; destination_address: string; destination_tag?: number;
+  }) => apiClient.post(API_ENDPOINTS.XRP.WITHDRAW, data),
+
+  getTransactions: (params?: { symbol?: string; limit?: number; offset?: number }) =>
+    apiClient.get(API_ENDPOINTS.XRP.TRANSACTIONS, { params }),
+
+  health: () => apiClient.get(API_ENDPOINTS.XRP.HEALTH),
+
+  // Yield farming
+  getPools:     () => apiClient.get(API_ENDPOINTS.XRP.YIELD_POOLS),
+  getPositions: () => apiClient.get(API_ENDPOINTS.XRP.YIELD_POSITIONS),
+
+  depositYield: (data: { pool: string; amount: string }) =>
+    apiClient.post(API_ENDPOINTS.XRP.YIELD_DEPOSIT, data),
+
+  withdrawYield: (data: { position_id: string }) =>
+    apiClient.post(API_ENDPOINTS.XRP.YIELD_WITHDRAW, data),
+
+  getYieldHistory: (params?: { pool?: string; limit?: number; offset?: number }) =>
+    apiClient.get(API_ENDPOINTS.XRP.YIELD_HISTORY, { params }),
+};
+
+const seedAPI = {
+  getRecoverySeeds: () => apiClient.get('/api/v1/seeds/recovery'),
+  getAccessLog:     () => apiClient.get('/api/v1/seeds/access-log'),
+};
+
 const initializeSession = async (): Promise<string> => {
   try {
     const response = await apiClient.post(API_ENDPOINTS.SESSION.INITIALIZE);
@@ -174,14 +174,9 @@ export {
   walletAPI,
   portfolioAPI,
   tradingAPI,
+  xrpAPI,        // ✅ NEW
   seedAPI,
   initializeSession,
-};
-
-// 🔐 Seed Recovery API
-const seedAPI = {
-  getRecoverySeeds: () => apiClient.get('/api/v1/seeds/recovery'),
-  getAccessLog: () => apiClient.get('/api/v1/seeds/access-log'),
 };
 
 export default apiClient;
