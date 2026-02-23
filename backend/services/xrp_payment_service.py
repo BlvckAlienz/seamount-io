@@ -62,12 +62,24 @@ class XRPPaymentService:
                 .execute()
             )
 
+            # ✅ SELF-HEAL: Auto-assign tag on first request instead of 404
             if not result.data:
-                raise ValueError(f"No XRP destination tag found for user {user_id}. "
-                                 "Ensure XRP wallet setup completed.")
+                logger.info(f"No destination tag for {user_id[:8]}... — auto-assigning now")
+                tag = await self._assign_xrp_destination_tag(user_id)
+                hot_wallet = self.settings.XRP_HOT_WALLET_ADDRESS
 
-            tag_data = result.data[0]
-            hot_wallet = tag_data['hot_wallet'] or self.settings.XRP_HOT_WALLET_ADDRESS
+                await asyncio.to_thread(
+                    lambda: self.supabase.table("xrp_destination_tags").insert({
+                        "user_id": user_id,
+                        "destination_tag": tag,
+                        "hot_wallet": hot_wallet,
+                        "created_at": datetime.utcnow().isoformat(),
+                    }).execute()
+                )
+                logger.info(f"✅ Auto-assigned destination tag {tag} to user {user_id[:8]}...")
+            else:
+                tag = int(result.data[0]['destination_tag'])
+                hot_wallet = result.data[0]['hot_wallet'] or self.settings.XRP_HOT_WALLET_ADDRESS
 
             return {
                 "success": True,
