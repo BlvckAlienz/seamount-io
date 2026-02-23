@@ -110,22 +110,24 @@ def get_xrp_payment_service(
     settings=Depends(get_settings),
 ):
     """
-    Build XRPPaymentService on demand.
-    Lazy-imports to avoid circular deps at startup.
+    Graceful degradation: DB-only operations work even if xrpl-py is missing.
+    On-chain operations (withdraw) will fail at call time if xrp_service is None.
     """
+    from backend.services.xrp_payment_service import XRPPaymentService
+
+    xrp_service = None
     try:
         from backend.services.xrp_service import XRPService
-        from backend.services.xrp_payment_service import XRPPaymentService
         xrp_service = XRPService(settings=settings)
-        return XRPPaymentService(
-            supabase_client=supabase,
-            xrp_service=xrp_service,
-            settings=settings,
-        )
     except Exception as e:
-        logger.error(f"❌ Failed to init XRPPaymentService: {e}")
-        raise HTTPException(status_code=503, detail="XRP payment service unavailable")
+        logger.warning(f"⚠️ XRPService unavailable (xrpl-py missing?): {e}. "
+                       "Read-only endpoints still functional.")
 
+    return XRPPaymentService(
+        supabase_client=supabase,
+        xrp_service=xrp_service,
+        settings=settings,
+    )
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 

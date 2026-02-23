@@ -313,6 +313,10 @@ class XRPPaymentService:
             }).execute()
         )
 
+        # ── Guard: xrp_service required for on-chain tx ──
+        if self.xrp is None:
+            raise RuntimeError("On-chain withdrawals unavailable: xrpl-py not installed on this server. Contact support.")
+        
         # ── Submit on-chain tx ──
         try:
             if symbol == "XRP":

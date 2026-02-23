@@ -73,13 +73,25 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         symbol: 'TRX'
       },
       solana: {
-      name: 'Solana',
-      icon: 'https://cryptologos.cc/logos/solana-sol-logo.svg',
-      color: 'from-purple-400 to-pink-600',
-      symbol: 'SOL'
+        name: 'Solana',
+        icon: 'https://cryptologos.cc/logos/solana-sol-logo.svg',
+        color: 'from-purple-400 to-pink-600',
+        symbol: 'SOL'
+      },
+      xrp: {
+        name: 'XRP Ledger',
+        icon: 'https://cryptologos.cc/logos/xrp-xrp-logo.svg',
+        color: 'from-blue-400 to-cyan-500',
+        symbol: 'RLUSD'
       }
     };
-    return configs[chain as keyof typeof configs] || configs.algorand;
+    // ✅ Default to a generic config, NOT algorand
+    return configs[chain as keyof typeof configs] || {
+      name: chain.toUpperCase(),
+      icon: '',
+      color: 'from-gray-500 to-gray-700',
+      symbol: chain.toUpperCase()
+    };
   };
 
   // 🔥 ABSOLUTE RELIABILITY: Multiple fallback icons
@@ -114,10 +126,15 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/sol.png',
         'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/sol.png',
         'https://cryptoicon-api.vercel.app/api/icon/sol'
+      ],
+      xrp: [
+        'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/xrp.png',
+        'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@bea1a9722a8c63169dcc06e86182bf2c55a76bbc/128/color/xrp.png',
+        'https://cryptoicon-api.vercel.app/api/icon/xrp'
       ]
     };
-    
-    return iconFallbacks[chain] || iconFallbacks.algorand;
+
+    return iconFallbacks[chain] || iconFallbacks.xrp || [];
   };
 
   const config = getChainConfig(chain);

@@ -111,7 +111,7 @@ async def retry_wallet_creation(
         
         # Validate chain names if provided
         if chains:
-            valid_chains = ['algorand', 'bitcoin', 'ethereum', 'polygon']
+            valid_chains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron', 'solana', 'xrp']
             invalid_chains = [c for c in chains if c not in valid_chains]
             if invalid_chains:
                 raise HTTPException(

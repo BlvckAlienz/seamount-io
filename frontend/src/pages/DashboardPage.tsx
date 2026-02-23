@@ -187,6 +187,20 @@ const DashboardPage = () => {
     } catch (error) {
       console.error('Failed to fetch wallets:', error);
     }
+
+    // XRP is custodial — check deposit-info for tag existence
+    // If the endpoint responds (even without xrp_service), tag is assigned
+    try {
+      const xrpRes = await apiClient.get('/api/v1/xrp/deposit-info');
+      if (xrpRes.data?.success && xrpRes.data?.destination_tag) {
+        setMultiChainWallets(prev => ({
+          ...prev,
+          xrp: { address: `tag:${xrpRes.data.destination_tag}` }
+        }));
+      }
+    } catch {
+      // XRP not set up yet — card shows as "not_created" which is fine
+    }
   };
 
   const calculateChainBalance = (chain: string) => {
@@ -197,6 +211,11 @@ const DashboardPage = () => {
   };
 
   const handleWalletCardClick = (chain: string) => {
+    // XRP is custodial — always route to XRP hub page
+    if (chain === 'xrp') {
+      navigate('/xrp');
+      return;
+    }
     if (multiChainWallets[chain]?.address) {
       setSelectedChain(chain);
       setShowWalletModal(true);
