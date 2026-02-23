@@ -69,12 +69,12 @@ class XRPPaymentService:
                 hot_wallet = self.settings.XRP_HOT_WALLET_ADDRESS
 
                 await asyncio.to_thread(
-                    lambda: self.supabase.table("xrp_destination_tags").insert({
+                    lambda: self.supabase.table("xrp_destination_tags").upsert({
                         "user_id": user_id,
                         "destination_tag": tag,
                         "hot_wallet": hot_wallet,
                         "created_at": datetime.utcnow().isoformat(),
-                    }).execute()
+                    }, on_conflict="user_id").execute()
                 )
                 logger.info(f"✅ Auto-assigned destination tag {tag} to user {user_id[:8]}...")
             else:
@@ -104,7 +104,8 @@ class XRPPaymentService:
             logger.error(f"get_deposit_info ValueError: {e}")
             raise
         except Exception as e:
-            logger.error(f"❌ get_deposit_info failed for {user_id}: {e}")
+            import traceback
+            logger.error(f"❌ get_deposit_info failed for {user_id}: {e}\n{traceback.format_exc()}")
             raise
 
     # ─── INTERNAL BALANCE ──────────────────────────────────────────────────────

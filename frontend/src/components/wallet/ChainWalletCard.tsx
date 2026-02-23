@@ -161,6 +161,12 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   };
 
   const handleCardClick = () => {
+    // XRP is custodial — no blockchain wallet to create.
+    // Navigate to XRP hub which auto-assigns destination tag on load.
+    if (chain === 'xrp') {
+      window.location.href = '/xrp';
+      return;
+    }
     if (status === 'not_created') {
       createSingleWallet(chain);
       return;
@@ -194,7 +200,7 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         </div>
 
         <div className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium text-center transition-colors group-hover:scale-105">
-          Create Wallet
+          {chain === 'xrp' ? 'Set Up Account' : 'Create Wallet'}
         </div>
       </div>
     );
