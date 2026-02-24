@@ -13,6 +13,7 @@ import logging
 from decimal import Decimal, ROUND_DOWN
 from typing import Dict, Any, Optional
 from datetime import datetime
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,9 @@ class XRPPaymentService:
             if not result.data:
                 logger.info(f"No destination tag for {user_id[:8]}... — auto-assigning now")
                 tag = await self._assign_xrp_destination_tag(user_id)
-                hot_wallet = self.settings.XRP_HOT_WALLET_ADDRESS
+                hot_wallet = getattr(self.settings, 'XRP_HOT_WALLET_ADDRESS', None) or os.getenv('XRP_HOT_WALLET_ADDRESS', '')
+                if not hot_wallet:
+                    raise RuntimeError("XRP_HOT_WALLET_ADDRESS not configured in environment")
 
                 await asyncio.to_thread(
                     lambda: self.supabase.table("xrp_destination_tags").upsert({
@@ -79,7 +82,7 @@ class XRPPaymentService:
                 logger.info(f"✅ Auto-assigned destination tag {tag} to user {user_id[:8]}...")
             else:
                 tag = int(result.data[0]['destination_tag'])
-                hot_wallet = result.data[0]['hot_wallet'] or self.settings.XRP_HOT_WALLET_ADDRESS
+                hot_wallet = result.data[0]['hot_wallet'] or getattr(self.settings, 'XRP_HOT_WALLET_ADDRESS', None) or os.getenv('XRP_HOT_WALLET_ADDRESS', '')
 
             return {
                 "success": True,

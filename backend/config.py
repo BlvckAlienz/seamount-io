@@ -35,6 +35,8 @@ class BlockchainNetwork(str, Enum):
     POLYGON = "polygon"
     BITCOIN = "bitcoin"
     TRON = "tron"
+    SOLANA = "solana"
+    XRP = "xrp"
 
 class TransactionType(str, Enum):
     """Transaction Types with Different Fee Structures"""
@@ -52,6 +54,15 @@ class PricingRegion(str, Enum):
     GHANA = "ghana"
     SOUTH_AFRICA = "south_africa"
     GLOBAL = "global"
+
+# ── XRP Ledger Configuration ──────────────────────────────────────
+XRP_NETWORK: str = "testnet"
+XRP_HOT_WALLET_ADDRESS: str = "rDESzopPoPL2WbvEcBKqtZ1ztCs46i9NS1"
+XRP_HOT_WALLET_SEED: str = "sEdTyYp1tFcGrnM8qiNUgJRgiHHgDS9"
+XRP_DEFI_WALLET_ADDRESS: str = "rJyGL4wLvo1yfntabicJCV6hz8aVxagY71"
+XRP_DEFI_WALLET_SEED: str = "sEd75hMDemdDpxASudax5yqqqmPMGvr"
+XRP_ADMIN_WALLET_ADDRESS: str = "rMMK8CQ3JCs7gMeVem7FkWfgpGs4d22zeA"
+XRP_ADMIN_WALLET_SEED: str = "sEdT8CMDmXnx5qPSav7XvWhM7B8Dr5Z"
 
 # ============================================================================
 # MULTI-CHAIN BUSINESS MODEL CONFIGURATION
