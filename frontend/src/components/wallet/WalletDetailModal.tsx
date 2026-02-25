@@ -64,6 +64,11 @@ const chainAssets: { [key: string]: Array<{ symbol: string; name: string }> } = 
     { symbol: 'SOL', name: 'Solana' },
     { symbol: 'USDT', name: 'Tether' },
     { symbol: 'USDC', name: 'USD Coin' }
+  ],
+  xrp: [
+    { symbol: 'RLUSD', name: 'Ripple USD' },
+    { symbol: 'USDC',  name: 'USD Coin' },
+    { symbol: 'XRP',   name: 'XRP' },
   ]
 };
 
@@ -73,7 +78,8 @@ const getOracleAssetName = (symbol: string): string => {
     'BTC': 'bitcoin', 'ETH': 'ethereum', 'MATIC': 'matic',
     'ALGO': 'algorand', 'TRX': 'tron', 'SOL': 'solana',
     'USDT': 'tether', 'USDC': 'tether', 'USDCa': 'tether', 
-    'goBTC': 'bitcoin', 'goETH': 'ethereum'
+    'goBTC': 'bitcoin', 'goETH': 'ethereum',
+    'XRP': 'ripple', 'RLUSD': 'tether'
   };
   return assetMap[symbol] || 'algorand';
 };
@@ -84,7 +90,8 @@ const getEmergencyFallbackPrice = (symbol: string): number => {
     'BTC': 63500.00, 'ETH': 2650.00, 'ALGO': 0.18,
     'MATIC': 0.75, 'TRX': 0.12, 'SOL': 145.00,
     'USDT': 1.00, 'USDC': 1.00, 'USDCa': 1.00, 
-    'goBTC': 63500.00, 'goETH': 2650.00
+    'goBTC': 63500.00, 'goETH': 2650.00,
+    'XRP': 0.50, 'RLUSD': 1.00
   };
   return fallbackPrices[symbol] || 0.00;
 };
@@ -535,7 +542,8 @@ const handleReceiveAsset = () => {
       polygon: `https://polygonscan.com/address/${address}`,
       algorand: `https://explorer.perawallet.app/address/${address}`,
       tron: `https://tronscan.org/#/address/${address}`,
-      solana: `https://explorer.solana.com/address/${address}`
+      solana: `https://explorer.solana.com/address/${address}`,
+      xrp: `https://testnet.xrpl.org/accounts/${address}`
     };
     return explorers[chain] || '#';
   };
@@ -625,25 +633,44 @@ const handleReceiveAsset = () => {
             <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-800 border border-gray-700 rounded-lg">
               <h4 className="text-sm font-semibold text-gray-400 mb-2">Wallet Balance</h4>
               <div className="text-xl sm:text-2xl font-bold text-white">${balance.toFixed(2)}</div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(address);
-                  toast.success('Address copied!');
-                }}
-                className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full font-medium"
-              >
-                <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
-              </button>
-              <a
-                href={getExplorerUrl(chain, address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300 mt-1 flex items-center gap-1 font-semibold"
-              >
-                View on Explorer
-                <ExternalLink className="w-3 h-3" />
-              </a>
+              {chain === 'xrp' ? (
+                <>
+                  <div className="text-xs text-gray-400 mt-2 font-medium">
+                    Custodial · Destination Tag:
+                  </div>
+                  <div className="text-lg font-bold text-blue-300 font-mono mt-1">
+                    {address.replace('tag:', '')}
+                  </div>
+                  <a
+                    href="/xrp"
+                    className="text-xs text-blue-400 hover:text-blue-300 mt-2 flex items-center gap-1 font-semibold"
+                  >
+                    Full XRP Details →
+                  </a>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(address);
+                      toast.success('Address copied!');
+                    }}
+                    className="text-xs text-gray-400 hover:text-white mt-2 flex items-center gap-1 truncate w-full font-medium"
+                  >
+                    <span className="truncate">{address.slice(0, 8)}...{address.slice(-6)}</span>
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </button>
+                  <a
+                    href={getExplorerUrl(chain, address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 mt-1 flex items-center gap-1 font-semibold"
+                  >
+                    View on Explorer
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </>
+              )}
             </div>
           </div>
 

@@ -211,16 +211,16 @@ const DashboardPage = () => {
   };
 
   const handleWalletCardClick = (chain: string) => {
-    // XRP is custodial — always route to XRP hub page
-    if (chain === 'xrp') {
-      navigate('/xrp');
-      return;
-    }
     if (multiChainWallets[chain]?.address) {
       setSelectedChain(chain);
       setShowWalletModal(true);
     } else {
-      toast.error(`${chain} wallet not created yet`);
+      // XRP: route to setup page; others: show error
+      if (chain === 'xrp') {
+        navigate('/xrp');
+      } else {
+        toast.error(`${chain} wallet not created yet`);
+      }
     }
   };
 
