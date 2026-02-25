@@ -163,7 +163,7 @@ const XRPPage: React.FC = () => {
     setTransferring(true);
     try {
       const r = await apiClient.post('/api/v1/xrp/transfer', {
-        recipient_id: transferRecipient,
+        recipient_tag: parseInt(transferRecipient),
         symbol: transferSymbol,
         amount: transferAmount,
         memo: transferMemo || undefined,
@@ -421,12 +421,16 @@ const XRPPage: React.FC = () => {
 
                 <form onSubmit={handleTransfer} className="space-y-4">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Recipient User ID</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Recipient's XRP Tag
+                      <span className="ml-1 text-gray-600">— ask them to check their XRP page</span>
+                    </label>
                     <input
-                      type="text"
+                      type="number"
                       value={transferRecipient}
                       onChange={e => setTransferRecipient(e.target.value)}
-                      placeholder="Paste recipient's Seamount user ID"
+                      placeholder="e.g. 10003"
+                      min="10001"
                       required
                       className="w-full bg-gray-900/60 border border-gray-600 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
                     />

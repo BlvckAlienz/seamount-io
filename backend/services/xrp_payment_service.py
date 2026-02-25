@@ -191,6 +191,22 @@ class XRPPaymentService:
                 balances[row['symbol']] = str(Decimal(str(row['balance'])))
         return balances
 
+    async def get_user_by_destination_tag(self, tag: int) -> str:
+        """Resolve a destination tag to a user_id. Raises ValueError if not found."""
+        result = await asyncio.to_thread(
+            lambda: self.supabase
+            .table("xrp_destination_tags")
+            .select("user_id")
+            .eq("destination_tag", tag)
+            .execute()
+        )
+        if not result.data:
+            raise ValueError(
+                f"No Seamount account found for destination tag {tag}. "
+                "Ask the recipient to check their XRP page for their tag."
+            )
+        return result.data[0]['user_id']
+    
     # ─── INTERNAL TRANSFER (P2P — zero fee, DB-only) ──────────────────────────
 
     async def internal_transfer(

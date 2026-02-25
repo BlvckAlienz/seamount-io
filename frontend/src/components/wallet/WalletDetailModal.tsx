@@ -2,6 +2,7 @@
 // ✅ PRODUCTION READY - ENHANCED PRICE DATA
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, TrendingUp, ArrowDownLeft, ExternalLink, Activity, RefreshCw, ChevronDown, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '../../config/api';
@@ -107,6 +108,7 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
   onOpenWithdrawModal,  // ✅ ADD THIS
   onOpenReceiveModal    // ✅ ADD THIS
 }) => {
+  const navigate = useNavigate();
   const [selectedAsset, setSelectedAsset] = useState<string>('');
   const [priceData, setPriceData] = useState<AssetPriceData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -646,12 +648,12 @@ const handleReceiveAsset = () => {
                   <div className="text-lg font-bold text-blue-300 font-mono mt-1">
                     {address.replace('tag:', '')}
                   </div>
-                  <a
-                    href="/xrp"
+                  <button
+                    onClick={() => { onClose(); navigate('/xrp'); }}
                     className="text-xs text-blue-400 hover:text-blue-300 mt-2 flex items-center gap-1 font-semibold"
                   >
                     Full XRP Details →
-                  </a>
+                  </button>
                 </>
               ) : (
                 <>

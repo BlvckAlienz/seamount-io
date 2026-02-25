@@ -29,9 +29,9 @@ SUPPORTED_SYMBOLS = {"RLUSD", "USDC", "XRP"}
 # ─── Pydantic Models ───────────────────────────────────────────────────────────
 
 class TransferRequest(BaseModel):
-    recipient_id: str
+    recipient_tag: int          # recipient's destination tag (visible on their XRP page)
     symbol: str
-    amount: str          # string to avoid float precision loss
+    amount: float
     memo: Optional[str] = None
 
     @field_validator("symbol")
@@ -186,11 +186,17 @@ async def internal_transfer(
     """
     try:
         sender_id = current_user["id"]
+        # Resolve destination tag → user_id
+        recipient_id = await svc.get_user_by_destination_tag(body.recipient_tag)
+
+        if recipient_id == current_user['id']:
+            raise HTTPException(status_code=400, detail="Cannot transfer to yourself")
+
         result = await svc.internal_transfer(
-            sender_id=sender_id,
-            recipient_id=body.recipient_id,
+            sender_id=current_user['id'],
+            recipient_id=recipient_id,
             symbol=body.symbol,
-            amount=Decimal(body.amount),
+            amount=Decimal(str(body.amount)),
             memo=body.memo,
         )
         return result
