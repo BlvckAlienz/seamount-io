@@ -53,13 +53,6 @@ class TransferRequest(BaseModel):
         except InvalidOperation:
             raise ValueError("Invalid amount format")
 
-    @field_validator("recipient_id")
-    @classmethod
-    def validate_recipient(cls, v):
-        if not v or len(v) < 10:
-            raise ValueError("Invalid recipient_id")
-        return v
-
 
 class WithdrawRequest(BaseModel):
     symbol: str

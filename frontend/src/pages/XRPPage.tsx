@@ -176,7 +176,8 @@ const XRPPage: React.FC = () => {
         toast.error(r.data?.detail || 'Transfer failed');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Transfer failed');
+      const d = err?.response?.data?.detail;
+      toast.error(Array.isArray(d) ? d.map((e: any) => e.msg).join(', ') : d || 'Transfer failed');
     } finally {
       setTransferring(false);
     }
@@ -202,7 +203,8 @@ const XRPPage: React.FC = () => {
         toast.error(r.data?.detail || 'Withdrawal failed');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Withdrawal failed');
+      const d = err?.response?.data?.detail;
+      toast.error(Array.isArray(d) ? d.map((e: any) => e.msg).join(', ') : d || 'Withdrawal failed');
     } finally {
       setWithdrawing(false);
     }
@@ -226,7 +228,8 @@ const XRPPage: React.FC = () => {
         toast.error(r.data?.detail || 'Deposit failed');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || 'Deposit failed');
+      const d = err?.response?.data?.detail;
+      toast.error(Array.isArray(d) ? d.map((e: any) => e.msg).join(', ') : d || 'Deposit failed');
     } finally {
       setDepositing(false);
     }
