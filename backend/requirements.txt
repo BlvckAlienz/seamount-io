@@ -50,6 +50,7 @@ algokit-utils==3.0.0
 eth-account==0.10.0
 hdwallet==2.2.1
 xrpl-py>=2.4.0
+websockets>=11.0.0
 
 # Bookkeeping service dependencies
 pandas==2.3.3
