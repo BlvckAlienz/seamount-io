@@ -84,6 +84,7 @@ const DashboardPage = () => {
     urgency: 'none',
   });
   const [multiChainWallets, setMultiChainWallets] = useState<any>({});
+  const [xrpTotalUSD, setXrpTotalUSD] = useState<number>(0);
   const [collateralStats, setCollateralStats] = useState({
     activePositions: 0,
     totalValue: 0,
@@ -191,12 +192,26 @@ const DashboardPage = () => {
     // XRP is custodial — check deposit-info for tag existence
     // If the endpoint responds (even without xrp_service), tag is assigned
     try {
-      const xrpRes = await apiClient.get('/api/v1/xrp/deposit-info');
-      if (xrpRes.data?.success && xrpRes.data?.destination_tag) {
+      const [xrpDepositRes, xrpBalRes] = await Promise.all([
+        apiClient.get('/api/v1/xrp/deposit-info'),
+        apiClient.get('/api/v1/xrp/balances'),
+      ]);
+
+      if (xrpDepositRes.data?.success && xrpDepositRes.data?.destination_tag) {
         setMultiChainWallets(prev => ({
           ...prev,
-          xrp: { address: `tag:${xrpRes.data.destination_tag}` }
+          xrp: { address: `tag:${xrpDepositRes.data.destination_tag}` }
         }));
+      }
+
+      if (xrpBalRes.data?.success) {
+        const b = xrpBalRes.data.balances;
+        // XRP price approximated at $0.50 for display — good enough for card
+        const total =
+          parseFloat(b.RLUSD || '0') +
+          parseFloat(b.USDC  || '0') +
+          parseFloat(b.XRP   || '0') * 0.5;
+        setXrpTotalUSD(parseFloat(total.toFixed(2)));
       }
     } catch {
       // XRP not set up yet — card shows as "not_created" which is fine
@@ -204,6 +219,7 @@ const DashboardPage = () => {
   };
 
   const calculateChainBalance = (chain: string) => {
+    if (chain === 'xrp') return xrpTotalUSD;  // ✅ from internal balances
     if (!portfolioData?.assets) return 0;
     return portfolioData.assets
       .filter((asset: any) => asset.chain === chain)

@@ -252,13 +252,6 @@ const XRPPage: React.FC = () => {
     }
   };
 
-  // ── Total USD estimate (XRP @ $0.50 approximation for display) ────────────
-  const totalUSD = (
-    parseFloat(balances.RLUSD) +
-    parseFloat(balances.USDC) +
-    parseFloat(balances.XRP) * 0.5
-  ).toFixed(2);
-
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -288,14 +281,8 @@ const XRPPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Balance Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <StatCard
-              label="XRP Ledger Balance"
-              value={loadingBalances ? '...' : `$${fmt(totalUSD, 2)}`}
-              sub="RLUSD + USDC + XRP·0.5"
-              color="text-green-400"
-            />
+          {/* Balance Cards — 3 assets only, no aggregate card */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
             {(['RLUSD', 'USDC', 'XRP'] as const).map(sym => (
               <div key={sym} className={`border rounded-xl p-4 ${SYMBOL_BG[sym]}`}>
                 <p className="text-xs text-gray-400 mb-1">{sym}</p>
@@ -407,7 +394,7 @@ const XRPPage: React.FC = () => {
               </div>
 
               {/* Transaction History preview */}
-              <XRPTxHistory key={historyKey} />
+              <XRPTxHistory refreshKey={historyKey} />
             </div>
           )}
 
@@ -757,16 +744,17 @@ const XRPPage: React.FC = () => {
 
 // ─── TX History sub-component ─────────────────────────────────────────────────
 
-const XRPTxHistory: React.FC = () => {
+const XRPTxHistory: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) => {
   const [txs, setTxs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     apiClient.get('/api/v1/xrp/transactions?limit=8')
       .then(r => { if (r.data?.success) setTxs(r.data.transactions || []); })
-      .catch(() => {})
+      .catch(e => console.error('TX history fetch failed:', e))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);  // ✅ re-fetches whenever refreshKey increments
 
   const typeLabel: Record<string, string> = {
     deposit: '↓ Deposit',

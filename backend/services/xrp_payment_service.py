@@ -265,30 +265,39 @@ class XRPPaymentService:
             raise RuntimeError(f"Transfer failed: {e}")
 
         tx_meta = {"memo": memo, "type": "internal_p2p"}
-        await asyncio.to_thread(
-            lambda: self.supabase.table("xrp_transactions").insert([
-                {
-                    "user_id": sender_id,
-                    "tx_type": "internal_transfer",
-                    "symbol": symbol,
-                    "amount": float(-amount),
-                    "to_address": f"internal:{recipient_id}",
-                    "status": "confirmed",
-                    "metadata": tx_meta,
-                    "created_at": now,
-                },
-                {
-                    "user_id": recipient_id,
-                    "tx_type": "internal_transfer",
-                    "symbol": symbol,
-                    "amount": float(amount),
-                    "from_address": f"internal:{sender_id}",
-                    "status": "confirmed",
-                    "metadata": tx_meta,
-                    "created_at": now,
-                },
-            ]).execute()
-        )
+        try:
+            await asyncio.to_thread(
+                lambda: self.supabase.table("xrp_transactions").insert([
+                    {
+                        "user_id": sender_id,
+                        "tx_type": "internal_transfer",
+                        "symbol": symbol,
+                        "amount": float(-amount),
+                        "to_address": f"internal:{recipient_id}",
+                        "status": "confirmed",
+                        "metadata": tx_meta,
+                        "created_at": now,
+                    },
+                    {
+                        "user_id": recipient_id,
+                        "tx_type": "internal_transfer",
+                        "symbol": symbol,
+                        "amount": float(amount),
+                        "from_address": f"internal:{sender_id}",
+                        "status": "confirmed",
+                        "metadata": tx_meta,
+                        "created_at": now,
+                    },
+                ]).execute()
+            )
+            logger.info(f"✅ TX logged: {amount} {symbol} | {sender_id[:8]}→{recipient_id[:8]}")
+        except Exception as log_err:
+            # Balance already moved — don't fail the transfer, but alert loudly
+            logger.error(
+                f"🚨 TX LOG FAILED (balance moved, tx unlogged): "
+                f"{amount} {symbol} | {sender_id[:8]}→{recipient_id[:8]} | {log_err}\n"
+                f"{tb.format_exc()}"
+            )
 
         logger.info(
             f"✅ Transfer: {amount} {symbol} | "
