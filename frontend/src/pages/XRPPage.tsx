@@ -80,6 +80,7 @@ const XRPPage: React.FC = () => {
   const [loadingBalances, setLoadingBalances] = useState(true);
   const [loadingDeposit, setLoadingDeposit] = useState(true);
   const [loadingYield, setLoadingYield] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);  // ✅ increment to force history refresh
 
   // Transfer form
   const [transferRecipient, setTransferRecipient] = useState('');
@@ -172,6 +173,7 @@ const XRPPage: React.FC = () => {
         toast.success(`✅ ${transferAmount} ${transferSymbol} sent instantly — $0.00 fee`);
         setTransferAmount(''); setTransferRecipient(''); setTransferMemo('');
         fetchBalances();
+        setHistoryKey(k => k + 1);  // ✅ refresh history
       } else {
         toast.error(r.data?.detail || 'Transfer failed');
       }
@@ -289,9 +291,9 @@ const XRPPage: React.FC = () => {
           {/* Balance Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatCard
-              label="Total Value (est.)"
+              label="XRP Ledger Balance"
               value={loadingBalances ? '...' : `$${fmt(totalUSD, 2)}`}
-              sub="RLUSD + USDC + XRP"
+              sub="RLUSD + USDC + XRP·0.5"
               color="text-green-400"
             />
             {(['RLUSD', 'USDC', 'XRP'] as const).map(sym => (
@@ -405,7 +407,7 @@ const XRPPage: React.FC = () => {
               </div>
 
               {/* Transaction History preview */}
-              <XRPTxHistory />
+              <XRPTxHistory key={historyKey} />
             </div>
           )}
 
