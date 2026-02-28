@@ -751,10 +751,13 @@ const XRPTxHistory: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) => 
   useEffect(() => {
     setLoading(true);
     apiClient.get('/api/v1/xrp/transactions?limit=8')
-      .then(r => { if (r.data?.success) setTxs(r.data.transactions || []); })
-      .catch(e => console.error('TX history fetch failed:', e))
+      .then(r => {
+        if (r.data?.success) setTxs(r.data.transactions || []);
+        else console.warn('TX fetch unexpected response:', r.data);
+      })
+      .catch(e => console.error('❌ TX history fetch failed:', e))
       .finally(() => setLoading(false));
-  }, [refreshKey]);  // ✅ re-fetches whenever refreshKey increments
+  }, [refreshKey]);
 
   const typeLabel: Record<string, string> = {
     deposit: '↓ Deposit',
