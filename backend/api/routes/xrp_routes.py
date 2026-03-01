@@ -8,6 +8,7 @@ GET  /xrp/balances              → all XRP ledger balances (RLUSD, USDC, XRP)
 POST /xrp/transfer              → internal P2P transfer (zero fee, instant)
 POST /xrp/withdraw              → external withdrawal (on-chain, with fee)
 GET  /xrp/transactions          → paginated transaction history
+GET  /xrp/withdraw/quote        → live fee preview before committing withdrawal
 GET  /xrp/health                → service health check
 """
 
@@ -256,6 +257,31 @@ async def get_transactions(
     except Exception as e:
         logger.error(f"GET /xrp/transactions error: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve transactions")
+
+
+@router.get("/withdraw/quote")
+async def withdrawal_quote(
+    symbol: str = Query(..., description="Asset: RLUSD, USDC, XRP"),
+    amount: float = Query(..., gt=0, description="Amount to withdraw"),
+    current_user: dict = Depends(get_current_user),
+    svc=Depends(get_xrp_payment_service),
+):
+    """
+    Returns live fee breakdown before user commits to a withdrawal.
+    Call this whenever amount or symbol changes in the withdraw form.
+    Response: { fee, fee_pct, total_deducted, fee_schedule, fee_note }
+    """
+    try:
+        from decimal import Decimal
+        return await svc.get_withdrawal_quote(
+            symbol=symbol.upper(),
+            amount=Decimal(str(amount)),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"GET /xrp/withdraw/quote error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to calculate fee quote")
 
 
 @router.get("/health")

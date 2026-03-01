@@ -1,11 +1,23 @@
 # File: backend/services/xrp_payment_service.py
 """
 XRP Payment Service — Seamount.io Phase 2
-Handles: internal P2P transfers (DB-only), withdrawals (on-chain), deposit info.
 
-Internal transfer:  pure Postgres — zero fee, sub-millisecond, no blockchain tx
-Withdrawal:         signs one Payment tx from Seamount hot wallet → external address
-Deposit info:       returns hot wallet address + user's destination tag
+─── FEE MODEL ─────────────────────────────────────────────────────────────────
+Withdrawal fee = base + (pct% × amount), clamped between min and max.
+
+  RLUSD / USDC:  $0.50 base + 0.5% │ min $0.50 │ max $10.00
+  XRP:            0.1  base + 1.0% │ min  0.10 │ max  10.00
+
+Examples:
+  $10    RLUSD → $0.50 + $0.05  = $0.55
+  $100   RLUSD → $0.50 + $0.50  = $1.00
+  $1,000 RLUSD → $0.50 + $5.00  = $5.50
+  $5,000 RLUSD → capped          = $10.00
+  10 XRP       → 0.1  + 0.1     = 0.20 XRP
+  1,000 XRP    → capped          = 10.0 XRP
+
+Fee stays in Seamount's hot wallet automatically — no extra collection tx needed.
+────────────────────────────────────────────────────────────────────────────────
 """
 
 import asyncio
@@ -13,32 +25,67 @@ import logging
 import os
 import traceback as tb
 from decimal import Decimal, ROUND_DOWN
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# ─── Minimum withdrawal amounts ───────────────────────────────────────────────
 MIN_WITHDRAWAL = {
     "RLUSD": Decimal("1.00"),
     "USDC":  Decimal("1.00"),
-    "XRP":   Decimal("0.1"),
+    "XRP":   Decimal("0.10"),
 }
 
-WITHDRAWAL_FEE = {
-    "RLUSD": Decimal("0.50"),
-    "USDC":  Decimal("0.50"),
-    "XRP":   Decimal("0.05"),
+# ─── Fee schedule: (base, pct_rate, min_fee, max_fee) ─────────────────────────
+FEE_SCHEDULE: Dict[str, Tuple[Decimal, Decimal, Decimal, Decimal]] = {
+    "RLUSD": (Decimal("0.50"), Decimal("0.005"), Decimal("0.50"), Decimal("10.00")),
+    "USDC":  (Decimal("0.50"), Decimal("0.005"), Decimal("0.50"), Decimal("10.00")),
+    "XRP":   (Decimal("0.10"), Decimal("0.010"), Decimal("0.10"), Decimal("10.00")),
 }
 
 SUPPORTED_SYMBOLS = {"RLUSD", "USDC", "XRP"}
-STARTING_TAG = 10001  # Tags 0-9999 reserved
+STARTING_TAG = 10001
+
+
+def calculate_withdrawal_fee(symbol: str, amount: Decimal) -> Decimal:
+    """
+    base + pct% of amount, clamped [min, max].
+    Fee stays in hot wallet — no extra tx required.
+    """
+    if symbol not in FEE_SCHEDULE:
+        return Decimal("0")
+    base, pct_rate, min_fee, max_fee = FEE_SCHEDULE[symbol]
+    raw = base + (amount * pct_rate)
+    fee = max(min_fee, min(raw, max_fee))
+    return fee.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+
+
+def fee_breakdown(symbol: str, amount: Decimal) -> Dict[str, str]:
+    """Human-readable fee breakdown for API responses and UI."""
+    fee = calculate_withdrawal_fee(symbol, amount)
+    total = (amount + fee).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    _, pct, min_f, max_f = FEE_SCHEDULE.get(
+        symbol, (Decimal(0), Decimal(0), Decimal(0), Decimal(0))
+    )
+    return {
+        "amount":         str(amount.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)),
+        "fee":            str(fee),
+        "fee_pct":        f"{float(pct) * 100:.1f}%",
+        "total_deducted": str(total),
+        "fee_note":       (
+            f"Seamount fee: {float(pct)*100:.1f}% of amount "
+            f"(min {min_f} {symbol}, max {max_f} {symbol}). "
+            "Retained in hot wallet automatically."
+        ),
+    }
 
 
 class XRPPaymentService:
 
     def __init__(self, supabase_client, xrp_service, settings=None):
         self.supabase = supabase_client
-        self.xrp = xrp_service  # May be None if xrpl-py unavailable
+        self.xrp = xrp_service
         from backend.config import get_settings
         self.settings = settings or get_settings()
         logger.info("✅ XRPPaymentService initialized")
@@ -46,23 +93,15 @@ class XRPPaymentService:
     # ─── HELPERS ──────────────────────────────────────────────────────────────
 
     def _get_hot_wallet(self) -> str:
-        """Read hot wallet address — never throws AttributeError."""
         addr = (
             getattr(self.settings, 'XRP_HOT_WALLET_ADDRESS', None)
             or os.getenv('XRP_HOT_WALLET_ADDRESS', '')
         )
         if not addr:
-            raise RuntimeError(
-                "XRP_HOT_WALLET_ADDRESS not set in environment variables."
-            )
+            raise RuntimeError("XRP_HOT_WALLET_ADDRESS not set in environment variables.")
         return addr
 
     async def _assign_xrp_destination_tag(self, user_id: str) -> int:
-        """
-        Assign a unique, auto-incrementing destination tag.
-        Reads MAX from DB so it is safe under concurrent requests.
-        Range: 10001 → 4,294,967,295
-        """
         try:
             result = await asyncio.to_thread(
                 lambda: self.supabase
@@ -72,17 +111,11 @@ class XRPPaymentService:
                 .limit(1)
                 .execute()
             )
-            if result.data:
-                next_tag = int(result.data[0]['destination_tag']) + 1
-            else:
-                next_tag = STARTING_TAG
-
+            next_tag = (int(result.data[0]['destination_tag']) + 1) if result.data else STARTING_TAG
             if next_tag > 4_294_967_295:
                 raise RuntimeError("Destination tag pool exhausted")
-
             logger.info(f"🏷️  Next destination tag: {next_tag}")
             return next_tag
-
         except Exception as e:
             logger.error(f"❌ _assign_xrp_destination_tag failed: {e}")
             raise
@@ -90,10 +123,6 @@ class XRPPaymentService:
     # ─── DEPOSIT INFO ─────────────────────────────────────────────────────────
 
     async def get_deposit_info(self, user_id: str) -> Dict[str, Any]:
-        """
-        Return hot wallet address + user's unique destination tag.
-        Auto-assigns tag on first call (self-healing — no manual setup needed).
-        """
         try:
             result = await asyncio.to_thread(
                 lambda: self.supabase
@@ -104,11 +133,9 @@ class XRPPaymentService:
             )
 
             if not result.data:
-                # ── First call: auto-assign ──
                 logger.info(f"No tag for {user_id[:8]}... — auto-assigning")
                 tag = await self._assign_xrp_destination_tag(user_id)
                 hot_wallet = self._get_hot_wallet()
-
                 await asyncio.to_thread(
                     lambda: self.supabase
                     .table("xrp_destination_tags")
@@ -124,14 +151,9 @@ class XRPPaymentService:
                     .execute()
                 )
                 logger.info(f"✅ Assigned tag {tag} → user {user_id[:8]}...")
-
             else:
-                # ── Existing user: read from DB ──
                 tag = int(result.data[0]['destination_tag'])
-                hot_wallet = (
-                    result.data[0].get('hot_wallet')
-                    or self._get_hot_wallet()
-                )
+                hot_wallet = result.data[0].get('hot_wallet') or self._get_hot_wallet()
 
             return {
                 "success": True,
@@ -153,9 +175,7 @@ class XRPPaymentService:
             }
 
         except Exception as e:
-            logger.error(
-                f"❌ get_deposit_info failed for {user_id}: {e}\n{tb.format_exc()}"
-            )
+            logger.error(f"❌ get_deposit_info failed for {user_id}: {e}\n{tb.format_exc()}")
             raise
 
     # ─── BALANCES ─────────────────────────────────────────────────────────────
@@ -164,7 +184,6 @@ class XRPPaymentService:
         symbol = symbol.upper()
         if symbol not in SUPPORTED_SYMBOLS:
             raise ValueError(f"Unsupported symbol: {symbol}")
-
         result = await asyncio.to_thread(
             lambda: self.supabase
             .table("xrp_internal_balances")
@@ -173,9 +192,7 @@ class XRPPaymentService:
             .eq("symbol", symbol)
             .execute()
         )
-        if not result.data:
-            return Decimal("0")
-        return Decimal(str(result.data[0]['balance']))
+        return Decimal(str(result.data[0]['balance'])) if result.data else Decimal("0")
 
     async def get_all_balances(self, user_id: str) -> Dict[str, str]:
         result = await asyncio.to_thread(
@@ -191,8 +208,9 @@ class XRPPaymentService:
                 balances[row['symbol']] = str(Decimal(str(row['balance'])))
         return balances
 
+    # ─── TAG RESOLVER ─────────────────────────────────────────────────────────
+
     async def get_user_by_destination_tag(self, tag: int) -> str:
-        """Resolve a destination tag to a user_id. Raises ValueError if not found."""
         result = await asyncio.to_thread(
             lambda: self.supabase
             .table("xrp_destination_tags")
@@ -203,10 +221,29 @@ class XRPPaymentService:
         if not result.data:
             raise ValueError(
                 f"No Seamount account found for destination tag {tag}. "
-                "Ask the recipient to check their XRP page for their tag."
+                "Ask the recipient to check their XRP page for their tag number."
             )
         return result.data[0]['user_id']
-    
+
+    # ─── FEE QUOTE (call before withdrawal to show user the cost) ─────────────
+
+    async def get_withdrawal_quote(self, symbol: str, amount: Decimal) -> Dict[str, Any]:
+        symbol = symbol.upper()
+        if symbol not in SUPPORTED_SYMBOLS:
+            raise ValueError(f"Unsupported symbol: {symbol}")
+        if amount < MIN_WITHDRAWAL.get(symbol, Decimal("1")):
+            raise ValueError(f"Minimum withdrawal: {MIN_WITHDRAWAL[symbol]} {symbol}")
+        bd = fee_breakdown(symbol, amount)
+        _, pct, min_f, max_f = FEE_SCHEDULE[symbol]
+        return {
+            "success": True,
+            **bd,
+            "fee_schedule": (
+                f"{float(pct)*100:.1f}% of amount + base, "
+                f"min {min_f} {symbol}, max {max_f} {symbol}"
+            ),
+        }
+
     # ─── INTERNAL TRANSFER (P2P — zero fee, DB-only) ──────────────────────────
 
     async def internal_transfer(
@@ -245,6 +282,7 @@ class XRPPaymentService:
             raise ValueError("Recipient has no active XRP account on Seamount")
 
         now = datetime.utcnow().isoformat()
+
         try:
             await asyncio.to_thread(
                 lambda: self.supabase.rpc("update_xrp_balance", {
@@ -264,7 +302,7 @@ class XRPPaymentService:
             logger.error(f"❌ internal_transfer RPC failed: {e}")
             raise RuntimeError(f"Transfer failed: {e}")
 
-        tx_meta = {"memo": memo, "type": "internal_p2p"}
+        tx_meta = {"memo": memo, "type": "internal_p2p", "fee": "0.00"}
         sender_row = {
             "user_id": sender_id,
             "tx_type": "internal_transfer",
@@ -287,7 +325,7 @@ class XRPPaymentService:
         }
         for label, row in [("sender", sender_row), ("recipient", recipient_row)]:
             try:
-                captured = dict(row)  # ✅ force value capture, not reference
+                captured = dict(row)
                 await asyncio.to_thread(
                     lambda r=captured: self.supabase
                     .table("xrp_transactions")
@@ -300,14 +338,11 @@ class XRPPaymentService:
                 )
             except Exception as log_err:
                 logger.error(
-                    f"🚨 TX LOG FAILED [{label}] user {row['user_id'][:8]}: "
+                    f"🚨 TX LOG FAILED [{label}] {row['user_id'][:8]}: "
                     f"{log_err}\n{tb.format_exc()}"
                 )
 
-        logger.info(
-            f"✅ Transfer: {amount} {symbol} | "
-            f"{sender_id[:8]}→{recipient_id[:8]} | fee: $0"
-        )
+        logger.info(f"✅ Transfer: {amount} {symbol} | {sender_id[:8]}→{recipient_id[:8]} | fee: $0")
         return {
             "success": True,
             "type": "internal_transfer",
@@ -329,6 +364,12 @@ class XRPPaymentService:
         destination_address: str,
         destination_tag: Optional[int] = None,
     ) -> Dict[str, Any]:
+        """
+        Fee flow (fully automatic — no extra tx needed):
+          1. user_balance  -= (amount + fee)       ← deducted upfront
+          2. hot_wallet sends `amount` → recipient ← XRPL tx
+          3. `fee` stays in hot_wallet             ← Seamount revenue
+        """
         symbol = symbol.upper()
 
         if symbol not in SUPPORTED_SYMBOLS:
@@ -342,15 +383,21 @@ class XRPPaymentService:
                 "On-chain withdrawals unavailable: xrpl-py not installed."
             )
 
-        fee = WITHDRAWAL_FEE.get(symbol, Decimal("0"))
-        total_deducted = (amount + fee).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+        # ── Dynamic fee ──
+        fee = calculate_withdrawal_fee(symbol, amount)
         amount = amount.quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+        total_deducted = (amount + fee).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+        bd = fee_breakdown(symbol, amount)
+
+        logger.info(
+            f"💸 Withdrawal: {amount} {symbol} | fee: {fee} | total: {total_deducted}"
+        )
 
         balance = await self.get_balance(user_id, symbol)
         if balance < total_deducted:
             raise ValueError(
                 f"Insufficient {symbol}. Need {total_deducted} "
-                f"(inc. {fee} fee). Have: {balance}"
+                f"(amount {amount} + fee {fee}). Have: {balance}"
             )
 
         # Pre-debit
@@ -372,7 +419,12 @@ class XRPPaymentService:
                 "to_address": destination_address,
                 "destination_tag": destination_tag,
                 "status": "pending",
-                "metadata": {"fee": str(fee), "total_deducted": str(total_deducted)},
+                "metadata": {
+                    "fee":            bd["fee"],
+                    "fee_pct":        bd["fee_pct"],
+                    "total_deducted": bd["total_deducted"],
+                    "fee_note":       bd["fee_note"],
+                },
                 "created_at": now,
             }).execute()
         )
@@ -395,15 +447,23 @@ class XRPPaymentService:
             tx_hash = result.get("tx_hash")
             await asyncio.to_thread(
                 lambda: self.supabase.table("xrp_transactions")
-                .update({"tx_hash": tx_hash, "status": "confirmed",
-                         "ledger_index": result.get("ledger_index")})
-                .eq("user_id", user_id).eq("status", "pending")
-                .eq("to_address", destination_address).execute()
+                .update({
+                    "tx_hash": tx_hash,
+                    "status": "confirmed",
+                    "ledger_index": result.get("ledger_index"),
+                })
+                .eq("user_id", user_id)
+                .eq("status", "pending")
+                .eq("to_address", destination_address)
+                .execute()
             )
 
             network = getattr(self.settings, 'XRP_NETWORK', 'mainnet')
-            base = "https://testnet.xrpl.org" if network == "testnet" else "https://xrpl.org"
-            logger.info(f"✅ Withdrawal: {amount} {symbol} → {destination_address[:10]}... tx:{tx_hash}")
+            base_url = "https://testnet.xrpl.org" if network == "testnet" else "https://xrpl.org"
+            logger.info(
+                f"✅ Withdrawal confirmed: {amount} {symbol} → "
+                f"{destination_address[:10]}... | fee kept: {fee} {symbol} | tx: {tx_hash}"
+            )
 
             return {
                 "success": True,
@@ -411,17 +471,20 @@ class XRPPaymentService:
                 "symbol": symbol,
                 "amount_sent": str(amount),
                 "fee": str(fee),
+                "fee_pct": bd["fee_pct"],
                 "total_deducted": str(total_deducted),
                 "destination": destination_address,
                 "destination_tag": destination_tag,
                 "tx_hash": tx_hash,
                 "status": "confirmed",
                 "settled_at": datetime.utcnow().isoformat(),
-                "explorer_url": f"{base}/transactions/{tx_hash}",
+                "explorer_url": f"{base_url}/transactions/{tx_hash}",
+                "fee_note": bd["fee_note"],
             }
 
         except Exception as chain_err:
-            logger.error(f"❌ On-chain withdrawal failed — refunding: {chain_err}")
+            # Full refund on failure — including the fee
+            logger.error(f"❌ Withdrawal failed — refunding {total_deducted} {symbol}: {chain_err}")
             try:
                 await asyncio.to_thread(
                     lambda: self.supabase.rpc("update_xrp_balance", {
@@ -433,10 +496,12 @@ class XRPPaymentService:
                 await asyncio.to_thread(
                     lambda: self.supabase.table("xrp_transactions")
                     .update({"status": "failed", "metadata": {"error": str(chain_err)}})
-                    .eq("user_id", user_id).eq("status", "pending")
-                    .eq("to_address", destination_address).execute()
+                    .eq("user_id", user_id)
+                    .eq("status", "pending")
+                    .eq("to_address", destination_address)
+                    .execute()
                 )
-                logger.info(f"✅ Refund: {total_deducted} {symbol} → {user_id[:8]}...")
+                logger.info(f"✅ Full refund: {total_deducted} {symbol} → {user_id[:8]}...")
             except Exception as refund_err:
                 logger.critical(
                     f"🚨 REFUND FAILED: user={user_id} "
@@ -463,7 +528,6 @@ class XRPPaymentService:
             )
             if symbol:
                 query = query.eq("symbol", symbol.upper())
-
             result = await asyncio.to_thread(lambda: query.execute())
             return {
                 "success": True,

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Waves, Copy, RefreshCw, ArrowUpRight, ArrowDownToLine,
   TrendingUp, AlertCircle, CheckCircle2, Loader2,
-  ChevronRight, Info, ExternalLink, Coins,
+  ChevronRight, Info, ExternalLink, Coins, X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/config/api';
@@ -96,6 +96,10 @@ const XRPPage: React.FC = () => {
   const [withdrawTag, setWithdrawTag] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawQuote, setWithdrawQuote] = useState<{
+    fee: string; fee_pct: string; total_deducted: string; fee_schedule: string;
+  } | null>(null);
+  const [quoteFetching, setQuoteFetching] = useState(false);
 
   // Yield deposit form
   const [yieldPool, setYieldPool] = useState('RLUSD/XRP');
@@ -185,6 +189,28 @@ const XRPPage: React.FC = () => {
     }
   };
 
+  // Live fee quote — debounced 600ms to avoid hammering API on every keystroke
+  useEffect(() => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      setWithdrawQuote(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setQuoteFetching(true);
+      try {
+        const r = await apiClient.get('/api/v1/xrp/withdraw/quote', {
+          params: { symbol: withdrawSymbol, amount: withdrawAmount },
+        });
+        if (r.data?.success) setWithdrawQuote(r.data);
+      } catch {
+        setWithdrawQuote(null);
+      } finally {
+        setQuoteFetching(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [withdrawAmount, withdrawSymbol]);
+
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!withdrawAmount || !withdrawAddress) return;
@@ -197,10 +223,14 @@ const XRPPage: React.FC = () => {
         destination_tag: withdrawTag ? parseInt(withdrawTag) : undefined,
       });
       if (r.data?.success) {
-        toast.success(`✅ ${withdrawAmount} ${withdrawSymbol} withdrawal submitted`);
+        toast.success(
+          `✅ ${r.data.amount_sent} ${withdrawSymbol} sent · Fee: ${r.data.fee} ${withdrawSymbol}`
+        );
         setWithdrawAmount(''); setWithdrawAddress(''); setWithdrawTag('');
+        setWithdrawQuote(null);
         setShowWithdraw(false);
         fetchBalances();
+        setHistoryKey(k => k + 1);l
       } else {
         toast.error(r.data?.detail || 'Withdrawal failed');
       }
@@ -559,15 +589,41 @@ const XRPPage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm p-3 bg-gray-900/40 rounded-xl">
-                      <span className="text-gray-400">Min withdrawal</span>
-                      <span className="text-right text-white">
-                        {withdrawSymbol === 'XRP' ? '0.1 XRP' : `1.00 ${withdrawSymbol}`}
-                      </span>
-                      <span className="text-gray-400">Fee</span>
-                      <span className="text-right text-orange-300">
-                        {withdrawSymbol === 'XRP' ? '0.05 XRP' : `0.50 ${withdrawSymbol}`}
-                      </span>
+                    <div className="p-3 bg-gray-900/40 rounded-xl space-y-2 text-sm">
+                      {/* Static minimums */}
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Min withdrawal</span>
+                        <span className="text-white">
+                          {withdrawSymbol === 'XRP' ? '0.1 XRP' : `1.00 ${withdrawSymbol}`}
+                        </span>
+                      </div>
+
+                      {/* Live fee quote */}
+                      {quoteFetching && (
+                        <div className="flex items-center gap-2 text-gray-500 text-xs">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Calculating fee...
+                        </div>
+                      )}
+                      {withdrawQuote && !quoteFetching && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Fee ({withdrawQuote.fee_pct})</span>
+                            <span className="text-orange-300">
+                              {withdrawQuote.fee} {withdrawSymbol}
+                            </span>
+                          </div>
+                          <div className="flex justify-between border-t border-gray-700/50 pt-2 font-semibold">
+                            <span className="text-gray-300">You pay total</span>
+                            <span className="text-white">
+                              {withdrawQuote.total_deducted} {withdrawSymbol}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600">{withdrawQuote.fee_schedule}</p>
+                        </>
+                      )}
+                      {!withdrawQuote && !quoteFetching && withdrawAmount && (
+                        <div className="text-xs text-gray-500">Enter valid amount to see fee</div>
+                      )}
                     </div>
 
                     <button
@@ -743,14 +799,17 @@ const XRPPage: React.FC = () => {
 };
 
 // ─── TX History sub-component ─────────────────────────────────────────────────
+// DROP-IN REPLACEMENT for the XRPTxHistory component at bottom of XRPPage.tsx
+// Adds clickable rows → slide-in detail drawer with full metadata
 
 const XRPTxHistory: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) => {
   const [txs, setTxs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<any | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    apiClient.get('/api/v1/xrp/transactions?limit=8')
+    apiClient.get('/api/v1/xrp/transactions?limit=20')
       .then(r => {
         if (r.data?.success) setTxs(r.data.transactions || []);
         else console.warn('TX fetch unexpected response:', r.data);
@@ -760,64 +819,226 @@ const XRPTxHistory: React.FC<{ refreshKey?: number }> = ({ refreshKey = 0 }) => 
   }, [refreshKey]);
 
   const typeLabel: Record<string, string> = {
-    deposit: '↓ Deposit',
-    withdrawal: '↑ Withdraw',
+    deposit:           '↓ Deposit',
+    withdrawal:        '↑ Withdraw',
     internal_transfer: '⇄ Transfer',
-    amm_deposit: '+ Yield deposit',
-    amm_withdrawal: '- Yield withdraw',
-    yield_credit: '✦ Yield',
+    amm_deposit:       '+ Yield deposit',
+    amm_withdrawal:    '- Yield withdraw',
+    yield_credit:      '✦ Yield',
   };
 
   const typeColor: Record<string, string> = {
-    deposit: 'text-green-400',
-    withdrawal: 'text-red-400',
+    deposit:           'text-green-400',
+    withdrawal:        'text-red-400',
     internal_transfer: 'text-blue-400',
-    amm_deposit: 'text-yellow-400',
-    amm_withdrawal: 'text-orange-400',
-    yield_credit: 'text-yellow-300',
+    amm_deposit:       'text-yellow-400',
+    amm_withdrawal:    'text-orange-400',
+    yield_credit:      'text-yellow-300',
+  };
+
+  const typeBg: Record<string, string> = {
+    deposit:           'bg-green-500/10 border-green-500/20',
+    withdrawal:        'bg-red-500/10 border-red-500/20',
+    internal_transfer: 'bg-blue-500/10 border-blue-500/20',
+    amm_deposit:       'bg-yellow-500/10 border-yellow-500/20',
+    amm_withdrawal:    'bg-orange-500/10 border-orange-500/20',
+    yield_credit:      'bg-yellow-400/10 border-yellow-400/20',
+  };
+
+  const isCredit = (tx: any) => parseFloat(tx.amount) >= 0;
+
+  // ── Detail drawer ─────────────────────────────────────────────────────────
+  const TxDetailDrawer = ({ tx, onClose }: { tx: any; onClose: () => void }) => {
+    const meta = tx.metadata || {};
+    const credit = isCredit(tx);
+
+    const rows: { label: string; value: string; mono?: boolean; copy?: boolean }[] = [
+      { label: 'Transaction ID', value: tx.id, mono: true, copy: true },
+      { label: 'Type',           value: typeLabel[tx.tx_type] || tx.tx_type },
+      { label: 'Asset',          value: tx.symbol },
+      { label: 'Amount',         value: `${credit ? '+' : ''}${fmt(Math.abs(parseFloat(tx.amount)), 6)} ${tx.symbol}`, mono: true },
+      { label: 'Status',         value: tx.status },
+      { label: 'Date',           value: new Date(tx.created_at).toLocaleString() },
+    ];
+
+    if (tx.from_address) rows.push({ label: 'From', value: tx.from_address, mono: true, copy: true });
+    if (tx.to_address)   rows.push({ label: 'To',   value: tx.to_address,   mono: true, copy: true });
+    if (tx.destination_tag != null) rows.push({ label: 'Destination Tag', value: String(tx.destination_tag), mono: true });
+    if (tx.tx_hash)      rows.push({ label: 'TX Hash', value: tx.tx_hash, mono: true, copy: true });
+    if (tx.ledger_index) rows.push({ label: 'Ledger Index', value: String(tx.ledger_index), mono: true });
+
+    // Metadata fields
+    if (meta.fee)            rows.push({ label: 'Fee',            value: `${meta.fee} ${tx.symbol}` });
+    if (meta.total_deducted) rows.push({ label: 'Total Deducted', value: `${meta.total_deducted} ${tx.symbol}` });
+    if (meta.memo)           rows.push({ label: 'Memo',           value: meta.memo });
+    if (meta.type)           rows.push({ label: 'Settlement',     value: meta.type === 'internal_p2p' ? 'Internal ledger (instant, $0 fee)' : meta.type });
+
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          onClick={onClose}
+        />
+
+        {/* Drawer */}
+        <div className="fixed right-0 top-0 h-full w-full max-w-md bg-gray-900 border-l border-gray-700 z-50 overflow-y-auto shadow-2xl">
+          {/* Header */}
+          <div className={`p-5 border-b border-gray-700 ${typeBg[tx.tx_type] || 'bg-gray-800'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-sm font-semibold px-3 py-1 rounded-full border ${typeBg[tx.tx_type]} ${typeColor[tx.tx_type] || 'text-gray-400'}`}>
+                {typeLabel[tx.tx_type] || tx.tx_type}
+              </span>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className={`text-3xl font-bold font-mono ${credit ? 'text-green-400' : 'text-red-400'}`}>
+              {credit ? '+' : ''}{fmt(Math.abs(parseFloat(tx.amount)), 6)} {tx.symbol}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {new Date(tx.created_at).toLocaleString()}
+            </p>
+          </div>
+
+          {/* Status pill */}
+          <div className="px-5 py-3 border-b border-gray-800">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+              tx.status === 'confirmed'
+                ? 'bg-green-500/15 text-green-400'
+                : tx.status === 'pending'
+                ? 'bg-yellow-500/15 text-yellow-400'
+                : 'bg-red-500/15 text-red-400'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                tx.status === 'confirmed' ? 'bg-green-400' : tx.status === 'pending' ? 'bg-yellow-400' : 'bg-red-400'
+              }`} />
+              {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+            </span>
+          </div>
+
+          {/* Detail rows */}
+          <div className="p-5 space-y-3">
+            {rows.map(({ label, value, mono, copy }) => (
+              <div key={label} className="flex items-start justify-between gap-4 py-2 border-b border-gray-800/60 last:border-0">
+                <span className="text-xs text-gray-500 shrink-0 pt-0.5 w-32">{label}</span>
+                <div className="flex items-start gap-2 flex-1 min-w-0 justify-end">
+                  <span className={`text-xs text-right break-all ${mono ? 'font-mono text-gray-200' : 'text-gray-300'}`}>
+                    {value}
+                  </span>
+                  {copy && (
+                    <button
+                      onClick={() => copyToClipboard(value, label)}
+                      className="shrink-0 text-gray-600 hover:text-blue-400 transition-colors mt-0.5"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Raw metadata (collapsible) */}
+          {Object.keys(meta).length > 0 && (
+            <details className="mx-5 mb-5 bg-gray-800/60 rounded-xl border border-gray-700/50">
+              <summary className="px-4 py-3 text-xs text-gray-400 cursor-pointer hover:text-white">
+                Raw Metadata
+              </summary>
+              <pre className="px-4 pb-4 text-xs text-gray-400 font-mono overflow-auto">
+                {JSON.stringify(meta, null, 2)}
+              </pre>
+            </details>
+          )}
+
+          {/* Explorer link */}
+          {tx.tx_hash && (
+            <div className="px-5 pb-5">
+              <a
+                href={`https://testnet.xrpl.org/transactions/${tx.tx_hash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                View on XRPL Explorer
+              </a>
+            </div>
+          )}
+
+          {/* Internal transfer note */}
+          {tx.tx_type === 'internal_transfer' && (
+            <div className="mx-5 pb-5">
+              <div className="flex items-start gap-2 p-3 bg-blue-900/20 border border-blue-500/20 rounded-xl">
+                <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-300">
+                  This transfer settled on Seamount's internal ledger — instant, zero fee, no blockchain transaction required.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </>
+    );
   };
 
   return (
-    <div className="bg-gray-800/60 border border-gray-700/50 rounded-2xl p-5">
-      <h2 className="text-lg font-bold text-white mb-4">Recent Transactions</h2>
-      {loading ? (
-        <div className="flex items-center gap-2 text-gray-400 py-4 justify-center">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading...
-        </div>
-      ) : txs.length === 0 ? (
-        <p className="text-center text-gray-500 py-6 text-sm">No XRP transactions yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {txs.map(tx => (
-            <div key={tx.id} className="flex items-center justify-between py-2 border-b border-gray-700/30 last:border-0">
-              <div className="flex items-center gap-3">
-                <span className={`text-sm font-medium ${typeColor[tx.tx_type] || 'text-gray-400'}`}>
-                  {typeLabel[tx.tx_type] || tx.tx_type}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {new Date(tx.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className={`text-sm font-mono font-medium ${parseFloat(tx.amount) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {parseFloat(tx.amount) >= 0 ? '+' : ''}{fmt(Math.abs(parseFloat(tx.amount)), 4)} {tx.symbol}
-                </span>
-                {tx.tx_hash && (
-                  <a
-                    href={`https://testnet.xrpl.org/transactions/${tx.tx_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xs text-gray-600 hover:text-blue-400 transition-colors"
-                  >
-                    <ExternalLink className="h-3 w-3 inline" /> explorer
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+    <>
+      <div className="bg-gray-800/60 border border-gray-700/50 rounded-2xl p-5">
+        <h2 className="text-lg font-bold text-white mb-4">Recent Transactions</h2>
+        {loading ? (
+          <div className="flex items-center gap-2 text-gray-400 py-4 justify-center">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+          </div>
+        ) : txs.length === 0 ? (
+          <p className="text-center text-gray-500 py-6 text-sm">No XRP transactions yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {txs.map(tx => (
+              <button
+                key={tx.id}
+                onClick={() => setSelected(tx)}
+                className="w-full flex items-center justify-between py-3 px-3 rounded-xl hover:bg-gray-700/50 transition-colors group border border-transparent hover:border-gray-600/50 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  {/* Type badge */}
+                  <span className={`text-sm font-medium ${typeColor[tx.tx_type] || 'text-gray-400'}`}>
+                    {typeLabel[tx.tx_type] || tx.tx_type}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(tx.created_at).toLocaleDateString()}
+                  </span>
+                  {tx.status === 'pending' && (
+                    <span className="text-xs px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                      pending
+                    </span>
+                  )}
+                  {tx.status === 'failed' && (
+                    <span className="text-xs px-1.5 py-0.5 bg-red-500/20 text-red-400 rounded">
+                      failed
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-mono font-medium ${isCredit(tx) ? 'text-green-400' : 'text-red-400'}`}>
+                    {isCredit(tx) ? '+' : ''}{fmt(Math.abs(parseFloat(tx.amount)), 4)} {tx.symbol}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-gray-600 group-hover:text-gray-400 transition-colors" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Detail drawer — portal-style, rendered outside the card */}
+      {selected && (
+        <TxDetailDrawer tx={selected} onClose={() => setSelected(null)} />
       )}
-    </div>
+    </>
   );
 };
 
