@@ -319,6 +319,14 @@ except ImportError as e:
     logger.error(f"❌ XRP yield router import error: {e}")
     routers_available['xrp_yield'] = None
 
+try:
+    from backend.api.routes.wdk_protocols_routes import router as wdk_protocols_router
+    routers_available['wdk_protocols'] = wdk_protocols_router
+    logger.info("✅ WDK Protocols router imported (swap, lend, fiat, prices)")
+except ImportError as e:
+    logger.error(f"❌ WDK Protocols router import error: {e}")
+    routers_available['wdk_protocols'] = None
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}
@@ -594,7 +602,7 @@ async def lifespan(app: FastAPI):
                         
                         scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
                         await scheduler.start()
-                        
+
                         # Schedule daily yield distribution at 3:30 AM UTC
                         async def run_daily_yield():
                             while True:
@@ -874,7 +882,11 @@ if routers_available.get('xrp'):
 if routers_available.get('xrp_yield'):
     app.include_router(routers_available['xrp_yield'])
     logger.info("✅ XRP yield router registered at /api/v1/xrp/yield")
-    
+
+if routers_available.get('wdk_protocols'):
+    app.include_router(routers_available['wdk_protocols'], prefix="/api/v1", tags=["WDK Protocols"])
+    logger.info("✅ WDK Protocols router registered at /api/v1/wdk")
+     
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")

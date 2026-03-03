@@ -3,6 +3,7 @@
 // Multi-chain wallet service with complete Bitcoin, Ethereum, Polygon, Tron, Solana support
 
 require('dotenv').config();
+const wdkProtocols = require('./wdk-protocols');
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -1216,6 +1217,9 @@ app.use((err, req, res, next) => {
         message: err.message 
     });
 });
+
+// WDK Protocol routes (Swap, Bridge, Lending, Fiat, Price)
+app.use('/wdk', validateApiKey, wdkProtocols);
 
 // 404 handler
 app.use((req, res) => {

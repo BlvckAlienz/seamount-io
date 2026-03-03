@@ -1,8 +1,8 @@
 // 📁 FILE: frontend/src/components/modals/SwapModal.tsx
-// ✅ PRODUCTION SWAP MODAL - Mobile-First Responsive Design
+// UPDATED: Dual-tab swap — Algorand (existing) + WDK Velora EVM (new)
 
 import React, { useState, useEffect } from 'react';
-import { X, ArrowDownUp, TrendingUp, AlertCircle, Check, Loader2 } from 'lucide-react';
+import { X, ArrowDownUp, TrendingUp, AlertCircle, Check, Loader2, Zap } from 'lucide-react';
 import { apiClient } from '@/config/api';
 import toast from 'react-hot-toast';
 
@@ -11,427 +11,413 @@ interface SwapModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const SUPPORTED_ASSETS = [
-  { symbol: 'USDT', name: 'Tether USD', decimals: 6 },
-  { symbol: 'ALGO', name: 'Algorand', decimals: 6 },
-  { symbol: 'USDCa', name: 'USD Coin', decimals: 6 },
-  { symbol: 'goBTC', name: 'Wrapped Bitcoin', decimals: 8 },
+// ── Asset definitions ──────────────────────────────────────────────
+const ALGO_ASSETS = [
+  { symbol: 'USDT',  name: 'Tether USD',      decimals: 6 },
+  { symbol: 'ALGO',  name: 'Algorand',         decimals: 6 },
+  { symbol: 'USDCa', name: 'USD Coin',         decimals: 6 },
+  { symbol: 'goBTC', name: 'Wrapped Bitcoin',  decimals: 8 },
   { symbol: 'goETH', name: 'Wrapped Ethereum', decimals: 8 },
 ];
 
+const WDK_ASSETS = [
+  { symbol: 'USDT', name: 'Tether USD (EVM)',  chain: 'ethereum' },
+  { symbol: 'USDC', name: 'USD Coin (EVM)',    chain: 'ethereum' },
+];
+
+const WDK_CHAINS = [
+  { id: 'ethereum', label: 'Ethereum' },
+  { id: 'polygon',  label: 'Polygon'  },
+];
+
+// ── Main Component ─────────────────────────────────────────────────
 export const SwapModal: React.FC<SwapModalProps> = ({ open, onOpenChange }) => {
-  const [fromAsset, setFromAsset] = useState('USDT');
-  const [toAsset, setToAsset] = useState('ALGO');
-  const [amount, setAmount] = useState('');
-  const [quote, setQuote] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [swapping, setSwapping] = useState(false);
-  const [error, setError] = useState('');
-  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab]     = useState<'algo' | 'wdk'>('algo');
+
+  // ── Algorand state ─────────────────────────────────────────────
+  const [fromAsset,        setFromAsset]        = useState('USDT');
+  const [toAsset,          setToAsset]          = useState('ALGO');
+  const [amount,           setAmount]           = useState('');
+  const [quote,            setQuote]            = useState<any>(null);
+  const [loading,          setLoading]          = useState(false);
+  const [swapping,         setSwapping]         = useState(false);
+  const [error,            setError]            = useState('');
+  const [balances,         setBalances]         = useState<Record<string, number>>({});
   const [fetchingBalances, setFetchingBalances] = useState(false);
 
-  // Fetch balances when modal opens
+  // ── WDK (Velora) state ─────────────────────────────────────────
+  const [wdkFromAsset, setWdkFromAsset] = useState('USDT');
+  const [wdkToAsset,   setWdkToAsset]   = useState('USDC');
+  const [wdkChain,     setWdkChain]     = useState('ethereum');
+  const [wdkAmount,    setWdkAmount]    = useState('');
+  const [wdkQuote,     setWdkQuote]     = useState<any>(null);
+  const [wdkLoading,   setWdkLoading]   = useState(false);
+  const [wdkSwapping,  setWdkSwapping]  = useState(false);
+  const [wdkError,     setWdkError]     = useState('');
+
+  // ── Fetch balances ─────────────────────────────────────────────
   useEffect(() => {
-    const fetchBalances = async () => {
-      if (!open) return;
-      
-      setFetchingBalances(true);
-      try {
-        const response = await apiClient.get('/api/v1/wallet/balances');
-        
-        if (response?.data?.success && response.data.assets) {
-          const balanceMap: Record<string, number> = {};
-          
-          response.data.assets.forEach((asset: any) => {
-            const assetKey = asset.asset || asset.symbol || asset.chain?.toUpperCase();
-            if (assetKey) {
-              balanceMap[assetKey] = asset.balance || 0;
-            }
+    if (!open) return;
+    setFetchingBalances(true);
+    apiClient.get('/api/v1/wallet/balances')
+      .then(res => {
+        if (res?.data?.success && res.data.assets) {
+          const map: Record<string, number> = {};
+          res.data.assets.forEach((a: any) => {
+            const key = a.asset || a.symbol || a.chain?.toUpperCase();
+            if (key) map[key] = a.balance || 0;
           });
-          
-          setBalances(balanceMap);
+          setBalances(map);
         }
-      } catch (err) {
-        console.error('Failed to fetch balances:', err);
-        setBalances({});
-      } finally {
-        setFetchingBalances(false);
-      }
-    };
-    
-    fetchBalances();
+      })
+      .catch(() => setBalances({}))
+      .finally(() => setFetchingBalances(false));
   }, [open]);
 
-  // Auto-fetch quote when amount/assets change
+  // ── Algorand: auto-fetch quote ─────────────────────────────────
   useEffect(() => {
-    if (!amount || parseFloat(amount) <= 0 || !open) {
+    if (!amount || parseFloat(amount) <= 0 || !open || activeTab !== 'algo') {
       setQuote(null);
       return;
     }
+    const t = setTimeout(fetchAlgoQuote, 500);
+    return () => clearTimeout(t);
+  }, [amount, fromAsset, toAsset, open, activeTab]);
 
-    const timer = setTimeout(() => {
-      fetchQuote();
-    }, 500);
+  // ── WDK: auto-fetch quote ──────────────────────────────────────
+  useEffect(() => {
+    if (!wdkAmount || parseFloat(wdkAmount) <= 0 || !open || activeTab !== 'wdk') {
+      setWdkQuote(null);
+      return;
+    }
+    const t = setTimeout(fetchWdkQuote, 500);
+    return () => clearTimeout(t);
+  }, [wdkAmount, wdkFromAsset, wdkToAsset, wdkChain, open, activeTab]);
 
-    return () => clearTimeout(timer);
-  }, [amount, fromAsset, toAsset, open]);
-
-  const fetchQuote = async () => {
-    setLoading(true);
-    setError('');
-
+  // ── Algorand quote ─────────────────────────────────────────────
+  const fetchAlgoQuote = async () => {
+    setLoading(true); setError('');
     try {
-      const response = await apiClient.post('/api/v1/swap/quote', {
+      const res = await apiClient.post('/api/v1/swap/quote', {
         from_asset: fromAsset,
-        to_asset: toAsset,
-        amount: parseFloat(amount),
+        to_asset:   toAsset,
+        amount:     parseFloat(amount),
       });
-
-      if (response.data.success !== false) {
-        setQuote(response.data);
-      } else {
-        setError(response.data.error || 'Failed to get quote');
-      }
+      if (res.data.success !== false) setQuote(res.data);
+      else setError(res.data.error || 'Failed to get quote');
     } catch (err: any) {
-      console.error('Quote fetch failed:', err);
       setError(err.response?.data?.detail || 'Unable to fetch quote');
       setQuote(null);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  const executeSwap = async () => {
-    if (!quote) {
-      toast.error('Please get a quote first');
-      return;
-    }
-
+  const executeAlgoSwap = async () => {
+    if (!quote) { toast.error('Get a quote first'); return; }
     setSwapping(true);
-
     try {
-      const response = await apiClient.post('/api/v1/swap/execute', {
-        from_asset: fromAsset,
-        to_asset: toAsset,
-        amount: parseFloat(amount),
+      const res = await apiClient.post('/api/v1/swap/execute', {
+        from_asset: fromAsset, to_asset: toAsset, amount: parseFloat(amount),
       });
-
-      if (response.data.success) {
-        toast.success(
-          `✅ Swap successful! Received ${response.data.amount_out.toFixed(4)} ${toAsset}`
-        );
-
-        setAmount('');
-        setQuote(null);
-        onOpenChange(false);
-
+      if (res.data.success) {
+        toast.success(`✅ Swap successful! Received ${res.data.amount_out.toFixed(4)} ${toAsset}`);
+        setAmount(''); setQuote(null); onOpenChange(false);
         window.dispatchEvent(new Event('wallet-balance-updated'));
-      } else {
-        throw new Error(response.data.error || 'Swap failed');
-      }
+      } else throw new Error(res.data.error || 'Swap failed');
     } catch (err: any) {
-      console.error('Swap execution failed:', err);
-      toast.error(err.response?.data?.detail || 'Swap failed. Please try again.');
-    } finally {
-      setSwapping(false);
-    }
+      toast.error(err.response?.data?.detail || 'Swap failed. Try again.');
+    } finally { setSwapping(false); }
   };
 
-  const swapAssets = () => {
-    const temp = fromAsset;
-    setFromAsset(toAsset);
-    setToAsset(temp);
+  // ── WDK quote ──────────────────────────────────────────────────
+  const fetchWdkQuote = async () => {
+    if (wdkFromAsset === wdkToAsset) {
+      setWdkError('Select different tokens'); return;
+    }
+    setWdkLoading(true); setWdkError('');
+    try {
+      const res = await apiClient.post('/api/v1/wdk/swap', {
+        token_in:  wdkFromAsset,
+        token_out: wdkToAsset,
+        amount_in: parseFloat(wdkAmount),
+        chain:     wdkChain,
+        // quote-only mode — backend should detect and return quote without executing
+        quote_only: true,
+      });
+      if (res.data.success !== false) setWdkQuote(res.data);
+      else setWdkError(res.data.error || 'Failed to get quote');
+    } catch (err: any) {
+      setWdkError(err.response?.data?.detail || 'Unable to fetch quote');
+      setWdkQuote(null);
+    } finally { setWdkLoading(false); }
   };
+
+  const executeWdkSwap = async () => {
+    if (!wdkQuote) { toast.error('Get a quote first'); return; }
+    setWdkSwapping(true);
+    try {
+      const res = await apiClient.post('/api/v1/wdk/swap', {
+        token_in:  wdkFromAsset,
+        token_out: wdkToAsset,
+        amount_in: parseFloat(wdkAmount),
+        chain:     wdkChain,
+      });
+      if (res.data.success) {
+        toast.success(`✅ EVM Swap done! Tx: ${res.data.tx_hash?.slice(0, 10)}...`);
+        setWdkAmount(''); setWdkQuote(null); onOpenChange(false);
+        window.dispatchEvent(new Event('wallet-balance-updated'));
+      } else throw new Error(res.data.error || 'WDK swap failed');
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'WDK Swap failed. Try again.');
+    } finally { setWdkSwapping(false); }
+  };
+
+  const swapAlgoAssets = () => { const t = fromAsset; setFromAsset(toAsset); setToAsset(t); };
+  const swapWdkAssets  = () => { const t = wdkFromAsset; setWdkFromAsset(wdkToAsset); setWdkToAsset(t); };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-2 sm:p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => onOpenChange(false)}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
 
-      {/* Modal - 📱 RESPONSIVE CONTAINER */}
-      <div 
+      <div
         className="relative bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-[500px] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 max-h-[90vh] overflow-y-auto"
         style={{ zIndex: 1000 }}
       >
-        {/* Header - 📱 COMPACT ON MOBILE */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <ArrowDownUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-            <span className="hidden xs:inline">Swap Assets</span>
-            <span className="xs:hidden">Swap</span>
+            <ArrowDownUp className="h-5 w-5 text-purple-600" />
+            Swap Assets
           </h2>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors p-1"
-          >
+          <button onClick={() => onOpenChange(false)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white p-1">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* From Asset - 📱 STACKED LAYOUT ON MOBILE */}
-        <div className="mb-3 sm:mb-4">
-          <label className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 block">
-            From
-          </label>
-
-          {/* Balance Display - 📱 COMPACT */}
-          {balances[fromAsset] !== undefined && (
-            <div className="flex justify-between items-center px-2 sm:px-3 py-1.5 sm:py-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">Available:</span>
-              <span className="font-bold text-xs sm:text-sm text-blue-700 dark:text-blue-300">
-                {balances[fromAsset].toFixed(6)} {fromAsset}
-              </span>
-            </div>
-          )}
-
-          {/* Input + Asset Selector - 📱 RESPONSIVE */}
-          <div className="flex flex-col xs:flex-row gap-2">
-            <div className="relative flex-1">
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 pr-14 sm:pr-16"
-              />
-              
-              {/* MAX Button - 📱 RESPONSIVE */}
-              {balances[fromAsset] > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setAmount(balances[fromAsset].toString())}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 sm:px-3 py-1 text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white rounded-md sm:rounded-lg transition-colors"
-                >
-                  MAX
-                </button>
-              )}
-            </div>
-
-            {/* Asset Dropdown - 📱 FULL WIDTH ON SMALL SCREENS */}
-            <select
-              value={fromAsset}
-              onChange={(e) => setFromAsset(e.target.value)}
-              className="w-full xs:w-auto bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              {SUPPORTED_ASSETS.map((asset) => (
-                <option key={asset.symbol} value={asset.symbol}>
-                  {asset.symbol}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Swap Direction Button - 📱 TOUCH-FRIENDLY */}
-        <div className="flex justify-center my-2 sm:my-3">
+        {/* Tabs */}
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 mb-5 overflow-hidden">
           <button
-            onClick={swapAssets}
-            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border-2 border-gray-300 dark:border-gray-500 rounded-full p-2 sm:p-2.5 transition-all hover:scale-110 active:scale-95"
+            className={`flex-1 py-2 text-sm font-semibold transition-colors ${
+              activeTab === 'algo'
+                ? 'bg-purple-600 text-white'
+                : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            onClick={() => setActiveTab('algo')}
           >
-            <ArrowDownUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+            Algorand DEX
+          </button>
+          <button
+            className={`flex-1 py-2 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+              activeTab === 'wdk'
+                ? 'bg-blue-600 text-white'
+                : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            onClick={() => setActiveTab('wdk')}
+          >
+            <Zap className="h-3.5 w-3.5" /> EVM (Velora)
           </button>
         </div>
 
-        {/* To Asset - 📱 RESPONSIVE */}
-        <div className="mb-4 sm:mb-6">
-          <label className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white mb-1.5 sm:mb-2 block">
-            To
-          </label>
-          <div className="flex flex-col xs:flex-row gap-2">
-            <input
-              type="text"
-              value={quote ? quote.amount_out.toFixed(4) : '0.00'}
-              readOnly
-              placeholder="0.00"
-              className="flex-1 bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-base sm:text-lg focus:outline-none"
-            />
-            <select
-              value={toAsset}
-              onChange={(e) => setToAsset(e.target.value)}
-              className="w-full xs:w-auto bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-gray-900 dark:text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              {SUPPORTED_ASSETS.filter((a) => a.symbol !== fromAsset).map((asset) => (
-                <option key={asset.symbol} value={asset.symbol}>
-                  {asset.symbol}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Quote Details */}
-        {quote && !error && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4 space-y-2">
-            {/* NEW: Show explicit exchange rate */}
-            <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b-2 border-blue-200 dark:border-blue-700">
-              <span className="text-gray-700 dark:text-gray-300 font-semibold">Exchange Rate</span>
-              <span className="text-gray-900 dark:text-white font-bold">
-                1 {fromAsset} = {quote.exchange_rate?.toFixed(6)} {toAsset}
-              </span>
-            </div>
-            
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700 dark:text-gray-300">Amount Before Fees</span>
-              <span className="text-gray-900 dark:text-white font-medium">
-                {quote.amount_out_before_fees?.toFixed(4)} {toAsset}
-              </span>
-            </div>
-            
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700 dark:text-gray-300">
-                Platform Fee ({quote.fee_percentage?.toFixed(1)}%)
-              </span>
-              <span className="text-orange-600 dark:text-orange-400 font-medium">
-                - {quote.fee_amount?.toFixed(4)} {toAsset}
-              </span>
-            </div>
-            
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700 dark:text-gray-300">Price Impact</span>
-              <span className={`font-medium ${
-                quote.price_impact > 5 
-                  ? 'text-red-600' 
-                  : quote.price_impact > 2 
-                  ? 'text-orange-600' 
-                  : 'text-green-600'
-              }`}>
-                {quote.price_impact?.toFixed(2)}%
-              </span>
-            </div>
-            
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700 dark:text-gray-300">Network Fee</span>
-              <span className="text-gray-900 dark:text-white">~$0.001</span>
-            </div>
-            
-            <div className="border-t-2 border-blue-300 dark:border-blue-700 pt-3 mt-3 flex justify-between items-center">
-              <span className="text-gray-900 dark:text-white font-semibold">You Receive</span>
-              <div className="text-right">
-                <div className="text-gray-900 dark:text-white font-bold text-lg">
-                  {quote.amount_out?.toFixed(4)} {toAsset}
+        {/* ── ALGORAND TAB ── */}
+        {activeTab === 'algo' && (
+          <>
+            {/* From */}
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-gray-900 dark:text-white mb-1 block">From</label>
+              {balances[fromAsset] !== undefined && (
+                <div className="flex justify-between items-center px-3 py-1.5 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <span className="text-xs text-gray-700 dark:text-gray-300">Available:</span>
+                  <span className="font-bold text-xs text-blue-700 dark:text-blue-300">
+                    {balances[fromAsset].toFixed(6)} {fromAsset}
+                  </span>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Min: {quote.min_amount_out?.toFixed(4)} {toAsset}
-                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <select
+                  value={fromAsset} onChange={e => setFromAsset(e.target.value)}
+                  className="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-2 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  {ALGO_ASSETS.map(a => <option key={a.symbol} value={a.symbol}>{a.symbol}</option>)}
+                </select>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* NEW: Rate Validation Warning */}
-        {quote && quote.exchange_rate && (
-          (() => {
-            // Calculate expected rate range based on asset pair
-            const expectedRates: { [key: string]: { min: number; max: number } } = {
-              'USDT-ALGO': { min: 1.5, max: 5.0 },   // 1 USDT = 1.5-5 ALGO
-              'ALGO-USDT': { min: 0.2, max: 0.7 },   // 1 ALGO = $0.20-$0.70
-              'USDT-USDCa': { min: 0.98, max: 1.02 }, // 1:1 stables
-            };
-            
-            const pairKey = `${fromAsset}-${toAsset}`;
-            const expected = expectedRates[pairKey];
-            
-            if (expected) {
-              const rate = quote.exchange_rate;
-              const isOutOfRange = rate < expected.min || rate > expected.max;
-              
-              if (isOutOfRange) {
-                return (
-                  <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-red-900 dark:text-red-100 font-semibold">
-                        ⚠️ Unusual Exchange Rate Detected
-                      </p>
-                      <p className="text-xs text-red-800 dark:text-red-200 mt-1">
-                        Rate: 1 {fromAsset} = {rate.toFixed(6)} {toAsset}<br />
-                        Expected: {expected.min} - {expected.max}<br />
-                        <strong>This quote may be inaccurate. Please double-check before proceeding.</strong>
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-            }
-            
-            return null;
-          })()
-        )}
-
-        {/* NEW: Price Impact Warning */}
-        {quote && quote.price_impact > 5 && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-red-900 dark:text-red-100 font-semibold">High Price Impact!</p>
-              <p className="text-xs text-red-800 dark:text-red-200 mt-1">
-                This swap will significantly affect the pool price. Consider reducing your amount.
-              </p>
+            {/* Swap button */}
+            <div className="flex justify-center my-2">
+              <button onClick={swapAlgoAssets} className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors">
+                <ArrowDownUp className="h-4 w-4 text-purple-600" />
+              </button>
             </div>
-          </div>
+
+            {/* To */}
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-gray-900 dark:text-white mb-1 block">To</label>
+              <select
+                value={toAsset} onChange={e => setToAsset(e.target.value)}
+                className="w-full bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                {ALGO_ASSETS.filter(a => a.symbol !== fromAsset).map(a => (
+                  <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                <span className="text-xs text-red-700 dark:text-red-400">{error}</span>
+              </div>
+            )}
+
+            {/* Quote */}
+            {loading && <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-purple-600" /></div>}
+            {quote && !loading && (
+              <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-400">You receive</span>
+                  <span className="font-bold text-purple-700 dark:text-purple-300">
+                    {quote.amount_out?.toFixed(6)} {toAsset}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-400">Rate</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    1 {fromAsset} = {quote.exchange_rate?.toFixed(6)} {toAsset}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-400">Fee</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {quote.fee_percentage?.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={executeAlgoSwap}
+              disabled={swapping || loading || !quote || !amount}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              {swapping ? <><Loader2 className="h-4 w-4 animate-spin" /> Swapping...</> : 'Swap'}
+            </button>
+          </>
         )}
 
-        {/* Error Display - 📱 COMPACT */}
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-2.5 sm:p-3 mb-3 sm:mb-4 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs sm:text-sm text-red-900 dark:text-red-100 font-medium">{error}</p>
-          </div>
-        )}
+        {/* ── WDK VELORA TAB ── */}
+        {activeTab === 'wdk' && (
+          <>
+            {/* Chain selector */}
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-gray-900 dark:text-white mb-1 block">Chain</label>
+              <div className="flex gap-2">
+                {WDK_CHAINS.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setWdkChain(c.id)}
+                    className={`flex-1 py-1.5 text-xs rounded-lg border font-semibold transition-colors ${
+                      wdkChain === c.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-blue-400'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Loading State - 📱 COMPACT */}
-        {loading && !error && (
-          <div className="flex items-center justify-center py-3 sm:py-4 text-gray-600 dark:text-gray-400">
-            <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
-            <span className="font-medium text-xs sm:text-sm">Fetching best rate...</span>
-          </div>
-        )}
+            {/* From */}
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-gray-900 dark:text-white mb-1 block">From</label>
+              <div className="flex gap-2">
+                <input
+                  type="number" value={wdkAmount} onChange={e => setWdkAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={wdkFromAsset} onChange={e => setWdkFromAsset(e.target.value)}
+                  className="bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-2 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {WDK_ASSETS.map(a => <option key={a.symbol} value={a.symbol}>{a.symbol}</option>)}
+                </select>
+              </div>
+            </div>
 
-        {/* Insufficient Balance Warning - 📱 COMPACT */}
-        {parseFloat(amount) > 0 && balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset] && (
-          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800 rounded-lg p-2.5 sm:p-3 mb-3 sm:mb-4 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs sm:text-sm text-red-900 dark:text-red-100 font-medium">
-              Insufficient balance. You have {balances[fromAsset].toFixed(6)} {fromAsset} available.
+            {/* Swap direction */}
+            <div className="flex justify-center my-2">
+              <button onClick={swapWdkAssets} className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors">
+                <ArrowDownUp className="h-4 w-4 text-blue-600" />
+              </button>
+            </div>
+
+            {/* To */}
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-gray-900 dark:text-white mb-1 block">To</label>
+              <select
+                value={wdkToAsset} onChange={e => setWdkToAsset(e.target.value)}
+                className="w-full bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-lg px-3 py-2.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {WDK_ASSETS.filter(a => a.symbol !== wdkFromAsset).map(a => (
+                  <option key={a.symbol} value={a.symbol}>{a.symbol} — {a.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Error */}
+            {wdkError && (
+              <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                <span className="text-xs text-red-700 dark:text-red-400">{wdkError}</span>
+              </div>
+            )}
+
+            {/* Quote */}
+            {wdkLoading && <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-blue-600" /></div>}
+            {wdkQuote && !wdkLoading && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-400">You receive (est.)</span>
+                  <span className="font-bold text-blue-700 dark:text-blue-300">
+                    {wdkQuote.amount_out ?? '—'} {wdkToAsset}
+                  </span>
+                </div>
+                {wdkQuote.fee && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">Est. fee</span>
+                    <span className="text-gray-800 dark:text-gray-200">{wdkQuote.fee} wei</span>
+                  </div>
+                )}
+                <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> Powered by Velora on {wdkChain.charAt(0).toUpperCase() + wdkChain.slice(1)}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={executeWdkSwap}
+              disabled={wdkSwapping || wdkLoading || !wdkQuote || !wdkAmount}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              {wdkSwapping ? <><Loader2 className="h-4 w-4 animate-spin" /> Swapping...</> : 'Swap via Velora'}
+            </button>
+
+            <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+              EVM swap powered by Tether WDK + Velora DEX
             </p>
-          </div>
+          </>
         )}
-
-        {/* Swap Button - 📱 TOUCH-FRIENDLY */}
-        <button
-          onClick={executeSwap}
-          disabled={
-            !quote || 
-            swapping || 
-            loading || 
-            !!error ||
-            (balances[fromAsset] !== undefined && parseFloat(amount) > balances[fromAsset])
-          }
-          className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm sm:text-base active:scale-95"
-        >
-          {swapping ? (
-            <>
-              <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-              Swapping...
-            </>
-          ) : (
-            <>
-              <ArrowDownUp className="h-4 w-4 sm:h-5 sm:w-5" />
-              Swap Now
-            </>
-          )}
-        </button>
-
-        {/* Disclaimer - 📱 COMPACT */}
-        <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 text-center mt-3 sm:mt-4 font-medium">
-          Powered by Pact Finance DEX on Algorand MainNet
-        </p>
       </div>
     </div>
   );
 };
+
+export default SwapModal;

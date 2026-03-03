@@ -1210,23 +1210,23 @@ class WDKClient:
                 from backend.config import get_settings
                 settings = get_settings()
                 
-                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_{chain.upper()}")
+                chain_suffix_map = {'ethereum': 'ETH', 'polygon': 'POLYGON'}
+                chain_suffix = chain_suffix_map.get(chain, chain.upper())
+                asset_key = f"{asset}_{chain_suffix}"
+                asset_config = settings.SUPPORTED_ASSETS.get(asset_key) or settings.SUPPORTED_ASSETS.get(asset)
                 if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for {chain}")
+                    raise Exception(f"Asset {asset} not configured for {chain}. Tried keys: {asset_key}, {asset}")
                 
                 token_address = asset_config.get('contract_address')
                 if not token_address:
                     raise Exception(f"No contract address for {asset} on {chain}")
-                
-                decimals = asset_config.get('decimals', 6)
-                amount_base = int(amount * (10 ** decimals))
                 
                 payload = {
                     'plaintext_seed': plaintext_seed,
                     'from_address': from_address,
                     'to_address': to_address,
                     'token_address': token_address,
-                    'amount': str(amount_base),
+                    'amount': str(amount),
                     'chain': chain,
                     'gasless': enable_gasless and chain == 'polygon'
                 }
@@ -1884,6 +1884,189 @@ class WDKClient:
         """Check if gasless transactions available"""
         return chain.lower() in self.GASLESS_CHAINS
     
+    # ================================================================
+    # NEW WDK PROTOCOL METHODS (Swap / Bridge / Lending / Fiat / Price)
+    # All route to new endpoints on the Node.js WDK service.
+    # ================================================================
+
+    async def wdk_swap(
+        self,
+        plaintext_seed: str,
+        account_index: int,
+        token_in: str,          # ERC-20 contract address
+        token_out: str,         # ERC-20 contract address
+        amount_in: int,         # Amount in token base units (BigInt compatible)
+        chain: str = 'ethereum'
+    ) -> Dict[str, Any]:
+        
+        # Execute a Velora EVM swap.
+        # Calls POST /wdk/swap on the Node.js service.
+
+        try:
+            payload = {
+                'plaintext_seed': plaintext_seed,
+                'account_index': account_index,
+                'token_in': token_in,
+                'token_out': token_out,
+                'amount_in': amount_in,
+                'chain': chain
+            }
+            result = await self._make_request('POST', '/wdk/swap', data=payload)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'Velora swap failed'))
+            logger.info(f"✅ WDK Velora swap: {result.get('tx_hash')}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_swap failed: {e}", exc_info=True)
+            raise
+
+    async def wdk_bridge(
+        self,
+        plaintext_seed: str,
+        account_index: int,
+        token: str,             # Token contract address on source chain
+        amount: int,            # Amount in base units
+        target_chain: str,      # e.g. 'ethereum' or 'ton'
+        recipient: str,         # Recipient address on target chain
+        source_chain: str = 'ethereum'
+    ) -> Dict[str, Any]:
+        
+        #Bridge USDT0 cross-chain via USDT0 EVM protocol.
+        # Calls POST /wdk/bridge on the Node.js service.
+        
+        try:
+            payload = {
+                'plaintext_seed': plaintext_seed,
+                'account_index': account_index,
+                'token': token,
+                'amount': amount,
+                'target_chain': target_chain,
+                'recipient': recipient,
+                'source_chain': source_chain
+            }
+            result = await self._make_request('POST', '/wdk/bridge', data=payload)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'USDT0 bridge failed'))
+            logger.info(f"✅ WDK bridge tx: {result.get('tx_hash')}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_bridge failed: {e}", exc_info=True)
+            raise
+
+    async def wdk_lend(
+        self,
+        plaintext_seed: str,
+        account_index: int,
+        action: str,            # 'supply' | 'withdraw' | 'borrow' | 'repay'
+        token: str,             # ERC-20 contract address
+        amount: int,            # Amount in base units
+        chain: str = 'ethereum'
+    ) -> Dict[str, Any]:
+        
+        # Interact with Aave lending protocol via WDK.
+        # Calls POST /wdk/lend on the Node.js service.
+        
+        if action not in ('supply', 'withdraw', 'borrow', 'repay'):
+            raise ValueError(f"Invalid lending action: {action}")
+        try:
+            payload = {
+                'plaintext_seed': plaintext_seed,
+                'account_index': account_index,
+                'action': action,
+                'token': token,
+                'amount': amount,
+                'chain': chain
+            }
+            result = await self._make_request('POST', '/wdk/lend', data=payload)
+            if not result.get('success'):
+                raise Exception(result.get('error', f'Aave {action} failed'))
+            logger.info(f"✅ WDK Aave {action}: {result.get('tx_hash')}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_lend({action}) failed: {e}", exc_info=True)
+            raise
+
+    async def wdk_fiat_quote(
+        self,
+        plaintext_seed: str,
+        account_index: int,
+        currency_code: str,     # e.g. 'USD', 'NGN', 'GBP'
+        crypto_currency: str,   # e.g. 'USDT' 
+        base_currency_amount: float,
+        chain: str = 'ethereum'
+    ) -> Dict[str, Any]:
+        
+        # Get MoonPay on-ramp quote via WDK fiat module.
+        # Calls POST /wdk/fiat/quote on the Node.js service.
+        
+        try:
+            payload = {
+                'plaintext_seed': plaintext_seed,
+                'account_index': account_index,
+                'currency_code': currency_code,
+                'crypto_currency': crypto_currency,
+                'base_currency_amount': base_currency_amount,
+                'chain': chain
+            }
+            result = await self._make_request('POST', '/wdk/fiat/quote', data=payload)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'MoonPay quote failed'))
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_fiat_quote failed: {e}", exc_info=True)
+            raise
+
+    async def wdk_fiat_buy(
+        self,
+        plaintext_seed: str,
+        account_index: int,
+        currency_code: str,
+        crypto_currency: str,
+        base_currency_amount: float,
+        chain: str = 'ethereum'
+    ) -> Dict[str, Any]:
+        
+        # Initiate MoonPay on-ramp purchase via WDK fiat module.
+        # Calls POST /wdk/fiat/buy on the Node.js service.
+        # Returns: { url: str } — redirect user to MoonPay widget URL.
+        
+        try:
+            payload = {
+                'plaintext_seed': plaintext_seed,
+                'account_index': account_index,
+                'currency_code': currency_code,
+                'crypto_currency': crypto_currency,
+                'base_currency_amount': base_currency_amount,
+                'chain': chain
+            }
+            result = await self._make_request('POST', '/wdk/fiat/buy', data=payload)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'MoonPay buy initiation failed'))
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_fiat_buy failed: {e}", exc_info=True)
+            raise
+
+    async def wdk_price_rates(
+        self,
+        tokens: list = None     # Optional list of token symbols to filter
+    ) -> Dict[str, Any]:
+        
+        # Get live price rates from Tether WDK price oracle.
+        # Calls GET /wdk/price-rates on the Node.js service.
+        
+        try:
+            params = {}
+            if tokens:
+                params['tokens'] = ','.join(tokens)
+            result = await self._make_request('GET', '/wdk/price-rates', params=params)
+            if not result.get('success'):
+                raise Exception(result.get('error', 'Price rates fetch failed'))
+            return result
+        except Exception as e:
+            logger.error(f"❌ wdk_price_rates failed: {e}", exc_info=True)
+            raise
+        
     async def health_check(self) -> Dict[str, Any]:
         """Check WDK service health"""
         try:
@@ -1893,7 +2076,7 @@ class WDKClient:
                 'wdk_service': result,
                 'indexer_enabled': self.indexer_url is not None,
                 'supported_chains': self.SUPPORTED_CHAINS,
-                'circuit_breaker': self.circuit_breaker.state
+                'circuit_breaker': self.state
             }
         except Exception as e:
             return {
