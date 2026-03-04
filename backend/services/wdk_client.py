@@ -280,6 +280,17 @@ class WDKClient:
                             return result
                     else:  # POST, PUT, etc.
                         async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            # 4xx = client/request error — do NOT retry, surface immediately
+                            if response.status in [400, 401, 403, 422]:
+                                error_body = await response.text()
+                                logger.error(f"❌ WDK client error {response.status}: {error_body[:300]}")
+                                try:
+                                    error_json = await response.json() if 'application/json' in response.content_type else {}
+                                    error_msg  = error_json.get('error') or error_json.get('detail') or error_body
+                                except Exception:
+                                    error_msg = error_body
+                                raise Exception(f"WDK request failed ({response.status}): {error_msg}")
+                            # 5xx = server error — retry these
                             if response.status in [502, 503, 504]:
                                 raise aiohttp.ClientResponseError(
                                     request_info=response.request_info,
@@ -289,8 +300,6 @@ class WDKClient:
                                 )
                             response.raise_for_status()
                             result = await response.json()
-                            
-                            # Success - record it in circuit breaker
                             self.circuit_breaker.record_success()
                             self.service_healthy = True
                             return result
@@ -1283,20 +1292,23 @@ class WDKClient:
                     }
                     
                 else:
-                    # TRC-20 token transfer (USDT)
-                    from backend.config import get_settings
-                    settings = get_settings()
-                    
-                    asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
+                    # TRC-20 token transfer (USDT, USDC)
+                    # Hardcoded Tron mainnet contracts — avoids dependency on config
+                    TRON_TOKEN_CONTRACTS = {
+                        'USDT': {'contract_address': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', 'decimals': 6},
+                        'USDC': {'contract_address': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8', 'decimals': 6},
+                    }
+
+                    asset_config = TRON_TOKEN_CONTRACTS.get(asset.upper())
                     if not asset_config:
-                        raise Exception(f"Asset {asset} not configured for Tron")
-                    
-                    token_address = asset_config.get('contract_address')
-                    if not token_address:
-                        raise Exception(f"No contract address for {asset} on Tron")
-                    
-                    decimals = asset_config.get('decimals', 6)
-                    amount_base = int(amount * (10 ** decimals))
+                        raise Exception(
+                            f"Unsupported Tron token: {asset}. "
+                            f"Supported: {list(TRON_TOKEN_CONTRACTS.keys())}"
+                        )
+
+                    token_address = asset_config['contract_address']
+                    decimals      = asset_config['decimals']
+                    amount_base   = int(amount * (10 ** decimals))
                     
                     # ✅ FIX: Remove from_address and chain – only required fields
                     payload = {
