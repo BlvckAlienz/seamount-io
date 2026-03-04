@@ -691,14 +691,12 @@ class MultiChainWalletService:
             }
             
         except Exception as e:
-            # Catch ANY error in the entire transaction flow
             error_msg = str(e)
-            logger.error(f"âŒ Payment failed for user {user_id}: {error_msg}")
-            
+            logger.error(f"❌ Payment failed for user {user_id}: {error_msg}", exc_info=True)
             return {
                 'success': False,
-                'message': 'Payment failed. Please try again.',
-                'error': error_msg
+                'message': error_msg,   # real error, not a generic wrapper
+                'error':   error_msg
             }
     
     # ========== HELPER METHODS ==========

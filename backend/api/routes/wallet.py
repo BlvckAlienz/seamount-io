@@ -450,8 +450,10 @@ async def send_payment(
         )
         
         if not result["success"]:
-            logger.warning(f"Payment failed for user {user_id}: {result.get('message')}")
-            raise HTTPException(status_code=400, detail=result.get("message", "Payment failed"))
+            # Surface the REAL error — not the generic wrapper
+            real_error = result.get("error") or result.get("message", "Payment failed")
+            logger.error(f"❌ Payment failed for user {user_id}: {real_error}")
+            raise HTTPException(status_code=400, detail=real_error)
         
         logger.info(f"âœ… Payment successful for user {user_id}: {result['transaction_id']}")
         

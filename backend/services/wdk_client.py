@@ -253,7 +253,7 @@ class WDKClient:
                 
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
+                    'X-API-Key': self.api_key  # always use env var, never hardcode
                 }
                 # Log request details (mask sensitive data)
                 safe_data = data.copy() if data else {}
@@ -280,17 +280,22 @@ class WDKClient:
                             return result
                     else:  # POST, PUT, etc.
                         async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                            # 4xx = client/request error — do NOT retry, surface immediately
-                            if response.status in [400, 401, 403, 422]:
-                                error_body = await response.text()
-                                logger.error(f"❌ WDK client error {response.status}: {error_body[:300]}")
+                            response_text = await response.text()
+
+                            # 4xx = bad request — surface immediately, DO NOT retry
+                            if 400 <= response.status < 500:
                                 try:
-                                    error_json = await response.json() if 'application/json' in response.content_type else {}
-                                    error_msg  = error_json.get('error') or error_json.get('detail') or error_body
+                                    import json as _json
+                                    err_body = _json.loads(response_text)
+                                    err_msg  = err_body.get('error') or err_body.get('detail') or response_text
                                 except Exception:
-                                    error_msg = error_body
-                                raise Exception(f"WDK request failed ({response.status}): {error_msg}")
-                            # 5xx = server error — retry these
+                                    err_msg = response_text
+                                logger.error(
+                                    f"❌ WDK {response.status} on {method} {endpoint}: {err_msg[:400]}"
+                                )
+                                raise Exception(f"WDK error ({response.status}): {err_msg}")
+
+                            # 5xx = server error — retry
                             if response.status in [502, 503, 504]:
                                 raise aiohttp.ClientResponseError(
                                     request_info=response.request_info,
@@ -298,8 +303,12 @@ class WDKClient:
                                     status=response.status,
                                     message=f"Service unavailable: {response.status}"
                                 )
-                            response.raise_for_status()
-                            result = await response.json()
+
+                            try:
+                                result = _json.loads(response_text) if response_text else {}
+                            except Exception:
+                                result = {'raw': response_text}
+
                             self.circuit_breaker.record_success()
                             self.service_healthy = True
                             return result
@@ -1356,20 +1365,23 @@ class WDKClient:
                 endpoint = '/wallet/solana/send'
                 
             else:
-                # SPL token transfer
-                from backend.config import get_settings
-                settings = get_settings()
-                
-                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_SOLANA")
-                if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for Solana")
-                
-                token_address = asset_config.get('contract_address')
+                # TRC-20 — hardcoded mainnet contracts, zero config dependency
+                TRON_CONTRACTS = {
+                    'USDT': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+                    'USDC': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8',
+                }
+                token_address = TRON_CONTRACTS.get(asset.upper())
                 if not token_address:
-                    raise Exception(f"No contract address for {asset} on Solana")
-                
-                decimals = asset_config.get('decimals', 9)
+                    raise Exception(
+                        f"Unsupported Tron token: '{asset}'. "
+                        f"Supported: {list(TRON_CONTRACTS.keys())}"
+                    )
+                decimals   = 6  # USDT/USDC are always 6 decimals on Tron
                 amount_base = int(amount * (10 ** decimals))
+                logger.info(
+                    f"🔑 Tron TRC-20: {asset} → contract {token_address[:12]}... "
+                    f"amount_base={amount_base}"
+                )
                 
                 payload = {
                     'plaintext_seed': plaintext_seed,
