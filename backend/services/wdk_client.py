@@ -305,9 +305,12 @@ class WDKClient:
                 last_exception = e
                 logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
-                # Record failure in circuit breaker
-                self.circuit_breaker.record_failure()
-                self.service_healthy = False
+                # ===== FIX: Only penalize circuit breaker for Node service failures =====
+                # Indexer failures (403) should not open the circuit
+                if not use_indexer:
+                    self.circuit_breaker.record_failure()
+                    self.service_healthy = False
+                # ===== END FIX =====
                 
                 if attempt < max_retries - 1:
                     # Exponential backoff with jitter

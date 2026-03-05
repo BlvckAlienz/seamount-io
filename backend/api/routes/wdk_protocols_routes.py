@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.dependencies import get_current_user
-from backend.wdk_client import WDKClient
+from backend.services.wdk_client import WDKClient
 from backend.services.database_service import DatabaseService
 from backend.services.wdk_protocols_service import WDKProtocolsService
 
