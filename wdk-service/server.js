@@ -875,6 +875,107 @@ app.post('/wallet/bitcoin/send', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
+// TRON TOKEN SEND (TRC-20: USDT) - PRODUCTION READY
+// ============================================================================
+app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+
+        // Validate seed
+        if (!validateSeedPhrase(plaintext_seed)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid BIP39 seed phrase' 
+            });
+        }
+
+        // Create Tron wallet
+        const tronWallet = await createTronWallet(plaintext_seed);
+        
+        console.log(`📍 Sending from: ${tronWallet.address}`);
+        console.log(`📍 Sending to: ${to_address}`);
+        console.log(`📍 Token contract: ${token_address}`);
+
+        // ✅ PRODUCTION IMPLEMENTATION USING TronWeb
+        try {
+            const tronWeb = new TronWeb({
+                fullHost: 'https://api.trongrid.io',
+                headers: { 'TRON-PRO-API-KEY': process.env.TRON_API_KEY || '' },
+                privateKey: tronWallet.privateKey
+            });
+
+            // Get TRC-20 contract
+            const contract = await tronWeb.contract().at(token_address);
+
+            // Check balance
+            const balance = await contract.balanceOf(tronWallet.address).call();
+            console.log(`💰 Token balance: ${balance.toString()}`);
+
+            if (BigInt(balance.toString()) < BigInt(amount)) {
+                throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance.toString()}`);
+            }
+
+            // Send token transfer
+            console.log(`⚙️ Building Tron token transfer...`);
+            
+            const txResult = await contract.transfer(to_address, amount).send({
+                feeLimit: 100000000, // 100 TRX
+                callValue: 0
+            });
+
+            console.log(`✅ Tron token transfer successful: ${txResult}`);
+
+            return res.json({
+                success: true,
+                tx_hash: txResult,
+                tx_id: txResult,
+                chain: 'tron',
+                timestamp: new Date().toISOString(),
+                explorer_url: `https://tronscan.org/#/transaction/${txResult}`
+            });
+
+        } catch (tronError) {
+            console.error(`❌ Tron token transfer failed:`, tronError.message);
+            
+            let errorMessage = tronError.message;
+            if (errorMessage.includes('Insufficient token balance')) {
+                errorMessage = tronError.message;
+            } else if (errorMessage.includes('INSUFFICIENT_BALANCE')) {
+                errorMessage = 'Insufficient TRX for energy/bandwidth fees.';
+            }
+            
+            return res.status(400).json({ 
+                success: false,
+                error: errorMessage,
+                chain: 'tron'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Tron token send failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ============================================================================
 // EVM TOKEN SEND (ERC-20: USDT, USDC) - PRODUCTION READY
 // ============================================================================
 app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
@@ -896,10 +997,13 @@ app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
             });
         }
 
+        // tron has its own dedicated route below — should never reach here
+        // but guard anyway
         if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
             return res.status(400).json({ 
                 success: false,
-                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
+                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.`,
+                hint: chain === 'tron' ? 'Use /wallet/tron/send-token endpoint directly' : undefined
             });
         }
 
@@ -1002,106 +1106,6 @@ app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
     }
 });
 
-// ============================================================================
-// TRON TOKEN SEND (TRC-20: USDT) - PRODUCTION READY
-// ============================================================================
-app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
-    try {
-        const { 
-            plaintext_seed, 
-            from_address, 
-            to_address, 
-            token_address,
-            amount
-        } = req.body;
-
-        if (!plaintext_seed || !to_address || !token_address || !amount) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'plaintext_seed, to_address, token_address, and amount required' 
-            });
-        }
-
-        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
-
-        // Validate seed
-        if (!validateSeedPhrase(plaintext_seed)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Invalid BIP39 seed phrase' 
-            });
-        }
-
-        // Create Tron wallet
-        const tronWallet = await createTronWallet(plaintext_seed);
-        
-        console.log(`📍 Sending from: ${tronWallet.address}`);
-        console.log(`📍 Sending to: ${to_address}`);
-        console.log(`📍 Token contract: ${token_address}`);
-
-        // ✅ PRODUCTION IMPLEMENTATION USING TronWeb
-        try {
-            const tronWeb = new TronWeb({
-                fullHost: 'https://api.trongrid.io',
-                headers: { 'TRON-PRO-API-KEY': process.env.TRON_API_KEY || '' },
-                privateKey: tronWallet.privateKey
-            });
-
-            // Get TRC-20 contract
-            const contract = await tronWeb.contract().at(token_address);
-
-            // Check balance
-            const balance = await contract.balanceOf(tronWallet.address).call();
-            console.log(`💰 Token balance: ${balance.toString()}`);
-
-            if (BigInt(balance.toString()) < BigInt(amount)) {
-                throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance.toString()}`);
-            }
-
-            // Send token transfer
-            console.log(`⚙️ Building Tron token transfer...`);
-            
-            const txResult = await contract.transfer(to_address, amount).send({
-                feeLimit: 100000000, // 100 TRX
-                callValue: 0
-            });
-
-            console.log(`✅ Tron token transfer successful: ${txResult}`);
-
-            return res.json({
-                success: true,
-                tx_hash: txResult,
-                tx_id: txResult,
-                chain: 'tron',
-                timestamp: new Date().toISOString(),
-                explorer_url: `https://tronscan.org/#/transaction/${txResult}`
-            });
-
-        } catch (tronError) {
-            console.error(`❌ Tron token transfer failed:`, tronError.message);
-            
-            let errorMessage = tronError.message;
-            if (errorMessage.includes('Insufficient token balance')) {
-                errorMessage = tronError.message;
-            } else if (errorMessage.includes('INSUFFICIENT_BALANCE')) {
-                errorMessage = 'Insufficient TRX for energy/bandwidth fees.';
-            }
-            
-            return res.status(400).json({ 
-                success: false,
-                error: errorMessage,
-                chain: 'tron'
-            });
-        }
-        
-    } catch (error) {
-        console.error('❌ Tron token send failed:', error);
-        res.status(500).json({ 
-            success: false,
-            error: error.message 
-        });
-    }
-});
 
 // ============================================================================
 // SOLANA SEND TRANSACTION - PRODUCTION READY
