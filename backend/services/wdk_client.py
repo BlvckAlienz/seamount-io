@@ -159,21 +159,6 @@ class WDKClient:
         
         self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
-        # Separate key for the WDK Node service (server.js) vs Tether Indexer
-        # ========== FIX BUG 1: Initialize node_api_key with fallback ==========
-        try:
-            _node_key_setting = getattr(self.settings, 'WDK_NODE_SERVICE_KEY', None)
-            if _node_key_setting and hasattr(_node_key_setting, 'get_secret_value'):
-                self.node_api_key = _node_key_setting.get_secret_value()
-            elif _node_key_setting:
-                self.node_api_key = str(_node_key_setting)
-            else:
-                self.node_api_key = '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
-        except Exception:
-            self.node_api_key = '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
-        logger.info(f"🔑 Node service key: {self.node_api_key[:10]}...")
-        # ========== END FIX BUG 1 ==========
-        
         # ✅ FIX: Read indexer URL from config (respects .env)
         self.indexer_url = self.settings.WDK_API_URL if self.api_key else None
         logger.info(f"🔗 WDK Indexer URL: {self.indexer_url}")
@@ -266,12 +251,10 @@ class WDKClient:
                 
                 url = f"{base}{endpoint}"
                 
-                # ========== FIX BUG 1: Use correct API key ==========
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key if use_indexer else self.node_api_key
+                    'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
                 }
-                # ========== END FIX BUG 1 ==========
                 # Log request details (mask sensitive data)
                 safe_data = data.copy() if data else {}
                 if 'plaintext_seed' in safe_data:
@@ -296,24 +279,7 @@ class WDKClient:
                             self.service_healthy = True
                             return result
                     else:  # POST, PUT, etc.
-                        # ========== FIX BUG 5: Read error body and handle 4xx/5xx properly ==========
                         async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                            response_text = await response.text()
-
-                            # 4xx = bad request — surface immediately, DO NOT retry
-                            if 400 <= response.status < 500:
-                                try:
-                                    import json as _json
-                                    err_body = _json.loads(response_text)
-                                    err_msg  = err_body.get('error') or err_body.get('detail') or response_text
-                                except Exception:
-                                    err_msg = response_text
-                                logger.error(
-                                    f"❌ WDK {response.status} on {method} {endpoint}: {err_msg[:400]}"
-                                )
-                                raise Exception(f"WDK error ({response.status}): {err_msg}")
-
-                            # 5xx = server error — retry
                             if response.status in [502, 503, 504]:
                                 raise aiohttp.ClientResponseError(
                                     request_info=response.request_info,
@@ -321,20 +287,13 @@ class WDKClient:
                                     status=response.status,
                                     message=f"Service unavailable: {response.status}"
                                 )
-
-                            try:
-                                import json as _json
-                                result = _json.loads(response_text) if response_text else {}
-                            except Exception:
-                                result = {'raw': response_text}
-
-                            # ========== FIX BUG 4: Only penalize circuit breaker for Node service failures ==========
-                            if not use_indexer:
-                                self.circuit_breaker.record_success()
-                                self.service_healthy = True
-                            # ========== END FIX BUG 4 ==========
+                            response.raise_for_status()
+                            result = await response.json()
+                            
+                            # Success - record it in circuit breaker
+                            self.circuit_breaker.record_success()
+                            self.service_healthy = True
                             return result
-                        # ========== END FIX BUG 5 ==========
                             
             except aiohttp.ClientResponseError as e:
                 # Try to read response body
@@ -346,11 +305,9 @@ class WDKClient:
                 last_exception = e
                 logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
-                # ========== FIX BUG 4: Only penalize circuit breaker for Node service failures ==========
-                if not use_indexer:
-                    self.circuit_breaker.record_failure()
-                    self.service_healthy = False
-                # ========== END FIX BUG 4 ==========
+                # Record failure in circuit breaker
+                self.circuit_breaker.record_failure()
+                self.service_healthy = False
                 
                 if attempt < max_retries - 1:
                     # Exponential backoff with jitter
@@ -1060,7 +1017,7 @@ class WDKClient:
                 }
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key if use_indexer else self.node_api_key  # uses fixed headers
+                    'X-API-Key': self.api_key
                 }
                 
                 timeout = aiohttp.ClientTimeout(total=10)
@@ -1249,31 +1206,20 @@ class WDKClient:
                 endpoint = f'/wallet/{chain}/send'
                 
             else:
-                # ========== FIX BUG 3: Hardcoded ERC-20 mainnet contracts ==========
-                EVM_CONTRACTS = {
-                    'ethereum': {
-                        'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-                        'USDC': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-                    },
-                    'polygon': {
-                        'USDT': '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
-                        'USDC': '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-                    }
-                }
-                chain_contracts = EVM_CONTRACTS.get(chain, {})
-                token_address   = chain_contracts.get(asset.upper())
+                # ERC-20 token transfer (USDT, USDC, etc.)
+                from backend.config import get_settings
+                settings = get_settings()
+                
+                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_{chain.upper()}")
+                if not asset_config:
+                    raise Exception(f"Asset {asset} not configured for {chain}")
+                
+                token_address = asset_config.get('contract_address')
                 if not token_address:
-                    raise Exception(
-                        f"Unsupported token '{asset}' on {chain}. "
-                        f"Supported: {list(chain_contracts.keys())}"
-                    )
-                decimals    = 6  # USDT/USDC always 6 decimals on EVM
+                    raise Exception(f"No contract address for {asset} on {chain}")
+                
+                decimals = asset_config.get('decimals', 6)
                 amount_base = int(amount * (10 ** decimals))
-                logger.info(
-                    f"🔑 EVM ERC-20: {asset} on {chain} → {token_address[:12]}... "
-                    f"amount_base={amount_base}"
-                )
-                # ========== END FIX BUG 3 ==========
                 
                 payload = {
                     'plaintext_seed': plaintext_seed,
@@ -1284,6 +1230,7 @@ class WDKClient:
                     'chain': chain,
                     'gasless': enable_gasless and chain == 'polygon'
                 }
+                
                 endpoint = f'/wallet/{chain}/send-token'
             
             try:
@@ -1336,31 +1283,29 @@ class WDKClient:
                     }
                     
                 else:
-                    # ========== FIX BUG 3: Hardcoded TRC-20 mainnet contracts ==========
-                    TRON_CONTRACTS = {
-                        'USDT': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-                        'USDC': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8',
-                    }
-                    token_address = TRON_CONTRACTS.get(asset.upper())
-                    if not token_address:
-                        raise Exception(
-                            f"Unsupported Tron token: '{asset}'. "
-                            f"Supported: {list(TRON_CONTRACTS.keys())}"
-                        )
-                    decimals   = 6  # USDT/USDC are always 6 decimals on Tron
-                    amount_base = int(amount * (10 ** decimals))
-                    logger.info(
-                        f"🔑 Tron TRC-20: {asset} → contract {token_address[:12]}... "
-                        f"amount_base={amount_base}"
-                    )
-                    # ========== END FIX BUG 3 ==========
+                    # TRC-20 token transfer (USDT)
+                    from backend.config import get_settings
+                    settings = get_settings()
                     
+                    asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_TRON")
+                    if not asset_config:
+                        raise Exception(f"Asset {asset} not configured for Tron")
+                    
+                    token_address = asset_config.get('contract_address')
+                    if not token_address:
+                        raise Exception(f"No contract address for {asset} on Tron")
+                    
+                    decimals = asset_config.get('decimals', 6)
+                    amount_base = int(amount * (10 ** decimals))
+                    
+                    # ✅ FIX: Remove from_address and chain – only required fields
                     payload = {
                         'plaintext_seed': plaintext_seed,
-                        'to_address': to_address,
+                        'to_address': to_address,           # use to_address (parameter)
                         'token_address': token_address,
                         'amount': str(amount_base)
                     }
+                    
                     endpoint = '/wallet/tron/send-token'
                     
                     result = await self._make_request('POST', endpoint, data=payload)
@@ -1399,23 +1344,20 @@ class WDKClient:
                 endpoint = '/wallet/solana/send'
                 
             else:
-                # Hardcoded SPL token mints
-                SPL_CONTRACTS = {
-                    'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-                    'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-                }
-                token_address = SPL_CONTRACTS.get(asset.upper())
+                # SPL token transfer
+                from backend.config import get_settings
+                settings = get_settings()
+                
+                asset_config = settings.SUPPORTED_ASSETS.get(f"{asset}_SOLANA")
+                if not asset_config:
+                    raise Exception(f"Asset {asset} not configured for Solana")
+                
+                token_address = asset_config.get('contract_address')
                 if not token_address:
-                    raise Exception(
-                        f"Unsupported Solana token: '{asset}'. "
-                        f"Supported: {list(SPL_CONTRACTS.keys())}"
-                    )
-                decimals   = 6  # USDT/USDC are always 6 decimals on Solana
+                    raise Exception(f"No contract address for {asset} on Solana")
+                
+                decimals = asset_config.get('decimals', 9)
                 amount_base = int(amount * (10 ** decimals))
-                logger.info(
-                    f"🔑 Solana SPL: {asset} → mint {token_address[:12]}... "
-                    f"amount_base={amount_base}"
-                )
                 
                 payload = {
                     'plaintext_seed': plaintext_seed,
@@ -1942,189 +1884,6 @@ class WDKClient:
         """Check if gasless transactions available"""
         return chain.lower() in self.GASLESS_CHAINS
     
-    # ================================================================
-    # NEW WDK PROTOCOL METHODS (Swap / Bridge / Lending / Fiat / Price)
-    # All route to new endpoints on the Node.js WDK service.
-    # ================================================================
-
-    async def wdk_swap(
-        self,
-        plaintext_seed: str,
-        account_index: int,
-        token_in: str,          # ERC-20 contract address
-        token_out: str,         # ERC-20 contract address
-        amount_in: int,         # Amount in token base units (BigInt compatible)
-        chain: str = 'ethereum'
-    ) -> Dict[str, Any]:
-        
-        # Execute a Velora EVM swap.
-        # Calls POST /wdk/swap on the Node.js service.
-
-        try:
-            payload = {
-                'plaintext_seed': plaintext_seed,
-                'account_index': account_index,
-                'token_in': token_in,
-                'token_out': token_out,
-                'amount_in': amount_in,
-                'chain': chain
-            }
-            result = await self._make_request('POST', '/wdk/swap', data=payload)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'Velora swap failed'))
-            logger.info(f"✅ WDK Velora swap: {result.get('tx_hash')}")
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_swap failed: {e}", exc_info=True)
-            raise
-
-    async def wdk_bridge(
-        self,
-        plaintext_seed: str,
-        account_index: int,
-        token: str,             # Token contract address on source chain
-        amount: int,            # Amount in base units
-        target_chain: str,      # e.g. 'ethereum' or 'ton'
-        recipient: str,         # Recipient address on target chain
-        source_chain: str = 'ethereum'
-    ) -> Dict[str, Any]:
-        
-        #Bridge USDT0 cross-chain via USDT0 EVM protocol.
-        # Calls POST /wdk/bridge on the Node.js service.
-        
-        try:
-            payload = {
-                'plaintext_seed': plaintext_seed,
-                'account_index': account_index,
-                'token': token,
-                'amount': amount,
-                'target_chain': target_chain,
-                'recipient': recipient,
-                'source_chain': source_chain
-            }
-            result = await self._make_request('POST', '/wdk/bridge', data=payload)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'USDT0 bridge failed'))
-            logger.info(f"✅ WDK bridge tx: {result.get('tx_hash')}")
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_bridge failed: {e}", exc_info=True)
-            raise
-
-    async def wdk_lend(
-        self,
-        plaintext_seed: str,
-        account_index: int,
-        action: str,            # 'supply' | 'withdraw' | 'borrow' | 'repay'
-        token: str,             # ERC-20 contract address
-        amount: int,            # Amount in base units
-        chain: str = 'ethereum'
-    ) -> Dict[str, Any]:
-        
-        # Interact with Aave lending protocol via WDK.
-        # Calls POST /wdk/lend on the Node.js service.
-        
-        if action not in ('supply', 'withdraw', 'borrow', 'repay'):
-            raise ValueError(f"Invalid lending action: {action}")
-        try:
-            payload = {
-                'plaintext_seed': plaintext_seed,
-                'account_index': account_index,
-                'action': action,
-                'token': token,
-                'amount': amount,
-                'chain': chain
-            }
-            result = await self._make_request('POST', '/wdk/lend', data=payload)
-            if not result.get('success'):
-                raise Exception(result.get('error', f'Aave {action} failed'))
-            logger.info(f"✅ WDK Aave {action}: {result.get('tx_hash')}")
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_lend({action}) failed: {e}", exc_info=True)
-            raise
-
-    async def wdk_fiat_quote(
-        self,
-        plaintext_seed: str,
-        account_index: int,
-        currency_code: str,     # e.g. 'USD', 'NGN', 'GBP'
-        crypto_currency: str,   # e.g. 'USDT' 
-        base_currency_amount: float,
-        chain: str = 'ethereum'
-    ) -> Dict[str, Any]:
-        
-        # Get MoonPay on-ramp quote via WDK fiat module.
-        # Calls POST /wdk/fiat/quote on the Node.js service.
-        
-        try:
-            payload = {
-                'plaintext_seed': plaintext_seed,
-                'account_index': account_index,
-                'currency_code': currency_code,
-                'crypto_currency': crypto_currency,
-                'base_currency_amount': base_currency_amount,
-                'chain': chain
-            }
-            result = await self._make_request('POST', '/wdk/fiat/quote', data=payload)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'MoonPay quote failed'))
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_fiat_quote failed: {e}", exc_info=True)
-            raise
-
-    async def wdk_fiat_buy(
-        self,
-        plaintext_seed: str,
-        account_index: int,
-        currency_code: str,
-        crypto_currency: str,
-        base_currency_amount: float,
-        chain: str = 'ethereum'
-    ) -> Dict[str, Any]:
-        
-        # Initiate MoonPay on-ramp purchase via WDK fiat module.
-        # Calls POST /wdk/fiat/buy on the Node.js service.
-        # Returns: { url: str } — redirect user to MoonPay widget URL.
-        
-        try:
-            payload = {
-                'plaintext_seed': plaintext_seed,
-                'account_index': account_index,
-                'currency_code': currency_code,
-                'crypto_currency': crypto_currency,
-                'base_currency_amount': base_currency_amount,
-                'chain': chain
-            }
-            result = await self._make_request('POST', '/wdk/fiat/buy', data=payload)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'MoonPay buy initiation failed'))
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_fiat_buy failed: {e}", exc_info=True)
-            raise
-
-    async def wdk_price_rates(
-        self,
-        tokens: list = None     # Optional list of token symbols to filter
-    ) -> Dict[str, Any]:
-        
-        # Get live price rates from Tether WDK price oracle.
-        # Calls GET /wdk/price-rates on the Node.js service.
-        
-        try:
-            params = {}
-            if tokens:
-                params['tokens'] = ','.join(tokens)
-            result = await self._make_request('GET', '/wdk/price-rates', params=params)
-            if not result.get('success'):
-                raise Exception(result.get('error', 'Price rates fetch failed'))
-            return result
-        except Exception as e:
-            logger.error(f"❌ wdk_price_rates failed: {e}", exc_info=True)
-            raise
-        
     async def health_check(self) -> Dict[str, Any]:
         """Check WDK service health"""
         try:
@@ -2134,7 +1893,7 @@ class WDKClient:
                 'wdk_service': result,
                 'indexer_enabled': self.indexer_url is not None,
                 'supported_chains': self.SUPPORTED_CHAINS,
-                'circuit_breaker': self.state
+                'circuit_breaker': self.circuit_breaker.state
             }
         except Exception as e:
             return {

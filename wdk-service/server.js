@@ -3,7 +3,6 @@
 // Multi-chain wallet service with complete Bitcoin, Ethereum, Polygon, Tron, Solana support
 
 require('dotenv').config();
-const wdkProtocols = require('./wdk-protocols');
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
@@ -573,111 +572,10 @@ app.post('/wallet/balance', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
-// TRON TOKEN SEND (must come BEFORE wildcard /wallet/:chain/send)
-// ============================================================================
-app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
-    try {
-        const { 
-            plaintext_seed, 
-            from_address, 
-            to_address, 
-            token_address,
-            amount
-        } = req.body;
-
-        if (!plaintext_seed || !to_address || !token_address || !amount) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'plaintext_seed, to_address, token_address, and amount required' 
-            });
-        }
-
-        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
-
-        // Validate seed
-        if (!validateSeedPhrase(plaintext_seed)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Invalid BIP39 seed phrase' 
-            });
-        }
-
-        // Create Tron wallet
-        const tronWallet = await createTronWallet(plaintext_seed);
-        
-        console.log(`📍 Sending from: ${tronWallet.address}`);
-        console.log(`📍 Sending to: ${to_address}`);
-        console.log(`📍 Token contract: ${token_address}`);
-
-        // ✅ PRODUCTION IMPLEMENTATION USING TronWeb
-        try {
-            const tronWeb = new TronWeb({
-                fullHost: 'https://api.trongrid.io',
-                headers: { 'TRON-PRO-API-KEY': process.env.TRON_API_KEY || '' },
-                privateKey: tronWallet.privateKey
-            });
-
-            // Get TRC-20 contract
-            const contract = await tronWeb.contract().at(token_address);
-
-            // Check balance
-            const balance = await contract.balanceOf(tronWallet.address).call();
-            console.log(`💰 Token balance: ${balance.toString()}`);
-
-            if (BigInt(balance.toString()) < BigInt(amount)) {
-                throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance.toString()}`);
-            }
-
-            // Send token transfer
-            console.log(`⚙️ Building Tron token transfer...`);
-            
-            const txResult = await contract.transfer(to_address, amount).send({
-                feeLimit: 100000000, // 100 TRX
-                callValue: 0
-            });
-
-            console.log(`✅ Tron token transfer successful: ${txResult}`);
-
-            return res.json({
-                success: true,
-                tx_hash: txResult,
-                tx_id: txResult,
-                chain: 'tron',
-                timestamp: new Date().toISOString(),
-                explorer_url: `https://tronscan.org/#/transaction/${txResult}`
-            });
-
-        } catch (tronError) {
-            console.error(`❌ Tron token transfer failed:`, tronError.message);
-            
-            let errorMessage = tronError.message;
-            if (errorMessage.includes('Insufficient token balance')) {
-                errorMessage = tronError.message;
-            } else if (errorMessage.includes('INSUFFICIENT_BALANCE')) {
-                errorMessage = 'Insufficient TRX for energy/bandwidth fees.';
-            }
-            
-            return res.status(400).json({ 
-                success: false,
-                error: errorMessage,
-                chain: 'tron'
-            });
-        }
-        
-    } catch (error) {
-        console.error('❌ Tron token send failed:', error);
-        res.status(500).json({ 
-            success: false,
-            error: error.message 
-        });
-    }
-});
-
-// ============================================================================
 // SEND TRANSACTION - EVM Chains (Ethereum, Polygon, Arbitrum)
 // ============================================================================
 
-app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
+app.post('/wallet/send', validateApiKey, async (req, res) => {
     try {
         const { encrypted_seed, chain, to, amount, gasless } = req.body;
 
@@ -816,137 +714,6 @@ app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
             success: false,
             error: error.message,
             timestamp: new Date().toISOString()
-        });
-    }
-});
-
-// ============================================================================
-// EVM TOKEN SEND (ERC-20: USDT, USDC) - PRODUCTION READY
-// ============================================================================
-app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
-    try {
-        const { chain } = req.params;
-        const { 
-            plaintext_seed, 
-            from_address, 
-            to_address, 
-            token_address,
-            amount,
-            gasless 
-        } = req.body;
-
-        if (!plaintext_seed || !to_address || !token_address || !amount) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'plaintext_seed, to_address, token_address, and amount required' 
-            });
-        }
-
-        // tron has its own dedicated route below — should never reach here
-        // but guard anyway
-        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
-            return res.status(400).json({ 
-                success: false,
-                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.`,
-                hint: chain === 'tron' ? 'Use /wallet/tron/send-token endpoint directly' : undefined
-            });
-        }
-
-        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
-        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
-
-        // Validate seed
-        if (!validateSeedPhrase(plaintext_seed)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Invalid BIP39 seed phrase' 
-            });
-        }
-
-        // Create EVM wallet
-        const evmWallet = await createEVMWallet(plaintext_seed);
-        const provider = providers[chain];
-        
-        if (!provider) {
-            throw new Error(`Provider not configured for ${chain}`);
-        }
-        
-        // Connect wallet to provider
-        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
-        
-        // ERC-20 ABI (minimal, for transfer function)
-        const ERC20_ABI = [
-            'function transfer(address to, uint256 amount) returns (bool)',
-            'function balanceOf(address owner) view returns (uint256)',
-            'function decimals() view returns (uint8)'
-        ];
-        
-        // Create contract instance
-        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
-        
-        // Get token decimals
-        const decimals = await tokenContract.decimals();
-        console.log(`📊 Token decimals: ${decimals}`);
-        
-        // Check balance
-        const balance = await tokenContract.balanceOf(wallet.address);
-        console.log(`💰 Token balance: ${ethers.formatUnits(balance, decimals)}`);
-        
-        const amountInBaseUnits = ethers.parseUnits(amount.toString(), decimals);
-        
-        if (balance < amountInBaseUnits) {
-            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${ethers.formatUnits(balance, decimals)}`);
-        }
-        
-        // Send token transfer transaction
-        console.log(`⚙️ Building ${chain} token transfer...`);
-        
-        const tx = await tokenContract.transfer(to_address, amountInBaseUnits);
-        
-        console.log(`⏳ Transaction submitted: ${tx.hash}`);
-        console.log(`⏳ Waiting for confirmation...`);
-        
-        // Wait for confirmation
-        const receipt = await tx.wait(1);
-        
-        console.log(`✅ Token transfer confirmed!`);
-        console.log(`   Block: ${receipt.blockNumber}`);
-        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
-        
-        // Calculate costs
-        const gasPrice = receipt.gasPrice || tx.gasPrice;
-        const gasCostWei = receipt.gasUsed * gasPrice;
-        const gasCostEth = ethers.formatEther(gasCostWei);
-        
-        return res.json({
-            success: true,
-            tx_hash: receipt.hash,
-            chain: chain,
-            block_number: receipt.blockNumber,
-            gas_used: receipt.gasUsed.toString(),
-            gas_price: gasPrice.toString(),
-            gas_cost_eth: gasCostEth,
-            status: receipt.status === 1 ? 'confirmed' : 'failed',
-            gasless_used: gasless || false,
-            timestamp: new Date().toISOString(),
-            explorer_url: getExplorerUrl(chain, receipt.hash)
-        });
-        
-    } catch (error) {
-        console.error(`❌ ${req.params.chain} token send failed:`, error);
-        
-        let errorMessage = error.message;
-        if (error.code === 'INSUFFICIENT_FUNDS') {
-            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
-        } else if (error.message.includes('Insufficient token balance')) {
-            errorMessage = error.message;
-        }
-        
-        return res.status(400).json({ 
-            success: false,
-            error: errorMessage,
-            error_code: error.code,
-            chain: req.params.chain
         });
     }
 });
@@ -1107,6 +874,235 @@ app.post('/wallet/bitcoin/send', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
+// EVM TOKEN SEND (ERC-20: USDT, USDC) - PRODUCTION READY
+// ============================================================================
+app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { chain } = req.params;
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount,
+            gasless 
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
+            });
+        }
+
+        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
+
+        // Validate seed
+        if (!validateSeedPhrase(plaintext_seed)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid BIP39 seed phrase' 
+            });
+        }
+
+        // Create EVM wallet
+        const evmWallet = await createEVMWallet(plaintext_seed);
+        const provider = providers[chain];
+        
+        if (!provider) {
+            throw new Error(`Provider not configured for ${chain}`);
+        }
+        
+        // Connect wallet to provider
+        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+        
+        // ERC-20 ABI (minimal, for transfer function)
+        const ERC20_ABI = [
+            'function transfer(address to, uint256 amount) returns (bool)',
+            'function balanceOf(address owner) view returns (uint256)',
+            'function decimals() view returns (uint8)'
+        ];
+        
+        // Create contract instance
+        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
+        
+        // Get token decimals
+        const decimals = await tokenContract.decimals();
+        console.log(`📊 Token decimals: ${decimals}`);
+        
+        // Check balance
+        const balance = await tokenContract.balanceOf(wallet.address);
+        console.log(`💰 Token balance: ${ethers.formatUnits(balance, decimals)}`);
+        
+        const amountInBaseUnits = ethers.parseUnits(amount.toString(), decimals);
+        
+        if (balance < amountInBaseUnits) {
+            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${ethers.formatUnits(balance, decimals)}`);
+        }
+        
+        // Send token transfer transaction
+        console.log(`⚙️ Building ${chain} token transfer...`);
+        
+        const tx = await tokenContract.transfer(to_address, amountInBaseUnits);
+        
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        console.log(`⏳ Waiting for confirmation...`);
+        
+        // Wait for confirmation
+        const receipt = await tx.wait(1);
+        
+        console.log(`✅ Token transfer confirmed!`);
+        console.log(`   Block: ${receipt.blockNumber}`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        
+        // Calculate costs
+        const gasPrice = receipt.gasPrice || tx.gasPrice;
+        const gasCostWei = receipt.gasUsed * gasPrice;
+        const gasCostEth = ethers.formatEther(gasCostWei);
+        
+        return res.json({
+            success: true,
+            tx_hash: receipt.hash,
+            chain: chain,
+            block_number: receipt.blockNumber,
+            gas_used: receipt.gasUsed.toString(),
+            gas_price: gasPrice.toString(),
+            gas_cost_eth: gasCostEth,
+            status: receipt.status === 1 ? 'confirmed' : 'failed',
+            gasless_used: gasless || false,
+            timestamp: new Date().toISOString(),
+            explorer_url: getExplorerUrl(chain, receipt.hash)
+        });
+        
+    } catch (error) {
+        console.error(`❌ ${req.params.chain} token send failed:`, error);
+        
+        let errorMessage = error.message;
+        if (error.code === 'INSUFFICIENT_FUNDS') {
+            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
+        } else if (error.message.includes('Insufficient token balance')) {
+            errorMessage = error.message;
+        }
+        
+        return res.status(400).json({ 
+            success: false,
+            error: errorMessage,
+            error_code: error.code,
+            chain: req.params.chain
+        });
+    }
+});
+
+// ============================================================================
+// TRON TOKEN SEND (TRC-20: USDT) - PRODUCTION READY
+// ============================================================================
+app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+
+        // Validate seed
+        if (!validateSeedPhrase(plaintext_seed)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid BIP39 seed phrase' 
+            });
+        }
+
+        // Create Tron wallet
+        const tronWallet = await createTronWallet(plaintext_seed);
+        
+        console.log(`📍 Sending from: ${tronWallet.address}`);
+        console.log(`📍 Sending to: ${to_address}`);
+        console.log(`📍 Token contract: ${token_address}`);
+
+        // ✅ PRODUCTION IMPLEMENTATION USING TronWeb
+        try {
+            const tronWeb = new TronWeb({
+                fullHost: 'https://api.trongrid.io',
+                headers: { 'TRON-PRO-API-KEY': process.env.TRON_API_KEY || '' },
+                privateKey: tronWallet.privateKey
+            });
+
+            // Get TRC-20 contract
+            const contract = await tronWeb.contract().at(token_address);
+
+            // Check balance
+            const balance = await contract.balanceOf(tronWallet.address).call();
+            console.log(`💰 Token balance: ${balance.toString()}`);
+
+            if (BigInt(balance.toString()) < BigInt(amount)) {
+                throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance.toString()}`);
+            }
+
+            // Send token transfer
+            console.log(`⚙️ Building Tron token transfer...`);
+            
+            const txResult = await contract.transfer(to_address, amount).send({
+                feeLimit: 100000000, // 100 TRX
+                callValue: 0
+            });
+
+            console.log(`✅ Tron token transfer successful: ${txResult}`);
+
+            return res.json({
+                success: true,
+                tx_hash: txResult,
+                tx_id: txResult,
+                chain: 'tron',
+                timestamp: new Date().toISOString(),
+                explorer_url: `https://tronscan.org/#/transaction/${txResult}`
+            });
+
+        } catch (tronError) {
+            console.error(`❌ Tron token transfer failed:`, tronError.message);
+            
+            let errorMessage = tronError.message;
+            if (errorMessage.includes('Insufficient token balance')) {
+                errorMessage = tronError.message;
+            } else if (errorMessage.includes('INSUFFICIENT_BALANCE')) {
+                errorMessage = 'Insufficient TRX for energy/bandwidth fees.';
+            }
+            
+            return res.status(400).json({ 
+                success: false,
+                error: errorMessage,
+                chain: 'tron'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Tron token send failed:', error);
+        res.status(500).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// ============================================================================
 // SOLANA SEND TRANSACTION - PRODUCTION READY
 // ============================================================================
 app.post('/wallet/solana/send', validateApiKey, async (req, res) => {
@@ -1220,9 +1216,6 @@ app.use((err, req, res, next) => {
         message: err.message 
     });
 });
-
-// WDK Protocol routes (Swap, Bridge, Lending, Fiat, Price)
-app.use('/wdk', validateApiKey, wdkProtocols);
 
 // 404 handler
 app.use((req, res) => {
