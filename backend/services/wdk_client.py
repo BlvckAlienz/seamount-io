@@ -1306,7 +1306,7 @@ class WDKClient:
                         'plaintext_seed': plaintext_seed,
                         'to_address': to_address,           # use to_address (parameter)
                         'token_address': token_address,
-                        'amount': str(amount_base)
+                        'amount': amount_base
                     }
                     
                     endpoint = '/wallet/tron/send-token'
