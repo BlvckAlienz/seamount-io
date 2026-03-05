@@ -160,13 +160,19 @@ class WDKClient:
         self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
         # Separate key for the WDK Node service (server.js) vs Tether Indexer
-        self.node_api_key = getattr(self.settings, 'WDK_NODE_API_KEY', None)
-        if self.node_api_key and hasattr(self.node_api_key, 'get_secret_value'):
-            self.node_api_key = self.node_api_key.get_secret_value()
-        # Fallback: use same key if no separate node key configured
-        if not self.node_api_key:
-            self.node_api_key = self.api_key
+        # ========== FIX BUG 1: Initialize node_api_key with fallback ==========
+        try:
+            _node_key_setting = getattr(self.settings, 'WDK_NODE_SERVICE_KEY', None)
+            if _node_key_setting and hasattr(_node_key_setting, 'get_secret_value'):
+                self.node_api_key = _node_key_setting.get_secret_value()
+            elif _node_key_setting:
+                self.node_api_key = str(_node_key_setting)
+            else:
+                self.node_api_key = '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
+        except Exception:
+            self.node_api_key = '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
         logger.info(f"🔑 Node service key: {self.node_api_key[:10]}...")
+        # ========== END FIX BUG 1 ==========
         
         # ✅ FIX: Read indexer URL from config (respects .env)
         self.indexer_url = self.settings.WDK_API_URL if self.api_key else None
@@ -260,10 +266,12 @@ class WDKClient:
                 
                 url = f"{base}{endpoint}"
                 
+                # ========== FIX BUG 1: Use correct API key ==========
                 headers = {
                     'Content-Type': 'application/json',
                     'X-API-Key': self.api_key if use_indexer else self.node_api_key
                 }
+                # ========== END FIX BUG 1 ==========
                 # Log request details (mask sensitive data)
                 safe_data = data.copy() if data else {}
                 if 'plaintext_seed' in safe_data:
@@ -288,6 +296,7 @@ class WDKClient:
                             self.service_healthy = True
                             return result
                     else:  # POST, PUT, etc.
+                        # ========== FIX BUG 5: Read error body and handle 4xx/5xx properly ==========
                         async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
                             response_text = await response.text()
 
@@ -314,13 +323,18 @@ class WDKClient:
                                 )
 
                             try:
+                                import json as _json
                                 result = _json.loads(response_text) if response_text else {}
                             except Exception:
                                 result = {'raw': response_text}
 
-                            self.circuit_breaker.record_success()
-                            self.service_healthy = True
+                            # ========== FIX BUG 4: Only penalize circuit breaker for Node service failures ==========
+                            if not use_indexer:
+                                self.circuit_breaker.record_success()
+                                self.service_healthy = True
+                            # ========== END FIX BUG 4 ==========
                             return result
+                        # ========== END FIX BUG 5 ==========
                             
             except aiohttp.ClientResponseError as e:
                 # Try to read response body
@@ -332,11 +346,11 @@ class WDKClient:
                 last_exception = e
                 logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 
-                # Only penalize circuit breaker for main WDK service failures
-                # NOT for Tether Indexer (use_indexer=True) — those are separate
+                # ========== FIX BUG 4: Only penalize circuit breaker for Node service failures ==========
                 if not use_indexer:
                     self.circuit_breaker.record_failure()
                     self.service_healthy = False
+                # ========== END FIX BUG 4 ==========
                 
                 if attempt < max_retries - 1:
                     # Exponential backoff with jitter
@@ -1046,7 +1060,7 @@ class WDKClient:
                 }
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key
+                    'X-API-Key': self.api_key if use_indexer else self.node_api_key  # uses fixed headers
                 }
                 
                 timeout = aiohttp.ClientTimeout(total=10)
@@ -1235,31 +1249,41 @@ class WDKClient:
                 endpoint = f'/wallet/{chain}/send'
                 
             else:
-                # ERC-20 token transfer (USDT, USDC, etc.)
-                from backend.config import get_settings
-                settings = get_settings()
-                
-                chain_suffix_map = {'ethereum': 'ETH', 'polygon': 'POLYGON'}
-                chain_suffix = chain_suffix_map.get(chain, chain.upper())
-                asset_key = f"{asset}_{chain_suffix}"
-                asset_config = settings.SUPPORTED_ASSETS.get(asset_key) or settings.SUPPORTED_ASSETS.get(asset)
-                if not asset_config:
-                    raise Exception(f"Asset {asset} not configured for {chain}. Tried keys: {asset_key}, {asset}")
-                
-                token_address = asset_config.get('contract_address')
+                # ========== FIX BUG 3: Hardcoded ERC-20 mainnet contracts ==========
+                EVM_CONTRACTS = {
+                    'ethereum': {
+                        'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                        'USDC': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+                    },
+                    'polygon': {
+                        'USDT': '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+                        'USDC': '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+                    }
+                }
+                chain_contracts = EVM_CONTRACTS.get(chain, {})
+                token_address   = chain_contracts.get(asset.upper())
                 if not token_address:
-                    raise Exception(f"No contract address for {asset} on {chain}")
+                    raise Exception(
+                        f"Unsupported token '{asset}' on {chain}. "
+                        f"Supported: {list(chain_contracts.keys())}"
+                    )
+                decimals    = 6  # USDT/USDC always 6 decimals on EVM
+                amount_base = int(amount * (10 ** decimals))
+                logger.info(
+                    f"🔑 EVM ERC-20: {asset} on {chain} → {token_address[:12]}... "
+                    f"amount_base={amount_base}"
+                )
+                # ========== END FIX BUG 3 ==========
                 
                 payload = {
                     'plaintext_seed': plaintext_seed,
                     'from_address': from_address,
                     'to_address': to_address,
                     'token_address': token_address,
-                    'amount': str(amount),
+                    'amount': str(amount_base),
                     'chain': chain,
                     'gasless': enable_gasless and chain == 'polygon'
                 }
-                
                 endpoint = f'/wallet/{chain}/send-token'
             
             try:
@@ -1312,32 +1336,31 @@ class WDKClient:
                     }
                     
                 else:
-                    # TRC-20 token transfer (USDT, USDC)
-                    # Hardcoded Tron mainnet contracts — avoids dependency on config
-                    TRON_TOKEN_CONTRACTS = {
-                        'USDT': {'contract_address': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', 'decimals': 6},
-                        'USDC': {'contract_address': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8', 'decimals': 6},
+                    # ========== FIX BUG 3: Hardcoded TRC-20 mainnet contracts ==========
+                    TRON_CONTRACTS = {
+                        'USDT': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+                        'USDC': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8',
                     }
-
-                    asset_config = TRON_TOKEN_CONTRACTS.get(asset.upper())
-                    if not asset_config:
+                    token_address = TRON_CONTRACTS.get(asset.upper())
+                    if not token_address:
                         raise Exception(
-                            f"Unsupported Tron token: {asset}. "
-                            f"Supported: {list(TRON_TOKEN_CONTRACTS.keys())}"
+                            f"Unsupported Tron token: '{asset}'. "
+                            f"Supported: {list(TRON_CONTRACTS.keys())}"
                         )
-
-                    token_address = asset_config['contract_address']
-                    decimals      = asset_config['decimals']
-                    amount_base   = int(amount * (10 ** decimals))
+                    decimals   = 6  # USDT/USDC are always 6 decimals on Tron
+                    amount_base = int(amount * (10 ** decimals))
+                    logger.info(
+                        f"🔑 Tron TRC-20: {asset} → contract {token_address[:12]}... "
+                        f"amount_base={amount_base}"
+                    )
+                    # ========== END FIX BUG 3 ==========
                     
-                    # ✅ FIX: Remove from_address and chain – only required fields
                     payload = {
                         'plaintext_seed': plaintext_seed,
-                        'to_address': to_address,           # use to_address (parameter)
+                        'to_address': to_address,
                         'token_address': token_address,
                         'amount': str(amount_base)
                     }
-                    
                     endpoint = '/wallet/tron/send-token'
                     
                     result = await self._make_request('POST', endpoint, data=payload)
@@ -1376,21 +1399,21 @@ class WDKClient:
                 endpoint = '/wallet/solana/send'
                 
             else:
-                # TRC-20 — hardcoded mainnet contracts, zero config dependency
-                TRON_CONTRACTS = {
-                    'USDT': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-                    'USDC': 'TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8',
+                # Hardcoded SPL token mints
+                SPL_CONTRACTS = {
+                    'USDT': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
+                    'USDC': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
                 }
-                token_address = TRON_CONTRACTS.get(asset.upper())
+                token_address = SPL_CONTRACTS.get(asset.upper())
                 if not token_address:
                     raise Exception(
-                        f"Unsupported Tron token: '{asset}'. "
-                        f"Supported: {list(TRON_CONTRACTS.keys())}"
+                        f"Unsupported Solana token: '{asset}'. "
+                        f"Supported: {list(SPL_CONTRACTS.keys())}"
                     )
-                decimals   = 6  # USDT/USDC are always 6 decimals on Tron
+                decimals   = 6  # USDT/USDC are always 6 decimals on Solana
                 amount_base = int(amount * (10 ** decimals))
                 logger.info(
-                    f"🔑 Tron TRC-20: {asset} → contract {token_address[:12]}... "
+                    f"🔑 Solana SPL: {asset} → mint {token_address[:12]}... "
                     f"amount_base={amount_base}"
                 )
                 
