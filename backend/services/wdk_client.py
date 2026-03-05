@@ -159,6 +159,15 @@ class WDKClient:
         
         self.api_key = self.settings.WDK_API_KEY.get_secret_value()
         
+        # Separate key for the WDK Node service (server.js) vs Tether Indexer
+        self.node_api_key = getattr(self.settings, 'WDK_NODE_API_KEY', None)
+        if self.node_api_key and hasattr(self.node_api_key, 'get_secret_value'):
+            self.node_api_key = self.node_api_key.get_secret_value()
+        # Fallback: use same key if no separate node key configured
+        if not self.node_api_key:
+            self.node_api_key = self.api_key
+        logger.info(f"🔑 Node service key: {self.node_api_key[:10]}...")
+        
         # ✅ FIX: Read indexer URL from config (respects .env)
         self.indexer_url = self.settings.WDK_API_URL if self.api_key else None
         logger.info(f"🔗 WDK Indexer URL: {self.indexer_url}")
@@ -253,7 +262,7 @@ class WDKClient:
                 
                 headers = {
                     'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key  # always use env var, never hardcode
+                    'X-API-Key': self.api_key if use_indexer else self.node_api_key
                 }
                 # Log request details (mask sensitive data)
                 safe_data = data.copy() if data else {}

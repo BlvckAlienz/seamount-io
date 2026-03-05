@@ -661,6 +661,8 @@ class Settings(BaseSettings):
         description="Tether WDK API Key from https://wdk-api.tether.io"
     )
 
+    WDK_NODE_API_KEY: Optional[SecretStr] = None  # For direct node access if needed (optional)
+
     # UPDATED: Only include our 5 supported chains
     WDK_ENABLED_CHAINS: List[str] = Field(default=[
         "bitcoin", "ethereum", "polygon", "tron"
