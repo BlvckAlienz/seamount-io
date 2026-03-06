@@ -280,6 +280,20 @@ class WDKClient:
                             return result
                     else:  # POST, PUT, etc.
                         async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            response_text = await response.text()
+
+                            # 4xx = client error — surface immediately, DO NOT retry
+                            if 400 <= response.status < 500:
+                                try:
+                                    import json as _json
+                                    err_body = _json.loads(response_text)
+                                    err_msg = err_body.get('error') or err_body.get('detail') or response_text
+                                except Exception:
+                                    err_msg = response_text
+                                logger.error(f"❌ WDK {response.status} on {method} {endpoint}: {err_msg[:400]}")
+                                raise Exception(f"WDK error ({response.status}): {err_msg}")
+
+                            # 5xx = server error — retry
                             if response.status in [502, 503, 504]:
                                 raise aiohttp.ClientResponseError(
                                     request_info=response.request_info,
@@ -287,9 +301,13 @@ class WDKClient:
                                     status=response.status,
                                     message=f"Service unavailable: {response.status}"
                                 )
-                            response.raise_for_status()
-                            result = await response.json()
-                            
+
+                            try:
+                                import json as _json
+                                result = _json.loads(response_text) if response_text else {}
+                            except Exception:
+                                result = {'raw': response_text}
+
                             # Success - record it in circuit breaker
                             self.circuit_breaker.record_success()
                             self.service_healthy = True
