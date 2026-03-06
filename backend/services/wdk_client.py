@@ -251,7 +251,7 @@ class WDKClient:
                 
                 url = f"{base}{endpoint}"
                 
-                                headers = {
+                headers = {
                     'Content-Type': 'application/json',
                     'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
                 }
