@@ -574,119 +574,6 @@ app.post('/wallet/balance', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
-// SEND TRANSACTION - EVM Chains (Ethereum, Polygon, Arbitrum)
-// ============================================================================
-
-// Generic EVM native send (accepts plaintext_seed)
-app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
-    try {
-        const { chain } = req.params;
-        const { plaintext_seed, to, amount, gasless } = req.body;
-
-        if (!plaintext_seed || !to || !amount) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Missing required fields: plaintext_seed, to, amount' 
-            });
-        }
-
-        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
-            return res.status(400).json({ 
-                success: false,
-                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
-            });
-        }
-
-        console.log(`💸 Initiating ${amount} ${chain.toUpperCase()} transfer to ${to.slice(0, 10)}...`);
-
-        if (!validateSeedPhrase(plaintext_seed)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Invalid seed phrase' 
-            });
-        }
-
-        try {
-            console.log(`⚙️ Processing ${chain} EVM transaction...`);
-            
-            const evmWallet = await createEVMWallet(plaintext_seed);
-            const provider = providers[chain];
-            
-            if (!provider) {
-                throw new Error(`Provider not configured for ${chain}`);
-            }
-            
-            const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
-            
-            console.log(`📍 Sending from: ${wallet.address.slice(0, 10)}...`);
-            console.log(`📍 Sending to: ${to.slice(0, 10)}...`);
-            console.log(`📍 Amount: ${amount} ${chain === 'ethereum' ? 'ETH' : 'MATIC'}`);
-            
-            const tx = await wallet.sendTransaction({
-                to: to,
-                value: ethers.parseEther(amount.toString())
-            });
-
-            console.log(`⏳ Transaction submitted: ${tx.hash}`);
-            console.log(`⏳ Waiting for confirmation...`);
-
-            const receipt = await tx.wait(1);
-
-            console.log(`✅ Transaction confirmed!`);
-            console.log(`   Block: ${receipt.blockNumber}`);
-            console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
-            console.log(`   Status: ${receipt.status === 1 ? 'Success' : 'Failed'}`);
-
-            const gasPrice = receipt.gasPrice || tx.gasPrice;
-            const gasCostWei = receipt.gasUsed * gasPrice;
-            const gasCostEth = ethers.formatEther(gasCostWei);
-
-            return res.json({
-                success: true,
-                tx_hash: receipt.hash,
-                tx_id: receipt.hash,
-                chain: chain,
-                block_number: receipt.blockNumber,
-                gas_used: receipt.gasUsed.toString(),
-                gas_price: gasPrice.toString(),
-                gas_cost_eth: gasCostEth,
-                status: receipt.status === 1 ? 'confirmed' : 'failed',
-                gasless_used: gasless || false,
-                timestamp: new Date().toISOString(),
-                explorer_url: getExplorerUrl(chain, receipt.hash)
-            });
-            
-        } catch (evmError) {
-            console.error(`❌ ${chain} transaction failed:`, evmError.message);
-            
-            let errorMessage = evmError.message;
-            if (evmError.code === 'INSUFFICIENT_FUNDS') {
-                errorMessage = `Insufficient ${chain.toUpperCase()} balance. Please fund your wallet.`;
-            } else if (evmError.code === 'NONCE_EXPIRED') {
-                errorMessage = 'Transaction nonce expired. Please retry.';
-            } else if (evmError.code === 'REPLACEMENT_UNDERPRICED') {
-                errorMessage = 'Gas price too low. Please increase gas price.';
-            }
-            
-            return res.status(400).json({ 
-                success: false,
-                error: errorMessage,
-                error_code: evmError.code,
-                chain: chain
-            });
-        }
-        
-    } catch (error) {
-        console.error('❌ Send transaction failed:', error);
-        return res.status(500).json({ 
-            success: false,
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-// ============================================================================
 // BITCOIN SEND TRANSACTION - PRODUCTION READY
 // ============================================================================
 app.post('/wallet/bitcoin/send', validateApiKey, async (req, res) => {
@@ -1040,134 +927,6 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
 });
 
 // ============================================================================
-// EVM TOKEN SEND (ERC-20: USDT, USDC) - PRODUCTION READY
-// ============================================================================
-app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
-    try {
-        const { chain } = req.params;
-        const { 
-            plaintext_seed, 
-            from_address, 
-            to_address, 
-            token_address,
-            amount,
-            gasless 
-        } = req.body;
-
-        if (!plaintext_seed || !to_address || !token_address || !amount) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'plaintext_seed, to_address, token_address, and amount required' 
-            });
-        }
-
-        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
-            return res.status(400).json({ 
-                success: false,
-                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
-            });
-        }
-
-        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
-        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
-
-        // Validate seed
-        if (!validateSeedPhrase(plaintext_seed)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Invalid BIP39 seed phrase' 
-            });
-        }
-
-        // Create EVM wallet
-        const evmWallet = await createEVMWallet(plaintext_seed);
-        const provider = providers[chain];
-        
-        if (!provider) {
-            throw new Error(`Provider not configured for ${chain}`);
-        }
-        
-        // Connect wallet to provider
-        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
-        
-        // ERC-20 ABI (minimal, for transfer function)
-        const ERC20_ABI = [
-            'function transfer(address to, uint256 amount) returns (bool)',
-            'function balanceOf(address owner) view returns (uint256)',
-            'function decimals() view returns (uint8)'
-        ];
-        
-        // Create contract instance
-        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
-        
-        // Get token decimals
-        const decimals = await tokenContract.decimals();
-        console.log(`📊 Token decimals: ${decimals}`);
-        
-        // Check balance
-        const balance = await tokenContract.balanceOf(wallet.address);
-        console.log(`💰 Token balance: ${ethers.formatUnits(balance, decimals)}`);
-        
-        const amountInBaseUnits = ethers.parseUnits(amount.toString(), decimals);
-        
-        if (balance < amountInBaseUnits) {
-            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${ethers.formatUnits(balance, decimals)}`);
-        }
-        
-        // Send token transfer transaction
-        console.log(`⚙️ Building ${chain} token transfer...`);
-        
-        const tx = await tokenContract.transfer(to_address, amountInBaseUnits);
-        
-        console.log(`⏳ Transaction submitted: ${tx.hash}`);
-        console.log(`⏳ Waiting for confirmation...`);
-        
-        // Wait for confirmation
-        const receipt = await tx.wait(1);
-        
-        console.log(`✅ Token transfer confirmed!`);
-        console.log(`   Block: ${receipt.blockNumber}`);
-        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
-        
-        // Calculate costs
-        const gasPrice = receipt.gasPrice || tx.gasPrice;
-        const gasCostWei = receipt.gasUsed * gasPrice;
-        const gasCostEth = ethers.formatEther(gasCostWei);
-        
-        return res.json({
-            success: true,
-            tx_hash: receipt.hash,
-            chain: chain,
-            block_number: receipt.blockNumber,
-            gas_used: receipt.gasUsed.toString(),
-            gas_price: gasPrice.toString(),
-            gas_cost_eth: gasCostEth,
-            status: receipt.status === 1 ? 'confirmed' : 'failed',
-            gasless_used: gasless || false,
-            timestamp: new Date().toISOString(),
-            explorer_url: getExplorerUrl(chain, receipt.hash)
-        });
-        
-    } catch (error) {
-        console.error(`❌ ${req.params.chain} token send failed:`, error);
-        
-        let errorMessage = error.message;
-        if (error.code === 'INSUFFICIENT_FUNDS') {
-            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
-        } else if (error.message.includes('Insufficient token balance')) {
-            errorMessage = error.message;
-        }
-        
-        return res.status(400).json({ 
-            success: false,
-            error: errorMessage,
-            error_code: error.code,
-            chain: req.params.chain
-        });
-    }
-});
-
-// ============================================================================
 // SOLANA NATIVE SEND - PRODUCTION READY
 // ============================================================================
 app.post('/wallet/solana/send', validateApiKey, async (req, res) => {
@@ -1360,6 +1119,247 @@ app.post('/wallet/solana/send-token', validateApiKey, async (req, res) => {
         res.status(500).json({ 
             success: false,
             error: error.message 
+        });
+    }
+});
+
+// ============================================================================
+// EVM NATIVE SEND (Ethereum, Polygon, Arbitrum) - WILDCARD
+// ============================================================================
+
+// Generic EVM native send (accepts plaintext_seed)
+app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
+    try {
+        const { chain } = req.params;
+        const { plaintext_seed, to, amount, gasless } = req.body;
+
+        if (!plaintext_seed || !to || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Missing required fields: plaintext_seed, to, amount' 
+            });
+        }
+
+        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
+            });
+        }
+
+        console.log(`💸 Initiating ${amount} ${chain.toUpperCase()} transfer to ${to.slice(0, 10)}...`);
+
+        if (!validateSeedPhrase(plaintext_seed)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid seed phrase' 
+            });
+        }
+
+        try {
+            console.log(`⚙️ Processing ${chain} EVM transaction...`);
+            
+            const evmWallet = await createEVMWallet(plaintext_seed);
+            const provider = providers[chain];
+            
+            if (!provider) {
+                throw new Error(`Provider not configured for ${chain}`);
+            }
+            
+            const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+            
+            console.log(`📍 Sending from: ${wallet.address.slice(0, 10)}...`);
+            console.log(`📍 Sending to: ${to.slice(0, 10)}...`);
+            console.log(`📍 Amount: ${amount} ${chain === 'ethereum' ? 'ETH' : 'MATIC'}`);
+            
+            const tx = await wallet.sendTransaction({
+                to: to,
+                value: ethers.parseEther(amount.toString())
+            });
+
+            console.log(`⏳ Transaction submitted: ${tx.hash}`);
+            console.log(`⏳ Waiting for confirmation...`);
+
+            const receipt = await tx.wait(1);
+
+            console.log(`✅ Transaction confirmed!`);
+            console.log(`   Block: ${receipt.blockNumber}`);
+            console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+            console.log(`   Status: ${receipt.status === 1 ? 'Success' : 'Failed'}`);
+
+            const gasPrice = receipt.gasPrice || tx.gasPrice;
+            const gasCostWei = receipt.gasUsed * gasPrice;
+            const gasCostEth = ethers.formatEther(gasCostWei);
+
+            return res.json({
+                success: true,
+                tx_hash: receipt.hash,
+                tx_id: receipt.hash,
+                chain: chain,
+                block_number: receipt.blockNumber,
+                gas_used: receipt.gasUsed.toString(),
+                gas_price: gasPrice.toString(),
+                gas_cost_eth: gasCostEth,
+                status: receipt.status === 1 ? 'confirmed' : 'failed',
+                gasless_used: gasless || false,
+                timestamp: new Date().toISOString(),
+                explorer_url: getExplorerUrl(chain, receipt.hash)
+            });
+            
+        } catch (evmError) {
+            console.error(`❌ ${chain} transaction failed:`, evmError.message);
+            
+            let errorMessage = evmError.message;
+            if (evmError.code === 'INSUFFICIENT_FUNDS') {
+                errorMessage = `Insufficient ${chain.toUpperCase()} balance. Please fund your wallet.`;
+            } else if (evmError.code === 'NONCE_EXPIRED') {
+                errorMessage = 'Transaction nonce expired. Please retry.';
+            } else if (evmError.code === 'REPLACEMENT_UNDERPRICED') {
+                errorMessage = 'Gas price too low. Please increase gas price.';
+            }
+            
+            return res.status(400).json({ 
+                success: false,
+                error: errorMessage,
+                error_code: evmError.code,
+                chain: chain
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Send transaction failed:', error);
+        return res.status(500).json({ 
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// ============================================================================
+// EVM TOKEN SEND (ERC-20: USDT, USDC) - PRODUCTION READY
+// ============================================================================
+app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
+    try {
+        const { chain } = req.params;
+        const { 
+            plaintext_seed, 
+            from_address, 
+            to_address, 
+            token_address,
+            amount,
+            gasless 
+        } = req.body;
+
+        if (!plaintext_seed || !to_address || !token_address || !amount) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'plaintext_seed, to_address, token_address, and amount required' 
+            });
+        }
+
+        if (!['ethereum', 'polygon', 'arbitrum'].includes(chain)) {
+            return res.status(400).json({ 
+                success: false,
+                error: `Unsupported chain: ${chain}. Use ethereum, polygon, or arbitrum.` 
+            });
+        }
+
+        console.log(`🪙 ${chain.toUpperCase()}: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
+        console.log(`   Token contract: ${token_address.slice(0, 10)}...`);
+
+        // Validate seed
+        if (!validateSeedPhrase(plaintext_seed)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid BIP39 seed phrase' 
+            });
+        }
+
+        // Create EVM wallet
+        const evmWallet = await createEVMWallet(plaintext_seed);
+        const provider = providers[chain];
+        
+        if (!provider) {
+            throw new Error(`Provider not configured for ${chain}`);
+        }
+        
+        // Connect wallet to provider
+        const wallet = new ethers.Wallet(evmWallet.privateKey, provider);
+        
+        // ERC-20 ABI (minimal, for transfer function)
+        const ERC20_ABI = [
+            'function transfer(address to, uint256 amount) returns (bool)',
+            'function balanceOf(address owner) view returns (uint256)',
+            'function decimals() view returns (uint8)'
+        ];
+        
+        // Create contract instance
+        const tokenContract = new ethers.Contract(token_address, ERC20_ABI, wallet);
+        
+        // Get token decimals
+        const decimals = await tokenContract.decimals();
+        console.log(`📊 Token decimals: ${decimals}`);
+        
+        // Check balance
+        const balance = await tokenContract.balanceOf(wallet.address);
+        console.log(`💰 Token balance: ${ethers.formatUnits(balance, decimals)}`);
+        
+        const amountInBaseUnits = ethers.parseUnits(amount.toString(), decimals);
+        
+        if (balance < amountInBaseUnits) {
+            throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${ethers.formatUnits(balance, decimals)}`);
+        }
+        
+        // Send token transfer transaction
+        console.log(`⚙️ Building ${chain} token transfer...`);
+        
+        const tx = await tokenContract.transfer(to_address, amountInBaseUnits);
+        
+        console.log(`⏳ Transaction submitted: ${tx.hash}`);
+        console.log(`⏳ Waiting for confirmation...`);
+        
+        // Wait for confirmation
+        const receipt = await tx.wait(1);
+        
+        console.log(`✅ Token transfer confirmed!`);
+        console.log(`   Block: ${receipt.blockNumber}`);
+        console.log(`   Gas Used: ${receipt.gasUsed.toString()}`);
+        
+        // Calculate costs
+        const gasPrice = receipt.gasPrice || tx.gasPrice;
+        const gasCostWei = receipt.gasUsed * gasPrice;
+        const gasCostEth = ethers.formatEther(gasCostWei);
+        
+        return res.json({
+            success: true,
+            tx_hash: receipt.hash,
+            chain: chain,
+            block_number: receipt.blockNumber,
+            gas_used: receipt.gasUsed.toString(),
+            gas_price: gasPrice.toString(),
+            gas_cost_eth: gasCostEth,
+            status: receipt.status === 1 ? 'confirmed' : 'failed',
+            gasless_used: gasless || false,
+            timestamp: new Date().toISOString(),
+            explorer_url: getExplorerUrl(chain, receipt.hash)
+        });
+        
+    } catch (error) {
+        console.error(`❌ ${req.params.chain} token send failed:`, error);
+        
+        let errorMessage = error.message;
+        if (error.code === 'INSUFFICIENT_FUNDS') {
+            errorMessage = `Insufficient ${req.params.chain.toUpperCase()} for gas fees.`;
+        } else if (error.message.includes('Insufficient token balance')) {
+            errorMessage = error.message;
+        }
+        
+        return res.status(400).json({ 
+            success: false,
+            error: errorMessage,
+            error_code: error.code,
+            chain: req.params.chain
         });
     }
 });
