@@ -1,45 +1,54 @@
 # File: backend/services/fee_collection_scheduler.py
 """
-Background fee collection scheduler
-Runs as part of the main backend process
+Production‑ready fee collection scheduler.
+Runs every 15 minutes to collect pending fees from all supported chains.
 """
 
 import asyncio
 import logging
-from datetime import datetime, time
-from typing import Optional
+from datetime import datetime
+from decimal import Decimal
+from typing import Dict, Optional
+
+from backend.config import settings
+from backend.services.database_service import DatabaseService
+from backend.services.algorand_service import AlgorandService
+from backend.services.seed_encryption_service import SeedEncryptionService
+from backend.services.wdk_client import WDKClient
 
 logger = logging.getLogger(__name__)
 
+# Chain → decimals for native asset (used to convert main unit to smallest unit)
+NATIVE_DECIMALS: Dict[str, int] = {
+    'algorand': 6,
+    'bitcoin': 8,
+    'ethereum': 18,
+    'polygon': 18,
+    'tron': 6,
+    'solana': 9,
+}
+
 class FeeCollectionScheduler:
     """
-    Runs fee collection at scheduled times
-    Non-blocking background task
+    Background task that collects pending fees from fees_owed.
+    Runs at a fixed interval (default 15 minutes).
     """
-    
-    def __init__(self, target_hour: int = 3, target_minute: int = 0):
-        """
-        Args:
-            target_hour: Hour to run (0-23, default 3 = 3 AM)
-            target_minute: Minute to run (0-59, default 0)
-        """
-        self.target_hour = target_hour
-        self.target_minute = target_minute
+
+    def __init__(self, interval_minutes: int = 15):
+        self.interval = interval_minutes * 60
         self.running = False
         self.task: Optional[asyncio.Task] = None
-    
+
     async def start(self):
-        """Start the scheduler"""
+        """Start the scheduler loop."""
         if self.running:
-            logger.warning("Fee collection scheduler already running")
             return
-        
         self.running = True
         self.task = asyncio.create_task(self._run_loop())
-        logger.info(f"✅ Fee collection scheduler started (runs daily at {self.target_hour:02d}:{self.target_minute:02d})")
-    
+        logger.info(f"✅ Fee collection scheduler started (interval={self.interval//60} min)")
+
     async def stop(self):
-        """Stop the scheduler"""
+        """Stop the scheduler gracefully."""
         self.running = False
         if self.task:
             self.task.cancel()
@@ -47,56 +56,156 @@ class FeeCollectionScheduler:
                 await self.task
             except asyncio.CancelledError:
                 pass
-        logger.info("❌ Fee collection scheduler stopped")
-    
+        logger.info("✅ Fee collection scheduler stopped")
+
     async def _run_loop(self):
-        """Main scheduler loop"""
+        """Main loop: collect fees, then sleep."""
         while self.running:
             try:
-                # Calculate time until next run
-                now = datetime.now()
-                target = now.replace(
-                    hour=self.target_hour,
-                    minute=self.target_minute,
-                    second=0,
-                    microsecond=0
-                )
-                
-                # If target time already passed today, schedule for tomorrow
-                if target <= now:
-                    target = target.replace(day=target.day + 1)
-                
-                wait_seconds = (target - now).total_seconds()
-                logger.info(f"⏰ Next fee collection in {wait_seconds/3600:.1f} hours (at {target})")
-                
-                # Wait until target time
-                await asyncio.sleep(wait_seconds)
-                
-                # Run collection
-                logger.info("💰 Starting scheduled fee collection...")
-                await self._collect_fees()
-                
-            except asyncio.CancelledError:
-                break
+                await self._collect_all_fees()
             except Exception as e:
-                logger.error(f"❌ Scheduler error: {e}")
-                # Wait 1 hour before retrying
-                await asyncio.sleep(3600)
-    
-    async def _collect_fees(self):
-        """Execute fee collection"""
+                logger.error(f"❌ Scheduler error: {e}", exc_info=True)
+            await asyncio.sleep(self.interval)
+
+    async def _collect_all_fees(self):
+        """Collect pending fees for all chains."""
+        # Create fresh service instances each cycle (no shared state)
+        db = DatabaseService()
+        algorand = AlgorandService(settings)
+        wdk = WDKClient()
+        seed_enc = SeedEncryptionService()
+
+        # Fetch all pending fees
+        result = db.supabase.table('fees_owed')\
+            .select('*')\
+            .eq('status', 'pending')\
+            .execute()
+        pending = result.data or []
+        logger.info(f"Found {len(pending)} pending fees to collect")
+
+        for fee in pending:
+            await self._collect_one_fee(fee, db, algorand, wdk, seed_enc)
+
+    async def _collect_one_fee(self, fee: dict, db, algorand, wdk, seed_enc):
+        """Process a single pending fee record."""
+        fee_id = fee['id']
+        user_id = fee['user_id']
+        chain = fee['chain']
+        asset = fee['asset']          # native asset, e.g., 'TRX'
+        amount_main = Decimal(str(fee['fee_amount']))  # in main unit (TRX, ALGO, etc.)
+        treasury = fee['treasury_address']
+
+        # Validate amount
+        if amount_main <= 0:
+            logger.error(f"Fee {fee_id} has non‑positive amount {amount_main} – marking as failed")
+            db.supabase.table('fees_owed')\
+                .update({'status': 'failed'})\
+                .eq('id', fee_id)\
+                .execute()
+            return
+
+        # Get user's wallet address and encrypted seed for this chain
+        from_address, encrypted_seed = await self._get_user_wallet(user_id, chain, db)
+        if not from_address or not encrypted_seed:
+            logger.error(f"Cannot retrieve wallet for user {user_id} chain {chain} – skipping fee {fee_id}")
+            return
+
+        logger.info(f"Collecting {amount_main} {asset} from {from_address[:8]}... to treasury {treasury[:8]}...")
+
         try:
-            from backend.scripts.collect_fees import collect_fees_for_chain
-            
-            chains = ['algorand', 'bitcoin', 'ethereum', 'polygon', 'tron']
-            
-            for chain in chains:
-                try:
-                    await collect_fees_for_chain(chain, dry_run=False)
-                except Exception as chain_err:
-                    logger.error(f"❌ Failed to collect {chain} fees: {chain_err}")
-            
-            logger.info("✅ Scheduled fee collection completed")
-            
+            # Convert main unit to smallest unit (e.g., TRX → sun, ALGO → microAlgos)
+            decimals = NATIVE_DECIMALS.get(chain, 6)
+            amount_smallest = int(amount_main * (10 ** decimals))
+
+            # Execute chain‑specific transfer
+            if chain == 'algorand':
+                tx_hash = await self._transfer_algorand(
+                    user_id, from_address, encrypted_seed, amount_smallest, treasury,
+                    algorand, seed_enc, db
+                )
+            else:
+                # All other chains go through WDK
+                tx_hash = await self._transfer_wdk(
+                    user_id, from_address, encrypted_seed, amount_smallest, asset, chain, treasury, wdk
+                )
+
+            # Update fee record as collected
+            db.supabase.table('fees_owed')\
+                .update({
+                    'status': 'collected',
+                    'collected_tx_id': tx_hash,
+                    'collected_at': datetime.utcnow().isoformat()
+                })\
+                .eq('id', fee_id)\
+                .execute()
+
+            logger.info(f"✅ Collected fee {fee_id}, tx: {tx_hash}")
+
         except Exception as e:
-            logger.error(f"❌ Fee collection failed: {e}")
+            logger.error(f"❌ Failed to collect fee {fee_id}: {e}", exc_info=True)
+            # Leave status as 'pending' to retry later
+
+    async def _get_user_wallet(self, user_id: str, chain: str, db):
+        """Retrieve user's wallet address and encrypted seed for the given chain."""
+        if chain == 'algorand':
+            # Algorand wallets are stored in user_wallets table
+            result = db.supabase.table('user_wallets')\
+                .select('algorand_address, algorand_private_key')\
+                .eq('user_id', user_id)\
+                .execute()
+            if result.data and len(result.data) > 0:
+                row = result.data[0]
+                return row.get('algorand_address'), row.get('algorand_private_key')
+            return None, None
+        else:
+            # Other chains are in multi_chain_addresses
+            result = db.supabase.table('multi_chain_addresses')\
+                .select('address, encrypted_seed')\
+                .eq('user_id', user_id)\
+                .eq('blockchain', chain)\
+                .execute()
+            if result.data and len(result.data) > 0:
+                row = result.data[0]
+                return row.get('address'), row.get('encrypted_seed')
+            return None, None
+
+    async def _transfer_algorand(self, user_id, from_address, encrypted_private_key,
+                                 amount_microalgos, treasury, algorand, seed_enc, db):
+        """Transfer native ALGO using AlgorandService."""
+        # Decrypt the private key
+        try:
+            private_key = seed_enc.decrypt_seed(encrypted_private_key)
+        except Exception as e:
+            raise Exception(f"Failed to decrypt Algorand private key: {e}")
+
+        # Transfer ALGO (asset_id = 0)
+        tx_id = await algorand.transfer_asset(
+            sender_private_key=private_key,
+            receiver_address=treasury,
+            asset_id=0,
+            amount=Decimal(amount_microalgos) / Decimal(1_000_000),  # convert back to ALGO for internal call
+            memo="Seamount fee collection"
+        )
+        return tx_id
+
+    async def _transfer_wdk(self, user_id, from_address, encrypted_seed, amount_smallest,
+                            asset_symbol, chain, treasury, wdk):
+        """Transfer native asset using WDKClient."""
+        # WDK's send_transaction expects amount in Decimal (main unit), not smallest unit.
+        # Convert back to main unit.
+        decimals = NATIVE_DECIMALS.get(chain, 6)
+        amount_main = Decimal(amount_smallest) / (10 ** decimals)
+
+        result = await wdk.send_transaction(
+            from_address=from_address,
+            to_address=treasury,
+            amount=amount_main,
+            asset=asset_symbol,        # native asset, e.g., 'TRX', 'BTC'
+            chain=chain,
+            encrypted_seed=encrypted_seed,
+            enable_gasless=False       # fee collection should not use gasless
+        )
+
+        if not result.get('success'):
+            raise Exception(result.get('error', 'WDK transfer failed'))
+        return result['tx_id']

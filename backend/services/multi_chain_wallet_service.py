@@ -575,12 +575,12 @@ class MultiChainWalletService:
                 
                 if not wallet_check.data or len(wallet_check.data) == 0:
                     raise Exception(
-                        "âŒ NO WALLET FOUND\n\n"
+                        "NO WALLET FOUND\n\n"
                         "You don't have an Algorand wallet yet.\n"
                         "Please create a wallet first by clicking 'Create Wallet' in the dashboard."
                     )
                 
-                logger.info(f"âœ… Algorand wallet verified for user {user_id}")
+                logger.info(f"Algorand wallet verified for user {user_id}")
             
             # ============================================================================
             # STEP 5: EXECUTE BLOCKCHAIN TRANSACTION
@@ -590,93 +590,95 @@ class MultiChainWalletService:
             else:
                 result = await self._send_via_wdk(user_id, recipient, asset, amount, optimal_chain)
             
-            logger.info(f"âœ… Blockchain transaction successful: {result['tx_id']}")
+            logger.info(f"Blockchain transaction successful: {result['tx_id']}")
             
             # ============================================================================
-            # STEP 6: RECORD TRANSACTION (NON-FATAL IF FAILS)
+            # STEP 6: RECORD TRANSACTION AND FEE (NON-FATAL IF FAILS)
             # ============================================================================
             try:
-                from backend.config import get_settings, CENTRAL_TREASURY_ADDRESSES
-                settings = get_settings()
+                from backend.config import CENTRAL_TREASURY_ADDRESSES
                 treasury_address = CENTRAL_TREASURY_ADDRESSES.get(optimal_chain, '')
-                
+
+                # ---------- Insert into blockchain_transactions ----------
                 transaction_data = {
                     'user_id': user_id,
                     'transaction_type': 'transfer',
                     'status': 'completed',
                     'amount': float(amount),
-                    'currency': asset,
+                    'asset': asset,
+                    'chain': optimal_chain,
+                    'txn_hash': result['tx_id'],
                     'to_address': recipient,
-                    'algorand_txn_id': result['tx_id'],
-                    'fee_amount': float(fee_calc['total_fee']),
-                    'fee_currency': 'USD',
-                    'created_at': datetime.utcnow().isoformat(),
+                    'network_fee': float(result.get('fee', 0)),
+                    'network_fee_asset': self._get_native_asset(optimal_chain),
+                    'platform_fee': float(fee_calc['platform_fee']),   # USD value for accounting
                     'metadata': {
-                        'chain': optimal_chain,
-                        'asset': asset,
-                        'memo': memo if memo else None,
-                        'estimated_arrival': self._estimate_arrival_time(optimal_chain),
-                        'treasury_address': treasury_address,
+                        'memo': memo,
                         'fee_owed': float(fee_calc['platform_fee']),
                         'fee_collected': False
-                    }
+                    },
+                    'created_at': datetime.utcnow().isoformat()
                 }
-                
-                response = self.db.supabase.table('transactions').insert(transaction_data).execute()
-                
+
+                response = self.db.supabase.table('blockchain_transactions').insert(transaction_data).execute()
+
                 if response.data:
                     transaction_id = response.data[0].get('id')
-                    logger.info(f"âœ… Transaction recorded in DB: {transaction_id}")
-                    
-                    # Record fee owed (for batch collection)
+                    logger.info(f"✅ Transaction recorded in DB: {transaction_id}")
+
+                    # ---------- Record fee owed in native token (for collection) ----------
                     try:
+                        # Calculate Seamount's fee in native token (e.g., 10% of network fee)
+                        network_fee_native = Decimal(str(result.get('fee', 0)))
+                        seamount_fee_native = network_fee_native * Decimal('0.10')   # Adjust percentage as needed
+                        native_asset = self._get_native_asset(optimal_chain)
+
                         fee_owed_data = {
                             'user_id': user_id,
                             'transaction_id': transaction_id,
                             'chain': optimal_chain,
-                            'asset': asset,
-                            'fee_amount': float(fee_calc['platform_fee']),
+                            'asset': native_asset,
+                            'fee_amount': float(seamount_fee_native),
                             'treasury_address': treasury_address,
                             'status': 'pending',
                             'created_at': datetime.utcnow().isoformat()
                         }
-                        
+
                         fee_insert = self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
-                        
+
                         if fee_insert.data:
-                            logger.info(f"ðŸ’° Fee recorded: ${fee_calc['platform_fee']} owed to treasury")
+                            logger.info(f"💰 Fee recorded: {seamount_fee_native} {native_asset} owed to treasury")
                         else:
-                            logger.warning(f"âš ï¸ Fee insert returned no data (non-fatal)")
-                            
+                            logger.warning("⚠️ Fee insert returned no data (non-fatal)")
+
                     except Exception as fee_err:
-                        logger.error(f"âŒ Failed to record fee owed (non-fatal): {fee_err}")
-                
-                # Track revenue (for analytics)
-                try:
-                    revenue_service = RevenueTrackingService(self.db)
-                    await revenue_service.track_transaction_fee(
-                        user_id=user_id,
-                        transaction_type="p2p_transfer",
-                        amount=amount,
-                        fee_rate=Decimal("0.007"),
-                        platform_fee=Decimal(str(fee_calc['platform_fee'])),
-                        network_fee=Decimal(str(fee_calc['network_fee'])),
-                        blockchain=optimal_chain,
-                        metadata={
-                            'transaction_id': result['tx_id'],
-                            'asset': asset,
-                            'memo': memo if memo else None,
-                            'fee_status': 'pending_collection'
-                        }
-                    )
-                    logger.info(f"ðŸ“Š Revenue tracked successfully")
-                except Exception as rev_err:
-                    logger.error(f"âŒ Revenue tracking failed (non-fatal): {rev_err}")
-                    
+                        logger.error(f"❌ Failed to record fee owed (non-fatal): {fee_err}")
+
+                    # ---------- Track USD revenue for analytics ----------
+                    try:
+                        revenue_service = RevenueTrackingService(self.db)
+                        await revenue_service.track_transaction_fee(
+                            user_id=user_id,
+                            transaction_type="p2p_transfer",
+                            amount=amount,
+                            fee_rate=Decimal("0.007"),
+                            platform_fee=Decimal(str(fee_calc['platform_fee'])),
+                            network_fee=Decimal(str(fee_calc['network_fee'])),
+                            blockchain=optimal_chain,
+                            metadata={
+                                'transaction_id': result['tx_id'],
+                                'asset': asset,
+                                'memo': memo,
+                                'fee_status': 'pending_collection'
+                            }
+                        )
+                        logger.info("📊 Revenue tracked successfully")
+                    except Exception as rev_err:
+                        logger.error(f"❌ Revenue tracking failed (non-fatal): {rev_err}")
+
             except Exception as db_err:
-                # Non-fatal: blockchain transaction already succeeded
-                logger.error(f"âŒ Database logging failed (transaction still succeeded on chain): {db_err}")
-            
+                logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
+                
             # ============================================================================
             # STEP 7: RETURN SUCCESS RESPONSE
             # ============================================================================

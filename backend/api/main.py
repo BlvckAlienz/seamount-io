@@ -600,7 +600,7 @@ async def lifespan(app: FastAPI):
                     try:
                         from backend.services.fee_collection_scheduler import FeeCollectionScheduler
                         
-                        scheduler = FeeCollectionScheduler(target_hour=3, target_minute=0)  # 3 AM daily
+                        scheduler = FeeCollectionScheduler(interval_minutes=15)   # instead of target_hour/target_minute
                         await scheduler.start()
 
                         # Schedule daily yield distribution at 3:30 AM UTC
