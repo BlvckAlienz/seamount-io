@@ -1,7 +1,7 @@
 # File: backend/services/fee_collection_scheduler.py
 """
 Production‑ready fee collection scheduler.
-Runs every 15 minutes to collect pending fees from all supported chains.
+Runs every 15 minutes (configurable) to collect pending fees from all supported chains.
 """
 
 import asyncio
@@ -34,7 +34,7 @@ class FeeCollectionScheduler:
     Runs at a fixed interval (default 15 minutes).
     """
 
-    def __init__(self, interval_minutes: int = 1):
+    def __init__(self, interval_minutes: int = 15):
         self.interval = interval_minutes * 60
         self.running = False
         self.task: Optional[asyncio.Task] = None
@@ -87,7 +87,7 @@ class FeeCollectionScheduler:
             await self._collect_one_fee(fee, db, algorand, wdk, seed_enc)
 
     async def _collect_one_fee(self, fee: dict, db, algorand, wdk, seed_enc):
-        """Process a single pending fee record."""
+        """Process a single pending fee record – actually transfers the native asset."""
         fee_id = fee['id']
         user_id = fee['user_id']
         chain = fee['chain']
@@ -113,33 +113,33 @@ class FeeCollectionScheduler:
         logger.info(f"Collecting {amount_main} {asset} from {from_address[:8]}... to treasury {treasury[:8]}...")
 
         try:
-            # Convert main unit to smallest unit (e.g., TRX → sun, ALGO → microAlgos)
+            # Convert main unit to smallest unit for the internal transfer methods
             decimals = NATIVE_DECIMALS.get(chain, 6)
             amount_smallest = int(amount_main * (10 ** decimals))
 
-            # Execute chain‑specific transfer
+            # Execute chain‑specific transfer using the same logic as user sends
             if chain == 'algorand':
-                tx_hash = await self._transfer_algorand(
-                    user_id, from_address, encrypted_seed, amount_smallest, treasury,
-                    algorand, seed_enc, db
-                )
+                # For Algorand, we need the private key (not seed)
+                # But _send_via_algorand expects private key, not seed.
+                # We'll reuse the existing method by first decrypting the private key.
+                # Note: user_wallets stores algorand_private_key (encrypted)
+                private_key = seed_enc.decrypt_seed(encrypted_seed)
+                tx_id = await self._transfer_algorand(user_id, from_address, private_key, amount_main, treasury, algorand)
             else:
-                # All other chains go through WDK
-                tx_hash = await self._transfer_wdk(
-                    user_id, from_address, encrypted_seed, amount_smallest, asset, chain, treasury, wdk
-                )
+                # For all other chains, use the WDK client
+                tx_id = await self._transfer_wdk(user_id, from_address, encrypted_seed, amount_main, asset, chain, treasury, wdk, seed_enc)
 
             # Update fee record as collected
             db.supabase.table('fees_owed')\
                 .update({
                     'status': 'collected',
-                    'collected_tx_id': tx_hash,
+                    'collected_tx_id': tx_id,
                     'collected_at': datetime.utcnow().isoformat()
                 })\
                 .eq('id', fee_id)\
                 .execute()
 
-            logger.info(f"✅ Collected fee {fee_id}, tx: {tx_hash}")
+            logger.info(f"✅ Collected fee {fee_id}, tx: {tx_id}")
 
         except Exception as e:
             logger.error(f"❌ Failed to collect fee {fee_id}: {e}", exc_info=True)
@@ -169,33 +169,23 @@ class FeeCollectionScheduler:
                 return row.get('address'), row.get('encrypted_seed')
             return None, None
 
-    async def _transfer_algorand(self, user_id, from_address, encrypted_private_key,
-                                 amount_microalgos, treasury, algorand, seed_enc, db):
+    async def _transfer_algorand(self, user_id, from_address, private_key, amount_main, treasury, algorand):
         """Transfer native ALGO using AlgorandService."""
-        # Decrypt the private key
-        try:
-            private_key = seed_enc.decrypt_seed(encrypted_private_key)
-        except Exception as e:
-            raise Exception(f"Failed to decrypt Algorand private key: {e}")
-
-        # Transfer ALGO (asset_id = 0)
+        # algorand.transfer_asset expects amount in main unit (ALGO)
         tx_id = await algorand.transfer_asset(
             sender_private_key=private_key,
             receiver_address=treasury,
-            asset_id=0,
-            amount=Decimal(amount_microalgos) / Decimal(1_000_000),  # convert back to ALGO for internal call
+            asset_id=0,  # 0 = native ALGO
+            amount=amount_main,
             memo="Seamount fee collection"
         )
         return tx_id
 
-    async def _transfer_wdk(self, user_id, from_address, encrypted_seed, amount_smallest,
-                            asset_symbol, chain, treasury, wdk):
-        """Transfer native asset using WDKClient."""
-        # WDK's send_transaction expects amount in Decimal (main unit), not smallest unit.
-        # Convert back to main unit.
-        decimals = NATIVE_DECIMALS.get(chain, 6)
-        amount_main = Decimal(amount_smallest) / (10 ** decimals)
-
+    async def _transfer_wdk(self, user_id, from_address, encrypted_seed, amount_main,
+                            asset_symbol, chain, treasury, wdk, seed_enc):
+        """Transfer native asset using WDKClient's send_transaction."""
+        # WDK's send_transaction expects the amount in main unit (e.g., TRX, not sun)
+        # and the encrypted seed (it will decrypt internally)
         result = await wdk.send_transaction(
             from_address=from_address,
             to_address=treasury,
