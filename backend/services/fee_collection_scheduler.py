@@ -34,7 +34,7 @@ class FeeCollectionScheduler:
     Runs at a fixed interval (default 15 minutes).
     """
 
-    def __init__(self, interval_minutes: int = 15):
+    def __init__(self, interval_minutes: int = 1):
         self.interval = interval_minutes * 60
         self.running = False
         self.task: Optional[asyncio.Task] = None
