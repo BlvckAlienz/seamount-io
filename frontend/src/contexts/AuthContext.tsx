@@ -1,5 +1,5 @@
 // File: frontend/src/contexts/AuthContext.tsx
-// âœ… PRODUCTION READY - HYBRID WALLET DETECTION
+// PRODUCTION READY - HYBRID WALLET DETECTION
 // Fast profile checks + API fallback for accuracy
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
@@ -547,9 +547,14 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
         
         // Tribe members always go to dashboard
+        // 🚨 Admin bypass — never auto-redirect admins
+        if (state.user.is_admin) {
+          return;
+        }
+
         if (kycStatus === 'approved' || state.user.role === 'tribe') {
           if (currentPath !== '/dashboard' && !currentPath.startsWith('/settings')) {
-            console.log('[Auth] Tribe member â†’ dashboard');
+            console.log('[Auth] Tribe member → dashboard');
             navigate('/dashboard');
           }
           return;

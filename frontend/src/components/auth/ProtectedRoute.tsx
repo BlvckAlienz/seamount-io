@@ -25,6 +25,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
+  console.log('🔍 ProtectedRoute Debug:', {
+    user,
+    userProfile,
+    isAdmin: userProfile?.is_admin,
+    kycLevel: user?.kyc_level,
+    accountType: userProfile?.account_type,
+    loading
+  });
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
