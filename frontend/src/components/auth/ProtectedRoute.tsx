@@ -30,8 +30,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // ADD ADMIN CHECK
-  if (adminRequired && !user.is_admin) {
+  if (adminRequired && !userProfile?.is_admin) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // 🚨 Admin bypass — skip ALL other guards (KYC, role, business checks)
+  if (userProfile?.is_admin) {
+    return <>{children}</>;
   }
 
   // 🆕 ADD BUSINESS CHECK
