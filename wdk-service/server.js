@@ -1,5 +1,5 @@
 // File: wdk-service/server.js
-// PRODUCTION DEPLOYMENT v2.1 - ALL CHAINS + ALL TOKENS
+// PRODUCTION DEPLOYMENT v2.2 - ALL CHAINS + ALL TOKENS
 // Multi-chain wallet service with complete Bitcoin, Ethereum, Polygon, Tron, Solana support
 // Includes native and token sends for every chain.
 
@@ -42,7 +42,7 @@ if (!WDK_API_KEY) {
     process.exit(1);
 }
 
-console.log('🚀 Starting WDK Service v2.1...');
+console.log('🚀 Starting WDK Service v2.2...');
 console.log(`🔑 API Key configured: ${WDK_API_KEY.slice(0, 10)}...`);
 console.log(`🌐 Port: ${PORT}`);
 
@@ -285,7 +285,7 @@ async function createSolanaWallet(mnemonic, index = 0) {
 app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
-        version: '2.1.0',
+        version: '2.2.0',
         chains: ['bitcoin', 'ethereum', 'polygon', 'arbitrum', 'tron', 'solana'],
         api_key_configured: !!WDK_API_KEY,
         encryption_configured: !!ENCRYPTION_KEY,
@@ -696,7 +696,7 @@ app.post('/wallet/bitcoin/send', validateApiKey, async (req, res) => {
                 tx_hash: txId,
                 tx_id: txId,
                 chain: 'bitcoin',
-                fee_satoshis: fee,
+                fee: fee / 100000000,  // Convert satoshis to BTC
                 amount_satoshis: amount_satoshis,
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://blockstream.info/tx/${txId}`
@@ -792,13 +792,22 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
                 callValue: 0
             });
 
-            console.log(`✅ Tron token transfer successful: ${txResult}`);
+            // Wait briefly for the transaction to be confirmed
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Fetch transaction info to get the actual fee
+            const txInfo = await tronWeb.trx.getTransactionInfo(txResult);
+            const feeInSun = txInfo?.fee || 0;
+            const feeInTrx = feeInSun / 1_000_000;  // Convert to TRX
+
+            console.log(`✅ Tron token transfer successful: ${txResult} (fee: ${feeInTrx} TRX)`);
 
             return res.json({
                 success: true,
                 tx_hash: txResult,
                 tx_id: txResult,
                 chain: 'tron',
+                fee: feeInTrx,                     // ✅ in TRX
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://tronscan.org/#/transaction/${txResult}`
             });
@@ -885,19 +894,26 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
             );
             const signedTx = await tronWeb.trx.sign(tx, tronWallet.privateKey);
             const receipt = await tronWeb.trx.sendRawTransaction(signedTx);
-
             if (!receipt.result) {
                 throw new Error('Transaction failed');
             }
 
-            console.log(`✅ TRX transfer successful: ${receipt.txid}`);
+            // Wait a moment for the transaction to be confirmed on the network
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Fetch transaction info to get the actual fee (in sun)
+            const txInfo = await tronWeb.trx.getTransactionInfo(receipt.txid);
+            const feeInSun = txInfo?.fee || 0;
+            const feeInTrx = feeInSun / 1_000_000;  // Convert to TRX
+
+            console.log(`✅ TRX transfer successful: ${receipt.txid} (fee: ${feeInTrx} TRX)`);
 
             return res.json({
                 success: true,
                 tx_hash: receipt.txid,
                 tx_id: receipt.txid,
                 chain: 'tron',
-                fee: receipt.energy_used || 0, // Tron returns energy used
+                fee: feeInTrx,                     // ✅ in TRX
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://tronscan.org/#/transaction/${receipt.txid}`
             });
@@ -979,13 +995,21 @@ app.post('/wallet/solana/send', validateApiKey, async (req, res) => {
                 [keypair]
             );
 
-            console.log(`✅ Solana transaction successful: ${signature}`);
+            // Fetch transaction details to get the fee
+            const txDetails = await providers.solana.getTransaction(signature, {
+                commitment: 'confirmed'
+            });
+            const feeInLamports = txDetails?.meta?.fee || 0;
+            const feeInSol = feeInLamports / 1_000_000_000;  // Convert to SOL
+
+            console.log(`✅ Solana transaction successful: ${signature} (fee: ${feeInSol} SOL)`);
 
             return res.json({
                 success: true,
                 tx_hash: signature,
                 tx_id: signature,
                 chain: 'solana',
+                fee: feeInSol,                      // ✅ in SOL
                 amount_lamports: amount_lamports,
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://explorer.solana.com/tx/${signature}`
@@ -1088,13 +1112,21 @@ app.post('/wallet/solana/send-token', validateApiKey, async (req, res) => {
                 [keypair]
             );
 
-            console.log(`✅ Solana token transfer successful: ${signature}`);
+            // Fetch transaction details to get the fee
+            const txDetails = await providers.solana.getTransaction(signature, {
+                commitment: 'confirmed'
+            });
+            const feeInLamports = txDetails?.meta?.fee || 0;
+            const feeInSol = feeInLamports / 1_000_000_000;  // Convert to SOL
+
+            console.log(`✅ Solana token transfer successful: ${signature} (fee: ${feeInSol} SOL)`);
 
             return res.json({
                 success: true,
                 tx_hash: signature,
                 tx_id: signature,
                 chain: 'solana',
+                fee: feeInSol,                      // ✅ in SOL
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://explorer.solana.com/tx/${signature}`
             });
@@ -1126,8 +1158,6 @@ app.post('/wallet/solana/send-token', validateApiKey, async (req, res) => {
 // ============================================================================
 // EVM NATIVE SEND (Ethereum, Polygon, Arbitrum) - WILDCARD
 // ============================================================================
-
-// Generic EVM native send (accepts plaintext_seed)
 app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
     try {
         const { chain } = req.params;
@@ -1200,6 +1230,7 @@ app.post('/wallet/:chain/send', validateApiKey, async (req, res) => {
                 gas_used: receipt.gasUsed.toString(),
                 gas_price: gasPrice.toString(),
                 gas_cost_eth: gasCostEth,
+                fee: parseFloat(gasCostEth),          // ✅ Add top-level fee
                 status: receipt.status === 1 ? 'confirmed' : 'failed',
                 gasless_used: gasless || false,
                 timestamp: new Date().toISOString(),
@@ -1339,6 +1370,7 @@ app.post('/wallet/:chain/send-token', validateApiKey, async (req, res) => {
             gas_used: receipt.gasUsed.toString(),
             gas_price: gasPrice.toString(),
             gas_cost_eth: gasCostEth,
+            fee: parseFloat(gasCostEth),          // ✅ Add top-level fee
             status: receipt.status === 1 ? 'confirmed' : 'failed',
             gasless_used: gasless || false,
             timestamp: new Date().toISOString(),
@@ -1401,7 +1433,7 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
     console.log('='.repeat(60));
-    console.log('✅ Multi-Chain Wallet Service READY v2.1');
+    console.log('✅ Multi-Chain Wallet Service READY v2.2');
     console.log('='.repeat(60));
     console.log(`📡 URL: http://localhost:${PORT}`);
     console.log(`🔑 API Key: ${WDK_API_KEY.slice(0, 10)}...`);
