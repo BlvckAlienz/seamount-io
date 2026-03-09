@@ -91,21 +91,19 @@ class FeeCollectionScheduler:
         fee_id = fee['id']
         user_id = fee['user_id']
         chain = fee['chain']
-        asset = fee['asset']          # native asset, e.g., 'TRX'
-        amount_main = Decimal(str(fee['fee_amount']))  # in main unit (TRX, ALGO, etc.)
+        asset = fee['asset']
+        amount_main = Decimal(str(fee['fee_amount']))
         treasury = fee['treasury_address']
 
-        # Validate amount
+        logger.info(f"[DEBUG] Processing fee {fee_id}: chain={chain}, asset={asset}, amount={amount_main}, treasury={treasury}")
+
         if amount_main <= 0:
             logger.error(f"Fee {fee_id} has non‑positive amount {amount_main} – marking as failed")
-            db.supabase.table('fees_owed')\
-                .update({'status': 'failed'})\
-                .eq('id', fee_id)\
-                .execute()
+            db.supabase.table('fees_owed').update({'status': 'failed'}).eq('id', fee_id).execute()
             return
 
-        # Get user's wallet address and encrypted seed for this chain
         from_address, encrypted_seed = await self._get_user_wallet(user_id, chain, db)
+        logger.info(f"[DEBUG] User wallet: from_address={from_address}, encrypted_seed present={bool(encrypted_seed)}")
         if not from_address or not encrypted_seed:
             logger.error(f"Cannot retrieve wallet for user {user_id} chain {chain} – skipping fee {fee_id}")
             return
@@ -113,23 +111,19 @@ class FeeCollectionScheduler:
         logger.info(f"Collecting {amount_main} {asset} from {from_address[:8]}... to treasury {treasury[:8]}...")
 
         try:
-            # Convert main unit to smallest unit for the internal transfer methods
             decimals = NATIVE_DECIMALS.get(chain, 6)
             amount_smallest = int(amount_main * (10 ** decimals))
+            logger.info(f"[DEBUG] Converted amount to smallest unit: {amount_smallest}")
 
-            # Execute chain‑specific transfer using the same logic as user sends
             if chain == 'algorand':
-                # For Algorand, we need the private key (not seed)
-                # But _send_via_algorand expects private key, not seed.
-                # We'll reuse the existing method by first decrypting the private key.
-                # Note: user_wallets stores algorand_private_key (encrypted)
                 private_key = seed_enc.decrypt_seed(encrypted_seed)
+                logger.info("[DEBUG] Private key decrypted for Algorand")
                 tx_id = await self._transfer_algorand(user_id, from_address, private_key, amount_main, treasury, algorand)
             else:
-                # For all other chains, use the WDK client
+                logger.info(f"[DEBUG] Calling wdk.send_transaction with asset={asset}, chain={chain}, amount={amount_main}")
                 tx_id = await self._transfer_wdk(user_id, from_address, encrypted_seed, amount_main, asset, chain, treasury, wdk, seed_enc)
 
-            # Update fee record as collected
+            logger.info(f"[DEBUG] Transfer successful, tx_id={tx_id}")
             db.supabase.table('fees_owed')\
                 .update({
                     'status': 'collected',
@@ -138,12 +132,10 @@ class FeeCollectionScheduler:
                 })\
                 .eq('id', fee_id)\
                 .execute()
-
             logger.info(f"✅ Collected fee {fee_id}, tx: {tx_id}")
 
         except Exception as e:
             logger.error(f"❌ Failed to collect fee {fee_id}: {e}", exc_info=True)
-            # Leave status as 'pending' to retry later
 
     async def _get_user_wallet(self, user_id: str, chain: str, db):
         """Retrieve user's wallet address and encrypted seed for the given chain."""
