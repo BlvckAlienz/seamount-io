@@ -31,6 +31,7 @@ interface NavItem {
   badge?: string;
   businessOnly?: boolean;
   individualOnly?: boolean;
+  adminOnly?: boolean;
 }
 
 const Sidebar: React.FC = () => {
@@ -45,7 +46,7 @@ const Sidebar: React.FC = () => {
     { label: 'Wallets', icon: Wallet, path: '/dashboard' },
     { label: 'XRP Ledger', icon: Waves, path: '/xrp' },
     { label: 'My Assets', icon: Briefcase, path: '/my-assets' },
-    { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', businessOnly: true },
+    { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', adminOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading' },
     { label: 'Audit & Tax', icon: Receipt, path: '/compliance', badge: 'NG', businessOnly: true },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
@@ -54,16 +55,15 @@ const Sidebar: React.FC = () => {
 
   // 🔒 FILTER: Hide business-only tabs from individual users
   const navItems = allNavItems.filter(item => {
-    // Business-only tabs (hide from individuals)
+    if (item.adminOnly) {
+      return userProfile?.is_admin === true;
+    }
     if (item.businessOnly) {
       return userProfile?.account_type === 'business';
     }
-    
-    // Individual-only tabs (hide from businesses)
     if (item.individualOnly) {
       return userProfile?.account_type !== 'business';
     }
-    
     return true;
   });
 
