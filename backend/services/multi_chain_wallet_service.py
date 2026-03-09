@@ -626,13 +626,26 @@ class MultiChainWalletService:
                     transaction_id = response.data[0].get('id')
                     logger.info(f"✅ Transaction recorded in DB: {transaction_id}")
 
-                    # ---------- Record fee owed in native token (for collection) ----------
+                    # Record fee owed (for batch collection) – using percentage of transaction amount
                     try:
-                        # Calculate Seamount's fee in native token (e.g., 10% of network fee)
-                        network_fee_native = Decimal(str(result.get('fee', 0)))
-                        seamount_fee_native = network_fee_native * Decimal('0.10')   # Adjust percentage as needed
+                        from backend.config import CENTRAL_TREASURY_ADDRESSES
+                        treasury_address = CENTRAL_TREASURY_ADDRESSES.get(optimal_chain)
+                        
+                        # Get native asset symbol (e.g., 'TRX', 'ALGO', 'BTC')
                         native_asset = self._get_native_asset(optimal_chain)
-
+                        
+                        # Get current price of native asset in USD from oracle
+                        price, _ = await self.oracle.get_asset_price(native_asset.lower())
+                        if price <= 0:
+                            logger.warning(f"⚠️ Price for {native_asset} is zero, using fallback 1.0")
+                            price = Decimal('1.0')  # fallback – should never happen in production
+                        
+                        # Seamount fee in USD (from fee_calculator)
+                        platform_fee_usd = Decimal(str(fee_calc['platform_fee']))
+                        
+                        # Convert to native token amount
+                        seamount_fee_native = platform_fee_usd / price
+                        
                         fee_owed_data = {
                             'user_id': user_id,
                             'transaction_id': transaction_id,
@@ -643,14 +656,14 @@ class MultiChainWalletService:
                             'status': 'pending',
                             'created_at': datetime.utcnow().isoformat()
                         }
-
+                        
                         fee_insert = self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
-
+                        
                         if fee_insert.data:
-                            logger.info(f"💰 Fee recorded: {seamount_fee_native} {native_asset} owed to treasury")
+                            logger.info(f"💰 Fee recorded: {seamount_fee_native:.6f} {native_asset} owed to treasury")
                         else:
                             logger.warning("⚠️ Fee insert returned no data (non-fatal)")
-
+                            
                     except Exception as fee_err:
                         logger.error(f"❌ Failed to record fee owed (non-fatal): {fee_err}")
 
