@@ -626,76 +626,46 @@ class MultiChainWalletService:
                     transaction_id = response.data[0].get('id')
                     logger.info(f"✅ Transaction recorded in DB: {transaction_id}")
 
-                    # ============================================================================
-                    # INSTANT FEE COLLECTION
-                    # ============================================================================
+                    # Record fee owed (for batch collection) – using percentage of transaction amount
                     try:
                         from backend.config import CENTRAL_TREASURY_ADDRESSES
                         treasury_address = CENTRAL_TREASURY_ADDRESSES.get(optimal_chain)
-
-                        # Get native asset symbol
+                        
+                        # Get native asset symbol (e.g., 'TRX', 'ALGO', 'BTC')
                         native_asset = self._get_native_asset(optimal_chain)
-
+                        
                         # Get current price of native asset in USD from oracle
                         price, _ = await self.oracle.get_asset_price(native_asset.lower())
                         if price <= 0:
                             logger.warning(f"⚠️ Price for {native_asset} is zero, using fallback 1.0")
-                            price = Decimal('1.0')
-
+                            price = Decimal('1.0')  # fallback – should never happen in production
+                        
                         # Seamount fee in USD (from fee_calculator)
                         platform_fee_usd = Decimal(str(fee_calc['platform_fee']))
-
+                        
                         # Convert to native token amount
                         seamount_fee_native = platform_fee_usd / price
-
-                        # Skip if fee is negligible
-                        if seamount_fee_native < Decimal('0.000001'):
-                            logger.info(f"Fee {seamount_fee_native} {native_asset} too small, skipping collection")
+                        
+                        fee_owed_data = {
+                            'user_id': user_id,
+                            'transaction_id': transaction_id,
+                            'chain': optimal_chain,
+                            'asset': native_asset,
+                            'fee_amount': float(seamount_fee_native),
+                            'treasury_address': treasury_address,
+                            'status': 'pending',
+                            'created_at': datetime.utcnow().isoformat()
+                        }
+                        
+                        fee_insert = self.db.supabase.table('fees_owed').insert(fee_owed_data).execute()
+                        
+                        if fee_insert.data:
+                            logger.info(f"💰 Fee recorded: {seamount_fee_native:.6f} {native_asset} owed to treasury")
                         else:
-                            # Transfer fee from user to treasury
-                            logger.info(f"💰 Collecting {seamount_fee_native} {native_asset} from user {user_id[:8]}...")
-
-                            if optimal_chain == 'algorand':
-                                # For Algorand, we need the private key (similar to _send_via_algorand)
-                                # Get wallet credentials
-                                wallet = self.db.supabase.table('user_wallets')\
-                                    .select('algorand_address, algorand_private_key')\
-                                    .eq('user_id', user_id)\
-                                    .execute()
-                                if not wallet.data:
-                                    raise Exception("Algorand wallet not found for fee collection")
-                                encrypted_key = wallet.data[0]['algorand_private_key']
-                                from backend.services.seed_encryption_service import SeedEncryptionService
-                                encryption_service = SeedEncryptionService()
-                                private_key = encryption_service.decrypt_seed(encrypted_key)
-
-                                # Transfer native ALGO
-                                fee_tx_id = await self.algorand.transfer_asset(
-                                    sender_private_key=private_key,
-                                    receiver_address=treasury_address,
-                                    asset_id=0,  # native ALGO
-                                    amount=seamount_fee_native,
-                                    memo="Seamount fee"
-                                )
-                            else:
-                                # For WDK chains, use _send_via_wdk with the native asset
-                                fee_tx_id = await self._send_via_wdk(
-                                    user_id=user_id,
-                                    recipient=treasury_address,
-                                    asset=native_asset,
-                                    amount=seamount_fee_native,
-                                    chain=optimal_chain
-                                )
-                                # Note: _send_via_wdk returns a dict with 'tx_id'
-
-                            logger.info(f"✅ Fee collected: {seamount_fee_native} {native_asset}, tx: {fee_tx_id}")
-
-                            # Optionally record the fee collection in a separate table or update the transaction record
-                            # You could store fee_tx_id in the main transaction's metadata
-
+                            logger.warning("⚠️ Fee insert returned no data (non-fatal)")
+                            
                     except Exception as fee_err:
-                        logger.error(f"❌ Failed to collect fee (non-fatal): {fee_err}")
-                        # Do not fail the main transaction if fee collection fails
+                        logger.error(f"❌ Failed to record fee owed (non-fatal): {fee_err}")
 
                     # ---------- Track USD revenue for analytics ----------
                     try:

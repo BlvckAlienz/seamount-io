@@ -672,15 +672,6 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"âš ï¸ WDK Deposit Monitor failed to start: {e}")
                 
-    # ============================================================================
-    # STOP FEE COLLECTION SCHEDULER
-    # ============================================================================
-    try:
-        if hasattr(app.state, 'fee_scheduler'):
-            await app.state.fee_scheduler.stop()
-            logger.info("âœ… Fee collection scheduler stopped")
-    except Exception as sched_err:
-        logger.error(f"âŒ Failed to stop scheduler: {sched_err}")
         
     # Store services for cleanup
     app.state.quota_service = quota_service if 'quota_service' in locals() else None
@@ -706,6 +697,14 @@ async def lifespan(app: FastAPI):
             logger.info("✅ XRP deposit monitor stopped")
         except Exception as e:
             logger.error(f"❌ Failed to stop XRP monitor: {e}")
+
+    # Stop fee collection scheduler
+    if hasattr(app.state, 'fee_scheduler'):
+        try:
+            await app.state.fee_scheduler.stop()
+            logger.info("✅ Fee collection scheduler stopped")
+        except Exception as e:
+            logger.error(f"❌ Failed to stop scheduler: {e}")
 
     logger.info("--- Seamount API Shutting Down ---")
 
