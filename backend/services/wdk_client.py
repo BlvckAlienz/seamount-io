@@ -1262,15 +1262,13 @@ class WDKClient:
             
             try:
                 result = await self._make_request('POST', endpoint, data=payload)
-                
+                logger.info(f"🔍 DEBUG: WDK raw response for {chain} {asset}: {result}")   # <-- ADD THIS
                 if not result.get('success'):
                     raise Exception(result.get('error', f'{chain} transaction failed'))
-                
                 return {
                     'tx_id': result['tx_hash'],
                     'chain': chain,
-                    'fee': result.get('gas_used', 0),
-                    'gasless_used': result.get('gasless', False),
+                    'fee': result.get('fee', 0),   # fee in main unit (BTC, TRX, etc.)
                     'success': True
                 }
                 

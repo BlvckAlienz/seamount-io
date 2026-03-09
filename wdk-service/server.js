@@ -750,7 +750,6 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
 
         console.log(`⚡ TRON: Sending ${amount} tokens to ${to_address.slice(0, 10)}...`);
 
-        // Validate seed
         if (!validateSeedPhrase(plaintext_seed)) {
             return res.status(400).json({ 
                 success: false,
@@ -758,14 +757,11 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
             });
         }
 
-        // Create Tron wallet
         const tronWallet = await createTronWallet(plaintext_seed);
-        
         console.log(`📍 Sending from: ${tronWallet.address}`);
         console.log(`📍 Sending to: ${to_address}`);
         console.log(`📍 Token contract: ${token_address}`);
 
-        // ✅ PRODUCTION IMPLEMENTATION USING TronWeb
         try {
             const tronWeb = new TronWeb({
                 fullHost: 'https://api.trongrid.io',
@@ -773,10 +769,7 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
                 privateKey: tronWallet.privateKey
             });
 
-            // Get TRC-20 contract
             const contract = await tronWeb.contract().at(token_address);
-
-            // Check balance
             const balance = await contract.balanceOf(tronWallet.address).call();
             console.log(`💰 Token balance: ${balance.toString()}`);
 
@@ -784,21 +777,24 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
                 throw new Error(`Insufficient token balance. Required: ${amount}, Available: ${balance.toString()}`);
             }
 
-            // Send token transfer
             console.log(`⚙️ Building Tron token transfer...`);
-            
             const txResult = await contract.transfer(to_address, amount).send({
                 feeLimit: 100000000, // 100 TRX
                 callValue: 0
             });
 
-            // Wait briefly for the transaction to be confirmed
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Fetch transaction info to get the actual fee
-            const txInfo = await tronWeb.trx.getTransactionInfo(txResult);
-            const feeInSun = txInfo?.fee || 0;
-            const feeInTrx = feeInSun / 1_000_000;  // Convert to TRX
+            // Wait for transaction to be confirmed and fetch fee
+            let txInfo = null;
+            let feeInSun = 0;
+            for (let i = 0; i < 10; i++) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                txInfo = await tronWeb.trx.getTransactionInfo(txResult);
+                if (txInfo && txInfo.fee !== undefined) {
+                    feeInSun = txInfo.fee;
+                    break;
+                }
+            }
+            const feeInTrx = feeInSun / 1_000_000;
 
             console.log(`✅ Tron token transfer successful: ${txResult} (fee: ${feeInTrx} TRX)`);
 
@@ -807,21 +803,19 @@ app.post('/wallet/tron/send-token', validateApiKey, async (req, res) => {
                 tx_hash: txResult,
                 tx_id: txResult,
                 chain: 'tron',
-                fee: feeInTrx,                     // ✅ in TRX
+                fee: feeInTrx,
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://tronscan.org/#/transaction/${txResult}`
             });
 
         } catch (tronError) {
             console.error(`❌ Tron token transfer failed:`, tronError.message);
-            
             let errorMessage = tronError.message;
             if (errorMessage.includes('Insufficient token balance')) {
                 errorMessage = tronError.message;
             } else if (errorMessage.includes('INSUFFICIENT_BALANCE')) {
                 errorMessage = 'Insufficient TRX for energy/bandwidth fees.';
             }
-            
             return res.status(400).json({ 
                 success: false,
                 error: errorMessage,
@@ -854,7 +848,6 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
 
         console.log(`💸 TRON: Sending ${amount_sun} sun to ${to_address.slice(0, 10)}...`);
 
-        // Validate seed
         if (!validateSeedPhrase(plaintext_seed)) {
             return res.status(400).json({ 
                 success: false,
@@ -862,9 +855,7 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
             });
         }
 
-        // Create Tron wallet
         const tronWallet = await createTronWallet(plaintext_seed);
-        
         console.log(`📍 Sending from: ${tronWallet.address}`);
         console.log(`📍 Sending to: ${to_address}`);
         console.log(`📍 Amount: ${amount_sun} sun`);
@@ -876,17 +867,13 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
                 privateKey: tronWallet.privateKey
             });
 
-            // Check balance
             const balance = await tronWeb.trx.getBalance(tronWallet.address);
             console.log(`💰 TRX balance: ${balance} sun`);
-
             if (balance < amount_sun) {
                 throw new Error(`Insufficient TRX balance. Required: ${amount_sun}, Available: ${balance}`);
             }
 
-            // Send TRX
             console.log(`⚙️ Building TRX transfer...`);
-            
             const tx = await tronWeb.transactionBuilder.sendTrx(
                 to_address,
                 amount_sun,
@@ -898,13 +885,18 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
                 throw new Error('Transaction failed');
             }
 
-            // Wait a moment for the transaction to be confirmed on the network
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Fetch transaction info to get the actual fee (in sun)
-            const txInfo = await tronWeb.trx.getTransactionInfo(receipt.txid);
-            const feeInSun = txInfo?.fee || 0;
-            const feeInTrx = feeInSun / 1_000_000;  // Convert to TRX
+            // Wait for transaction to be confirmed and fetch fee
+            let txInfo = null;
+            let feeInSun = 0;
+            for (let i = 0; i < 10; i++) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                txInfo = await tronWeb.trx.getTransactionInfo(receipt.txid);
+                if (txInfo && txInfo.fee !== undefined) {
+                    feeInSun = txInfo.fee;
+                    break;
+                }
+            }
+            const feeInTrx = feeInSun / 1_000_000;
 
             console.log(`✅ TRX transfer successful: ${receipt.txid} (fee: ${feeInTrx} TRX)`);
 
@@ -913,19 +905,17 @@ app.post('/wallet/tron/send', validateApiKey, async (req, res) => {
                 tx_hash: receipt.txid,
                 tx_id: receipt.txid,
                 chain: 'tron',
-                fee: feeInTrx,                     // ✅ in TRX
+                fee: feeInTrx,
                 timestamp: new Date().toISOString(),
                 explorer_url: `https://tronscan.org/#/transaction/${receipt.txid}`
             });
 
         } catch (tronError) {
             console.error(`❌ TRX transfer failed:`, tronError.message);
-            
             let errorMessage = tronError.message;
             if (errorMessage.includes('Insufficient')) {
                 errorMessage = tronError.message;
             }
-            
             return res.status(400).json({ 
                 success: false,
                 error: errorMessage,
