@@ -106,6 +106,7 @@ const DashboardPage = () => {
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);  // ✅ ADD THIS
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [receivePreselectedChain, setReceivePreselectedChain] = useState<string | undefined>(undefined);
   
   const AUTO_CREATED_CHAINS = [
     { id: 'algorand', name: 'Algorand',   symbol: 'ALGO'  },
@@ -297,7 +298,7 @@ const DashboardPage = () => {
             
             <button 
               onClick={() => setShowReceiveModal(true)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-indigo-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
             >
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">Receive</span>
@@ -394,7 +395,10 @@ const DashboardPage = () => {
           balance={calculateChainBalance(selectedChain)}
           onOpenFundModal={() => setShowFundModal(true)}
           onOpenWithdrawModal={() => setShowWithdrawModal(true)}  // ✅ ADD THIS
-          onOpenReceiveModal={() => setShowReceiveModal(true)}    // ✅ ADD THIS
+          onOpenReceiveModal={(chain) => {
+            setReceivePreselectedChain(chain);
+            setShowReceiveModal(true);
+          }}
         />
       )}
       <FundWalletModal open={showFundModal} onOpenChange={setShowFundModal} />
@@ -406,9 +410,10 @@ const DashboardPage = () => {
         isOpen={showReceiveModal} 
         onClose={() => {
           setShowReceiveModal(false);
+          setReceivePreselectedChain(undefined);   // <-- add this line
           console.log('🔍 Debug - Closing ReceiveModal');
         }}
-        preselectedChain={selectedChain || undefined}
+        preselectedChain={receivePreselectedChain}
         walletAddresses={(() => {
           const addresses = Object.fromEntries(
             Object.entries(multiChainWallets).map(([chain, data]: [string, any]) => [

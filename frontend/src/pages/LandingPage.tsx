@@ -1761,7 +1761,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Building an <span className="gradient-text">Ownership Economy</span> for Everyone
               </h2>
               <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                Join the platform where entrepreneurs and SMEs are the default users, not an afterthought.
+                Join the platform where creatives and SMEs are the default users, not an afterthought.
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 

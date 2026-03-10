@@ -18,7 +18,6 @@ interface WalletDetailModalProps {
   balance: number;
   onOpenFundModal: () => void;  // ✅ NEW PROP
   onOpenWithdrawModal: () => void;  // ✅ ADD
-  onOpenReceiveModal: () => void;   // ✅ ADD
 }
 
 interface AssetPriceData {
@@ -520,28 +519,6 @@ const WalletDetailModal: React.FC<WalletDetailModalProps> = ({
     });
   };
 
-const handleReceiveAsset = () => {
-  if (!selectedAsset) {
-    toast.error('Please select an asset first');
-    return;
-  }
-  
-  // Store selected asset and chain for ReceiveModal (backup)
-  sessionStorage.setItem('receive_asset', selectedAsset);
-  sessionStorage.setItem('receive_chain', chain);
-  
-  // Open ReceiveModal first (so the chain state is still valid)
-  onOpenReceiveModal();
-  
-  // Then close this modal
-  onClose();
-  
-  toast.success(`Ready to receive ${selectedAsset}`, {
-    duration: 2000,
-    icon: '📥'
-  });
-};
-
   const getExplorerUrl = (chain: string, address: string) => {
     const explorers: { [key: string]: string } = {
       bitcoin: `https://blockstream.info/address/${address}`,
@@ -730,14 +707,6 @@ const handleReceiveAsset = () => {
                     >
                       <ArrowUpRight className="w-5 h-5" />
                       Sell
-                    </button>
-                    
-                    <button
-                      onClick={handleReceiveAsset}
-                      className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 sm:px-6 py-3 rounded-xl font-bold text-white transition-all hover:shadow-lg hover:shadow-blue-500/50 text-sm sm:text-base"
-                    >
-                      <Download className="w-5 h-5" />
-                      Receive
                     </button>
                   </div>
                 </div>

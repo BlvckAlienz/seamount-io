@@ -84,7 +84,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@esbuild-plugins/node-globals-polyfill'],
+    exclude: [],
     include: [
       'react',
       'react-dom',
