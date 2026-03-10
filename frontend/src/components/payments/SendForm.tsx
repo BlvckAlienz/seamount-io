@@ -1,8 +1,8 @@
 // File: frontend/src/components/payments/SendForm.tsx
-// ✅ PRODUCTION-READY: Toast shows DURING transaction (modal stays open)
-// ✅ Enhanced with fee display and balance validation
+// ✅ PRODUCTION-READY: QR code scanning added
+// ✅ Fee display and balance validation remain
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useWallet } from '@/contexts/WalletContext';
 import { Button } from '@/components/ui/button.tsx';
@@ -26,9 +26,12 @@ import {
   ArrowRight,
   Info,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  QrCode,
+  X
 } from 'lucide-react';
 import { apiClient } from '@/config/api';
+import { Html5QrcodeScanner } from 'html5-qrcode'; // ✅ QR scanner import
 
 // ============================================================================
 // CHAIN ASSET GROUPS (unchanged)
@@ -169,6 +172,11 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const [feeLoading, setFeeLoading] = useState(false);
   const [insufficientNative, setInsufficientNative] = useState(false);
 
+  // QR scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerContainerId = 'qr-reader';
+
   // Get chain from selected asset
   const selectedChain = getChainFromAsset(asset);
   const nativeAsset = getNativeAsset(selectedChain);
@@ -266,6 +274,50 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
     const totalNativeNeeded = estimatedNetworkFee + seamountFeeNative;
     setInsufficientNative(nativeBalance < totalNativeNeeded);
   }, [amount, estimatedNetworkFee, seamountFeeNative, nativeBalance]);
+
+  // ============================================================================
+  // QR SCANNER SETUP
+  // ============================================================================
+  useEffect(() => {
+    if (showScanner) {
+      // Initialize scanner when modal opens
+      scannerRef.current = new Html5QrcodeScanner(
+        scannerContainerId,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        false
+      );
+
+      scannerRef.current.render(
+        (decodedText) => {
+          // Success callback
+          // Extract address if it's a URI (e.g., bitcoin:address?amount=...)
+          let address = decodedText;
+          if (decodedText.includes(':')) {
+            const parts = decodedText.split(':');
+            if (parts.length > 1) {
+              // Take the part after the colon, and before any '?' if present
+              address = parts[1].split('?')[0];
+            }
+          }
+          setRecipient(address);
+          setShowScanner(false);
+          toast.success('Address scanned successfully');
+        },
+        (errorMessage) => {
+          // Error callback – ignore most errors, but log for debugging
+          console.debug('QR scan error:', errorMessage);
+        }
+      );
+    }
+
+    // Cleanup when scanner closes
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(console.error);
+        scannerRef.current = null;
+      }
+    };
+  }, [showScanner]);
 
   // ============================================================================
   // PROCEED TO CONFIRMATION
@@ -375,7 +427,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // ============================================================================
   return (
     <>
-      <Dialog open={open && !showConfirmation} onOpenChange={onOpenChange}>
+      <Dialog open={open && !showConfirmation && !showScanner} onOpenChange={onOpenChange}>
         <DialogContent 
           className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600"
           style={{ zIndex: 1000 }}
@@ -443,21 +495,31 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               </div>
             </div>
 
-            {/* Recipient Address */}
+            {/* Recipient Address with QR Button */}
             <div className="space-y-2">
               <Label htmlFor="recipient" className="text-sm font-semibold text-gray-900 dark:text-white">
                 Recipient Address
               </Label>
-              <Input
-                id="recipient"
-                placeholder={`Enter ${selectedChain} address`}
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                disabled={loading}
-                className={`w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base ${
-                  validationError ? 'border-red-500 dark:border-red-500' : ''
-                }`}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="recipient"
+                  placeholder={`Enter ${selectedChain} address`}
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  disabled={loading}
+                  className={`flex-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base ${
+                    validationError ? 'border-red-500 dark:border-red-500' : ''
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="h-12 w-12 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  title="Scan QR Code"
+                >
+                  <QrCode className="h-5 w-5" />
+                </button>
+              </div>
               
               {validationError && (
                 <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 font-medium">
@@ -603,6 +665,36 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             >
               Review Transaction
               <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR SCANNER MODAL */}
+      <Dialog open={showScanner} onOpenChange={setShowScanner}>
+        <DialogContent className="sm:max-w-[500px] max-w-[95vw] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+              <QrCode className="h-6 w-6 text-blue-600" />
+              Scan QR Code
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-gray-400">
+              Position the QR code inside the frame to scan.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div id={scannerContainerId} className="w-full h-[300px] bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden"></div>
+          </div>
+
+          <DialogFooter className="border-t pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowScanner(false)}
+              className="w-full sm:w-auto h-12 px-6 text-base font-semibold"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

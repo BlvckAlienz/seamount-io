@@ -30,6 +30,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
+    "html5-qrcode": "^2.3.8",
     "jwt-decode": "^3.1.2",
     "lucide-react": "^0.562.0",
     "process": "^0.11.10",
@@ -47,7 +48,7 @@
     "recharts": "^2.8.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^1.14.0",
-    "vercel": "^41.0.2",
+    "vercel": "^50.29.0",
     "viem": "^2.21.5",
     "wagmi": "^2.12.5",
     "web3": "^4.16.0"
@@ -61,8 +62,8 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/react-select-country-list": "^2.2.3",
     "@types/react-sparklines": "^1.7.5",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.0",
+    "@typescript-eslint/parser": "^8.57.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
@@ -73,7 +74,7 @@
     "terser": "^5.44.1",
     "typescript": "^5.2.2",
     "vite": "^7.1.9",
-    "vite-plugin-node-polyfills": "^0.24.0"
+    "vite-plugin-node-polyfills": "^0.2.0"
   },
   "engines": {
     "node": ">=18.0.0",
