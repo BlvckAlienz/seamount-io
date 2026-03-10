@@ -73,6 +73,32 @@ const KYCPromptBanner: React.FC<KYCPromptBannerProps> = ({
   );
 };
 
+{/* Tron Activation Banner (simpler) */}
+{multiChainWallets['tron']?.address && calculateChainBalance('tron') === 0 && (
+  <div className="mb-6 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-900/20 to-purple-900/20 backdrop-blur-sm p-4">
+    <div className="flex items-start gap-3">
+      <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-600 text-white shadow-lg">
+        <span className="text-2xl">⚡</span>
+      </div>
+      <div className="flex-1">
+        <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+          Activate Your Tron Wallet
+        </h3>
+        <p className="text-sm text-gray-300 mt-1">
+          Tron wallets need at least <span className="text-cyan-400 font-bold">1 TRX</span> to activate.  
+          Without activation, you cannot send TRX or USDT.
+        </p>
+        <button
+          onClick={() => setShowFundModal(true)}
+          className="mt-3 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white rounded-lg font-medium transition-all"
+        >
+          Deposit TRX
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 // Main Dashboard Component
 const DashboardPage = () => {
   const { user, userProfile } = useAuth();

@@ -279,8 +279,18 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // QR SCANNER SETUP
   // ============================================================================
   useEffect(() => {
-    if (showScanner) {
-      // Initialize scanner when modal opens
+    if (!showScanner) return;
+
+    // Small delay to ensure modal is fully rendered
+    const timer = setTimeout(() => {
+      const scannerElement = document.getElementById(scannerContainerId);
+      if (!scannerElement) {
+        console.error('QR scanner container not found');
+        toast.error('Could not initialize scanner');
+        setShowScanner(false);
+        return;
+      }
+
       scannerRef.current = new Html5QrcodeScanner(
         scannerContainerId,
         { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -290,12 +300,10 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       scannerRef.current.render(
         (decodedText) => {
           // Success callback
-          // Extract address if it's a URI (e.g., bitcoin:address?amount=...)
           let address = decodedText;
           if (decodedText.includes(':')) {
             const parts = decodedText.split(':');
             if (parts.length > 1) {
-              // Take the part after the colon, and before any '?' if present
               address = parts[1].split('?')[0];
             }
           }
@@ -304,14 +312,14 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
           toast.success('Address scanned successfully');
         },
         (errorMessage) => {
-          // Error callback – ignore most errors, but log for debugging
+          // Ignore most errors, log for debugging
           console.debug('QR scan error:', errorMessage);
         }
       );
-    }
+    }, 100); // small delay
 
-    // Cleanup when scanner closes
     return () => {
+      clearTimeout(timer);
       if (scannerRef.current) {
         scannerRef.current.clear().catch(console.error);
         scannerRef.current = null;
