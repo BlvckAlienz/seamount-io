@@ -31,7 +31,7 @@ import {
   X
 } from 'lucide-react';
 import { apiClient } from '@/config/api';
-import { Html5QrcodeScanner } from 'html5-qrcode'; // ✅ QR scanner import
+import { Html5Qrcode } from 'html5-qrcode';
 
 // ============================================================================
 // CHAIN ASSET GROUPS (unchanged)
@@ -174,7 +174,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
   // QR scanner state
   const [showScanner, setShowScanner] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'qr-reader';
 
   // Get chain from selected asset
@@ -278,52 +278,87 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   // ============================================================================
   // QR SCANNER SETUP
   // ============================================================================
-  useEffect(() => {
-    if (!showScanner) return;
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        const state = scannerRef.current.getState();
+        // State 2 = SCANNING, State 3 = PAUSED
+        if (state === 2 || state === 3) {
+          await scannerRef.current.stop();
+        }
+      } catch (e) {
+        console.debug('Scanner stop error (safe to ignore):', e);
+      } finally {
+        scannerRef.current = null;
+      }
+    }
+  };
 
-    // Small delay to ensure modal is fully rendered
-    const timer = setTimeout(() => {
-      const scannerElement = document.getElementById(scannerContainerId);
-      if (!scannerElement) {
-        console.error('QR scanner container not found');
-        toast.error('Could not initialize scanner');
+  useEffect(() => {
+    if (!showScanner) {
+      stopScanner();
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const el = document.getElementById(scannerContainerId);
+      if (!el) {
+        console.error('QR container not found');
+        toast.error('Could not initialize camera');
         setShowScanner(false);
         return;
       }
 
-      scannerRef.current = new Html5QrcodeScanner(
-        scannerContainerId,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        false
-      );
+      try {
+        const qr = new Html5Qrcode(scannerContainerId);
+        scannerRef.current = qr;
 
-      scannerRef.current.render(
-        (decodedText) => {
-          // Success callback
-          let address = decodedText;
-          if (decodedText.includes(':')) {
-            const parts = decodedText.split(':');
-            if (parts.length > 1) {
-              address = parts[1].split('?')[0];
-            }
-          }
-          setRecipient(address);
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) {
+          toast.error('No camera found on this device');
           setShowScanner(false);
-          toast.success('Address scanned successfully');
-        },
-        (errorMessage) => {
-          // Ignore most errors, log for debugging
-          console.debug('QR scan error:', errorMessage);
+          return;
         }
-      );
-    }, 100); // small delay
+
+        // Prefer back camera on mobile
+        const camera = cameras.find(c =>
+          c.label.toLowerCase().includes('back') ||
+          c.label.toLowerCase().includes('rear') ||
+          c.label.toLowerCase().includes('environment')
+        ) || cameras[cameras.length - 1];
+
+        await qr.start(
+          camera.id,
+          { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+          (decodedText) => {
+            // Extract address — strip crypto URI prefix (e.g. "bitcoin:addr?amount=x")
+            let address = decodedText.trim();
+            if (address.includes(':')) {
+              address = address.split(':')[1]?.split('?')[0] || address;
+            }
+            setRecipient(address.trim());
+            toast.success('✅ Address scanned successfully');
+            setShowScanner(false);
+          },
+          (err) => {
+            // Per-frame errors are normal, suppress them
+            console.debug('QR frame error:', err);
+          }
+        );
+      } catch (err: any) {
+        console.error('QR scanner failed to start:', err);
+        if (err?.message?.includes('Permission')) {
+          toast.error('Camera permission denied. Please allow camera access.');
+        } else {
+          toast.error('Failed to start scanner. Try again.');
+        }
+        setShowScanner(false);
+      }
+    }, 300);
 
     return () => {
       clearTimeout(timer);
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
-      }
+      stopScanner();
     };
   }, [showScanner]);
 
@@ -679,27 +714,38 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       </Dialog>
 
       {/* QR SCANNER MODAL */}
-      <Dialog open={showScanner} onOpenChange={setShowScanner}>
-        <DialogContent className="sm:max-w-[500px] max-w-[95vw] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
-          <DialogHeader className="border-b pb-4">
+      <Dialog open={showScanner} onOpenChange={(open) => { if (!open) setShowScanner(false); }}>
+        <DialogContent
+          className="sm:max-w-[500px] max-w-[95vw] bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600"
+          style={{ zIndex: 2000 }}
+        >
+          <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
-              <QrCode className="h-6 w-6 text-blue-600" />
-              Scan QR Code
+              <QrCode className="h-6 w-6 text-blue-500" />
+              Scan Wallet QR Code
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
-              Position the QR code inside the frame to scan.
+            <DialogDescription className="text-gray-600 dark:text-gray-400 text-sm">
+              Point your camera at a wallet QR code. Address will auto-fill.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <div id={scannerContainerId} className="w-full h-[300px] bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden"></div>
+          <div className="py-4 flex flex-col items-center gap-3">
+            {/* Scanner viewport */}
+            <div
+              id={scannerContainerId}
+              className="w-full rounded-xl overflow-hidden border-2 border-blue-500 dark:border-blue-400"
+              style={{ minHeight: '300px', background: '#000' }}
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              Supports Bitcoin, Ethereum, Algorand, Tron, Polygon, Solana QR codes
+            </p>
           </div>
 
-          <DialogFooter className="border-t pt-4">
+          <DialogFooter className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <Button
               variant="outline"
               onClick={() => setShowScanner(false)}
-              className="w-full sm:w-auto h-12 px-6 text-base font-semibold"
+              className="w-full h-12 px-6 text-base font-semibold border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X className="mr-2 h-4 w-4" />
               Cancel
