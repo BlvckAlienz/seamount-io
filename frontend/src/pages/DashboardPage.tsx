@@ -14,6 +14,7 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownToLine,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '@/config/api';
@@ -294,6 +295,14 @@ const DashboardPage = () => {
               <span className="hidden sm:inline">Send</span>
             </button>
             
+            <button 
+              onClick={() => setShowReceiveModal(true)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Receive</span>
+            </button>
+
             <button 
               onClick={() => setShowSwapModal(true)}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
