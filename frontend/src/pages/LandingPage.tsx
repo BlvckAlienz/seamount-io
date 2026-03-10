@@ -1155,9 +1155,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <CreditCard className="h-8 w-8 text-green-500" />
                 </motion.div>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Fund with Local Fiat</h3>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">Receive Tokens or Fund Wallet</h3>
               <p className="text-gray-600 text-sm mb-4">
-                Deposit using Paystack or Flutterwave. Naira, Cedi, Shillings—we support local currencies.
+                Send tokens to your wallets or buy with Naira, Cedi, Shillings—we support local currencies.
               </p>
               <div className="flex items-center gap-2 text-xs">
                 <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Paystack</span>
@@ -1184,9 +1184,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <TrendingUp className="h-8 w-8 text-orange-500" />
                 </motion.div>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-900">Trade & Withdraw</h3>
+              <h3 className="text-xl font-bold mb-3 text-gray-900">Send & Withdraw</h3>
               <p className="text-gray-600 text-sm mb-4">
-                Buy digital assets, earn yields, swap tokens. Withdraw anytime back to local fiat—seamlessly.
+                Make global payments, earn yields, swap tokens. Withdraw anytime back to local fiat—seamlessly.
               </p>
               <div className="flex items-center gap-2 text-xs text-orange-600 font-medium">
                 <Sparkles className="h-4 w-4" />

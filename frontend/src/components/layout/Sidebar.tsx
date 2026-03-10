@@ -123,7 +123,7 @@ const Sidebar: React.FC = () => {
               </div>
               <div className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
                 <div className="text-white font-bold text-lg">Seamount</div>
-                <div className="text-gray-400 text-xs">Private Markets</div>
+                <div className="text-gray-400 text-xs">Payments Network</div>
               </div>
             </div>
           </div>
