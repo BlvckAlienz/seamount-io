@@ -350,12 +350,6 @@ const DashboardPage = () => {
                     Tron wallets need at least <span className="text-cyan-400 font-bold">1 TRX</span> to activate.  
                     Without activation, you cannot send TRX or USDT.
                   </p>
-                  <button
-                    onClick={() => setShowFundModal(true)}
-                    className="mt-3 px-4 py-2 bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white rounded-lg font-medium transition-all"
-                  >
-                    Deposit TRX
-                  </button>
                 </div>
               </div>
             </div>
