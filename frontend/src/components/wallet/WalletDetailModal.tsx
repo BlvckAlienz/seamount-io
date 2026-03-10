@@ -526,15 +526,15 @@ const handleReceiveAsset = () => {
     return;
   }
   
-  // Store selected asset and chain for ReceiveModal
+  // Store selected asset and chain for ReceiveModal (backup)
   sessionStorage.setItem('receive_asset', selectedAsset);
   sessionStorage.setItem('receive_chain', chain);
   
-  // Close this modal
-  onClose();
-  
-  // Open ReceiveModal (passed via props)
+  // Open ReceiveModal first (so the chain state is still valid)
   onOpenReceiveModal();
+  
+  // Then close this modal
+  onClose();
   
   toast.success(`Ready to receive ${selectedAsset}`, {
     duration: 2000,
