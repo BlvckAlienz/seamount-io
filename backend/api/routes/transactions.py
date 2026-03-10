@@ -607,6 +607,53 @@ async def get_transaction_history(
         logger.error(f"Transaction history failed: {e}")
         raise HTTPException(status_code=500, detail="Transaction history retrieval failed")
 
+@router.get("/blockchain-history")
+async def get_blockchain_transaction_history(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: Dict = Depends(get_current_user),
+    db_service = Depends(get_db_service)
+):
+    """Get user's on‑chain transaction history from blockchain_transactions table."""
+    try:
+        user_id = current_user["id"]
+        
+        result = db_service.supabase.table('blockchain_transactions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .range(offset, offset + limit - 1)\
+            .execute()
+        
+        transactions = []
+        for tx in result.data or []:
+            transactions.append({
+                "id": tx["id"],
+                "created_at": tx["created_at"],
+                "transaction_type": tx["transaction_type"],
+                "amount": float(tx["amount"]),
+                "asset": tx["asset"],
+                "chain": tx["chain"],
+                "txn_hash": tx["txn_hash"],
+                "to_address": tx["to_address"],
+                "status": tx["status"],
+                "network_fee": float(tx["network_fee"]) if tx["network_fee"] else 0,
+                "network_fee_asset": tx["network_fee_asset"],
+                "platform_fee": float(tx["platform_fee"]) if tx["platform_fee"] else 0,
+            })
+        
+        return {
+            "success": True,
+            "transactions": transactions,
+            "total_count": len(transactions),
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(f"Blockchain transaction history failed: {e}")
+        raise HTTPException(status_code=500, detail="Transaction history retrieval failed")
+    
 @router.get("/corridors")
 async def get_supported_corridors(
     db_service = Depends(get_db_service)

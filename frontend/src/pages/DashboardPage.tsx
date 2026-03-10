@@ -10,6 +10,7 @@ import {
   Shield,
   Wallet,
   Coins,
+  Clock,
   Target,
   ArrowUpRight,
   ArrowDownToLine,
@@ -26,6 +27,7 @@ import { SendForm } from '@/components/payments/SendForm';
 import { SwapModal } from '@/components/modals/SwapModal';
 import { EarnModal } from '@/components/modals/EarnModal';
 import ReceiveModal from '@/components/wallet/ReceiveModal';  // ✅ ADD THIS
+import { TransactionHistoryModal } from '@/components/wallet/TransactionHistoryModal';
 import { formatCurrencyUSD } from '@/utils/formatters';
 
 // KYC Banner Component
@@ -102,6 +104,7 @@ const DashboardPage = () => {
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);  // ✅ ADD THIS
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   const AUTO_CREATED_CHAINS = [
     { id: 'algorand', name: 'Algorand',   symbol: 'ALGO'  },
@@ -314,6 +317,14 @@ const DashboardPage = () => {
               <ArrowDownToLine className="h-4 w-4" />
               <span className="hidden sm:inline">Withdraw</span>
             </button>
+
+            <button 
+              onClick={() => setShowHistoryModal(true)}
+              className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">History</span>
+            </button>
           </div>
 
           {/* KYC Banner */}
@@ -388,6 +399,10 @@ const DashboardPage = () => {
           console.log('🔍 Debug - Preselected chain:', selectedChain);
           return addresses;
         })()}
+      />
+      <TransactionHistoryModal 
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
       />
     </div>
   );

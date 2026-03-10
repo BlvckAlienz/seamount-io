@@ -1,5 +1,6 @@
 // File: frontend/src/components/payments/SendForm.tsx
 // ✅ PRODUCTION-READY: Toast shows DURING transaction (modal stays open)
+// ✅ Enhanced with fee display and balance validation
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -24,11 +25,13 @@ import {
   CheckCircle2, 
   ArrowRight,
   Info,
-  Activity
+  Activity,
+  AlertTriangle
 } from 'lucide-react';
+import { apiClient } from '@/config/api';
 
 // ============================================================================
-// CHAIN ASSET GROUPS
+// CHAIN ASSET GROUPS (unchanged)
 // ============================================================================
 const ASSET_GROUPS = {
   algorand: [
@@ -95,9 +98,7 @@ const ADDRESS_PATTERNS: { [key: string]: RegExp } = {
 // ============================================================================
 // GET CHAIN FROM ASSET
 // ============================================================================
-// Update the getChainFromAsset function:
 const getChainFromAsset = (assetValue: string): string => {
-  // Handle chain-suffixed assets
   if (assetValue.includes('_')) {
     const chainPart = assetValue.split('_')[1]?.toLowerCase();
     const chainMap: { [key: string]: string } = {
@@ -110,13 +111,27 @@ const getChainFromAsset = (assetValue: string): string => {
     return chainMap[chainPart] || 'algorand';
   }
   
-  // Legacy mapping
   for (const [chain, assets] of Object.entries(ASSET_GROUPS)) {
     if (assets.some(a => a.value === assetValue)) {
       return chain;
     }
   }
   return 'algorand';
+};
+
+// ============================================================================
+// NATIVE ASSET MAP
+// ============================================================================
+const getNativeAsset = (chain: string): string => {
+  const map: Record<string, string> = {
+    tron: 'TRX',
+    algorand: 'ALGO',
+    ethereum: 'ETH',
+    polygon: 'MATIC',
+    bitcoin: 'BTC',
+    solana: 'SOL'
+  };
+  return map[chain] || 'ALGO';
 };
 
 // ============================================================================
@@ -132,11 +147,9 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
   useEffect(() => {
     if (open) {
-      console.log('📢 SendForm opened – triggering balance refresh');
       fetchBalances();
     }
   }, [open, fetchBalances]);
-  console.log('🔥 SendForm balances:', balances);
   
   // Form state
   const [recipient, setRecipient] = useState('');
@@ -150,13 +163,20 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  // Fee state
+  const [estimatedNetworkFee, setEstimatedNetworkFee] = useState<number>(0);
+  const [seamountFeeNative, setSeamountFeeNative] = useState<number>(0);
+  const [feeLoading, setFeeLoading] = useState(false);
+  const [insufficientNative, setInsufficientNative] = useState(false);
+
   // Get chain from selected asset
   const selectedChain = getChainFromAsset(asset);
+  const nativeAsset = getNativeAsset(selectedChain);
   const selectedAssetConfig = ALL_ASSETS.find(a => a.value === asset);
   
   // Get available balance
   const availableBalance = balances[asset]?.balance || 0;
-  console.log(`🔥 SendForm: asset=${asset}, balances[asset]=`, balances[asset]);
+  const nativeBalance = balances[nativeAsset]?.balance || 0;
   const balanceUSD = balances[asset]?.usd_value || 0;
 
   // ============================================================================
@@ -177,10 +197,80 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
   }, [recipient, selectedChain]);
 
   // ============================================================================
+  // FETCH FEE ESTIMATE
+  // ============================================================================
+  useEffect(() => {
+    const fetchFeeEstimate = async () => {
+      if (!amount || parseFloat(amount) <= 0) {
+        setEstimatedNetworkFee(0);
+        setSeamountFeeNative(0);
+        return;
+      }
+
+      setFeeLoading(true);
+      try {
+        const response = await apiClient.post('/api/v1/fees/estimate', {
+          chain: selectedChain,
+          asset,
+          amount: parseFloat(amount)
+        });
+        
+        if (response.data.success) {
+          setEstimatedNetworkFee(response.data.network_fee_native || 0);
+          setSeamountFeeNative(response.data.seamount_fee_native || 0);
+        } else {
+          // Fallback to rough estimates
+          const nativeFees: Record<string, number> = {
+            tron: 1.1,
+            algorand: 0.001,
+            ethereum: 0.005,
+            polygon: 0.01,
+            bitcoin: 0.0005,
+            solana: 0.00001
+          };
+          setEstimatedNetworkFee(nativeFees[selectedChain] || 0);
+          const seamountPercent = 0.1; // 10% of network fee
+          setSeamountFeeNative((nativeFees[selectedChain] || 0) * seamountPercent);
+        }
+      } catch (error) {
+        console.error('Failed to fetch fee estimate:', error);
+        // Fallback
+        const nativeFees: Record<string, number> = {
+          tron: 1.1,
+          algorand: 0.001,
+          ethereum: 0.005,
+          polygon: 0.01,
+          bitcoin: 0.0005,
+          solana: 0.00001
+        };
+        setEstimatedNetworkFee(nativeFees[selectedChain] || 0);
+        const seamountPercent = 0.1;
+        setSeamountFeeNative((nativeFees[selectedChain] || 0) * seamountPercent);
+      } finally {
+        setFeeLoading(false);
+      }
+    };
+
+    fetchFeeEstimate();
+  }, [amount, asset, selectedChain]);
+
+  // ============================================================================
+  // CHECK IF USER HAS ENOUGH NATIVE BALANCE
+  // ============================================================================
+  useEffect(() => {
+    if (!amount || parseFloat(amount) <= 0) {
+      setInsufficientNative(false);
+      return;
+    }
+
+    const totalNativeNeeded = estimatedNetworkFee + seamountFeeNative;
+    setInsufficientNative(nativeBalance < totalNativeNeeded);
+  }, [amount, estimatedNetworkFee, seamountFeeNative, nativeBalance]);
+
+  // ============================================================================
   // PROCEED TO CONFIRMATION
   // ============================================================================
   const handleProceedToConfirmation = () => {
-    // Validation
     if (!recipient || !amount || parseFloat(amount) <= 0) {
       toast.error('Please fill in all required fields');
       return;
@@ -197,12 +287,16 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       return;
     }
 
-    // Show confirmation modal
+    if (insufficientNative) {
+      toast.error(`Insufficient ${nativeAsset} to cover fees. Please deposit more ${nativeAsset}.`);
+      return;
+    }
+
     setShowConfirmation(true);
   };
 
   // ============================================================================
-  // ✅ EXECUTE TRANSACTION (TOAST SHOWS IMMEDIATELY - MODAL STAYS OPEN)
+  // EXECUTE TRANSACTION
   // ============================================================================
   const handleConfirmSend = async () => {
     setLoading(true);
@@ -217,24 +311,18 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       });
 
       if (result.success) {
-        // ✅ Show toast immediately (modal still open)
         toast.success(
           `✅ ${parseFloat(amount).toFixed(6)} ${asset} sent successfully!\n\nTx: ${result.tx_id?.substring(0, 12)}...`,
           {
             duration: 6000,
             icon: '🚀',
-            style: {
-              zIndex: 99999,
-            }
+            style: { zIndex: 99999 }
           }
         );
         
-        // Close modals after showing toast
         setTimeout(() => {
           setShowConfirmation(false);
           onOpenChange(false);
-          
-          // Reset form
           setRecipient('');
           setAmount('');
           setMemo('');
@@ -247,20 +335,15 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
         });
       }
     } catch (err: any) {
-      // ============================================================================
-      // 🚨 ENHANCED ERROR HANDLING - Parse backend validation errors
-      // ============================================================================
       let errorMsg = err.response?.data?.detail || err.message || 'Transaction failed';
       
-      // Parse specific Algorand errors
+      // Enhanced error parsing
       if (errorMsg.includes('minimum') && errorMsg.includes('0.1 ALGO')) {
-        // New account needs 0.1 ALGO
         errorMsg = `❌ NEW ACCOUNT ACTIVATION REQUIRED\n\n` +
                   `Algorand requires 0.1 ALGO minimum to activate new accounts.\n\n` +
                   `Current amount: ${amount} ALGO\n` +
                   `Please send at least 0.1 ALGO for first transaction.`;
       } else if (errorMsg.includes('opt-in') || errorMsg.includes('opted-in')) {
-        // ASA opt-in required
         errorMsg = `❌ ASSET OPT-IN REQUIRED\n\n` +
                   `Recipient must opt-in to ${asset} before receiving.\n\n` +
                   `Ask them to:\n` +
@@ -268,12 +351,10 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                   `2. Add ${asset} asset\n` +
                   `3. Try transaction again`;
       } else if (errorMsg.includes('Insufficient balance')) {
-        // Balance error
         errorMsg = `❌ INSUFFICIENT BALANCE\n\n` +
                   `Available: ${availableBalance.toFixed(6)} ${asset}\n` +
                   `Required: ${parseFloat(amount).toFixed(6)} ${asset} + fees`;
       } else if (errorMsg.includes('Invalid') && errorMsg.includes('address')) {
-        // Address validation error
         errorMsg = `❌ INVALID RECIPIENT ADDRESS\n\n` +
                   `The ${selectedChain} address format is incorrect.\n` +
                   `Please double-check the address.`;
@@ -281,12 +362,8 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       
       setError(errorMsg);
       toast.error(errorMsg, {
-        duration: 10000, // Longer duration for detailed errors
-        style: {
-          zIndex: 99999,
-          maxWidth: '500px',
-          whiteSpace: 'pre-line' // Preserve line breaks
-        }
+        duration: 10000,
+        style: { zIndex: 99999, maxWidth: '500px', whiteSpace: 'pre-line' }
       });
     } finally {
       setLoading(false);
@@ -443,6 +520,55 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               </p>
             </div>
 
+            {/* Fee Estimate */}
+            {(estimatedNetworkFee > 0 || seamountFeeNative > 0) && (
+              <div className="space-y-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Fee Estimate</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Network Fee:</span>
+                  <span className="font-mono text-gray-900 dark:text-white">
+                    {estimatedNetworkFee.toFixed(6)} {nativeAsset}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Seamount Fee:</span>
+                  <span className="font-mono text-green-600 dark:text-green-400 font-medium">
+                    {seamountFeeNative.toFixed(6)} {nativeAsset}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between text-sm font-semibold border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">
+                  <span className="text-gray-800 dark:text-gray-200">Total Cost:</span>
+                  <span className="text-gray-900 dark:text-white">
+                    {(parseFloat(amount) + estimatedNetworkFee + seamountFeeNative).toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
+                  </span>
+                </div>
+                
+                {/* Insufficient Balance Warning */}
+                {insufficientNative && (
+                  <div className="flex items-start gap-2 mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded">
+                    <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-800 dark:text-red-300">
+                      <span className="font-bold">Insufficient {nativeAsset} balance.</span> You need additional{' '}
+                      {(estimatedNetworkFee + seamountFeeNative - nativeBalance).toFixed(6)} {nativeAsset} to cover fees.
+                    </div>
+                  </div>
+                )}
+                
+                {feeLoading && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className="animate-spin rounded-full h-3 w-3 border-b border-gray-500"></div>
+                    Estimating fees...
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Info Alert */}
             <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
               <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -472,7 +598,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             </Button>
             <Button
               onClick={handleProceedToConfirmation}
-              disabled={loading || !recipient || !amount || parseFloat(amount) <= 0 || !!validationError || availableBalance === 0}
+              disabled={loading || !recipient || !amount || parseFloat(amount) <= 0 || !!validationError || availableBalance === 0 || insufficientNative}
               className="w-full sm:w-auto h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
             >
               Review Transaction
@@ -514,6 +640,30 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                       ≈ ${(parseFloat(amount) * (balanceUSD / availableBalance)).toFixed(2)} USD
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Fee Breakdown */}
+              <div className="border-t border-green-300 dark:border-green-700 pt-3 mt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Network Fee:</span>
+                  <span className="font-mono text-gray-900 dark:text-white">
+                    {estimatedNetworkFee.toFixed(6)} {nativeAsset}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Seamount Fee:</span>
+                  <span className="font-mono text-green-600 dark:text-green-400 font-medium">
+                    {seamountFeeNative.toFixed(6)} {nativeAsset}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between text-sm font-semibold border-t border-green-300 dark:border-green-700 pt-2 mt-1">
+                  <span className="text-gray-800 dark:text-gray-200">Total to Deduct:</span>
+                  <span className="text-gray-900 dark:text-white">
+                    {(parseFloat(amount) + estimatedNetworkFee + seamountFeeNative).toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
+                  </span>
                 </div>
               </div>
 
@@ -561,13 +711,18 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             </Button>
             <Button
               onClick={handleConfirmSend}
-              disabled={loading}
-              className="w-full sm:w-auto h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              disabled={loading || insufficientNative}
+              className="w-full sm:w-auto h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 text-white transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Sending...
+                </>
+              ) : insufficientNative ? (
+                <>
+                  <AlertTriangle className="mr-2 h-5 w-5" />
+                  Insufficient Funds
                 </>
               ) : (
                 <>

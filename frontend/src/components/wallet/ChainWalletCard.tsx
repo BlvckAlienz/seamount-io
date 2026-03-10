@@ -19,7 +19,11 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   status, 
   onCardClick 
 }) => {
-  // Add this function to create single wallet
+  const [copied, setCopied] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [currentIconIndex, setCurrentIconIndex] = useState(0);
+
+  // Create single wallet
   const createSingleWallet = async (chain: string) => {
     try {
       toast.loading(`Creating ${chain} wallet...`);
@@ -27,8 +31,7 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
       
       if (response.data.success) {
         toast.success(`${chain} wallet created successfully!`);
-        // Refresh the wallet status
-        onCardClick(); // This will trigger parent to refresh
+        onCardClick(); // refresh
       } else {
         toast.error(`Failed to create ${chain} wallet`);
       }
@@ -39,7 +42,7 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
     }
   };
 
-  // Primary icon configuration
+  // Chain configuration
   const getChainConfig = (chain: string) => {
     const configs = {
       algorand: {
@@ -85,7 +88,6 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         symbol: 'RLUSD'
       }
     };
-    // ✅ Default to a generic config, NOT algorand
     return configs[chain as keyof typeof configs] || {
       name: chain.toUpperCase(),
       icon: '',
@@ -94,8 +96,8 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
     };
   };
 
-  // 🔥 ABSOLUTE RELIABILITY: Multiple fallback icons
-  const getReliableIcons = (chain: string) => {
+  // Reliable icon fallbacks
+  const getReliableIcons = (chain: string): string[] => {
     const iconFallbacks: { [key: string]: string[] } = {
       bitcoin: [
         'https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/btc.png',
@@ -133,14 +135,11 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
         'https://cryptoicon-api.vercel.app/api/icon/xrp'
       ]
     };
-
     return iconFallbacks[chain] || iconFallbacks.xrp || [];
   };
 
   const config = getChainConfig(chain);
   const iconFallbacks = getReliableIcons(chain);
-  const [currentIconIndex, setCurrentIconIndex] = useState(0);
-  const [copied, setCopied] = useState(false);
 
   const handleIconError = () => {
     if (currentIconIndex < iconFallbacks.length - 1) {
@@ -163,14 +162,12 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   const handleCardClick = () => {
     if (status === 'not_created') {
       if (chain === 'xrp') {
-        // XRP not set up yet — go to hub for auto-assignment
         window.location.href = '/xrp';
         return;
       }
       createSingleWallet(chain);
       return;
     }
-    // XRP created: let parent handle it (opens WalletDetailModal)
     onCardClick();
   };
 
@@ -209,8 +206,82 @@ const ChainWalletCard: React.FC<ChainWalletCardProps> = ({
   return (
     <div 
       onClick={handleCardClick}
-      className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-1 cursor-pointer group"
+      className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-2xl p-6 border border-gray-700/50 hover:border-blue-500/50 transition-all hover:shadow-xl hover:shadow-blue-500/10 transform hover:-translate-y-1 cursor-pointer group relative"
     >
+      {/* Tron Activation Tooltip & Preferred Badge */}
+      {chain === 'tron' && status === 'created' && (
+        <>
+          {/* Preferred Badge */}
+          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600/90 to-cyan-600/90 rounded-full text-[10px] font-bold text-white border border-cyan-400/50 shadow-lg">
+            <span className="text-cyan-300">⚡</span>
+            <span>PREFERRED</span>
+          </div>
+
+          {/* Activation Tooltip Trigger */}
+          <div 
+            className="absolute bottom-2 left-2 z-10 flex items-center gap-1 text-xs text-cyan-400/70 cursor-help border border-cyan-500/30 rounded-full px-2 py-1 bg-gradient-to-r from-cyan-900/20 to-purple-900/20 backdrop-blur-sm hover:border-cyan-400/50 transition-all"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-cyan-400">⚡</span>
+            <span>Activation Required</span>
+          </div>
+
+          {/* Tooltip */}
+          {showTooltip && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setShowTooltip(false)}
+              />
+              <div className="absolute z-50 bottom-full left-0 mb-2 w-64 p-3 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-cyan-500/30 rounded-lg shadow-2xl backdrop-blur-md">
+                <div className="absolute bottom-[-6px] left-4 w-3 h-3 bg-gray-900 border-r border-b border-cyan-500/30 transform rotate-45"></div>
+                
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-8 bg-gradient-to-b from-cyan-400 to-purple-500 rounded-full"></div>
+                  <h4 className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+                    TRON Activation
+                  </h4>
+                </div>
+                
+                <p className="text-xs text-gray-300 mb-2">
+                  Your Tron wallet needs a minimum of <span className="text-cyan-400 font-bold">1 TRX</span> to be activated on the network.
+                </p>
+                
+                <div className="space-y-1 text-xs">
+                  <div className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">•</span>
+                    <span className="text-gray-400">Send at least 1 TRX to activate</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">•</span>
+                    <span className="text-gray-400">Keep ≥0.1 TRX to stay active</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">•</span>
+                    <span className="text-gray-400">Without activation, tokens won't arrive</span>
+                  </div>
+                </div>
+                
+                <div className="mt-3 pt-2 border-t border-cyan-500/30">
+                  <a 
+                    href="https://tronscan.org/#/address/TR9vTo1mvpf93LzDPfo7tY7CRXxB1fKijb"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View on Tronscan
+                  </a>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
       <div className="flex items-start justify-between mb-4">
         <div className={`p-3 rounded-xl bg-gradient-to-br ${config.color} text-white shadow-lg`}>
           <img 

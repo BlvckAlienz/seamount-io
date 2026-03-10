@@ -97,7 +97,32 @@ class WithdrawRequest(BaseModel):
         return v
 
 
-# ─── Dependency: XRP Payment Service ──────────────────────────────────────────
+# ─── XRPService availability — checked ONCE at startup, cached forever ────────
+# Prevents the import attempt (and warning) firing on every single request.
+_xrp_service_cache: dict = {"checked": False, "instance": None}
+
+def _get_cached_xrp_service(settings):
+    """
+    Attempt XRPService import exactly once per server process.
+    Subsequent calls return the cached result instantly — no log spam.
+    """
+    if not _xrp_service_cache["checked"]:
+        try:
+            from backend.services.xrp_service import XRPService
+            _xrp_service_cache["instance"] = XRPService(settings=settings)
+            logger.info("✅ XRPService (xrpl-py) loaded successfully — on-chain ops enabled")
+        except Exception as e:
+            _xrp_service_cache["instance"] = None
+            logger.warning(
+                f"⚠️ XRPService unavailable: {e}. "
+                "Deposits/transfers/balances work fine. "
+                "On-chain withdrawals disabled until xrpl-py is fixed."
+            )
+        finally:
+            _xrp_service_cache["checked"] = True
+
+    return _xrp_service_cache["instance"]
+
 
 def get_xrp_payment_service(
     supabase=Depends(get_supabase_client),
@@ -105,21 +130,13 @@ def get_xrp_payment_service(
 ):
     """
     Graceful degradation: DB-only operations work even if xrpl-py is missing.
-    On-chain operations (withdraw) will fail at call time if xrp_service is None.
+    XRPService availability is checked once at startup — not per request.
     """
     from backend.services.xrp_payment_service import XRPPaymentService
 
-    xrp_service = None
-    try:
-        from backend.services.xrp_service import XRPService
-        xrp_service = XRPService(settings=settings)
-    except Exception as e:
-        logger.warning(f"⚠️ XRPService unavailable (xrpl-py missing?): {e}. "
-                       "Read-only endpoints still functional.")
-
     return XRPPaymentService(
         supabase_client=supabase,
-        xrp_service=xrp_service,
+        xrp_service=_get_cached_xrp_service(settings),
         settings=settings,
     )
 

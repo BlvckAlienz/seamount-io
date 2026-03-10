@@ -600,7 +600,7 @@ async def lifespan(app: FastAPI):
                     try:
                         from backend.services.fee_collection_scheduler import FeeCollectionScheduler
                         
-                        scheduler = FeeCollectionScheduler(interval_minutes=1)   # instead of target_hour/target_minute
+                        scheduler = FeeCollectionScheduler(interval_minutes=15)   # instead of target_hour/target_minute
                         await scheduler.start()
                         app.state.fee_scheduler = scheduler
 
@@ -627,9 +627,6 @@ async def lifespan(app: FastAPI):
 
 
                         logger.info("✅ Fee collection scheduler started (runs daily at 3:00 AM)")
-                        
-                        # Store reference for cleanup
-                        app.state.fee_scheduler = scheduler
                         
                     except Exception as sched_err:
                         logger.error(f"❌ Fee collection scheduler failed to start: {sched_err}")
