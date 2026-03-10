@@ -541,7 +541,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             {/* Recipient Address with QR Button */}
             <div className="space-y-2">
               <Label htmlFor="recipient" className="text-sm font-semibold text-gray-900 dark:text-white">
-                Recipient Address
+                Recipient Address (Scan QR Code Available)
               </Label>
               <div className="flex gap-2">
                 <Input
