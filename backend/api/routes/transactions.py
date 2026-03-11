@@ -614,10 +614,11 @@ async def get_blockchain_transaction_history(
     current_user: Dict = Depends(get_current_user),
     db_service = Depends(get_db_service)
 ):
-    """Get user's on‑chain transaction history from blockchain_transactions table."""
+    """Get user's on‑chain transaction history with Seamount fee from fees_owed."""
     try:
         user_id = current_user["id"]
         
+        # Fetch blockchain transactions
         result = db_service.supabase.table('blockchain_transactions')\
             .select('*')\
             .eq('user_id', user_id)\
@@ -627,6 +628,16 @@ async def get_blockchain_transaction_history(
         
         transactions = []
         for tx in result.data or []:
+            # Fetch corresponding fee from fees_owed
+            fee_result = db_service.supabase.table('fees_owed')\
+                .select('fee_amount, asset')\
+                .eq('transaction_id', tx['id'])\
+                .maybe_single()\
+                .execute()
+            
+            seamount_fee = float(fee_result.data['fee_amount']) if fee_result.data and fee_result.data['fee_amount'] else 0
+            seamount_fee_asset = fee_result.data['asset'] if fee_result.data else None
+            
             transactions.append({
                 "id": tx["id"],
                 "created_at": tx["created_at"],
@@ -640,6 +651,9 @@ async def get_blockchain_transaction_history(
                 "network_fee": float(tx["network_fee"]) if tx["network_fee"] else 0,
                 "network_fee_asset": tx["network_fee_asset"],
                 "platform_fee": float(tx["platform_fee"]) if tx["platform_fee"] else 0,
+                # ✅ New fields for Seamount fee
+                "seamount_fee": seamount_fee,
+                "seamount_fee_asset": seamount_fee_asset,
             })
         
         return {

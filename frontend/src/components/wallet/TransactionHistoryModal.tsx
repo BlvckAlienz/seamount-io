@@ -32,6 +32,8 @@ interface Transaction {
   network_fee: number;
   network_fee_asset: string;
   platform_fee: number;
+  seamount_fee?: number;
+  seamount_fee_asset?: string;
 }
 
 interface TransactionHistoryModalProps {
@@ -189,7 +191,11 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
                       {tx.amount.toFixed(6)} {tx.asset}
                     </div>
                     <div className="text-xs text-gray-500">
-                      Fee: {tx.network_fee.toFixed(6)} {tx.network_fee_asset}
+                        {tx.seamount_fee !== undefined && tx.seamount_fee > 0 && (
+                            <div className="text-xs text-gray-500">
+                                Seamount Fee: {tx.seamount_fee.toFixed(6)} {tx.seamount_fee_asset || ''}
+                            </div>
+                        )}
                     </div>
                   </div>
 
