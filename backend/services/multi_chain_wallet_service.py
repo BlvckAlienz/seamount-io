@@ -602,7 +602,7 @@ class MultiChainWalletService:
                 # ---------- Insert into blockchain_transactions ----------
                 transaction_data = {
                     'user_id': user_id,
-                    'transaction_type': 'transfer',
+                    'transaction_type': 'send',
                     'status': 'completed',
                     'amount': float(amount),
                     'asset': asset,

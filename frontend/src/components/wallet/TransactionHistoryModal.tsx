@@ -78,17 +78,17 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-        const response = await apiClient.get('/api/v1/transactions/blockchain-history');  // ✅ NEW ENDPOINT
-        if (response.data.success) {
+      const response = await apiClient.get('/api/v1/transactions/blockchain-history');
+      if (response.data.success) {
         setTransactions(response.data.transactions || []);
-        }
+      }
     } catch (error) {
-        console.error('Failed to fetch transactions:', error);
-        toast.error('Could not load transaction history');
+      console.error('Failed to fetch transactions:', error);
+      toast.error('Could not load transaction history');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
   const filteredTransactions = filter === 'all' 
     ? transactions 
@@ -160,63 +160,67 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
               <p className="text-sm text-gray-600 mt-2">Your transaction history will appear here</p>
             </div>
           ) : (
-            filteredTransactions.map((tx) => (
-              <div
-                key={tx.id}
-                className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-cyan-500/20 rounded-xl p-4 hover:border-cyan-500/40 transition-all"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  {/* Left: Chain & Type */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl">{CHAIN_ICONS[tx.chain]}</div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-semibold text-white">
-                          {tx.transaction_type === 'send' ? 'Sent' : 'Received'}
-                        </span>
-                        {tx.status === 'completed' ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-400" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-400" />
-                        )}
+            filteredTransactions.map((tx) => {
+              // Determine if this is a send (outgoing) transaction
+              const isSend = tx.transaction_type === 'send' || tx.transaction_type === 'transfer';
+              const typeLabel = isSend ? 'Sent' : 'Received';
+              const sign = isSend ? '-' : '+';
+
+              return (
+                <div
+                  key={tx.id}
+                  className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-cyan-500/20 rounded-xl p-4 hover:border-cyan-500/40 transition-all"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* Left: Chain & Type */}
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">{CHAIN_ICONS[tx.chain]}</div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white">
+                            {typeLabel}
+                          </span>
+                          {tx.status === 'completed' ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-400" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-400" />
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500">{formatDate(tx.created_at)}</div>
                       </div>
-                      <div className="text-xs text-gray-500">{formatDate(tx.created_at)}</div>
                     </div>
-                  </div>
 
-                  {/* Middle: Amount & Asset */}
-                  <div className="text-left md:text-center">
-                    <div className="text-xl font-bold text-white">
-                      {tx.transaction_type === 'send' ? '-' : '+'}
-                      {tx.amount.toFixed(6)} {tx.asset}
+                    {/* Middle: Amount & Asset */}
+                    <div className="text-left md:text-center">
+                      <div className="text-xl font-bold text-white">
+                        {sign}{tx.amount.toFixed(6)} {tx.asset}
+                      </div>
+                      {tx.seamount_fee !== undefined && tx.seamount_fee > 0 && (
+                        <div className="text-xs text-gray-500">
+                          Seamount Fee: {tx.seamount_fee.toFixed(6)} {tx.seamount_fee_asset || ''}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500">
-                        {tx.seamount_fee !== undefined && tx.seamount_fee > 0 && (
-                            <div className="text-xs text-gray-500">
-                                Seamount Fee: {tx.seamount_fee.toFixed(6)} {tx.seamount_fee_asset || ''}
-                            </div>
-                        )}
-                    </div>
-                  </div>
 
-                  {/* Right: To Address & Explorer Link */}
-                  <div className="text-left md:text-right">
-                    <div className="text-sm text-gray-400">
-                      To: {tx.to_address.slice(0, 8)}...{tx.to_address.slice(-6)}
+                    {/* Right: To Address & Explorer Link */}
+                    <div className="text-left md:text-right">
+                      <div className="text-sm text-gray-400">
+                        To: {tx.to_address.slice(0, 8)}...{tx.to_address.slice(-6)}
+                      </div>
+                      <a
+                        href={getExplorerUrl(tx.chain, tx.txn_hash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors mt-1"
+                      >
+                        View on Explorer
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </div>
-                    <a
-                      href={getExplorerUrl(tx.chain, tx.txn_hash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors mt-1"
-                    >
-                      View on Explorer
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </DialogContent>
