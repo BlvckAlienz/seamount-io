@@ -1,9 +1,0 @@
-Lessons learned: 
-
-1: Whenever you drop a table, immediately audit every function and trigger that references it. Run this query after any future table drops:
-sql-- Run after dropping any table to catch stale references
-SELECT proname, prosrc
-FROM pg_proc
-JOIN pg_namespace ON pg_namespace.oid = pg_proc.pronamespace
-WHERE pg_namespace.nspname = 'public'
-  AND prosrc ILIKE '%YOUR_DROPPED_TABLE_NAME%';

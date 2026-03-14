@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button.tsx'
@@ -115,6 +116,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
   // 🎯 CRITICAL: Call useAuth hook to get session
   const { session } = useAuth()
+  const navigate = useNavigate()
 
   // ✅ FIXED: Remove logger, add proper error handling
   const fetchQuote = async () => {
@@ -483,6 +485,14 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           ⚡ Crypto credited <strong>instantly to 30 seconds</strong> after payment confirmation.
           {currency === 'NGN' && <span className="block text-blue-600 mt-1">🔵 Powered by Paystack (Best rates for NGN)</span>}
         </p>
+        <div className="text-center pb-3">
+          <button
+            onClick={() => { onOpenChange(false); navigate('/payments?tab=p2p') }}
+            className="text-xs text-gray-500 hover:text-green-400 transition-colors underline underline-offset-2"
+          >
+            💰 Or buy via P2P merchants — as low as 0.3% fee
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
   )

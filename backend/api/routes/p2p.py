@@ -1,0 +1,552 @@
+# FILE: backend/api/routes/p2p.py
+# Full updated file — adds receipt upload, cancel order, and GET order endpoints
+
+import logging
+import uuid
+from datetime import datetime, timezone
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+
+from backend.dependencies import get_current_user, get_supabase_client
+from backend.services.p2p.order_service import (
+    create_p2p_order,
+    confirm_payment_sent,
+    merchant_confirm_and_release
+)
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/p2p", tags=["P2P Trading"])
+
+
+# ── MERCHANT REGISTRATION ─────────────────────────────────────
+
+class RegisterMerchantRequest(BaseModel):
+    display_name: str
+
+class PaymentMethodsRequest(BaseModel):
+    merchant_id: str
+    payment_methods: List[Dict[str, Any]]
+
+class CreateListingRequest(BaseModel):
+    merchant_id: str
+    token: str
+    fiat_currency: str
+    price_per_token: float
+    min_order_fiat: float
+    max_order_fiat: float
+    available_amount: float
+    payment_methods: List[str]
+    payment_details: Dict[str, Any]
+    terms: Optional[str] = None
+
+class OnlineStatusRequest(BaseModel):
+    is_online: bool
+
+
+# ── POST /api/p2p/merchants/register ─────────────────────────
+@router.post("/merchants/register")
+async def register_merchant(
+    payload: RegisterMerchantRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        user_id = current_user["id"]
+
+        # Check not already a merchant
+        existing = supabase.table("p2p_merchants") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .maybe_single() \
+            .execute()
+        if existing.data:
+            return {"success": True, "merchant_id": existing.data["id"], "already_exists": True}
+
+        res = supabase.table("p2p_merchants").insert({
+            "user_id": user_id,
+            "display_name": payload.display_name,
+            "verified": False,
+            "is_online": True
+        }).execute()
+
+        if not res.data:
+            raise Exception("Insert returned no data")
+
+        logger.info(f"[P2P] Merchant registered: {user_id}")
+        return {"success": True, "merchant_id": res.data[0]["id"]}
+
+    except Exception as e:
+        logger.error(f"[P2P] Merchant registration error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to register merchant")
+
+
+# ── POST /api/p2p/merchants/payment-methods ──────────────────
+@router.post("/merchants/payment-methods")
+async def save_payment_methods(
+    payload: PaymentMethodsRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        # Verify ownership
+        m = supabase.table("p2p_merchants") \
+            .select("id") \
+            .eq("id", payload.merchant_id) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single() \
+            .execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Store as metadata on merchant profile
+        supabase.table("p2p_merchants").update({
+            "payment_methods_config": payload.payment_methods,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", payload.merchant_id).execute()
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Payment methods save error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save payment methods")
+
+
+# ── GET /api/p2p/merchants/me ─────────────────────────────────
+@router.get("/merchants/me")
+async def get_my_merchant_profile(
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        res = supabase.table("p2p_merchants") \
+            .select("*") \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single() \
+            .execute()
+
+        if not res.data:
+            return {"success": False, "merchant": None}
+
+        return {"success": True, "merchant": res.data}
+    except Exception as e:
+        logger.error(f"[P2P] Get merchant profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch merchant profile")
+
+
+# ── PATCH /api/p2p/merchants/me/online ───────────────────────
+@router.patch("/merchants/me/online")
+async def update_online_status(
+    payload: OnlineStatusRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        supabase.table("p2p_merchants").update({
+            "is_online": payload.is_online
+        }).eq("user_id", current_user["id"]).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to update status")
+
+
+# ── GET /api/p2p/merchants/{merchant_id}/listings ────────────
+@router.get("/merchants/{merchant_id}/listings")
+async def get_merchant_listings(
+    merchant_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        # Verify ownership
+        m = supabase.table("p2p_merchants") \
+            .select("id").eq("id", merchant_id) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single().execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        res = supabase.table("p2p_listings") \
+            .select("*") \
+            .eq("merchant_id", merchant_id) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        return {"success": True, "listings": res.data or []}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch listings")
+
+
+# ── GET /api/p2p/merchants/{merchant_id}/orders ──────────────
+@router.get("/merchants/{merchant_id}/orders")
+async def get_merchant_orders(
+    merchant_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        m = supabase.table("p2p_merchants") \
+            .select("id").eq("id", merchant_id) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single().execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        res = supabase.table("p2p_orders") \
+            .select("*") \
+            .eq("merchant_id", merchant_id) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        return {"success": True, "orders": res.data or []}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
+
+# ── POST /api/p2p/listings ────────────────────────────────────
+@router.post("/listings")
+async def create_listing(
+    payload: CreateListingRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        # Verify merchant ownership
+        m = supabase.table("p2p_merchants") \
+            .select("id").eq("id", payload.merchant_id) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single().execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        res = supabase.table("p2p_listings").insert({
+            "merchant_id": payload.merchant_id,
+            "token": payload.token,
+            "fiat_currency": payload.fiat_currency,
+            "price_per_token": payload.price_per_token,
+            "min_order_fiat": payload.min_order_fiat,
+            "max_order_fiat": payload.max_order_fiat,
+            "available_amount": payload.available_amount,
+            "payment_methods": payload.payment_methods,
+            "payment_details": payload.payment_details,
+            "terms": payload.terms,
+            "is_active": True
+        }).execute()
+
+        if not res.data:
+            raise Exception("Insert returned no data")
+
+        logger.info(f"[P2P] Listing created: {res.data[0]['id']}")
+        return {"success": True, "listing": res.data[0]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Create listing error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create listing")
+
+
+# ── PATCH /api/p2p/listings/{listing_id}/toggle ──────────────
+@router.patch("/listings/{listing_id}/toggle")
+async def toggle_listing(
+    listing_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        listing = supabase.table("p2p_listings") \
+            .select("id, is_active, merchant_id") \
+            .eq("id", listing_id) \
+            .maybe_single().execute()
+
+        if not listing.data:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        # Verify ownership
+        m = supabase.table("p2p_merchants") \
+            .select("id").eq("id", listing.data["merchant_id"]) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single().execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        new_status = not listing.data["is_active"]
+        supabase.table("p2p_listings").update({
+            "is_active": new_status
+        }).eq("id", listing_id).execute()
+
+        return {"success": True, "is_active": new_status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to toggle listing")
+
+
+# ── DELETE /api/p2p/listings/{listing_id} ────────────────────
+@router.delete("/listings/{listing_id}")
+async def delete_listing(
+    listing_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        listing = supabase.table("p2p_listings") \
+            .select("id, merchant_id").eq("id", listing_id) \
+            .maybe_single().execute()
+
+        if not listing.data:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        m = supabase.table("p2p_merchants") \
+            .select("id").eq("id", listing.data["merchant_id"]) \
+            .eq("user_id", current_user["id"]) \
+            .maybe_single().execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        supabase.table("p2p_listings").delete().eq("id", listing_id).execute()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete listing")
+
+
+# ── REQUEST MODELS ────────────────────────────────────────────
+
+class CreateOrderRequest(BaseModel):
+    idempotency_key: str
+    listing_id: str
+    fiat_amount: float
+    payment_method: str
+
+
+# ── GET /api/p2p/orders/{order_id} ───────────────────────────
+# Fetch a single order (buyer or merchant only).
+# Frontend uses Supabase Realtime for live updates,
+# this endpoint is used for the initial page load.
+@router.get("/orders/{order_id}")
+async def get_order(
+    order_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        result = supabase.table("p2p_orders") \
+            .select("*, p2p_merchants(*), p2p_listings(payment_details)") \
+            .eq("id", order_id) \
+            .maybe_single() \
+            .execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        order = result.data
+        user_id = current_user["id"]
+
+        # Verify caller is buyer or merchant — no peeking at other people's orders
+        merchant_user_id = (order.get("p2p_merchants") or {}).get("user_id")
+        if order["buyer_id"] != user_id and merchant_user_id != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        return {"success": True, "order": order}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Get order error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch order")
+
+
+# ── POST /api/p2p/orders ─────────────────────────────────────
+@router.post("/orders")
+async def create_order(
+    payload: CreateOrderRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        result = await create_p2p_order(
+            idempotency_key=payload.idempotency_key,
+            listing_id=payload.listing_id,
+            buyer_id=current_user["id"],
+            fiat_amount=payload.fiat_amount,
+            payment_method=payload.payment_method
+        )
+        return {
+            "success": True,
+            "order": result["order"],
+            "payment_details": result["payment_details"],
+            "is_duplicate": result["is_duplicate"]
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[P2P] Create order error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+
+# ── POST /api/p2p/orders/receipt-upload ──────────────────────
+# Buyer uploads payment receipt image.
+# Mirrors the compliance.py upload pattern exactly:
+#   supabase.storage.from_("p2p-receipts").upload(path, file_bytes)
+@router.post("/orders/receipt-upload")
+async def upload_receipt(
+    file: UploadFile = File(...),
+    order_id: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        user_id = current_user["id"]
+
+        # Verify order belongs to buyer and is in payment_window
+        order_res = supabase.table("p2p_orders") \
+            .select("id, status, buyer_id") \
+            .eq("id", order_id) \
+            .eq("buyer_id", user_id) \
+            .maybe_single() \
+            .execute()
+
+        if not order_res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order_res.data["status"] != "payment_window":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot upload receipt for order in '{order_res.data['status']}' status"
+            )
+
+        # Read file
+        file_bytes = await file.read()
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        # Validate file type
+        allowed_types = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type not allowed. Use: JPEG, PNG, WebP, or PDF"
+            )
+
+        # Build storage path — mirrors compliance.py pattern
+        file_ext = (file.filename or "receipt").split(".")[-1]
+        file_path = f"{user_id}/receipts/{uuid.uuid4()}.{file_ext}"
+
+        # Upload to Supabase storage bucket
+        try:
+            upload_response = supabase.storage.from_("p2p-receipts").upload(
+                path=file_path,
+                file=file_bytes,
+                file_options={"content-type": file.content_type}
+            )
+            if hasattr(upload_response, "error") and upload_response.error:
+                raise Exception(f"Storage error: {upload_response.error}")
+        except Exception as storage_err:
+            logger.error(f"[P2P] Storage upload failed: {storage_err}")
+            raise HTTPException(status_code=500, detail="Failed to upload file to storage")
+
+        # Get public URL — same pattern as compliance.py
+        try:
+            file_url = supabase.storage.from_("p2p-receipts").get_public_url(file_path)
+        except Exception:
+            project_ref = supabase.url.split("//")[1].split(".")[0]
+            file_url = f"https://{project_ref}.supabase.co/storage/v1/object/public/p2p-receipts/{file_path}"
+
+        # Update order with receipt URL and advance status to 'paid'
+        await confirm_payment_sent(
+            order_id=order_id,
+            buyer_id=user_id,
+            receipt_url=file_url
+        )
+
+        logger.info(f"[P2P] Receipt uploaded for order {order_id}")
+        return {"success": True, "receipt_url": file_url}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Receipt upload error: {e}")
+        raise HTTPException(status_code=500, detail="Receipt upload failed")
+
+
+# ── PATCH /api/p2p/orders/{order_id}/release ─────────────────
+@router.patch("/orders/{order_id}/release")
+async def release_tokens(
+    order_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        result = await merchant_confirm_and_release(
+            order_id=order_id,
+            merchant_user_id=current_user["id"]
+        )
+        return {"success": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[P2P] Release tokens error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to release tokens")
+
+
+# ── PATCH /api/p2p/orders/{order_id}/cancel ──────────────────
+# Buyer cancels an order in payment_window status.
+@router.patch("/orders/{order_id}/cancel")
+async def cancel_order(
+    order_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    try:
+        user_id = current_user["id"]
+
+        order_res = supabase.table("p2p_orders") \
+            .select("id, status, buyer_id") \
+            .eq("id", order_id) \
+            .eq("buyer_id", user_id) \
+            .maybe_single() \
+            .execute()
+
+        if not order_res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order_res.data["status"] != "payment_window":
+            raise HTTPException(
+                status_code=400,
+                detail="Only orders in payment_window can be cancelled"
+            )
+
+        from datetime import datetime, timezone
+        supabase.table("p2p_orders").update({
+            "status": "cancelled",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", order_id).execute()
+
+        supabase.table("p2p_messages").insert({
+            "order_id": order_id,
+            "is_system": True,
+            "message": "Buyer cancelled the order."
+        }).execute()
+
+        # Audit
+        supabase.table("settlement_audit_log").insert({
+            "order_id": order_id,
+            "event_type": "state_change",
+            "prev_status": "payment_window",
+            "new_status": "cancelled",
+            "actor_id": user_id
+        }).execute()
+
+        logger.info(f"[P2P] Order {order_id} cancelled by buyer")
+        return {"success": True, "message": "Order cancelled"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Cancel order error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel order")

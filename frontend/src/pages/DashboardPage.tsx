@@ -14,7 +14,9 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownToLine,
-  Download
+  Download,
+  Store,
+  ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '@/config/api';
@@ -326,6 +328,22 @@ const DashboardPage = () => {
             >
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">History</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/payments?tab=p2p')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              <span className="hidden sm:inline">Buy Crypto</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/merchant')}
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <Store className="h-4 w-4" />
+              <span className="hidden sm:inline">P2P Merchant</span>
             </button>
           </div>
 

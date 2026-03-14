@@ -288,6 +288,21 @@ except ImportError as e:
     routers_available['swap'] = None
 
 try:
+    from backend.api.routes.p2p import router as p2p_router
+    routers_available['p2p'] = p2p_router
+    logger.info("✅ P2P router imported")
+except ImportError as e:
+    logger.error(f"❌ P2P router import error: {e}")
+    routers_available['p2p'] = None
+
+try:
+    from backend.workers.p2p_worker import P2PWorker
+    logger.info("✅ P2P worker imported")
+except ImportError as e:
+    logger.error(f"❌ P2P worker import error: {e}")
+    P2PWorker = None
+
+try:
     from backend.api.routes.yield_routes import router as yield_router
     routers_available['yield'] = yield_router
     logger.info("✅ Yield router imported")
@@ -501,6 +516,19 @@ async def lifespan(app: FastAPI):
                         logger.warning(f"⚠️ WalletCreationService unavailable: {e}")
                         wallet_creation_service = None
 
+                    # ── Start P2P Worker ──────────────────────────────────
+                    if P2PWorker:
+                        try:
+                            p2p_worker = P2PWorker(
+                                supabase=supabase_client,
+                                multi_chain_wallet_service=multi_chain_wallet_service
+                            )
+                            await p2p_worker.start()
+                            app.state.p2p_worker = p2p_worker
+                            logger.info("✅ P2P worker started")
+                        except Exception as e:
+                            logger.error(f"❌ P2P worker failed to start: {e}")
+
                     # Start XRP Deposit Monitor (WebSocket — background task)
                     if xrp_service and xrp_services_available:
                         try:
@@ -687,6 +715,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"❌ Failed to stop price logger: {e}")
 
+    # Stop P2P worker
+    if hasattr(app.state, 'p2p_worker'):
+        try:
+            await app.state.p2p_worker.stop()
+            logger.info("✅ P2P worker stopped")
+        except Exception as e:
+            logger.error(f"❌ Failed to stop P2P worker: {e}")
+
     # Stop XRP monitor
     if hasattr(app.state, 'xrp_monitor'):
         try:
@@ -862,7 +898,11 @@ if routers_available.get('bank_verification'):
 if routers_available.get('swap'):
     app.include_router(routers_available['swap'], prefix="/api/v1", tags=["Swap"])
     logger.info("Swap router registered at /api/v1/swap")
-    
+
+if routers_available.get('p2p'):
+    app.include_router(routers_available['p2p'])
+    logger.info("✅ P2P router registered at /api/p2p")
+
 if routers_available.get('yield'):
     app.include_router(routers_available['yield'], prefix="/api/v1", tags=["Yield"])
     logger.info("Yield router registered at /api/v1")

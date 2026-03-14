@@ -44,6 +44,8 @@ import PredictionMarketsPage from './pages/PredictionMarketsPage';
 import MarketTerminal from './components/market/MarketTerminal';
 import MyAssetsPage from '@/pages/MyAssetsPage';
 import XRPPage from '@/pages/XRPPage';
+import P2POrderPage from '@/pages/P2POrderPage';
+import MerchantDashboardPage from '@/pages/MerchantDashboardPage';
 
 // --- Context & Hooks ---
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -178,6 +180,10 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           } 
         />
+        <Route
+          path="/p2p"
+          element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>}
+        />
         <Route 
           path="/meter-xpress" 
           element={
@@ -220,6 +226,22 @@ const AppContent: React.FC = () => {
               <XRPPage />
             </ProtectedRoute>
           } 
+        />
+        <Route
+          path="/p2p/orders/:id"
+          element={
+            <ProtectedRoute>
+              <P2POrderPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/merchant"
+          element={
+            <ProtectedRoute>
+              <MerchantDashboardPage />
+            </ProtectedRoute>
+          }
         />
         <Route 
           path="/wallets/all" 
