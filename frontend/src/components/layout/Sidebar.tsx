@@ -21,6 +21,8 @@ import {
   Wallet,
   Waves,
   Zap,
+  ShoppingBag,
+  Store
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -45,6 +47,8 @@ const Sidebar: React.FC = () => {
   const allNavItems: NavItem[] = [
     { label: 'Wallets', icon: Wallet, path: '/dashboard' },
     { label: 'XRP Ledger', icon: Waves, path: '/xrp' },
+    { label: 'P2P Trading',  icon: ShoppingBag,  path: '/payments'  },
+    { label: 'Merchant Hub', icon: Store,        path: '/merchant'  },
     { label: 'My Assets', icon: Briefcase, path: '/my-assets', adminOnly: true },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', adminOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading', adminOnly: true },

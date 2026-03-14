@@ -318,7 +318,7 @@ class P2PWorker:
         except Exception as e:
             logger.warning(f"[P2PWorker] Failed to mark job {job_id} as failed: {e}")
 
-    def _recover_stuck_jobs(self):
+    async def _recover_stuck_jobs(self):
         """
         Reset any jobs that got stuck in 'processing' for too long.
         This handles the case where the server crashed mid-job.

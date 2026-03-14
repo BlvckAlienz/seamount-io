@@ -85,7 +85,7 @@ async def create_p2p_order(
         "status": "payment_window",
         "payment_deadline": deadline.isoformat(),
         "platform_fee_bps": 30
-    }).execute()
+    }).select().execute()
 
     if not order_res.data:
         raise Exception("Failed to create order — no data returned from database")

@@ -68,7 +68,7 @@ async def register_merchant(
             "display_name": payload.display_name,
             "verified": False,
             "is_online": True
-        }).execute()
+        }).select().execute()
 
         if not res.data:
             raise Exception("Insert returned no data")
@@ -236,7 +236,7 @@ async def create_listing(
             "payment_details": payload.payment_details,
             "terms": payload.terms,
             "is_active": True
-        }).execute()
+        }).select().execute()
 
         if not res.data:
             raise Exception("Insert returned no data")
