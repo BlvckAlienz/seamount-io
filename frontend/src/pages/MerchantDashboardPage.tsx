@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '@/config/api'
-import { supabase } from '@/config/supabaseClient'
+import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import toast from 'react-hot-toast'
 import Sidebar from '@/components/layout/Sidebar'

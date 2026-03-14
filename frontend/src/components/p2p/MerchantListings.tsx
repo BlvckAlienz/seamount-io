@@ -3,7 +3,7 @@
 // Token list mirrors ASSET_GROUPS in SendForm.tsx exactly.
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/config/supabaseClient'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
