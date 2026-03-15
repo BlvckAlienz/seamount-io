@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { MerchantOnboardingModal } from '@/components/p2p/MerchantOnboardingModal'
+import { CreateListingModal } from '@/components/p2p/CreateListingModal'
 
 // ── TYPES ─────────────────────────────────────────────────────
 interface MerchantProfile {
@@ -79,7 +80,8 @@ export default function MerchantDashboardPage() {
   const [merchant,        setMerchant]        = useState<MerchantProfile | null>(null)
   const [listings,        setListings]        = useState<Listing[]>([])
   const [orders,          setOrders]          = useState<Order[]>([])
-  const [showOnboarding,  setShowOnboarding]  = useState(false)
+  const [showOnboarding,    setShowOnboarding]    = useState(false)
+  const [showCreateListing, setShowCreateListing] = useState(false)
   const [togglingId,      setTogglingId]      = useState<string | null>(null)
   const [orderFilter,     setOrderFilter]     = useState<string>('all')
 
@@ -277,6 +279,53 @@ export default function MerchantDashboardPage() {
     )
   }
 
+  if (merchant && merchant.status === 'pending') {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md text-center space-y-5">
+            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-full flex items-center justify-center border border-yellow-500/30">
+              <Clock className="h-10 w-10 text-yellow-400 animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Application Under Review
+              </h1>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Your merchant application has been submitted successfully.
+                Our team reviews all applications within <strong className="text-white">24–48 hours</strong>.
+                You will be notified once your account is approved.
+              </p>
+            </div>
+            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-left space-y-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-bold">
+                Application Details
+              </p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Display name</span>
+                <span className="text-white font-medium">{merchant.display_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Status</span>
+                <span className="text-yellow-400 font-medium">⏳ Pending Review</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Applied</span>
+                <span className="text-white">
+                  {new Date(merchant.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600">
+              Questions? Contact support from the Settings page.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Merchant dashboard ────────────────────────────────────
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -313,7 +362,7 @@ export default function MerchantDashboardPage() {
                 {merchant.is_online ? 'Online' : 'Offline'}
               </button>
               <Button
-                onClick={() => setShowOnboarding(true)}
+                onClick={() => setShowCreateListing(true)}
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700 gap-2"
               >
@@ -572,12 +621,21 @@ export default function MerchantDashboardPage() {
       <MerchantOnboardingModal
         open={showOnboarding}
         onOpenChange={setShowOnboarding}
-        onSuccess={() => {
-          fetchListings()
-          fetchOrders()
-          toast.success('Listing created!')
-        }}
+        onSuccess={() => fetchMerchant()}
       />
+
+      {/* Create listing modal — for approved merchants adding new listings */}
+      {merchant && (
+        <CreateListingModal
+          merchantId={merchant.id}
+          open={showCreateListing}
+          onOpenChange={setShowCreateListing}
+          onSuccess={() => {
+            fetchListings()
+            toast.success('Listing live on marketplace!')
+          }}
+        />
+      )}
     </div>
   )
 }

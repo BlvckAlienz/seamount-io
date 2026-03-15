@@ -69,12 +69,12 @@ async def register_merchant(
             }
 
         # INSERT — do not rely on postgrest-py returning data from insert
-        supabase.table("p2p_merchants").insert({
+        res = supabase.table("p2p_merchants").insert({
             "user_id": user_id,
             "display_name": payload.display_name,
             "verified": False,
             "is_online": True
-        }).execute()
+        }).select().execute()
 
         # Fetch the created record separately — bulletproof across all versions
         created = supabase.table("p2p_merchants") \
@@ -87,7 +87,7 @@ async def register_merchant(
             raise Exception("Merchant record not found after insert")
 
         logger.info(f"[P2P] Merchant registered: {user_id}")
-        return {"success": True, "merchant_id": created.data["id"]}
+        return {"success": True, "merchant_id": created.data[0]["id"]}
 
     except Exception as e:
         logger.error(f"[P2P] Merchant registration error: {e}")
@@ -229,17 +229,22 @@ async def create_listing(
     supabase=Depends(get_supabase_client)
 ):
     try:
-        # Verify merchant ownership
+        # ── Verify merchant ownership ──────────────────────────
         m = supabase.table("p2p_merchants") \
-            .select("id").eq("id", payload.merchant_id) \
+            .select("id") \
+            .eq("id", payload.merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .limit(1).execute()
+            .limit(1) \
+            .execute()
 
         if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # INSERT without relying on return data
-        supabase.table("p2p_listings").insert({
+        # m.data is a LIST — access with [0]
+        merchant_id = m.data[0]["id"]
+
+        # ── INSERT ─────────────────────────────────────────────
+        res = supabase.table("p2p_listings").insert({
             "merchant_id": payload.merchant_id,
             "token": payload.token,
             "fiat_currency": payload.fiat_currency,
@@ -251,12 +256,12 @@ async def create_listing(
             "payment_details": payload.payment_details,
             "terms": payload.terms,
             "is_active": True
-        }).execute()
+        }).select().execute()
 
-        # Fetch the created listing separately
+        # ── Fetch created row separately ───────────────────────
         created = supabase.table("p2p_listings") \
             .select("*") \
-            .eq("merchant_id", payload.merchant_id) \
+            .eq("merchant_id", merchant_id) \
             .eq("token", payload.token) \
             .eq("fiat_currency", payload.fiat_currency) \
             .order("created_at", desc=True) \
@@ -266,8 +271,11 @@ async def create_listing(
         if not created.data or len(created.data) == 0:
             raise Exception("Listing not found after insert")
 
-        logger.info(f"[P2P] Listing created: {created.data['id']}")
-        return {"success": True, "listing": created.data[0]}
+        # created.data is a LIST — access with [0]
+        listing = created.data[0]
+
+        logger.info(f"[P2P] Listing created: {listing['id']}")
+        return {"success": True, "listing": listing}
 
     except HTTPException:
         raise
@@ -539,7 +547,7 @@ async def cancel_order(
         if not order_res.data:
             raise HTTPException(status_code=404, detail="Order not found")
 
-        if order_res.data["status"] != "payment_window":
+        if order_res.data[0]["status"] != "payment_window":
             raise HTTPException(
                 status_code=400,
                 detail="Only orders in payment_window can be cancelled"

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from decimal import Decimal
+from pydantic import BaseModel
 import logging
 
 from backend.dependencies import get_current_user, get_db_service
@@ -608,4 +609,534 @@ async def get_uncollected_fees(
         
     except Exception as e:
         logger.error(f"❌ Fee tracking failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# ON-RAMP MONITOR  (onramp_transactions — 94 rows, real data)
+# ============================================================================
+
+@router.get("/onramp/summary")
+async def get_onramp_summary(
+    days: int = Query(30, ge=1, le=365),
+    exclude_test: bool = Query(True), 
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    On-ramp funnel — conversion rate, stuck payments, provider breakdown.
+    Queries: onramp_transactions (status, provider, currency, amount_fiat, seamount_fee)
+    """
+    try:
+        time_filter = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+        query = db.supabase.table("onramp_transactions") \
+            .select(
+                "id,user_id,user_email,status,provider,currency,"
+                "crypto_asset,amount_fiat,seamount_fee,net_to_user,"
+                "created_at,completed_at,failed_at"
+            ) \
+            .gte("created_at", time_filter) \
+            .order("created_at", desc=True) 
+        
+        # Exclude test records if flagged
+        if exclude_test:
+            query = query.eq("is_test", False)
+
+        res = query.execute()
+
+        rows = res.data or []
+
+        # Status breakdown
+        status_counts: dict = {}
+        provider_counts: dict = {}
+        currency_counts: dict = {}
+        total_fiat = 0.0
+        total_fees = 0.0
+        completed_fiat = 0.0
+
+        for r in rows:
+            s = r.get("status", "unknown")
+            p = r.get("provider", "unknown")
+            c = r.get("currency", "unknown")
+            amt = float(r.get("amount_fiat") or 0)
+            fee = float(r.get("seamount_fee") or 0)
+
+            status_counts[s]   = status_counts.get(s, 0) + 1
+            provider_counts[p] = provider_counts.get(p, 0) + 1
+            currency_counts[c] = currency_counts.get(c, 0) + 1
+            total_fiat        += amt
+            total_fees        += fee
+            if s in ("completed", "success", "confirmed"):
+                completed_fiat += amt
+
+        total = len(rows)
+        completed = status_counts.get("completed", 0) + status_counts.get("success", 0)
+        pending   = status_counts.get("pending_payment", 0) + status_counts.get("pending", 0)
+        failed    = status_counts.get("failed", 0) + status_counts.get("cancelled", 0)
+        conversion_rate = round(completed / total * 100, 1) if total > 0 else 0
+
+        # Stuck payments: pending_payment for > 2 hours
+        stuck_cutoff = (datetime.utcnow() - timedelta(hours=2)).isoformat()
+        stuck = [
+            {
+                "id": r["id"],
+                "user_email": r.get("user_email"),
+                "currency": r.get("currency"),
+                "amount_fiat": float(r.get("amount_fiat") or 0),
+                "crypto_asset": r.get("crypto_asset"),
+                "provider": r.get("provider"),
+                "created_at": r.get("created_at"),
+                "checkout_url": None  # not selected for brevity
+            }
+            for r in rows
+            if r.get("status") == "pending_payment"
+            and (r.get("created_at") or "") < stuck_cutoff
+        ]
+
+        # Recent 20 for live feed
+        recent = [
+            {
+                "id": r["id"],
+                "user_email": r.get("user_email"),
+                "status": r.get("status"),
+                "provider": r.get("provider"),
+                "currency": r.get("currency"),
+                "amount_fiat": float(r.get("amount_fiat") or 0),
+                "seamount_fee": float(r.get("seamount_fee") or 0),
+                "crypto_asset": r.get("crypto_asset"),
+                "created_at": r.get("created_at"),
+                "completed_at": r.get("completed_at"),
+            }
+            for r in rows[:20]
+        ]
+
+        return {
+            "success": True,
+            "summary": {
+                "total_attempts": total,
+                "completed": completed,
+                "pending_payment": pending,
+                "failed": failed,
+                "conversion_rate_pct": conversion_rate,
+                "total_fiat_initiated": round(total_fiat, 2),
+                "total_fiat_completed": round(completed_fiat, 2),
+                "total_seamount_fees": round(total_fees, 2),
+            },
+            "by_status":   status_counts,
+            "by_provider": provider_counts,
+            "by_currency": currency_counts,
+            "stuck_payments": stuck,
+            "stuck_count": len(stuck),
+            "recent": recent,
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] Onramp summary error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# BLOCKCHAIN TRANSACTIONS  (blockchain_transactions — 5 rows, real data)
+# ============================================================================
+
+@router.get("/blockchain/summary")
+async def get_blockchain_summary(
+    days: int = Query(30, ge=1, le=365),
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    Blockchain transaction feed + chain/asset breakdown.
+    Queries: blockchain_transactions
+    (transaction_type, status, amount, asset, chain, txn_hash, platform_fee)
+    """
+    try:
+        time_filter = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+        res = db.supabase.table("blockchain_transactions") \
+            .select(
+                "id,user_id,transaction_type,status,amount,asset,chain,"
+                "txn_hash,to_address,network_fee,platform_fee,created_at"
+            ) \
+            .gte("created_at", time_filter) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        rows = res.data or []
+
+        chain_vol: dict  = {}
+        asset_vol: dict  = {}
+        status_counts: dict = {}
+        total_volume = 0.0
+        total_platform_fees = 0.0
+
+        for r in rows:
+            chain  = r.get("chain", "unknown")
+            asset  = r.get("asset", "unknown")
+            status = r.get("status", "unknown")
+            amt    = float(r.get("amount") or 0)
+            pfee   = float(r.get("platform_fee") or 0)
+
+            chain_vol[chain]   = chain_vol.get(chain, 0) + amt
+            asset_vol[asset]   = asset_vol.get(asset, 0) + amt
+            status_counts[status] = status_counts.get(status, 0) + 1
+            total_volume       += amt
+            total_platform_fees += pfee
+
+        # Enrich with user email
+        enriched = []
+        for r in rows[:20]:
+            profile = db.supabase.table("user_profiles") \
+                .select("email") \
+                .eq("user_id", r["user_id"]) \
+                .limit(1).execute()
+            email = profile.data[0]["email"] if profile.data else "unknown"
+            enriched.append({
+                "id": r["id"],
+                "user_email": email,
+                "transaction_type": r.get("transaction_type"),
+                "status": r.get("status"),
+                "amount": float(r.get("amount") or 0),
+                "asset": r.get("asset"),
+                "chain": r.get("chain"),
+                "txn_hash": r.get("txn_hash"),
+                "to_address": r.get("to_address"),
+                "platform_fee": float(r.get("platform_fee") or 0),
+                "created_at": r.get("created_at"),
+            })
+
+        return {
+            "success": True,
+            "summary": {
+                "total_transactions": len(rows),
+                "total_volume": round(total_volume, 6),
+                "total_platform_fees": round(total_platform_fees, 6),
+                "by_status": status_counts,
+                "by_chain": {k: round(v, 6) for k, v in chain_vol.items()},
+                "by_asset": {k: round(v, 6) for k, v in asset_vol.items()},
+            },
+            "recent": enriched,
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] Blockchain summary error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# FEE TREASURY  (fees_owed — 6 rows, real data)
+# ============================================================================
+
+@router.get("/fees/treasury")
+async def get_fee_treasury(
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    Fee collection health: collected vs pending vs failed.
+    Queries: fees_owed
+    (fee_amount, status, chain, asset, collected_tx_id, collected_at)
+    """
+    try:
+        res = db.supabase.table("fees_owed") \
+            .select(
+                "id,user_id,transaction_id,chain,asset,"
+                "fee_amount,status,collected_tx_id,collected_at,created_at"
+            ) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        rows = res.data or []
+
+        by_status: dict = {}
+        by_chain:  dict = {}
+        collected_total = 0.0
+        pending_total   = 0.0
+        failed_total    = 0.0
+
+        for r in rows:
+            s   = r.get("status", "unknown")
+            ch  = r.get("chain", "unknown")
+            amt = float(r.get("fee_amount") or 0)
+
+            by_status[s]  = by_status.get(s, 0) + amt
+            by_chain[ch]  = by_chain.get(ch, 0) + amt
+
+            if s == "collected":
+                collected_total += amt
+            elif s == "pending":
+                pending_total += amt
+            elif s == "failed":
+                failed_total += amt
+
+        collection_rate = round(
+            collected_total / (collected_total + pending_total + failed_total) * 100, 1
+        ) if (collected_total + pending_total + failed_total) > 0 else 0
+
+        return {
+            "success": True,
+            "summary": {
+                "total_records": len(rows),
+                "collected": round(collected_total, 6),
+                "pending": round(pending_total, 6),
+                "failed": round(failed_total, 6),
+                "collection_rate_pct": collection_rate,
+                "by_status": {k: round(v, 6) for k, v in by_status.items()},
+                "by_chain":  {k: round(v, 6) for k, v in by_chain.items()},
+            },
+            "records": [
+                {
+                    "id": r["id"],
+                    "transaction_id": r.get("transaction_id"),
+                    "chain": r.get("chain"),
+                    "asset": r.get("asset"),
+                    "fee_amount": float(r.get("fee_amount") or 0),
+                    "status": r.get("status"),
+                    "collected_tx_id": r.get("collected_tx_id"),
+                    "collected_at": r.get("collected_at"),
+                    "created_at": r.get("created_at"),
+                }
+                for r in rows
+            ],
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] Fee treasury error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# USER PIPELINE  (user_profiles — 29 rows, real data)
+# ============================================================================
+
+@router.get("/users/pipeline")
+async def get_user_pipeline(
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    User funnel: signups → KYC → wallet creation → first transaction.
+    Queries: user_profiles
+    """
+    try:
+        res = db.supabase.table("user_profiles") \
+            .select(
+                "user_id,email,first_name,last_name,country_code,"
+                "kyc_status,kyc_level,account_type,role,"
+                "wallet_creation_complete,onboarding_complete,"
+                "cumulative_volume_30d,created_at"
+            ) \
+            .order("created_at", desc=True) \
+            .execute()
+
+        rows = res.data or []
+
+        kyc_breakdown:  dict = {}
+        role_breakdown: dict = {}
+        acct_breakdown: dict = {}
+        wallets_created = 0
+        onboarding_done = 0
+
+        for r in rows:
+            ks = r.get("kyc_status", "unknown")
+            ro = r.get("role", "unknown")
+            at = r.get("account_type", "unknown")
+
+            kyc_breakdown[ks]  = kyc_breakdown.get(ks, 0) + 1
+            role_breakdown[ro] = role_breakdown.get(ro, 0) + 1
+            acct_breakdown[at] = acct_breakdown.get(at, 0) + 1
+
+            if r.get("wallet_creation_complete"):
+                wallets_created += 1
+            if r.get("onboarding_complete"):
+                onboarding_done += 1
+
+        total = len(rows)
+
+        # Recent 10 signups
+        recent = [
+            {
+                "user_id": r["user_id"],
+                "email": r.get("email"),
+                "name": f"{r.get('first_name', '')} {r.get('last_name', '')}".strip(),
+                "country": r.get("country_code"),
+                "kyc_status": r.get("kyc_status"),
+                "account_type": r.get("account_type"),
+                "wallet_ready": r.get("wallet_creation_complete", False),
+                "volume_30d": float(r.get("cumulative_volume_30d") or 0),
+                "joined": r.get("created_at"),
+            }
+            for r in rows[:10]
+        ]
+
+        return {
+            "success": True,
+            "summary": {
+                "total_users": total,
+                "onboarding_complete": onboarding_done,
+                "wallets_created": wallets_created,
+                "wallets_pending": total - wallets_created,
+                "by_kyc_status": kyc_breakdown,
+                "by_role": role_breakdown,
+                "by_account_type": acct_breakdown,
+            },
+            "recent_signups": recent,
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] User pipeline error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# P2P COMMAND CENTER  (p2p_merchants, p2p_listings, p2p_orders)
+# ============================================================================
+
+@router.get("/p2p/overview")
+async def get_p2p_overview(
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    P2P health: merchants by status, live listings, order pipeline.
+    Queries: p2p_merchants, p2p_listings, p2p_orders
+    """
+    try:
+        # Merchants
+        merchants_res = db.supabase.table("p2p_merchants") \
+            .select("id,user_id,display_name,verified,status,is_online,"
+                    "total_orders,completion_rate,created_at") \
+            .order("created_at", desc=True) \
+            .execute()
+        merchants = merchants_res.data or []
+
+        merchant_status: dict = {}
+        for m in merchants:
+            s = m.get("status", "unknown")
+            merchant_status[s] = merchant_status.get(s, 0) + 1
+
+        # Pending approvals — enriched with user email
+        pending_merchants = []
+        for m in merchants:
+            if m.get("status") == "pending":
+                profile = db.supabase.table("user_profiles") \
+                    .select("email") \
+                    .eq("user_id", m["user_id"]) \
+                    .limit(1).execute()
+                email = profile.data[0]["email"] if profile.data else "unknown"
+                pending_merchants.append({
+                    "id": m["id"],
+                    "display_name": m.get("display_name"),
+                    "user_email": email,
+                    "created_at": m.get("created_at"),
+                })
+
+        # Listings
+        listings_res = db.supabase.table("p2p_listings") \
+            .select("id,token,fiat_currency,price_per_token,"
+                    "available_amount,is_active,created_at") \
+            .execute()
+        listings = listings_res.data or []
+        active_listings   = sum(1 for l in listings if l.get("is_active"))
+        inactive_listings = len(listings) - active_listings
+
+        # Orders
+        orders_res = db.supabase.table("p2p_orders") \
+            .select("id,status,token,fiat_amount,token_amount,created_at") \
+            .order("created_at", desc=True) \
+            .execute()
+        orders = orders_res.data or []
+
+        order_status: dict = {}
+        total_p2p_volume = 0.0
+        for o in orders:
+            s = o.get("status", "unknown")
+            order_status[s] = order_status.get(s, 0) + 1
+            if s == "completed":
+                total_p2p_volume += float(o.get("token_amount") or 0)
+
+        return {
+            "success": True,
+            "merchants": {
+                "total": len(merchants),
+                "by_status": merchant_status,
+                "pending_approval": pending_merchants,
+                "all": [
+                    {
+                        "id": m["id"],
+                        "display_name": m.get("display_name"),
+                        "status": m.get("status"),
+                        "verified": m.get("verified"),
+                        "is_online": m.get("is_online"),
+                        "total_orders": m.get("total_orders"),
+                        "completion_rate": float(m.get("completion_rate") or 0),
+                        "created_at": m.get("created_at"),
+                    }
+                    for m in merchants
+                ],
+            },
+            "listings": {
+                "total": len(listings),
+                "active": active_listings,
+                "inactive": inactive_listings,
+            },
+            "orders": {
+                "total": len(orders),
+                "by_status": order_status,
+                "total_volume": round(total_p2p_volume, 6),
+                "recent": orders[:10],
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] P2P overview error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# MERCHANT APPROVE / REJECT  (already defined above, included for reference)
+# This is the endpoint from the merchant approval section.
+# If you already added it, skip this block.
+# ============================================================================
+
+class MerchantReviewRequest(BaseModel):
+    action: str        # 'approved' or 'rejected'
+    note: Optional[str] = None
+
+from pydantic import BaseModel
+from typing import Optional
+
+@router.patch("/p2p/merchants/{merchant_id}/review")
+async def admin_review_merchant(
+    merchant_id: str,
+    payload: MerchantReviewRequest,
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Admin approves or rejects a P2P merchant application."""
+    try:
+        if payload.action not in ("approved", "rejected"):
+            raise HTTPException(status_code=400, detail="action must be 'approved' or 'rejected'")
+
+        db.supabase.table("p2p_merchants").update({
+            "status": payload.action,
+            "verified": payload.action == "approved",
+            "is_online": payload.action == "approved",
+        }).eq("id", merchant_id).execute()
+
+        # Log review
+        db.supabase.table("p2p_merchant_reviews").insert({
+            "merchant_id": merchant_id,
+            "admin_id": admin["id"],
+            "action": payload.action,
+            "note": payload.note,
+        }).execute()
+
+        logger.info(f"[Admin] Merchant {merchant_id} {payload.action} by {admin.get('email')}")
+        return {"success": True, "action": payload.action}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Admin] Merchant review error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
