@@ -54,27 +54,40 @@ async def register_merchant(
     try:
         user_id = current_user["id"]
 
-        # Check not already a merchant
+        # Check if already a merchant — return existing profile
         existing = supabase.table("p2p_merchants") \
             .select("id") \
             .eq("user_id", user_id) \
             .maybe_single() \
             .execute()
-        if existing.data:
-            return {"success": True, "merchant_id": existing.data["id"], "already_exists": True}
 
-        res = supabase.table("p2p_merchants").insert({
+        if existing.data:
+            return {
+                "success": True,
+                "merchant_id": existing.data["id"],
+                "already_exists": True
+            }
+
+        # INSERT — do not rely on postgrest-py returning data from insert
+        supabase.table("p2p_merchants").insert({
             "user_id": user_id,
             "display_name": payload.display_name,
             "verified": False,
             "is_online": True
-        }).select().execute()
+        }).execute()
 
-        if not res.data:
-            raise Exception("Insert returned no data")
+        # Fetch the created record separately — bulletproof across all versions
+        created = supabase.table("p2p_merchants") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .single() \
+            .execute()
+
+        if not created.data:
+            raise Exception("Merchant record not found after insert")
 
         logger.info(f"[P2P] Merchant registered: {user_id}")
-        return {"success": True, "merchant_id": res.data[0]["id"]}
+        return {"success": True, "merchant_id": created.data["id"]}
 
     except Exception as e:
         logger.error(f"[P2P] Merchant registration error: {e}")
@@ -218,13 +231,17 @@ async def create_listing(
     try:
         # Verify merchant ownership
         m = supabase.table("p2p_merchants") \
-            .select("id").eq("id", payload.merchant_id) \
+            .select("id") \
+            .eq("id", payload.merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single().execute()
+            .maybe_single() \
+            .execute()
+
         if not m.data:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        res = supabase.table("p2p_listings").insert({
+        # INSERT without relying on return data
+        supabase.table("p2p_listings").insert({
             "merchant_id": payload.merchant_id,
             "token": payload.token,
             "fiat_currency": payload.fiat_currency,
@@ -236,13 +253,24 @@ async def create_listing(
             "payment_details": payload.payment_details,
             "terms": payload.terms,
             "is_active": True
-        }).select().execute()
+        }).execute()
 
-        if not res.data:
-            raise Exception("Insert returned no data")
+        # Fetch the created listing separately
+        created = supabase.table("p2p_listings") \
+            .select("*") \
+            .eq("merchant_id", payload.merchant_id) \
+            .eq("token", payload.token) \
+            .eq("fiat_currency", payload.fiat_currency) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .single() \
+            .execute()
 
-        logger.info(f"[P2P] Listing created: {res.data[0]['id']}")
-        return {"success": True, "listing": res.data[0]}
+        if not created.data:
+            raise Exception("Listing not found after insert")
+
+        logger.info(f"[P2P] Listing created: {created.data['id']}")
+        return {"success": True, "listing": created.data}
 
     except HTTPException:
         raise

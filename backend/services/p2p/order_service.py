@@ -70,9 +70,11 @@ async def create_p2p_order(
     deadline = datetime.now(timezone.utc) + timedelta(minutes=ORDER_TIMEOUT_MINS)
 
     # ── Create order ──────────────────────────────────────────
-    order_res = supabase.table("p2p_orders").insert({
+    order_number = _gen_order_number()
+
+    supabase.table("p2p_orders").insert({
         "idempotency_key": idempotency_key,
-        "order_number": _gen_order_number(),
+        "order_number": order_number,
         "listing_id": listing_id,
         "buyer_id": buyer_id,
         "merchant_id": listing["merchant_id"],
@@ -85,12 +87,19 @@ async def create_p2p_order(
         "status": "payment_window",
         "payment_deadline": deadline.isoformat(),
         "platform_fee_bps": 30
-    }).select().execute()
+    }).execute()
+
+    # Fetch created order separately
+    order_res = supabase.table("p2p_orders") \
+        .select("*") \
+        .eq("idempotency_key", idempotency_key) \
+        .single() \
+        .execute()
 
     if not order_res.data:
-        raise Exception("Failed to create order — no data returned from database")
+        raise Exception("Order not found after insert")
 
-    order = order_res.data[0]
+    order = order_res.data
 
     # ── Audit log ─────────────────────────────────────────────
     await _audit_log(

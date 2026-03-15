@@ -230,7 +230,11 @@ export function MerchantListings() {
             <SelectTrigger className="w-36 h-9 rounded-full text-sm font-semibold bg-gray-100 dark:bg-gray-800 border-0">
               <SelectValue placeholder="More tokens" />
             </SelectTrigger>
-            <SelectContent className="max-h-80">
+            <SelectContent
+              className="max-h-80 z-[200] bg-white border border-gray-200 shadow-xl"
+              position="popper"
+              sideOffset={4}
+            >
               {ASSET_GROUPS.map(group => (
                 <div key={group.chain}>
                   <div className="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wide bg-gray-50 dark:bg-gray-900">
@@ -263,7 +267,11 @@ export function MerchantListings() {
             <SelectTrigger className="w-28 h-10">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              className="z-[200] bg-white border border-gray-200 shadow-xl"
+              position="popper"
+              sideOffset={4}
+            >
               {FIAT_CURRENCIES.map(f => (
                 <SelectItem key={f} value={f}>{f}</SelectItem>
               ))}
@@ -297,7 +305,11 @@ export function MerchantListings() {
             <SelectTrigger className="w-44 h-10">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              className="z-[200] bg-white border border-gray-200 shadow-xl"
+              position="popper"
+              sideOffset={4}
+            >
               <SelectItem value="all">All Methods</SelectItem>
               <SelectItem value="M-Pesa">M-Pesa</SelectItem>
               <SelectItem value="Airtel Money">Airtel Money</SelectItem>
