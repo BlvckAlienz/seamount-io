@@ -36,14 +36,15 @@ async def create_p2p_order(
     existing = supabase.table("p2p_orders") \
         .select("*, p2p_listings(payment_details)") \
         .eq("idempotency_key", idempotency_key) \
-        .maybe_single() \
+        .limit(1) \
         .execute()
 
-    if existing.data:
+    if existing.data and len(existing.data) > 0:
+        row = existing.data[0]
         logger.info(f"[P2P] Duplicate request — returning existing order: {idempotency_key}")
         return {
-            "order": existing.data,
-            "payment_details": (existing.data.get("p2p_listings") or {}).get("payment_details"),
+            "order": row,
+            "payment_details": (row.get("p2p_listings") or {}).get("payment_details"),
             "is_duplicate": True
         }
 
@@ -52,13 +53,13 @@ async def create_p2p_order(
         .select("*, p2p_merchants(*)") \
         .eq("id", listing_id) \
         .eq("is_active", True) \
-        .maybe_single() \
+        .limit(1) \
         .execute()
 
-    if not listing_res.data:
+    if not listing_res.data or len(listing_res.data) == 0:
         raise ValueError("Listing not available or inactive")
 
-    listing = listing_res.data
+    listing = listing_res.data[0]
 
     if not (listing["min_order_fiat"] <= fiat_amount <= listing["max_order_fiat"]):
         raise ValueError(
@@ -93,13 +94,13 @@ async def create_p2p_order(
     order_res = supabase.table("p2p_orders") \
         .select("*") \
         .eq("idempotency_key", idempotency_key) \
-        .single() \
+        .limit(1) \
         .execute()
 
-    if not order_res.data:
+    if not order_res.data or len(order_res.data) == 0:
         raise Exception("Order not found after insert")
 
-    order = order_res.data
+    order = order_res.data[0]
 
     # ── Audit log ─────────────────────────────────────────────
     await _audit_log(
@@ -147,13 +148,13 @@ async def confirm_payment_sent(
         .eq("id", order_id) \
         .eq("buyer_id", buyer_id) \
         .eq("status", "payment_window") \
-        .maybe_single() \
+        .limit(1) \
         .execute()
 
-    if not order_res.data:
+    if not order_res.data or len(order_res.data) == 0:
         raise ValueError("Order not found or already processed")
 
-    order = order_res.data
+    order = order_res.data[0]
 
     # Check timer has not expired
     deadline = datetime.fromisoformat(order["payment_deadline"])
@@ -203,23 +204,23 @@ async def merchant_confirm_and_release(
     merchant_res = supabase.table("p2p_merchants") \
         .select("id") \
         .eq("user_id", merchant_user_id) \
-        .maybe_single() \
+        .limit(1) \
         .execute()
 
-    if not merchant_res.data:
+    if not merchant_res.data or len(merchant_res.data) == 0:
         raise ValueError("Merchant profile not found")
 
-    merchant_id = merchant_res.data["id"]
+    merchant_id = merchant_res.data[0]["id"]
 
     order_res = supabase.table("p2p_orders") \
         .select("*") \
         .eq("id", order_id) \
         .eq("merchant_id", merchant_id) \
         .eq("status", "paid") \
-        .maybe_single() \
+        .limit(1) \
         .execute()
 
-    if not order_res.data:
+    if not order_res.data or len(order_res.data) == 0:
         raise ValueError("Order not found or not in paid state")
 
     # Move to confirming — worker handles the WDK transfer

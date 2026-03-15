@@ -118,13 +118,13 @@ class P2PWorker:
             .select("*") \
             .eq("id", order_id) \
             .eq("status", "confirming") \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not order_res.data:
+        if not order_res.data or len(order_res.data) == 0:
             raise ValueError(f"Order {order_id} not found or not in confirming state")
 
-        order = order_res.data
+        order = order_res.data[0]
         token: str = order["token"]  # e.g. USDT_TRON, USDC_POLYGON, BTC
 
         # ── Resolve chain from token ───────────────────────────
@@ -148,17 +148,17 @@ class P2PWorker:
             buyer_res = self.supabase.table("user_wallets") \
                 .select("algorand_address") \
                 .eq("user_id", order["buyer_id"]) \
-                .maybe_single() \
+                .limit(1) \
                 .execute()
-            buyer_address = (buyer_res.data or {}).get("algorand_address")
+            buyer_address = (buyer_res.data[0] if buyer_res.data else {}).get("algorand_address")
         else:
             buyer_res = self.supabase.table("multi_chain_addresses") \
                 .select("address") \
                 .eq("user_id", order["buyer_id"]) \
                 .eq("blockchain", chain) \
-                .maybe_single() \
+                .limit(1) \
                 .execute()
-            buyer_address = (buyer_res.data or {}).get("address")
+            buyer_address = (buyer_res.data[0] if buyer_res.data else {}).get("address")
 
         if not buyer_address:
             raise ValueError(
@@ -225,14 +225,14 @@ class P2PWorker:
         order_res = self.supabase.table("p2p_orders") \
             .select("status") \
             .eq("id", order_id) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not order_res.data:
+        if not order_res.data or len(order_res.data) == 0:
             logger.warning(f"[P2PWorker] Expire job: order {order_id} not found")
             return
 
-        if order_res.data["status"] != "payment_window":
+        if order_res.data[0]["status"] != "payment_window":
             # Already paid or cancelled — nothing to do
             return
 

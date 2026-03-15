@@ -58,13 +58,13 @@ async def register_merchant(
         existing = supabase.table("p2p_merchants") \
             .select("id") \
             .eq("user_id", user_id) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if existing.data:
+        if existing.data and len(existing.data) > 0:
             return {
                 "success": True,
-                "merchant_id": existing.data["id"],
+                "merchant_id": existing.data[0]["id"],
                 "already_exists": True
             }
 
@@ -107,9 +107,9 @@ async def save_payment_methods(
             .select("id") \
             .eq("id", payload.merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
-        if not m.data:
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
         # Store as metadata on merchant profile
@@ -136,13 +136,13 @@ async def get_my_merchant_profile(
         res = supabase.table("p2p_merchants") \
             .select("*") \
             .eq("user_id", current_user["id"]) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not res.data:
+        if not res.data or len(res.data) == 0:
             return {"success": False, "merchant": None}
 
-        return {"success": True, "merchant": res.data}
+        return {"success": True, "merchant": res.data[0]}
     except Exception as e:
         logger.error(f"[P2P] Get merchant profile error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch merchant profile")
@@ -176,8 +176,8 @@ async def get_merchant_listings(
         m = supabase.table("p2p_merchants") \
             .select("id").eq("id", merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single().execute()
-        if not m.data:
+            .limit(1).execute()
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
         res = supabase.table("p2p_listings") \
@@ -204,8 +204,8 @@ async def get_merchant_orders(
         m = supabase.table("p2p_merchants") \
             .select("id").eq("id", merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single().execute()
-        if not m.data:
+            .limit(1).execute()
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
         res = supabase.table("p2p_orders") \
@@ -231,13 +231,11 @@ async def create_listing(
     try:
         # Verify merchant ownership
         m = supabase.table("p2p_merchants") \
-            .select("id") \
-            .eq("id", payload.merchant_id) \
+            .select("id").eq("id", payload.merchant_id) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single() \
-            .execute()
+            .limit(1).execute()
 
-        if not m.data:
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
         # INSERT without relying on return data
@@ -263,14 +261,13 @@ async def create_listing(
             .eq("fiat_currency", payload.fiat_currency) \
             .order("created_at", desc=True) \
             .limit(1) \
-            .single() \
             .execute()
 
-        if not created.data:
+        if not created.data or len(created.data) == 0:
             raise Exception("Listing not found after insert")
 
         logger.info(f"[P2P] Listing created: {created.data['id']}")
-        return {"success": True, "listing": created.data}
+        return {"success": True, "listing": created.data[0]}
 
     except HTTPException:
         raise
@@ -290,20 +287,19 @@ async def toggle_listing(
         listing = supabase.table("p2p_listings") \
             .select("id, is_active, merchant_id") \
             .eq("id", listing_id) \
-            .maybe_single().execute()
+            .limit(1).execute()
 
-        if not listing.data:
+        if not listing.data or len(listing.data) == 0:
             raise HTTPException(status_code=404, detail="Listing not found")
 
-        # Verify ownership
         m = supabase.table("p2p_merchants") \
-            .select("id").eq("id", listing.data["merchant_id"]) \
+            .select("id").eq("id", listing.data[0]["merchant_id"]) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single().execute()
-        if not m.data:
+            .limit(1).execute()
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        new_status = not listing.data["is_active"]
+        new_status = not listing.data[0]["is_active"]
         supabase.table("p2p_listings").update({
             "is_active": new_status
         }).eq("id", listing_id).execute()
@@ -325,16 +321,16 @@ async def delete_listing(
     try:
         listing = supabase.table("p2p_listings") \
             .select("id, merchant_id").eq("id", listing_id) \
-            .maybe_single().execute()
+            .limit(1).execute()
 
-        if not listing.data:
+        if not listing.data or len(listing.data) == 0:
             raise HTTPException(status_code=404, detail="Listing not found")
 
         m = supabase.table("p2p_merchants") \
-            .select("id").eq("id", listing.data["merchant_id"]) \
+            .select("id").eq("id", listing.data[0]["merchant_id"]) \
             .eq("user_id", current_user["id"]) \
-            .maybe_single().execute()
-        if not m.data:
+            .limit(1).execute()
+        if not m.data or len(m.data) == 0:
             raise HTTPException(status_code=403, detail="Access denied")
 
         supabase.table("p2p_listings").delete().eq("id", listing_id).execute()
@@ -368,13 +364,13 @@ async def get_order(
         result = supabase.table("p2p_orders") \
             .select("*, p2p_merchants(*), p2p_listings(payment_details)") \
             .eq("id", order_id) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not result.data:
+        if not result.data or len(result.data) == 0:
             raise HTTPException(status_code=404, detail="Order not found")
 
-        order = result.data
+        order = result.data[0]
         user_id = current_user["id"]
 
         # Verify caller is buyer or merchant — no peeking at other people's orders
@@ -437,13 +433,13 @@ async def upload_receipt(
             .select("id, status, buyer_id") \
             .eq("id", order_id) \
             .eq("buyer_id", user_id) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not order_res.data:
+        if not order_res.data or len(order_res.data) == 0:
             raise HTTPException(status_code=404, detail="Order not found")
 
-        if order_res.data["status"] != "payment_window":
+        if order_res.data[0]["status"] != "payment_window":
             raise HTTPException(
                 status_code=400,
                 detail=f"Cannot upload receipt for order in '{order_res.data['status']}' status"
