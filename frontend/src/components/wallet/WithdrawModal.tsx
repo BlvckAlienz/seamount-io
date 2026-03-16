@@ -147,14 +147,14 @@ const WITHDRAWAL_CURRENCIES = [
 
 // Nigerian Banks (for bank transfer option)
 const NIGERIAN_BANKS = [
+  // ── Tier-1 Commercial Banks ──────────────────────────
   { code: '044', name: 'Access Bank' },
-  { code: '023', name: 'Citibank' },
-  { code: '050', name: 'Ecobank' },
-  { code: '084', name: 'Enterprise Bank' },
+  { code: '023', name: 'Citibank Nigeria' },
+  { code: '050', name: 'Ecobank Nigeria' },
   { code: '070', name: 'Fidelity Bank' },
-  { code: '011', name: 'First Bank' },
-  { code: '214', name: 'First City Monument Bank' },
-  { code: '058', name: 'Guaranty Trust Bank' },
+  { code: '011', name: 'First Bank of Nigeria' },
+  { code: '214', name: 'FCMB (First City Monument Bank)' },
+  { code: '058', name: 'GTBank (Guaranty Trust)' },
   { code: '030', name: 'Heritage Bank' },
   { code: '301', name: 'Jaiz Bank' },
   { code: '082', name: 'Keystone Bank' },
@@ -162,14 +162,68 @@ const NIGERIAN_BANKS = [
   { code: '076', name: 'Polaris Bank' },
   { code: '101', name: 'Providus Bank' },
   { code: '221', name: 'Stanbic IBTC Bank' },
-  { code: '068', name: 'Standard Chartered Bank' },
+  { code: '068', name: 'Standard Chartered Bank Nigeria' },
   { code: '232', name: 'Sterling Bank' },
-  { code: '100', name: 'Suntrust Bank' },
-  { code: '032', name: 'Union Bank' },
-  { code: '033', name: 'United Bank for Africa' },
+  { code: '100', name: 'SunTrust Bank' },
+  { code: '032', name: 'Union Bank of Nigeria' },
+  { code: '033', name: 'UBA (United Bank for Africa)' },
   { code: '215', name: 'Unity Bank' },
-  { code: '035', name: 'Wema Bank' },
+  { code: '035', name: 'Wema Bank (ALAT)' },
   { code: '057', name: 'Zenith Bank' },
+  { code: '032', name: 'Union Bank' },
+  // ── Digital / Fintech Banks (CBN-licensed) ───────────
+  { code: '999240', name: 'Kuda Bank' },
+  { code: '120001', name: 'Opay (OPay Digital Services)' },
+  { code: '100033', name: 'Palmpay' },
+  { code: '120003', name: 'Moniepoint MFB' },
+  { code: '100026', name: 'Carbon (Paylater)' },
+  { code: '090325', name: 'Fairmoney MFB' },
+  { code: '090267', name: 'Kuda MFB' },
+  // ── Other CBN-licensed Banks ─────────────────────────
+  { code: '035A', name: 'ALAT by Wema' },
+  { code: '000036', name: 'Globus Bank' },
+  { code: '000026', name: 'Taj Bank' },
+  { code: '000031', name: 'Titan Trust Bank' },
+  { code: '000029', name: 'Optimus Bank' },
+  { code: '000025', name: 'Lotus Bank' },
+  { code: '000027', name: 'Paga' },
+  { code: '100002', name: 'Paga MFB' },
+  { code: '090115', name: 'Empire Trust MFB' },
+  { code: '090261', name: 'Mint MFB' },
+  { code: '090303', name: 'Aella MFB' },
+  { code: '100004', name: 'ASO Savings & Loans' },
+]
+
+const KENYAN_BANKS = [
+  // ── Tier-1 Commercial Banks (CBK-licensed) ───────────
+  { code: '01', name: 'Kenya Commercial Bank (KCB)' },
+  { code: '02', name: 'Equity Bank Kenya' },
+  { code: '03', name: 'Co-operative Bank of Kenya' },
+  { code: '04', name: 'NCBA Bank Kenya' },
+  { code: '05', name: 'Absa Bank Kenya' },
+  { code: '06', name: 'Standard Chartered Bank Kenya' },
+  { code: '07', name: 'I&M Bank Kenya' },
+  { code: '08', name: 'Diamond Trust Bank (DTB)' },
+  { code: '09', name: 'Family Bank Kenya' },
+  { code: '10', name: 'Stanbic Bank Kenya' },
+  { code: '11', name: 'Bank of Africa Kenya' },
+  { code: '12', name: 'Citibank Kenya' },
+  { code: '13', name: 'HFC Bank (Housing Finance)' },
+  { code: '14', name: 'National Bank of Kenya' },
+  { code: '15', name: 'Prime Bank Kenya' },
+  { code: '16', name: 'SBM Bank Kenya' },
+  { code: '17', name: 'Sidian Bank' },
+  { code: '18', name: 'Spire Bank' },
+  { code: '19', name: 'Trans-National Bank' },
+  { code: '20', name: 'UBA Kenya' },
+  { code: '21', name: 'Victoria Commercial Bank' },
+  // ── Digital / Fintech (CBK-licensed) ─────────────────
+  { code: 'D01', name: 'M-Pesa (Safaricom)' },
+  { code: 'D02', name: 'Airtel Money Kenya' },
+  { code: 'D03', name: 'T-Kash (Telkom Kenya)' },
+  { code: 'D04', name: 'Equity EazzyBanking' },
+  { code: 'D05', name: 'KCB M-Pesa' },
+  { code: 'D06', name: 'MCo-op Cash' },
 ]
 
 // Mobile Money Provider Display Names
@@ -625,19 +679,24 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
           {/* Bank Transfer Fields */}
           {payoutMethod === 'bank_transfer' && supportsBankTransfer && (
             <>
-              {/* Bank Selection (Nigeria only for now) */}
-              {currency === 'NGN' && (
+              {/* Bank Selection — Nigeria + Kenya */}
+              {(currency === 'NGN' || currency === 'KES') && (
                 <div className="space-y-2">
-                  <Label htmlFor="bank" className="text-sm font-semibold text-gray-900 dark:text-white">Bank</Label>
+                  <Label htmlFor="bank" className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Bank
+                  </Label>
                   <Select value={bankCode} onValueChange={setBankCode}>
-                    <SelectTrigger id="bank" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                    <SelectTrigger
+                      id="bank"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12"
+                    >
                       <SelectValue placeholder="Select bank" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
-                      {NIGERIAN_BANKS.map((bank) => (
-                        <SelectItem 
-                          key={bank.code} 
-                          value={bank.code} 
+                      {(currency === 'NGN' ? NIGERIAN_BANKS : KENYAN_BANKS).map(bank => (
+                        <SelectItem
+                          key={bank.code}
+                          value={bank.code}
                           className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           {bank.name}

@@ -30,6 +30,7 @@ interface MerchantProfile {
   avg_release_time_mins: number
   is_online: boolean
   created_at: string
+  status: 'pending' | 'approved' | 'rejected'
 }
 
 interface Listing {
@@ -322,6 +323,115 @@ export default function MerchantDashboardPage() {
             </p>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (merchant && merchant.status === 'rejected') {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-lg w-full space-y-5">
+
+            {/* Header */}
+            <div className="text-center space-y-3">
+              <div className="w-20 h-20 mx-auto bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/30">
+                <XCircle className="h-10 w-10 text-red-400" />
+              </div>
+              <h1 className="text-2xl font-bold text-white">Application Not Approved</h1>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Your merchant application was reviewed and could not be approved at this time.
+                This does not prevent you from using Seamount as a buyer.
+              </p>
+            </div>
+
+            {/* Common rejection reasons */}
+            <div className="bg-gray-800/60 rounded-2xl border border-gray-700 p-5 space-y-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                Common Reasons for Rejection
+              </p>
+              {[
+                {
+                  icon: '🪪',
+                  title: 'KYC Not Completed',
+                  detail: 'Merchants must complete full identity verification before listing.'
+                },
+                {
+                  icon: '💼',
+                  title: 'Insufficient Token Balance',
+                  detail: 'Your Seamount wallets must hold the tokens you intend to sell before listing.'
+                },
+                {
+                  icon: '📋',
+                  title: 'Incomplete Profile',
+                  detail: 'Your account profile is missing required information such as phone number or country.'
+                },
+                {
+                  icon: '⚠️',
+                  title: 'Policy Violation Risk',
+                  detail: 'Your account activity or details raised a compliance concern during review.'
+                },
+                {
+                  icon: '🏦',
+                  title: 'Unverified Payment Method',
+                  detail: 'The payment account you listed could not be verified as belonging to you.'
+                },
+              ].map((r, i) => (
+                <div key={i} className="flex gap-3 items-start">
+                  <span className="text-xl flex-shrink-0 mt-0.5">{r.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{r.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{r.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* What to do next */}
+            <div className="bg-blue-500/10 rounded-2xl border border-blue-500/20 p-5 space-y-3">
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide">
+                What to Do Next
+              </p>
+              <ol className="space-y-2">
+                {[
+                  'Complete KYC verification in Settings → Identity Verification',
+                  'Fund your Seamount wallet with the tokens you plan to sell',
+                  'Ensure your profile is fully completed with accurate details',
+                  'Verify that your payment account name matches your KYC identity',
+                  'Once ready, reapply using the button below',
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-gray-300">
+                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* Reapply button */}
+            <button
+              onClick={() => setShowOnboarding(true)}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <BadgeCheck className="h-5 w-5" />
+              Reapply as Merchant
+            </button>
+
+            <p className="text-center text-xs text-gray-600">
+              Need help? Contact support from the Settings page.
+            </p>
+          </div>
+        </div>
+
+        {/* Onboarding modal for reapplication */}
+        <MerchantOnboardingModal
+          open={showOnboarding}
+          onOpenChange={setShowOnboarding}
+          onSuccess={() => fetchMerchant()}
+        />
       </div>
     )
   }

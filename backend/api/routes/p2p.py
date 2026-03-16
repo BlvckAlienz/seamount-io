@@ -62,11 +62,41 @@ async def register_merchant(
             .execute()
 
         if existing.data and len(existing.data) > 0:
-            return {
-                "success": True,
-                "merchant_id": existing.data[0]["id"],
-                "already_exists": True
-            }
+            existing_merchant = existing.data[0]
+            existing_status = existing_merchant.get("status", "pending")
+
+            # Approved merchants cannot re-register
+            if existing_status == "approved":
+                return {
+                    "success": True,
+                    "merchant_id": existing_merchant["id"],
+                    "already_exists": True
+                }
+
+            # Rejected merchants can reapply — reset to pending
+            if existing_status == "rejected":
+                supabase.table("p2p_merchants").update({
+                    "status": "pending",
+                    "display_name": payload.display_name,
+                    "is_online": False,
+                    "verified": False,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }).eq("id", existing_merchant["id"]).execute()
+
+                logger.info(f"[P2P] Merchant reapplication submitted: {user_id}")
+                return {
+                    "success": True,
+                    "merchant_id": existing_merchant["id"],
+                    "reapplied": True
+                }
+
+            # Pending — already waiting for review
+            if existing_status == "pending":
+                return {
+                    "success": True,
+                    "merchant_id": existing_merchant["id"],
+                    "already_exists": True
+                }
 
         # INSERT — no chaining
         supabase.table("p2p_merchants").insert({

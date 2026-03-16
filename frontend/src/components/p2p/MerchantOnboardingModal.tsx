@@ -44,11 +44,62 @@ const FIAT_OPTIONS = [
 ]
 
 const PAYMENT_METHOD_OPTIONS = [
-  'M-Pesa', 'M-Pesa Paybill', 'Airtel Money',
-  'Equity Bank', 'KCB Bank', 'Bank Transfer',
-  'GTBank', 'Access Bank', 'Zenith Bank',
-  'Standard Bank', 'FNB', 'SEPA Transfer',
-  'UK Bank Transfer', 'PayPal'
+  // ── Nigeria: Mobile Money ──────────────────────────────
+  'Opay',
+  'Palmpay',
+  'Kuda Bank',
+  'Moniepoint',
+  'Carbon (Paylater)',
+  'Fairmoney',
+
+  // ── Nigeria: Tier-1 Commercial Banks ──────────────────
+  'GTBank (Guaranty Trust)',
+  'Access Bank',
+  'Zenith Bank',
+  'First Bank of Nigeria',
+  'UBA (United Bank for Africa)',
+  'Fidelity Bank',
+  'FCMB (First City Monument Bank)',
+  'Sterling Bank',
+  'Union Bank',
+  'Wema Bank (ALAT)',
+  'Stanbic IBTC',
+  'Citibank Nigeria',
+  'Ecobank Nigeria',
+  'Heritage Bank',
+  'Polaris Bank',
+  'Providus Bank',
+  'Jaiz Bank',
+  'Keystone Bank',
+  'SunTrust Bank',
+  'Titan Trust Bank',
+  'TAJ Bank',
+  'Globus Bank',
+  'Optimus Bank',
+
+  // ── Kenya: Mobile Money ────────────────────────────────
+  'M-Pesa (Safaricom)',
+  'M-Pesa Paybill',
+  'Airtel Money Kenya',
+  'T-Kash (Telkom)',
+
+  // ── Kenya: Banks ───────────────────────────────────────
+  'Equity Bank Kenya',
+  'KCB Bank Kenya',
+  'Co-operative Bank',
+  'NCBA Bank',
+  'Absa Bank Kenya',
+  'Standard Chartered Kenya',
+  'I&M Bank',
+  'Diamond Trust Bank',
+  'Family Bank',
+  'Stanbic Bank Kenya',
+
+  // ── International / Cross-border ──────────────────────
+  'Bank Transfer (Other)',
+  'SEPA Transfer',
+  'UK Bank Transfer',
+  'PayPal',
 ]
 
 interface PaymentMethod {
