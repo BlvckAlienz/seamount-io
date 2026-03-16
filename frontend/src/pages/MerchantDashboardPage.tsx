@@ -331,102 +331,73 @@ export default function MerchantDashboardPage() {
     return (
       <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
         <Sidebar />
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="max-w-lg w-full space-y-5">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md space-y-4">
 
-            {/* Header */}
-            <div className="text-center space-y-3">
-              <div className="w-20 h-20 mx-auto bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/30">
-                <XCircle className="h-10 w-10 text-red-400" />
+            {/* Status card */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 bg-red-500/20 rounded-full flex items-center justify-center">
+                <XCircle className="h-6 w-6 text-red-400" />
               </div>
-              <h1 className="text-2xl font-bold text-white">Application Not Approved</h1>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Your merchant application was reviewed and could not be approved at this time.
-                This does not prevent you from using Seamount as a buyer.
+              <h1 className="text-lg font-bold text-white">Application Not Approved</h1>
+              <p className="text-gray-400 text-sm mt-1">
+                You can still buy crypto on Seamount. Fix the items below and reapply.
               </p>
             </div>
 
-            {/* Common rejection reasons */}
-            <div className="bg-gray-800/60 rounded-2xl border border-gray-700 p-5 space-y-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                Common Reasons for Rejection
+            {/* Rejection reasons — compact grid */}
+            <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-4 space-y-2.5">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                Common Reasons
               </p>
               {[
-                {
-                  icon: '🪪',
-                  title: 'KYC Not Completed',
-                  detail: 'Merchants must complete full identity verification before listing.'
-                },
-                {
-                  icon: '💼',
-                  title: 'Insufficient Token Balance',
-                  detail: 'Your Seamount wallets must hold the tokens you intend to sell before listing.'
-                },
-                {
-                  icon: '📋',
-                  title: 'Incomplete Profile',
-                  detail: 'Your account profile is missing required information such as phone number or country.'
-                },
-                {
-                  icon: '⚠️',
-                  title: 'Policy Violation Risk',
-                  detail: 'Your account activity or details raised a compliance concern during review.'
-                },
-                {
-                  icon: '🏦',
-                  title: 'Unverified Payment Method',
-                  detail: 'The payment account you listed could not be verified as belonging to you.'
-                },
+                { icon: '🪪', text: 'KYC not completed'                    },
+                { icon: '💼', text: 'Zero or insufficient token balance'    },
+                { icon: '📋', text: 'Incomplete profile (phone / country)'  },
+                { icon: '🏦', text: 'Payment account name mismatch'         },
+                { icon: '⚠️', text: 'Compliance concern flagged'            },
               ].map((r, i) => (
-                <div key={i} className="flex gap-3 items-start">
-                  <span className="text-xl flex-shrink-0 mt-0.5">{r.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{r.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{r.detail}</p>
-                  </div>
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <span className="text-base w-6 text-center flex-shrink-0">{r.icon}</span>
+                  <span className="text-gray-300">{r.text}</span>
                 </div>
               ))}
             </div>
 
-            {/* What to do next */}
-            <div className="bg-blue-500/10 rounded-2xl border border-blue-500/20 p-5 space-y-3">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wide">
-                What to Do Next
+            {/* Action steps — numbered, compact */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 space-y-2.5">
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">
+                Before Reapplying
               </p>
-              <ol className="space-y-2">
-                {[
-                  'Complete KYC verification in Settings → Identity Verification',
-                  'Fund your Seamount wallet with the tokens you plan to sell',
-                  'Ensure your profile is fully completed with accurate details',
-                  'Verify that your payment account name matches your KYC identity',
-                  'Once ready, reapply using the button below',
-                ].map((step, i) => (
-                  <li key={i} className="flex gap-2.5 text-sm text-gray-300">
-                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
+              {[
+                'Complete KYC in Settings → Identity',
+                'Fund wallets with tokens you plan to sell',
+                'Ensure payment account matches your KYC name',
+              ].map((step, i) => (
+                <div key={i} className="flex items-center gap-3 text-sm text-gray-300">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">
+                    {i + 1}
+                  </span>
+                  {step}
+                </div>
+              ))}
             </div>
 
-            {/* Reapply button */}
+            {/* CTA */}
             <button
               onClick={() => setShowOnboarding(true)}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
             >
-              <BadgeCheck className="h-5 w-5" />
+              <BadgeCheck className="h-4 w-4" />
               Reapply as Merchant
             </button>
 
             <p className="text-center text-xs text-gray-600">
-              Need help? Contact support from the Settings page.
+              Questions? Go to Settings → Support
             </p>
           </div>
         </div>
 
-        {/* Onboarding modal for reapplication */}
         <MerchantOnboardingModal
           open={showOnboarding}
           onOpenChange={setShowOnboarding}
