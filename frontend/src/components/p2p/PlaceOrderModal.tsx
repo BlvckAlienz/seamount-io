@@ -77,12 +77,12 @@ export function PlaceOrderModal({
     setError(null)
 
     try {
-      const { data } = await apiClient.post('/api/p2p/orders', {
-        idempotencyKey: uuidv4(),         // unique per attempt — prevents duplicates
-        listingId: listing.id,
-        buyerId: user.id,
-        fiatAmount: parseFloat(fiatAmount),
-        paymentMethod
+      const res = await apiClient.post('/api/p2p/orders', {
+        idempotency_key: uuidv4(),        // snake_case — matches FastAPI model
+        listing_id: listing.id,
+        fiat_amount: parseFloat(fiatAmount),
+        payment_method: paymentMethod
+        // buyer_id omitted — backend reads from auth token
       })
 
       toast.success('Order placed! Payment details are now visible.')
