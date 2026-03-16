@@ -68,22 +68,23 @@ async def register_merchant(
                 "already_exists": True
             }
 
-        # INSERT — do not rely on postgrest-py returning data from insert
-        res = supabase.table("p2p_merchants").insert({
+        # INSERT — no chaining
+        supabase.table("p2p_merchants").insert({
             "user_id": user_id,
             "display_name": payload.display_name,
             "verified": False,
-            "is_online": True
-        }).select().execute()
+            "is_online": False,
+            "status": "pending"
+        }).execute()
 
-        # Fetch the created record separately — bulletproof across all versions
+        # Fetch separately — .limit(1) not .single()
         created = supabase.table("p2p_merchants") \
             .select("id") \
             .eq("user_id", user_id) \
-            .single() \
+            .limit(1) \
             .execute()
 
-        if not created.data:
+        if not created.data or len(created.data) == 0:
             raise Exception("Merchant record not found after insert")
 
         logger.info(f"[P2P] Merchant registered: {user_id}")
@@ -244,7 +245,7 @@ async def create_listing(
         merchant_id = m.data[0]["id"]
 
         # ── INSERT ─────────────────────────────────────────────
-        res = supabase.table("p2p_listings").insert({
+        supabase.table("p2p_listings").insert({
             "merchant_id": payload.merchant_id,
             "token": payload.token,
             "fiat_currency": payload.fiat_currency,
@@ -256,7 +257,7 @@ async def create_listing(
             "payment_details": payload.payment_details,
             "terms": payload.terms,
             "is_active": True
-        }).select().execute()
+        }).execute()
 
         # ── Fetch created row separately ───────────────────────
         created = supabase.table("p2p_listings") \
@@ -450,7 +451,7 @@ async def upload_receipt(
         if order_res.data[0]["status"] != "payment_window":
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot upload receipt for order in '{order_res.data['status']}' status"
+                detail=f"Cannot upload receipt for order in '{order_res.data[0]['status']}' status"
             )
 
         # Read file
@@ -541,10 +542,10 @@ async def cancel_order(
             .select("id, status, buyer_id") \
             .eq("id", order_id) \
             .eq("buyer_id", user_id) \
-            .maybe_single() \
+            .limit(1) \
             .execute()
 
-        if not order_res.data:
+        if not order_res.data or len(order_res.data) == 0:
             raise HTTPException(status_code=404, detail="Order not found")
 
         if order_res.data[0]["status"] != "payment_window":
