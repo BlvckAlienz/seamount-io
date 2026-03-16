@@ -88,7 +88,7 @@ async def create_p2p_order(
         "status": "payment_window",
         "payment_deadline": deadline.isoformat(),
         "platform_fee_bps": 30
-    }).select().execute()
+    }).execute()
 
     # Fetch created order separately
     order_res = supabase.table("p2p_orders") \
