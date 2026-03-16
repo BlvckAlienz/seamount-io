@@ -77,7 +77,7 @@ export function PlaceOrderModal({
     setError(null)
 
     try {
-      const res = await apiClient.post('/api/p2p/orders', {
+      const { data } = await apiClient.post('/api/p2p/orders', {
         idempotency_key: uuidv4(),        // snake_case — matches FastAPI model
         listing_id: listing.id,
         fiat_amount: parseFloat(fiatAmount),
