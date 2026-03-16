@@ -1,4 +1,5 @@
-const [showReceipt,  setShowReceipt]  = useState(false)
+
+// FILE: frontend/src/pages/P2POrderPage.tsx
 
   // ── Inline header — avoids inner-component remount bug ───────
   const renderHeader = (backPath: string) => (
