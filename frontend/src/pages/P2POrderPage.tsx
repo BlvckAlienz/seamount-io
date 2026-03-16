@@ -54,39 +54,46 @@ interface Message {
   created_at: string
 }
 
-// ── STATUS CONFIG ─────────────────────────────────────────────
+// ── STATUS CONFIG — separate desc for buyer vs merchant ───────
 const STATUS_CFG: Record<string, {
-  label: string; color: string; desc: string
+  label: string; color: string
+  buyerDesc: string; merchantDesc: string
 }> = {
   payment_window: {
     label: 'Awaiting Payment',
-    color: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-500/40',
-    desc: 'Complete your payment before the timer expires'
+    color: 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-300 border-yellow-400 dark:border-yellow-500/40',
+    buyerDesc:     'Complete your payment before the timer expires',
+    merchantDesc:  'Waiting for buyer to make payment and upload receipt'
   },
   paid: {
     label: 'Payment Sent',
-    color: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-500/40',
-    desc: 'Waiting for merchant to verify and release tokens'
+    color: 'bg-blue-500/20 text-blue-800 dark:text-blue-300 border-blue-400 dark:border-blue-500/40',
+    buyerDesc:     'Waiting for merchant to verify and release tokens',
+    merchantDesc:  'Buyer has paid — verify receipt and release tokens'
   },
   confirming: {
     label: 'Releasing Tokens',
-    color: 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-500/40',
-    desc: 'Merchant confirmed. Tokens are being released...'
+    color: 'bg-purple-500/20 text-purple-800 dark:text-purple-300 border-purple-400 dark:border-purple-500/40',
+    buyerDesc:     'Merchant confirmed. Tokens are being released to your wallet...',
+    merchantDesc:  'Token release in progress...'
   },
   completed: {
     label: 'Completed',
-    color: 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-500/40',
-    desc: 'Tokens have been released to your wallet'
+    color: 'bg-green-500/20 text-green-800 dark:text-green-300 border-green-400 dark:border-green-500/40',
+    buyerDesc:     'Tokens have been released to your wallet',
+    merchantDesc:  'Order fulfilled. Tokens released successfully.'
   },
   cancelled: {
     label: 'Cancelled',
     color: 'bg-gray-200 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-600',
-    desc: 'This order has been cancelled'
+    buyerDesc:     'This order has been cancelled',
+    merchantDesc:  'This order was cancelled'
   },
   disputed: {
     label: 'Disputed',
-    color: 'bg-red-500/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-500/40',
-    desc: 'Under review by Seamount support'
+    color: 'bg-red-500/20 text-red-800 dark:text-red-300 border-red-400 dark:border-red-500/40',
+    buyerDesc:     'Under review by Seamount support',
+    merchantDesc:  'Under review by Seamount support'
   },
 }
 
@@ -369,8 +376,8 @@ export default function P2POrderPage() {
     </div>
   )
 
-  // ── Shared status banner ──────────────────────────────────────
-  const StatusBanner = () => (
+  // ── Shared status banner — role-aware ────────────────────────
+  const StatusBanner = ({ isMerchantView }: { isMerchantView: boolean }) => (
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusCfg?.color}`}>
       {order.status === 'confirming'
         ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
@@ -378,7 +385,9 @@ export default function P2POrderPage() {
       }
       <div className="flex-1">
         <p className="font-bold text-sm">{statusCfg?.label}</p>
-        <p className="text-xs opacity-80">{statusCfg?.desc}</p>
+        <p className="text-xs opacity-80">
+          {isMerchantView ? statusCfg?.merchantDesc : statusCfg?.buyerDesc}
+        </p>
       </div>
       {order.status === 'payment_window' && timeLeft > 0 && (
         <span className={`font-mono font-bold text-lg flex-shrink-0 ${
@@ -395,14 +404,14 @@ export default function P2POrderPage() {
   // ════════════════════════════════════════════════════════════
   if (isMerchant) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-3 md:p-6">
+      <div className="min-h-screen bg-white dark:bg-gray-50 p-3 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
           <PageHeader backPath="/merchant" />
-          <StatusBanner />
+          <StatusBanner isMerchantView={true} />
 
-          {/* Order summary */}
-          <div className="bg-gray-800/50 rounded-xl border border-gray-700 divide-y divide-gray-700/60">
+          {/* Order summary — light theme for merchant */}
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 shadow-sm">
             {[
               { label: 'Buyer pays',  value: `${order.fiat_amount.toLocaleString()} ${order.fiat_currency}` },
               { label: 'You release', value: `${order.token_amount.toFixed(6)} ${tokenDisplay}`, hl: true },
@@ -410,28 +419,28 @@ export default function P2POrderPage() {
               { label: 'Via',         value: order.payment_method },
             ].map((r, i) => (
               <div key={i} className="flex justify-between px-4 py-2.5 text-sm">
-                <span className="text-gray-400">{r.label}</span>
-                <span className={`font-semibold ${r.hl ? 'text-blue-400' : 'text-white'}`}>{r.value}</span>
+                <span className="text-gray-500">{r.label}</span>
+                <span className={`font-semibold ${r.hl ? 'text-blue-600' : 'text-gray-900'}`}>{r.value}</span>
               </div>
             ))}
             {order.release_tx_hash && (
               <div className="flex justify-between px-4 py-2.5 text-sm items-center">
-                <span className="text-gray-400">Tx hash</span>
+                <span className="text-gray-500">Tx hash</span>
                 <button onClick={() => copy(order.release_tx_hash!, 'Hash')}
-                  className="text-blue-400 font-mono text-xs flex items-center gap-1 hover:underline">
+                  className="text-blue-600 font-mono text-xs flex items-center gap-1 hover:underline">
                   {order.release_tx_hash.slice(0, 14)}... <Copy className="h-3 w-3" />
                 </button>
               </div>
             )}
           </div>
 
-          {/* Receipt — only when paid */}
+          {/* Receipt */}
           {order.status === 'paid' && order.payment_receipt_url && (
-            <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
               <button onClick={() => setShowReceipt(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700/40 transition">
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 transition">
                 <span className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-blue-400" />
+                  <Eye className="h-4 w-4 text-blue-500" />
                   Payment Receipt (uploaded by buyer)
                 </span>
                 {showReceipt
@@ -442,11 +451,11 @@ export default function P2POrderPage() {
               {showReceipt && (
                 <div className="px-4 pb-4">
                   <a href={order.payment_receipt_url} target="_blank" rel="noopener noreferrer"
-                    className="block rounded-lg overflow-hidden border border-gray-600 hover:border-blue-500 transition">
+                    className="block rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition">
                     <img src={order.payment_receipt_url} alt="Receipt"
-                      className="w-full max-h-52 object-contain bg-gray-900"
+                      className="w-full max-h-52 object-contain bg-gray-50"
                       onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    <p className="text-xs text-blue-400 text-center py-2">View full receipt ↗</p>
+                    <p className="text-xs text-blue-500 text-center py-2">View full receipt ↗</p>
                   </a>
                 </div>
               )}
@@ -492,7 +501,7 @@ export default function P2POrderPage() {
       <div className="max-w-2xl mx-auto space-y-4">
 
         <PageHeader backPath="/payments" />
-        <StatusBanner />
+        <StatusBanner isMerchantView={false} />
 
         {/* Order summary */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/60">
@@ -543,7 +552,7 @@ export default function P2POrderPage() {
           </div>
         )}
 
-        {/* Receipt upload */}
+        {/* Receipt upload + Cancel */}
         {isBuyer && order.status === 'payment_window' && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm">Step 2 — Upload Payment Receipt</h3>
@@ -569,6 +578,36 @@ export default function P2POrderPage() {
             <Button variant="outline" size="sm" onClick={handleCancel}
               className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs">
               Cancel Order
+            </Button>
+          </div>
+        )}
+
+        {/* Dispute button — shown after payment_window ends and tokens not released */}
+        {isBuyer && order.status === 'paid' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+            <p className="text-xs text-gray-500">
+              Already paid? If the merchant does not release tokens within 15 minutes
+              of confirming your payment, you can raise a dispute.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!id || !confirm('Raise a dispute for this order? Our support team will review within 24 hours.')) return
+                try {
+                  await supabase.from('p2p_orders')
+                    .update({ status: 'disputed' }).eq('id', id)
+                  await supabase.from('p2p_messages').insert({
+                    order_id: id, is_system: true,
+                    message: 'Buyer has raised a dispute. Seamount support has been notified.'
+                  })
+                  toast.success('Dispute raised. Support will contact you within 24 hours.')
+                  fetchOrder()
+                } catch { toast.error('Failed to raise dispute') }
+              }}
+              className="w-full text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
+            >
+              ⚠️ Raise a Dispute
             </Button>
           </div>
         )}

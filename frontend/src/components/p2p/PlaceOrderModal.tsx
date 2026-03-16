@@ -77,19 +77,25 @@ export function PlaceOrderModal({
     setError(null)
 
     try {
-      const { data } = await apiClient.post('/api/p2p/orders', {
-        idempotency_key: uuidv4(),        // snake_case — matches FastAPI model
-        listing_id: listing.id,
-        fiat_amount: parseFloat(fiatAmount),
-        payment_method: paymentMethod
-        // buyer_id omitted — backend reads from auth token
+      const res = await apiClient.post('/api/p2p/orders', {
+        idempotency_key: uuidv4(),
+        listing_id:      listing.id,
+        fiat_amount:     parseFloat(fiatAmount),
+        payment_method:  paymentMethod
       })
 
-      toast.success('Order placed! Payment details are now visible.')
-      onOpenChange(false)
-
-      // Navigate to order detail page
-      window.location.href = `/p2p/orders/${data.order.id}`
+      if (res?.data?.success) {
+        const orderId = res.data?.order?.id
+        toast.success('Order placed! Payment details are now visible.')
+        onOpenChange(false)
+        if (orderId) {
+          window.location.href = `/p2p/orders/${orderId}`
+        } else {
+          window.location.href = '/payments'
+        }
+      } else {
+        throw new Error(res?.data?.detail ?? 'Failed to place order')
+      }
     } catch (err: any) {
       const msg = err.response?.data?.detail ?? err.message ?? 'Failed to place order'
       setError(msg)
