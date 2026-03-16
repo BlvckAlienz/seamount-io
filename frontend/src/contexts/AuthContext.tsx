@@ -546,9 +546,12 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
           path: currentPath
         });
         
-        // Tribe members always go to dashboard
-        // 🚨 Admin bypass — never auto-redirect admins
+        // Admins go straight to dashboard from landing page
+        // but are never force-redirected away from other pages
         if (state.user.is_admin) {
+          if (currentPath === '/' || currentPath === '/landing') {
+            navigate('/dashboard');
+          }
           return;
         }
 
