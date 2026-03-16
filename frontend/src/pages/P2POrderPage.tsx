@@ -1,46 +1,4 @@
-
 // FILE: frontend/src/pages/P2POrderPage.tsx
-
-  // ── Inline header — avoids inner-component remount bug ───────
-  const renderHeader = (backPath: string) => (
-    <div className="flex items-center gap-3">
-      <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="p-2">
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-      <div className="flex-1">
-        <h1 className="text-base font-bold text-gray-900 dark:text-white">
-          Order #{order?.order_number}
-        </h1>
-        <p className="text-xs text-gray-500">{order ? new Date(order.created_at).toLocaleString() : ''}</p>
-      </div>
-      <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing} className="p-2">
-        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-      </Button>
-    </div>
-  )
-
-  // ── Inline status banner — role-aware ─────────────────────────
-  const renderStatus = (isMerchantView: boolean) => (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusCfg?.color}`}>
-      {order?.status === 'confirming'
-        ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-        : <Clock className="h-4 w-4 flex-shrink-0" />
-      }
-      <div className="flex-1">
-        <p className="font-bold text-sm">{statusCfg?.label}</p>
-        <p className="text-xs opacity-80">
-          {isMerchantView ? statusCfg?.merchantDesc : statusCfg?.buyerDesc}
-        </p>
-      </div>
-      {order?.status === 'payment_window' && timeLeft > 0 && (
-        <span className={`font-mono font-bold text-lg flex-shrink-0 ${
-          timeLeft < 120 ? 'text-red-600 dark:text-red-400' : ''
-        }`}>
-          {formatTime(timeLeft)}
-        </span>
-      )}
-    </div>
-  )// FILE: frontend/src/pages/P2POrderPage.tsx
 // Buyer view: timer, payment details, receipt upload, chat
 // Merchant view: order summary, receipt preview, release button, chat
 
@@ -55,8 +13,8 @@ import {
   ShieldCheck, AlertCircle, Loader2, Copy,
   ArrowLeft, RefreshCw, Eye, ChevronDown, ChevronUp
 } from 'lucide-react'
-import { Button } from '@/components/ui/button.tsx'
-import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 // ── TYPES ─────────────────────────────────────────────────────
 interface Order {
@@ -140,11 +98,7 @@ const STATUS_CFG: Record<string, {
 }
 
 // ── Flatten nested payment_details ────────────────────────────
-// Handles {"Airtel Money": {"phone_number":"...","account_name":"..."}}
-// and flat {"Airtel Money": "07123..."}
-function flattenPaymentDetails(
-  details: Record<string, any>
-): { key: string; value: string }[] {
+function flattenPaymentDetails(details: Record<string, any>): { key: string; value: string }[] {
   const rows: { key: string; value: string }[] = []
   for (const [method, val] of Object.entries(details ?? {})) {
     if (val && typeof val === 'object') {
@@ -239,18 +193,13 @@ export default function P2POrderPage() {
   const [sendingChat,  setSendingChat]  = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true)
-    await fetchOrder()
-    await fetchMessages()
-    setRefreshing(false)
-  }, [fetchOrder, fetchMessages])
+  const [showReceipt,  setShowReceipt]  = useState(false)      // for merchant receipt toggle
 
   const fileRef    = useRef<HTMLInputElement>(null)
   const chatRef    = useRef<HTMLDivElement>(null)
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Derived values
   const isBuyer    = order?.buyer_id === user?.id
   const isMerchant = order?.p2p_merchants?.user_id === user?.id
   const tokenDisplay = (order?.token ?? '').split('_')[0]
@@ -258,7 +207,7 @@ export default function P2POrderPage() {
   const paymentRows = flattenPaymentDetails(order?.p2p_listings?.payment_details ?? {})
   const platformFee = order ? (order.token_amount * order.platform_fee_bps) / 10000 : 0
 
-  // ── Fetch ────────────────────────────────────────────────────
+  // ── Data fetching ────────────────────────────────────────────
   const fetchOrder = useCallback(async () => {
     if (!id) return
     try {
@@ -281,9 +230,17 @@ export default function P2POrderPage() {
     if (data) setMessages(data)
   }, [id])
 
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchOrder()
+    await fetchMessages()
+    setRefreshing(false)
+  }, [fetchOrder, fetchMessages])
+
+  // Initial load
   useEffect(() => { fetchOrder(); fetchMessages() }, [fetchOrder, fetchMessages])
 
-  // Realtime order
+  // Realtime order updates
   useEffect(() => {
     if (!id) return
     const ch = supabase.channel(`order:${id}`)
@@ -305,7 +262,7 @@ export default function P2POrderPage() {
     return () => { supabase.removeChannel(ch) }
   }, [id])
 
-  // Timer
+  // Timer for payment window
   useEffect(() => {
     if (!order?.payment_deadline || order.status !== 'payment_window') {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -323,11 +280,12 @@ export default function P2POrderPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [order?.payment_deadline, order?.status, fetchOrder])
 
-  // Scroll chat
+  // Scroll chat to bottom on new messages
   useEffect(() => {
     chatRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // ── Helpers ──────────────────────────────────────────────────
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
@@ -336,7 +294,7 @@ export default function P2POrderPage() {
     toast.success(`${label} copied!`)
   }
 
-  // ── Receipt upload ────────────────────────────────────────────
+  // ── Receipt upload ───────────────────────────────────────────
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file || !id) return
     setUploading(true)
@@ -357,7 +315,7 @@ export default function P2POrderPage() {
     }
   }
 
-  // ── Release tokens ────────────────────────────────────────────
+  // ── Release tokens ───────────────────────────────────────────
   const handleRelease = async () => {
     if (!id) return; setReleasing(true)
     try {
@@ -369,7 +327,7 @@ export default function P2POrderPage() {
     } finally { setReleasing(false) }
   }
 
-  // ── Cancel ────────────────────────────────────────────────────
+  // ── Cancel order (buyer only) ───────────────────────────────
   const handleCancel = async () => {
     if (!id || !confirm('Cancel this order?')) return
     try {
@@ -380,7 +338,7 @@ export default function P2POrderPage() {
     }
   }
 
-  // ── Chat ──────────────────────────────────────────────────────
+  // ── Send chat message ────────────────────────────────────────
   const sendChat = async () => {
     if (!chatMsg.trim() || !id || !user?.id) return
     setSendingChat(true)
@@ -393,6 +351,46 @@ export default function P2POrderPage() {
     } finally { setSendingChat(false) }
   }
 
+  // ── Inline header & status banner (role‑aware) ──────────────
+  const renderHeader = (backPath: string) => (
+    <div className="flex items-center gap-3">
+      <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="p-2">
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <div className="flex-1">
+        <h1 className="text-base font-bold text-gray-900 dark:text-white">
+          Order #{order?.order_number}
+        </h1>
+        <p className="text-xs text-gray-500">{order ? new Date(order.created_at).toLocaleString() : ''}</p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing} className="p-2">
+        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+      </Button>
+    </div>
+  )
+
+  const renderStatus = (isMerchantView: boolean) => (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusCfg?.color}`}>
+      {order?.status === 'confirming'
+        ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+        : <Clock className="h-4 w-4 flex-shrink-0" />
+      }
+      <div className="flex-1">
+        <p className="font-bold text-sm">{statusCfg?.label}</p>
+        <p className="text-xs opacity-80">
+          {isMerchantView ? statusCfg?.merchantDesc : statusCfg?.buyerDesc}
+        </p>
+      </div>
+      {order?.status === 'payment_window' && timeLeft > 0 && (
+        <span className={`font-mono font-bold text-lg flex-shrink-0 ${
+          timeLeft < 120 ? 'text-red-600 dark:text-red-400' : ''
+        }`}>
+          {formatTime(timeLeft)}
+        </span>
+      )}
+    </div>
+  )
+
   // ── Loading / error ───────────────────────────────────────────
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -404,47 +402,6 @@ export default function P2POrderPage() {
       <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
       <p className="text-gray-600 dark:text-gray-400">{error ?? 'Order not found'}</p>
       <Button className="mt-6" onClick={() => navigate('/payments')}>Back to Payments</Button>
-    </div>
-  )
-
-  // ── Shared header ─────────────────────────────────────────────
-  const PageHeader = ({ backPath }: { backPath: string }) => (
-    <div className="flex items-center gap-3">
-      <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="p-2">
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-      <div className="flex-1">
-        <h1 className="text-base font-bold text-gray-900 dark:text-white">
-          Order #{order.order_number}
-        </h1>
-        <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
-      </div>
-      <Button variant="ghost" size="sm" onClick={fetchOrder} className="p-2">
-        <RefreshCw className="h-4 w-4" />
-      </Button>
-    </div>
-  )
-
-  // ── Shared status banner — role-aware ────────────────────────
-  const StatusBanner = ({ isMerchantView }: { isMerchantView: boolean }) => (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusCfg?.color}`}>
-      {order.status === 'confirming'
-        ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-        : <Clock className="h-4 w-4 flex-shrink-0" />
-      }
-      <div className="flex-1">
-        <p className="font-bold text-sm">{statusCfg?.label}</p>
-        <p className="text-xs opacity-80">
-          {isMerchantView ? statusCfg?.merchantDesc : statusCfg?.buyerDesc}
-        </p>
-      </div>
-      {order.status === 'payment_window' && timeLeft > 0 && (
-        <span className={`font-mono font-bold text-lg flex-shrink-0 ${
-          timeLeft < 120 ? 'text-red-600 dark:text-red-400' : ''
-        }`}>
-          {formatTime(timeLeft)}
-        </span>
-      )}
     </div>
   )
 
