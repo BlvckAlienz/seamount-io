@@ -334,67 +334,60 @@ export default function MerchantDashboardPage() {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-full max-w-md space-y-4">
 
-            {/* Status card */}
-            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 text-center">
-              <div className="w-12 h-12 mx-auto mb-3 bg-red-500/20 rounded-full flex items-center justify-center">
-                <XCircle className="h-6 w-6 text-red-400" />
+            {/* Status card — tight */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+              <XCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-white leading-tight">Application Not Approved</p>
+                <p className="text-xs text-gray-400">You can still buy crypto. Fix issues below and reapply.</p>
               </div>
-              <h1 className="text-lg font-bold text-white">Application Not Approved</h1>
-              <p className="text-gray-400 text-sm mt-1">
-                You can still buy crypto on Seamount. Fix the items below and reapply.
-              </p>
             </div>
 
-            {/* Rejection reasons — compact grid */}
-            <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-4 space-y-2.5">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                Common Reasons
-              </p>
-              {[
-                { icon: '🪪', text: 'KYC not completed'                    },
-                { icon: '💼', text: 'Zero or insufficient token balance'    },
-                { icon: '📋', text: 'Incomplete profile (phone / country)'  },
-                { icon: '🏦', text: 'Payment account name mismatch'         },
-                { icon: '⚠️', text: 'Compliance concern flagged'            },
-              ].map((r, i) => (
-                <div key={i} className="flex items-center gap-3 text-sm">
-                  <span className="text-base w-6 text-center flex-shrink-0">{r.icon}</span>
-                  <span className="text-gray-300">{r.text}</span>
-                </div>
-              ))}
-            </div>
+            {/* Reasons + Steps — single combined card */}
+            <div className="bg-gray-800/60 border border-gray-700 rounded-xl divide-y divide-gray-700/60">
+              {/* Reasons */}
+              <div className="px-4 py-3 space-y-1.5">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Why it was rejected</p>
+                {[
+                  { icon: '🪪', text: 'KYC not completed'                   },
+                  { icon: '💼', text: 'Insufficient token balance'           },
+                  { icon: '📋', text: 'Incomplete profile'                   },
+                  { icon: '🏦', text: 'Payment account name mismatch'        },
+                ].map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-300">
+                    <span className="w-4 text-center flex-shrink-0">{r.icon}</span>
+                    {r.text}
+                  </div>
+                ))}
+              </div>
 
-            {/* Action steps — numbered, compact */}
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 space-y-2.5">
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">
-                Before Reapplying
-              </p>
-              {[
-                'Complete KYC in Settings → Identity',
-                'Fund wallets with tokens you plan to sell',
-                'Ensure payment account matches your KYC name',
-              ].map((step, i) => (
-                <div key={i} className="flex items-center gap-3 text-sm text-gray-300">
-                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">
-                    {i + 1}
-                  </span>
-                  {step}
-                </div>
-              ))}
+              {/* Steps */}
+              <div className="px-4 py-3 space-y-1.5">
+                <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Before reapplying</p>
+                {[
+                  'Complete KYC in Settings → Identity',
+                  'Fund wallets with tokens you plan to sell',
+                  'Ensure payment account matches your KYC name',
+                ].map((step, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-300">
+                    <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center flex-shrink-0 font-bold">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* CTA */}
             <button
               onClick={() => setShowOnboarding(true)}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
             >
-              <BadgeCheck className="h-4 w-4" />
-              Reapply as Merchant
+              <BadgeCheck className="h-4 w-4" /> Reapply as Merchant
             </button>
 
-            <p className="text-center text-xs text-gray-600">
-              Questions? Go to Settings → Support
-            </p>
+            <p className="text-center text-xs text-gray-600">Questions? Settings → Support</p>
           </div>
         </div>
 
