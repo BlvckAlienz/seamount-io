@@ -1,4 +1,45 @@
-// FILE: frontend/src/pages/P2POrderPage.tsx
+const [showReceipt,  setShowReceipt]  = useState(false)
+
+  // ── Inline header — avoids inner-component remount bug ───────
+  const renderHeader = (backPath: string) => (
+    <div className="flex items-center gap-3">
+      <Button variant="ghost" size="sm" onClick={() => navigate(backPath)} className="p-2">
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <div className="flex-1">
+        <h1 className="text-base font-bold text-gray-900 dark:text-white">
+          Order #{order?.order_number}
+        </h1>
+        <p className="text-xs text-gray-500">{order ? new Date(order.created_at).toLocaleString() : ''}</p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing} className="p-2">
+        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+      </Button>
+    </div>
+  )
+
+  // ── Inline status banner — role-aware ─────────────────────────
+  const renderStatus = (isMerchantView: boolean) => (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${statusCfg?.color}`}>
+      {order?.status === 'confirming'
+        ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+        : <Clock className="h-4 w-4 flex-shrink-0" />
+      }
+      <div className="flex-1">
+        <p className="font-bold text-sm">{statusCfg?.label}</p>
+        <p className="text-xs opacity-80">
+          {isMerchantView ? statusCfg?.merchantDesc : statusCfg?.buyerDesc}
+        </p>
+      </div>
+      {order?.status === 'payment_window' && timeLeft > 0 && (
+        <span className={`font-mono font-bold text-lg flex-shrink-0 ${
+          timeLeft < 120 ? 'text-red-600 dark:text-red-400' : ''
+        }`}>
+          {formatTime(timeLeft)}
+        </span>
+      )}
+    </div>
+  )// FILE: frontend/src/pages/P2POrderPage.tsx
 // Buyer view: timer, payment details, receipt upload, chat
 // Merchant view: order summary, receipt preview, release button, chat
 
@@ -196,7 +237,14 @@ export default function P2POrderPage() {
   const [chatMsg,      setChatMsg]      = useState('')
   const [sendingChat,  setSendingChat]  = useState(false)
   const [error,        setError]        = useState<string | null>(null)
-  const [showReceipt,  setShowReceipt]  = useState(false)
+  const [refreshing,   setRefreshing]   = useState(false)
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchOrder()
+    await fetchMessages()
+    setRefreshing(false)
+  }, [fetchOrder, fetchMessages])
 
   const fileRef    = useRef<HTMLInputElement>(null)
   const chatRef    = useRef<HTMLDivElement>(null)
@@ -407,8 +455,8 @@ export default function P2POrderPage() {
       <div className="min-h-screen bg-white dark:bg-gray-50 p-3 md:p-6">
         <div className="max-w-2xl mx-auto space-y-4">
 
-          <PageHeader backPath="/merchant" />
-          <StatusBanner isMerchantView={true} />
+          {renderHeader('/merchant')}
+          {renderStatus(true)}
 
           {/* Order summary — light theme for merchant */}
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 shadow-sm">
@@ -500,8 +548,8 @@ export default function P2POrderPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-3 md:p-6">
       <div className="max-w-2xl mx-auto space-y-4">
 
-        <PageHeader backPath="/payments" />
-        <StatusBanner isMerchantView={false} />
+        {renderHeader('/payments')}
+        {renderStatus(false)}
 
         {/* Order summary */}
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/60">
