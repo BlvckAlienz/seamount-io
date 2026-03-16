@@ -521,7 +521,13 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     // 🚨 CRITICAL: Don't interfere with admin or settings routes
-    if (currentPath.startsWith('/admin') || currentPath.startsWith('/settings')) {
+    if (
+      currentPath.startsWith('/admin') ||
+      currentPath.startsWith('/settings') ||
+      currentPath.startsWith('/p2p/') ||        // ← P2P order pages
+      currentPath.startsWith('/merchant') ||    // ← Merchant dashboard
+      currentPath.startsWith('/payments')       // ← Payments page
+    ) {
       console.log('🛡️ [Navigation] Protected route detected - skipping auto-navigation');
       return; // ← EXIT EARLY
     }

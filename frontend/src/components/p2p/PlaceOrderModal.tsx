@@ -1,9 +1,8 @@
 // FILE: frontend/src/components/p2p/PlaceOrderModal.tsx
-// Order form shown when user clicks "Buy" on a merchant card.
-// Mirrors Binance's order placement UX.
 
 import { useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/config/api'
@@ -14,9 +13,15 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Label } from '@/components/ui/label.tsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx'
+import {
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue
+} from '@/components/ui/select.tsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.tsx'
-import { ShieldCheck, Clock, Star, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import {
+  ShieldCheck, Clock, Star,
+  AlertCircle, ArrowRight, Loader2
+} from 'lucide-react'
 
 interface Listing {
   id: string
@@ -49,26 +54,28 @@ interface PlaceOrderModalProps {
 export function PlaceOrderModal({
   listing, fiatCurrency, tokenMeta, open, onOpenChange
 }: PlaceOrderModalProps) {
+  // ✅ BOTH hooks called at top level — never conditionally
   const { user } = useAuth()
-  const [fiatAmount,     setFiatAmount]     = useState('')
-  const [paymentMethod,  setPaymentMethod]  = useState('')
-  const [loading,        setLoading]        = useState(false)
-  const [error,          setError]          = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  const [fiatAmount,    setFiatAmount]    = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState<string | null>(null)
 
   const tokenDisplay = listing.token.split('_')[0]
   const m = listing.p2p_merchants
 
-  // Derived token amount from fiat input
   const tokenAmount = fiatAmount && parseFloat(fiatAmount) > 0
     ? (parseFloat(fiatAmount) / listing.price_per_token).toFixed(6)
     : '0.000000'
 
   const isAmountValid =
-    fiatAmount &&
+    !!fiatAmount &&
     parseFloat(fiatAmount) >= listing.min_order_fiat &&
     parseFloat(fiatAmount) <= listing.max_order_fiat
 
-  // ── Submit Order ─────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
     if (!isAmountValid || !paymentMethod) return
     if (!user?.id) { toast.error('Please log in first'); return }
@@ -77,24 +84,25 @@ export function PlaceOrderModal({
     setError(null)
 
     try {
-      const res = await apiClient.post('/api/p2p/orders', {
+      const response = await apiClient.post('/api/p2p/orders', {
         idempotency_key: uuidv4(),
         listing_id:      listing.id,
         fiat_amount:     parseFloat(fiatAmount),
         payment_method:  paymentMethod
       })
 
-      if (res?.data?.success) {
-        const orderId = res.data?.order?.id
-        toast.success('Order placed! Payment details are now visible.')
+      const body = response?.data
+
+      if (body?.success) {
+        const orderId: string | undefined = body?.order?.id
+        // Close modal before navigating — prevents state update on unmounted component
         onOpenChange(false)
-        if (orderId) {
-          window.location.href = `/p2p/orders/${orderId}`
-        } else {
-          window.location.href = '/payments'
-        }
+        toast.success('Order placed! Payment details are now visible.')
+        // ✅ navigate() = client-side transition, no page reload,
+        //    AuthContext evaluateNavigation() does NOT re-fire
+        navigate(orderId ? `/p2p/orders/${orderId}` : '/payments')
       } else {
-        throw new Error(res?.data?.detail ?? 'Failed to place order')
+        throw new Error(body?.detail ?? 'Failed to place order')
       }
     } catch (err: any) {
       const msg = err.response?.data?.detail ?? err.message ?? 'Failed to place order'
@@ -106,8 +114,9 @@ export function PlaceOrderModal({
   }
 
   return (
-          <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-w-[95vw] w-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 max-h-[90vh] overflow-y-auto">
+
         <DialogHeader className="border-b pb-3">
           <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">
             Buy {tokenDisplay}
@@ -119,7 +128,7 @@ export function PlaceOrderModal({
 
         <div className="space-y-4 py-3">
 
-          {/* Merchant Summary — compact */}
+          {/* Merchant Summary */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {m.display_name.charAt(0).toUpperCase()}
@@ -127,12 +136,20 @@ export function PlaceOrderModal({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1 font-semibold text-gray-900 dark:text-white text-sm">
                 <span className="truncate">{m.display_name}</span>
-                {m.verified && <ShieldCheck className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />}
+                {m.verified && (
+                  <ShieldCheck className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                )}
               </div>
               <div className="flex gap-2 text-xs text-gray-500 mt-0.5 flex-wrap">
                 <span>{m.total_orders} orders</span>
-                <span><Star className="h-3 w-3 inline text-yellow-400 mr-0.5" />{m.completion_rate.toFixed(1)}%</span>
-                <span><Clock className="h-3 w-3 inline mr-0.5" />{m.avg_release_time_mins}min</span>
+                <span>
+                  <Star className="h-3 w-3 inline text-yellow-400 mr-0.5" />
+                  {m.completion_rate.toFixed(1)}%
+                </span>
+                <span>
+                  <Clock className="h-3 w-3 inline mr-0.5" />
+                  {m.avg_release_time_mins}min
+                </span>
               </div>
             </div>
             <div className="text-right flex-shrink-0">
@@ -143,7 +160,7 @@ export function PlaceOrderModal({
             </div>
           </div>
 
-          {/* Merchant Terms */}
+          {/* Terms */}
           {listing.terms && (
             <div className="text-xs text-gray-600 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2.5">
               <span className="font-bold text-yellow-700 dark:text-yellow-400">Terms: </span>
@@ -151,10 +168,12 @@ export function PlaceOrderModal({
             </div>
           )}
 
-          {/* Fiat + Token inputs — side by side on larger screens */}
+          {/* Amount inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">I will pay</Label>
+              <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+                I will pay
+              </Label>
               <div className="relative">
                 <Input
                   type="number"
@@ -174,7 +193,9 @@ export function PlaceOrderModal({
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">I will receive</Label>
+              <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+                I will receive
+              </Label>
               <div className="relative">
                 <Input
                   readOnly
@@ -190,8 +211,14 @@ export function PlaceOrderModal({
 
           {/* Payment Method */}
           <div className="space-y-1">
-            <Label className="text-xs font-semibold text-gray-700 dark:text-white">Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={loading}>
+            <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+              Payment Method
+            </Label>
+            <Select
+              value={paymentMethod}
+              onValueChange={setPaymentMethod}
+              disabled={loading}
+            >
               <SelectTrigger className="h-11 w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
@@ -213,15 +240,16 @@ export function PlaceOrderModal({
             </Select>
           </div>
 
-          {/* Warning */}
+          {/* Info */}
           <Alert className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 py-2.5">
             <AlertCircle className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
             <AlertDescription className="text-xs text-gray-700 dark:text-gray-300">
-              You have <strong>15 minutes</strong> to complete payment after placing the order.
-              Payment details revealed only after placement.
+              You have <strong>15 minutes</strong> to complete payment after placing
+              the order. Payment details revealed only after placement.
             </AlertDescription>
           </Alert>
 
+          {/* Inline error */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -244,13 +272,13 @@ export function PlaceOrderModal({
             disabled={loading || !isAmountValid || !paymentMethod}
             className="flex-1 h-10 font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
           >
-            {loading ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Placing...</>
-            ) : (
-              <>Place Order <ArrowRight className="ml-2 h-4 w-4" /></>
-            )}
+            {loading
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Placing...</>
+              : <>Place Order <ArrowRight className="ml-2 h-4 w-4" /></>
+            }
           </Button>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   )
