@@ -12,7 +12,7 @@ import {
   ArrowLeft, RefreshCw, AlertTriangle, CheckCircle,
   XCircle, Clock, Users, TrendingUp, DollarSign,
   Activity, ShoppingBag, Shield, ChevronDown,
-  ChevronUp, ExternalLink, Loader2, BadgeCheck
+  ChevronUp, ExternalLink, Loader2, BadgeCheck, Send
 } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────
@@ -60,6 +60,205 @@ interface P2PSummary {
   }
   listings: { total: number; active: number }
   orders: { total: number; by_status: Record<string, number>; total_volume: number; recent: any[] }
+}
+
+interface AdminOrderModalProps {
+  orderId: string | null
+  onClose: () => void
+}
+
+function AdminOrderModal({ orderId, onClose }: AdminOrderModalProps) {
+  const [data,       setData]       = useState<any>(null)
+  const [loading,    setLoading]    = useState(false)
+  const [msgText,    setMsgText]    = useState('')
+  const [recipient,  setRecipient]  = useState<'buyer' | 'merchant' | 'both'>('buyer')
+  const [sending,    setSending]    = useState(false)
+
+  useEffect(() => {
+    if (!orderId) return
+    setLoading(true)
+    apiClient.get(`/api/v1/admin/p2p/orders/${orderId}`)
+      .then(r => setData(r.data))
+      .catch(() => toast.error('Failed to load order'))
+      .finally(() => setLoading(false))
+  }, [orderId])
+
+  const sendMessage = async () => {
+    if (!msgText.trim() || !orderId) return
+    setSending(true)
+    try {
+      await apiClient.post(`/api/v1/admin/p2p/orders/${orderId}/message`, {
+        message: msgText.trim(),
+        recipient
+      })
+      toast.success(`Message sent to ${recipient}`)
+      setMsgText('')
+      // Refresh messages
+      const r = await apiClient.get(`/api/v1/admin/p2p/orders/${orderId}`)
+      setData(r.data)
+    } catch {
+      toast.error('Failed to send message')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (!orderId) return null
+
+  const order = data?.order
+  const messages: any[] = data?.messages || []
+  const audit: any[] = data?.audit_log || []
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+          <h2 className="font-bold text-white text-base">
+            🛡️ Admin Order View
+            {order && <span className="ml-2 font-mono text-blue-400">#{order.order_number}</span>}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl leading-none">✕</button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+          </div>
+        ) : order ? (
+          <div className="p-5 space-y-5">
+
+            {/* Order summary */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {[
+                ['Status',   order.status],
+                ['Token',    `${order.token_amount?.toFixed(4)} ${order.token?.split('_')[0]}`],
+                ['Fiat',     `${order.fiat_amount?.toLocaleString()} ${order.fiat_currency}`],
+                ['Buyer',    order.buyer?.email || order.buyer_id],
+                ['Merchant', order.p2p_merchants?.display_name || '—'],
+                ['Tx Hash',  order.release_tx_hash ? order.release_tx_hash.slice(0,16)+'...' : '—'],
+                ['Chain Tx Status', order.blockchain_tx?.status || 'N/A'],
+                ['Created',  new Date(order.created_at).toLocaleString()],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="bg-gray-800/60 rounded-lg px-3 py-2">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
+                  <div className="text-white text-sm font-medium mt-0.5 break-all">{String(value)}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* ⚠️ Status mismatch warning */}
+            {order.blockchain_tx && order.blockchain_tx.status === 'completed'
+              && ['disputed', 'expired', 'cancelled'].includes(order.status) && (
+              <div className="bg-red-900/20 border border-red-500/40 rounded-xl px-4 py-3 text-sm text-red-300">
+                ⚠️ <strong>Status mismatch:</strong> blockchain_transactions shows{' '}
+                <span className="font-mono">completed</span> but p2p_orders is{' '}
+                <span className="font-mono text-red-400">{order.status}</span>.{' '}
+                The on-chain transfer executed but the order was subsequently {order.status}.
+                Trust <strong>p2p_orders.status</strong> as the business truth.
+              </div>
+            )}
+
+            {/* Chat — split by recipient visibility */}
+            <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-700 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white">Order Chat</h3>
+                <span className="text-xs text-gray-500">
+                  🔒 = private admin message | Buyer/Merchant see only their own
+                </span>
+              </div>
+              <div className="max-h-52 overflow-y-auto p-3 space-y-2">
+                {messages.map((msg: any) => {
+                  const isAdminMsg  = msg.sender_role === 'admin'
+                  const isSystem    = msg.is_system
+                  const visLabel    = msg.visibility === 'buyer_admin'
+                    ? '→ Buyer only 🔒'
+                    : msg.visibility === 'merchant_admin'
+                    ? '→ Merchant only 🔒'
+                    : ''
+                  return (
+                    <div key={msg.id} className={`flex ${isSystem ? 'justify-center' : isAdminMsg ? 'justify-end' : 'justify-start'}`}>
+                      {isSystem ? (
+                        <span className="text-xs text-gray-400 bg-gray-900 px-3 py-1 rounded-full border border-gray-700 max-w-xs text-center">
+                          {msg.message}
+                        </span>
+                      ) : (
+                        <div className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs ${
+                          isAdminMsg
+                            ? 'bg-purple-700 text-white rounded-br-none'
+                            : 'bg-gray-700 text-gray-100 rounded-bl-none'
+                        }`}>
+                          {msg.message}
+                          {visLabel && <div className="text-[10px] text-purple-300 mt-0.5">{visLabel}</div>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Admin send */}
+              <div className="p-3 border-t border-gray-700 space-y-2">
+                {/* Recipient selector */}
+                <div className="flex gap-2">
+                  {(['buyer', 'merchant', 'both'] as const).map(r => (
+                    <button key={r} onClick={() => setRecipient(r)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition ${
+                        recipient === r
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-700 text-gray-400 hover:text-white'
+                      }`}>
+                      {r === 'both' ? 'Both parties' : r}
+                    </button>
+                  ))}
+                  <span className="text-xs text-gray-500 ml-auto self-center">
+                    {recipient === 'buyer' && '🔒 Merchant cannot see this'}
+                    {recipient === 'merchant' && '🔒 Buyer cannot see this'}
+                    {recipient === 'both' && 'Visible to all'}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={msgText}
+                    onChange={e => setMsgText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                    placeholder={`Message to ${recipient}...`}
+                    className="flex-1 text-sm px-3 py-2 rounded-lg border border-gray-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button onClick={sendMessage} disabled={sending || !msgText.trim()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-1">
+                    {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    Send
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Audit log */}
+            {audit.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Audit Trail</p>
+                <div className="space-y-1">
+                  {audit.map((a: any) => (
+                    <div key={a.id} className="text-xs text-gray-400 flex gap-2">
+                      <span className="text-gray-600">{new Date(a.created_at).toLocaleTimeString()}</span>
+                      <span>{a.event_type}</span>
+                      {a.prev_status && <><span className="text-gray-600">→</span><span className="text-yellow-400">{a.prev_status}</span></>}
+                      <span className="text-gray-600">→</span>
+                      <span className="text-green-400">{a.new_status}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-12">Order not found</p>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -160,6 +359,7 @@ export const AdminDashboard = () => {
   const [users,        setUsers]        = useState<any>(null)
   const [p2p,          setP2p]          = useState<any>(null)
   const [reviewingId,  setReviewingId]  = useState<string | null>(null)
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
 
   // Guard
   useEffect(() => {
@@ -485,6 +685,25 @@ export const AdminDashboard = () => {
             </div>
           )}
 
+          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2 mt-4">Recent Orders</p>
+            <div className="space-y-1 mb-5">
+              {(p2p?.orders?.recent ?? []).map((o: any) => (
+                <button
+                  key={o.id}
+                  onClick={() => setSelectedOrderId(o.id)}
+                  className="w-full flex items-center gap-3 bg-gray-900/40 rounded-xl px-4 py-2.5 border border-gray-700 hover:border-purple-500/40 transition text-left"
+                >
+                  <span className="font-mono text-xs text-gray-400">#{String(o.id).slice(-8)}</span>
+                  <span className="text-white text-xs font-medium flex-1">
+                    {o.token?.split('_')[0]} — {o.token_amount?.toFixed(4)}
+                  </span>
+                  <StatusPill status={o.status} />
+                  <span className="text-xs text-gray-500">{new Date(o.created_at).toLocaleDateString()}</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-purple-400" />
+                </button>
+              ))}
+            </div>
+            
           {/* All merchants */}
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">All Merchants</p>
           <div className="space-y-2">
@@ -566,6 +785,10 @@ export const AdminDashboard = () => {
         </Section>
 
       </div>
+      <AdminOrderModal
+        orderId={selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
+      />
     </div>
   )
 }

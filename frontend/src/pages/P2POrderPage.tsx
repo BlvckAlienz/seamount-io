@@ -89,6 +89,12 @@ const STATUS_CFG: Record<string, {
     buyerDesc:     'This order has been cancelled',
     merchantDesc:  'This order was cancelled'
   },
+  expired: {
+    label: 'Expired',
+    color: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-500/40',
+    buyerDesc:     'Payment window elapsed — order expired before payment was made',
+    merchantDesc:  'Buyer did not pay within the 15-minute window. Order expired.'
+  },
   disputed: {
     label: 'Disputed',
     color: 'bg-red-500/20 text-red-800 dark:text-red-300 border-red-400 dark:border-red-500/40',
@@ -529,7 +535,7 @@ export default function P2POrderPage() {
             chatMsg={chatMsg} setChatMsg={setChatMsg}
             onSend={sendChat} sending={sendingChat}
             chatRef={chatRef}
-            disabled={['completed', 'cancelled'].includes(order.status)}
+            disabled={['completed', 'cancelled', 'expired'].includes(order.status)}
           />
         </div>
       </div>
@@ -552,7 +558,6 @@ export default function P2POrderPage() {
             { label: 'You buy',      value: `${order.token_amount.toFixed(6)} ${tokenDisplay}`, hl: true },
             { label: 'You pay',      value: `${order.fiat_amount.toLocaleString()} ${order.fiat_currency}` },
             { label: 'Rate',         value: `${order.price_per_token.toLocaleString()} ${order.fiat_currency}/${tokenDisplay}` },
-            { label: 'Platform fee', value: `${platformFee.toFixed(6)} ${tokenDisplay}` },
             { label: 'Payment via',  value: order.payment_method },
             { label: 'Merchant',     value: order.p2p_merchants.display_name },
           ].map((r, i) => (
@@ -660,7 +665,7 @@ export default function P2POrderPage() {
           chatMsg={chatMsg} setChatMsg={setChatMsg}
           onSend={sendChat} sending={sendingChat}
           chatRef={chatRef}
-          disabled={['completed', 'cancelled'].includes(order.status)}
+          disabled={['completed', 'cancelled', 'expired'].includes(order.status)}
         />
       </div>
     </div>

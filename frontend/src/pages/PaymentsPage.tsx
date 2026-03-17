@@ -21,6 +21,7 @@ const STATUS_PILL: Record<string, string> = {
   confirming:     'bg-purple-100 text-purple-800',
   completed:      'bg-green-100 text-green-800',
   cancelled:      'bg-gray-100 text-gray-600',
+  expired: 'bg-orange-100 text-orange-700',
   disputed:       'bg-red-100 text-red-800',
 }
 
@@ -76,7 +77,7 @@ function OrderHistory() {
     <div className="space-y-4">
       {/* Filter pills */}
       <div className="flex gap-2 flex-wrap">
-        {['all', 'payment_window', 'paid', 'completed', 'cancelled', 'disputed'].map(f => (
+        {['all', 'payment_window', 'paid', 'completed', 'expired', 'cancelled', 'disputed'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition
               ${filter === f
@@ -85,6 +86,7 @@ function OrderHistory() {
               }`}>
             {f === 'all' ? `All (${orders.length})` :
              f === 'payment_window' ? `Pending (${counts[f] ?? 0})` :
+             f === 'expired' ? `Expired (${counts[f] ?? 0})` :
              `${f.charAt(0).toUpperCase() + f.slice(1)} (${counts[f] ?? 0})`}
           </button>
         ))}

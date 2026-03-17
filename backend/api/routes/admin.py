@@ -1140,3 +1140,198 @@ async def admin_review_merchant(
     except Exception as e:
         logger.error(f"[Admin] Merchant review error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+# ============================================================================
+# P2P ORDER DETAIL — admin view
+# Returns full order + buyer info + merchant info + all messages
+# ============================================================================
+
+@router.get("/p2p/orders/{order_id}")
+async def admin_get_order(
+    order_id: str,
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    Admin full order view — all data, all messages (visibility-aware).
+    Joins p2p_orders with p2p_merchants, user_profiles (buyer + merchant user).
+    """
+    try:
+        order_res = db.supabase.table("p2p_orders") \
+            .select("*, p2p_merchants(*), p2p_listings(payment_details, payment_methods)") \
+            .eq("id", order_id) \
+            .limit(1) \
+            .execute()
+
+        if not order_res.data or len(order_res.data) == 0:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        order = order_res.data[0]
+
+        # ── Buyer profile ─────────────────────────────────────
+        buyer_res = db.supabase.table("user_profiles") \
+            .select("user_id, email, first_name, last_name, kyc_status") \
+            .eq("user_id", order["buyer_id"]) \
+            .limit(1) \
+            .execute()
+        buyer = buyer_res.data[0] if buyer_res.data else {}
+
+        # ── Merchant user profile ─────────────────────────────
+        merchant_data = order.get("p2p_merchants") or {}
+        merchant_user_res = db.supabase.table("user_profiles") \
+            .select("user_id, email, first_name, last_name") \
+            .eq("user_id", merchant_data.get("user_id", "")) \
+            .limit(1) \
+            .execute()
+        merchant_user = merchant_user_res.data[0] if merchant_user_res.data else {}
+
+        # ── All messages (admin sees everything) ─────────────
+        msgs_res = db.supabase.table("p2p_messages") \
+            .select("*") \
+            .eq("order_id", order_id) \
+            .order("created_at", ascending=True) \
+            .execute()
+
+        # ── Audit log ─────────────────────────────────────────
+        audit_res = db.supabase.table("settlement_audit_log") \
+            .select("*") \
+            .eq("order_id", order_id) \
+            .order("created_at", ascending=True) \
+            .execute()
+
+        # ── Blockchain tx (if completed) ─────────────────────
+        bt_res = db.supabase.table("blockchain_transactions") \
+            .select("status, txn_hash, amount, asset, chain, created_at") \
+            .eq("p2p_order_id", order_id) \
+            .limit(1) \
+            .execute()
+        blockchain_tx = bt_res.data[0] if bt_res.data else None
+
+        return {
+            "success": True,
+            "order": {
+                **order,
+                "buyer": buyer,
+                "merchant_user": merchant_user,
+                "blockchain_tx": blockchain_tx,
+            },
+            "messages": msgs_res.data or [],
+            "audit_log": audit_res.data or [],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Admin] Get order error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ADMIN SEND MESSAGE — isolated by recipient
+# ============================================================================
+
+class AdminMessageRequest(BaseModel):
+    message: str
+    recipient: str   # 'buyer' | 'merchant' | 'both'
+
+@router.post("/p2p/orders/{order_id}/message")
+async def admin_send_message(
+    order_id: str,
+    payload: AdminMessageRequest,
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """
+    Admin sends a message to buyer, merchant, or both.
+    - recipient='buyer'    → visibility='buyer_admin'   (merchant CANNOT see)
+    - recipient='merchant' → visibility='merchant_admin' (buyer CANNOT see)
+    - recipient='both'     → visibility='all'
+    
+    RLS on p2p_messages enforces this on the client side.
+    """
+    try:
+        if payload.recipient not in ("buyer", "merchant", "both"):
+            raise HTTPException(status_code=400, detail="recipient must be 'buyer', 'merchant', or 'both'")
+        if not payload.message.strip():
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+        # Verify order exists
+        order_res = db.supabase.table("p2p_orders") \
+            .select("id, buyer_id, merchant_id") \
+            .eq("id", order_id) \
+            .limit(1) \
+            .execute()
+        if not order_res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        visibility_map = {
+            "buyer":    "buyer_admin",
+            "merchant": "merchant_admin",
+            "both":     "all",
+        }
+        visibility = visibility_map[payload.recipient]
+
+        prefix_map = {
+            "buyer":    "🛡️ Seamount Support (to you):",
+            "merchant": "🛡️ Seamount Support (to you):",
+            "both":     "🛡️ Seamount Support:",
+        }
+
+        db.supabase.table("p2p_messages").insert({
+            "order_id":    order_id,
+            "sender_id":   admin["id"],
+            "is_system":   False,
+            "sender_role": "admin",
+            "visibility":  visibility,
+            "message":     f"{prefix_map[payload.recipient]} {payload.message.strip()}"
+        }).execute()
+
+        logger.info(
+            f"[Admin] Message sent to '{payload.recipient}' "
+            f"on order {order_id} by {admin.get('email')}"
+        )
+        return {"success": True, "visibility": visibility}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Admin] Send message error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# P2P ORDERS LIST — paginated, filterable for admin
+# ============================================================================
+
+@router.get("/p2p/orders")
+async def admin_list_orders(
+    status: str = None,
+    limit: int = 50,
+    offset: int = 0,
+    admin: dict = Depends(require_admin),
+    db: DatabaseService = Depends(get_db_service)
+):
+    """Paginated P2P order list with optional status filter."""
+    try:
+        query = db.supabase.table("p2p_orders") \
+            .select(
+                "id, order_number, token, fiat_currency, fiat_amount, "
+                "token_amount, status, created_at, release_tx_hash, "
+                "p2p_merchants(display_name)"
+            ) \
+            .order("created_at", desc=True) \
+            .limit(limit) \
+            .offset(offset)
+
+        if status:
+            query = query.eq("status", status)
+
+        res = query.execute()
+        return {
+            "success": True,
+            "orders": res.data or [],
+            "count": len(res.data or []),
+        }
+    except Exception as e:
+        logger.error(f"[Admin] List orders error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

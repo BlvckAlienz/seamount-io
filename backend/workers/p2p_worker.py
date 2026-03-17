@@ -480,6 +480,28 @@ class P2PWorker:
             metadata={"tx_hash": tx_hash}
         )
 
+        # Write to blockchain_transactions with VERIFIED status only.
+        # This is the source of truth for the admin dashboard.
+        # Status is 'completed' here because we already verified on-chain above.
+        # If the order later becomes 'disputed', the admin P2P view uses
+        # p2p_orders.status (accurate) not blockchain_transactions.status.
+        try:
+            self.supabase.table("blockchain_transactions").insert({
+                "user_id": order["buyer_id"],
+                "transaction_type": "p2p_release",
+                "status": "completed",
+                "amount": order["token_amount"],
+                "asset": token,
+                "chain": chain,
+                "txn_hash": tx_hash,
+                "to_address": buyer_address,
+                "platform_fee": 0,          # fee not collected yet — see note in p2p_worker
+                "p2p_order_id": order_id,   # FK to join in admin queries
+            }).execute()
+        except Exception as bt_err:
+            # Non-fatal — blockchain_transactions is analytics, not settlement
+            logger.warning(f"[P2PWorker] blockchain_transactions write failed: {bt_err}")
+            
         logger.info(f"[P2PWorker] Token release complete — tx: {tx_hash}")
 
     # ── Order Expire Handler ───────────────────────────────────
@@ -502,18 +524,27 @@ class P2PWorker:
             return
 
         self.supabase.table("p2p_orders").update({
-            "status": "cancelled",
+            "status": "expired",                               # ← was 'cancelled'
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", order_id).execute()
 
-        self.supabase.table("p2p_messages").insert({
-            "order_id": order_id,
-            "is_system": True,
-            "message": "Payment window expired. Order automatically cancelled."
-        }).execute()
+        # System message — fires Realtime INSERT which frontend catches
+        try:
+            self.supabase.table("p2p_messages").insert({
+                "order_id": order_id,
+                "is_system": True,
+                "sender_role": "system",
+                "visibility": "all",
+                "message": (
+                    "⏰ Payment window expired. This order has been automatically "
+                    "marked as expired. The merchant's tokens remain available."
+                )
+            }).execute()
+        except Exception as msg_err:
+            logger.warning(f"[P2PWorker] Expiry system message failed (non-critical): {msg_err}")
 
-        self._write_audit(order_id, "state_change", "payment_window", "cancelled")
-        logger.info(f"[P2PWorker] Order {order_id} expired and cancelled")
+        self._write_audit(order_id, "state_change", "payment_window", "expired")
+        logger.info(f"[P2PWorker] Order {order_id} expired")
 
     # ── Job State Helpers ──────────────────────────────────────
 

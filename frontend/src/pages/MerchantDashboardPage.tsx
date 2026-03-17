@@ -66,6 +66,7 @@ const STATUS_BADGE: Record<string, { label: string; class: string }> = {
   confirming:     { label: 'Releasing',        class: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
   completed:      { label: 'Completed',        class: 'bg-green-500/20 text-green-300 border-green-500/30'  },
   cancelled:      { label: 'Cancelled',        class: 'bg-gray-600/40 text-gray-400 border-gray-600'       },
+  expired:        { label: 'Expired', class: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
   disputed:       { label: 'Disputed',         class: 'bg-red-500/20 text-red-300 border-red-500/30'       },
 }
 
@@ -252,7 +253,7 @@ export default function MerchantDashboardPage() {
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               {[
-                { label: '0.3%', sub: 'per trade earned' },
+                { label: 'Your rate', sub: 'spread-based earnings' },
                 { label: '15min', sub: 'payment window' },
                 { label: '100%', sub: 'escrow protected' },
               ].map((s, i) => (
@@ -600,7 +601,7 @@ export default function MerchantDashboardPage() {
             <div className="space-y-4">
               {/* Filter */}
               <div className="flex gap-2 flex-wrap">
-                {['all', 'payment_window', 'paid', 'confirming', 'completed', 'disputed'].map(f => (
+                {['all', 'payment_window', 'paid', 'confirming', 'completed', 'expired', 'cancelled', 'disputed'].map(f => (
                   <button
                     key={f}
                     onClick={() => setOrderFilter(f)}

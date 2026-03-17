@@ -336,8 +336,8 @@ export function MerchantOnboardingModal({ open, onOpenChange, onSuccess }: Props
                 <p className="font-bold mb-1">Merchant Benefits</p>
                 <ul className="text-yellow-300/80 space-y-1 text-xs">
                   <li>✓ Verified badge on all your listings</li>
-                  <li>✓ Earn 0.3% fee on every completed trade</li>
-                  <li>✓ Priority in listing sort order</li>
+                  <li>✓ Set your own rates and earn on the spread</li>
+                  <li>✓ Large market of verified traders</li>
                   <li>✓ Access to merchant dashboard & analytics</li>
                 </ul>
               </div>
