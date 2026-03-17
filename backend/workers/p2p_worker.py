@@ -12,6 +12,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
+import aiohttp
 
 from supabase import Client
 
@@ -106,6 +107,236 @@ class P2PWorker:
             logger.error(f"[P2PWorker] ❌ Job {job_id} failed: {e}")
             self._retry_or_fail(job)
 
+    async def _verify_tx_on_chain(
+        self,
+        tx_hash: str,
+        chain: str,
+        max_attempts: int = 8,
+        delay_secs: int = 5
+    ) -> tuple[bool, str]:
+        """
+        Poll the chain until tx is confirmed or max_attempts exhausted.
+        Returns (success: bool, reason: str).
+        A broadcast-confirmed hash ≠ successful execution (see: OUT_OF_ENERGY).
+        """
+        for attempt in range(1, max_attempts + 1):
+            await asyncio.sleep(delay_secs)
+            logger.info(
+                f"[P2PWorker] Verifying tx {tx_hash[:16]}... "
+                f"on {chain} (attempt {attempt}/{max_attempts})"
+            )
+
+            try:
+                # ── TRON ──────────────────────────────────────
+                if chain == "tron":
+                    url = f"https://apilist.tronscanapi.com/api/transaction-info?hash={tx_hash}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            url, timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status != 200:
+                                continue
+                            data = await resp.json()
+                            confirmed    = data.get("confirmed", False)
+                            contract_ret = data.get("contractRet", "")
+                            if not confirmed:
+                                logger.info("[P2PWorker] Tron tx not yet confirmed, retrying...")
+                                continue
+                            if contract_ret == "SUCCESS":
+                                return True, "SUCCESS"
+                            elif contract_ret:
+                                # OUT_OF_ENERGY, REVERT, etc.
+                                return False, contract_ret
+                            continue  # contractRet absent — still pending
+
+                # ── EVM (Ethereum, Polygon, Base) ─────────────
+                elif chain in ("ethereum", "polygon", "base"):
+                    rpc_urls = {
+                        "ethereum": "https://eth.drpc.org",
+                        "polygon":  "https://polygon-rpc.com",
+                        "base":     "https://mainnet.base.org",
+                    }
+                    payload = {
+                        "jsonrpc": "2.0", "id": 1,
+                        "method":  "eth_getTransactionReceipt",
+                        "params":  [tx_hash]
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            rpc_urls[chain], json=payload,
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            data = await resp.json()
+                            receipt = data.get("result")
+                            if receipt is None:
+                                continue  # not mined yet
+                            status = int(receipt.get("status", "0x0"), 16)
+                            return (True, "SUCCESS") if status == 1 else (False, "REVERTED")
+
+                # ── Solana ────────────────────────────────────
+                elif chain == "solana":
+                    payload = {
+                        "jsonrpc": "2.0", "id": 1,
+                        "method":  "getTransaction",
+                        "params":  [tx_hash, {"encoding": "json", "commitment": "confirmed"}]
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.mainnet-beta.solana.com",
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            data = await resp.json()
+                            result = data.get("result")
+                            if result is None:
+                                continue
+                            err = result.get("meta", {}).get("err")
+                            return (True, "SUCCESS") if err is None else (False, str(err))
+
+                # ── Algorand ──────────────────────────────────
+                elif chain == "algorand":
+                    url = f"https://mainnet-api.algonode.cloud/v2/transactions/{tx_hash}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            url, timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status == 200:
+                                return True, "SUCCESS"
+                            elif resp.status == 404:
+                                continue
+                            else:
+                                return False, f"HTTP_{resp.status}"
+
+                # ── Unknown chain — don't block forever ───────
+                else:
+                    logger.warning(
+                        f"[P2PWorker] No verifier for chain '{chain}', assuming SUCCESS"
+                    )
+                    return True, "UNVERIFIED"
+
+            except Exception as e:
+                logger.warning(f"[P2PWorker] Verify attempt {attempt} error: {e}")
+                continue
+
+        return False, "TIMEOUT_UNCONFIRMED"
+
+    # ─────────────────────────────────────────────────────────────
+    # Add _verify_tx_on_chain method
+    # ─────────────────────────────────────────────────────────────
+
+    async def _verify_tx_on_chain(
+        self,
+        tx_hash: str,
+        chain: str,
+        max_attempts: int = 8,
+        delay_secs: int = 5
+    ) -> tuple[bool, str]:
+        """
+        Poll the chain until tx is confirmed or max_attempts exhausted.
+        Returns (success: bool, reason: str).
+        A broadcast-confirmed hash ≠ successful execution (see: OUT_OF_ENERGY).
+        """
+        for attempt in range(1, max_attempts + 1):
+            await asyncio.sleep(delay_secs)
+            logger.info(
+                f"[P2PWorker] Verifying tx {tx_hash[:16]}... "
+                f"on {chain} (attempt {attempt}/{max_attempts})"
+            )
+
+            try:
+                # ── TRON ──────────────────────────────────────
+                if chain == "tron":
+                    url = f"https://apilist.tronscanapi.com/api/transaction-info?hash={tx_hash}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            url, timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status != 200:
+                                continue
+                            data = await resp.json()
+                            confirmed    = data.get("confirmed", False)
+                            contract_ret = data.get("contractRet", "")
+                            if not confirmed:
+                                logger.info("[P2PWorker] Tron tx not yet confirmed, retrying...")
+                                continue
+                            if contract_ret == "SUCCESS":
+                                return True, "SUCCESS"
+                            elif contract_ret:
+                                # OUT_OF_ENERGY, REVERT, etc.
+                                return False, contract_ret
+                            continue  # contractRet absent — still pending
+
+                # ── EVM (Ethereum, Polygon, Base) ─────────────
+                elif chain in ("ethereum", "polygon", "base"):
+                    rpc_urls = {
+                        "ethereum": "https://eth.drpc.org",
+                        "polygon":  "https://polygon-rpc.com",
+                        "base":     "https://mainnet.base.org",
+                    }
+                    payload = {
+                        "jsonrpc": "2.0", "id": 1,
+                        "method":  "eth_getTransactionReceipt",
+                        "params":  [tx_hash]
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            rpc_urls[chain], json=payload,
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            data = await resp.json()
+                            receipt = data.get("result")
+                            if receipt is None:
+                                continue  # not mined yet
+                            status = int(receipt.get("status", "0x0"), 16)
+                            return (True, "SUCCESS") if status == 1 else (False, "REVERTED")
+
+                # ── Solana ────────────────────────────────────
+                elif chain == "solana":
+                    payload = {
+                        "jsonrpc": "2.0", "id": 1,
+                        "method":  "getTransaction",
+                        "params":  [tx_hash, {"encoding": "json", "commitment": "confirmed"}]
+                    }
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://api.mainnet-beta.solana.com",
+                            json=payload,
+                            timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            data = await resp.json()
+                            result = data.get("result")
+                            if result is None:
+                                continue
+                            err = result.get("meta", {}).get("err")
+                            return (True, "SUCCESS") if err is None else (False, str(err))
+
+                # ── Algorand ──────────────────────────────────
+                elif chain == "algorand":
+                    url = f"https://mainnet-api.algonode.cloud/v2/transactions/{tx_hash}"
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            url, timeout=aiohttp.ClientTimeout(total=10)
+                        ) as resp:
+                            if resp.status == 200:
+                                return True, "SUCCESS"
+                            elif resp.status == 404:
+                                continue
+                            else:
+                                return False, f"HTTP_{resp.status}"
+
+                # ── Unknown chain — don't block forever ───────
+                else:
+                    logger.warning(
+                        f"[P2PWorker] No verifier for chain '{chain}', assuming SUCCESS"
+                    )
+                    return True, "UNVERIFIED"
+
+            except Exception as e:
+                logger.warning(f"[P2PWorker] Verify attempt {attempt} error: {e}")
+                continue
+
+        return False, "TIMEOUT_UNCONFIRMED"
+        
     # ── Token Release Handler ──────────────────────────────────
 
     async def _handle_token_release(self, job: Dict[str, Any]):
@@ -187,33 +418,67 @@ class P2PWorker:
                 f"WDK transfer failed: {tx_result.get('message', 'unknown error')}"
             )
 
-        tx_hash = tx_result.get("transaction_id", "")
+        tx_hash = tx_result.get("transaction_id", "") or tx_result.get("tx_hash", "")
 
-        # Mark order completed
+        # ── On-chain verification ─────────────────────────────
+        # Broadcast confirmed ≠ execution succeeded.
+        # Tron is the worst offender: OUT_OF_ENERGY = confirmed but failed.
+        verified, reason = await self._verify_tx_on_chain(tx_hash, chain)
+
+        if not verified:
+            logger.error(f"[P2PWorker] Tx {tx_hash[:16]}... FAILED on-chain: {reason}")
+
+            # Revert to confirming — merchant must fix wallet and retry
+            self.supabase.table("p2p_orders").update({
+                "status": "confirming",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", order_id).execute()
+
+            self.supabase.table("p2p_messages").insert({
+                "order_id": order_id,
+                "is_system": True,
+                "message": (
+                    f"⚠️ Token transfer failed on-chain ({reason}). "
+                    f"Merchant: ensure your wallet has sufficient gas/energy and retry release. "
+                    f"Tx: {tx_hash}"
+                )
+            }).execute()
+
+            self._write_audit(
+                order_id, "tx_failed", "confirming", "confirming",
+                actor_id=merchant_user_id,
+                metadata={"tx_hash": tx_hash, "reason": reason}
+            )
+
+            # Raise so the job retries via _retry_or_fail
+            raise Exception(f"On-chain tx failed: {reason}")
+
+        # ── Verified SUCCESS ──────────────────────────────────
         self.supabase.table("p2p_orders").update({
             "status": "completed",
             "release_tx_hash": tx_hash,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", order_id).execute()
 
-        # Update merchant order count
         self.supabase.rpc(
             "increment_merchant_orders",
             {"p_merchant_id": order["merchant_id"]}
         ).execute()
 
-        # System message
         self.supabase.table("p2p_messages").insert({
             "order_id": order_id,
             "is_system": True,
             "message": (
-                f"{order['token_amount']} {token} released to buyer. "
+                f"✅ {order['token_amount']} {token} released to buyer. "
                 f"Transaction: {tx_hash}"
             )
         }).execute()
 
-        # Audit
-        self._write_audit(order_id, "state_change", "confirming", "completed", merchant_user_id)
+        self._write_audit(
+            order_id, "state_change", "confirming", "completed",
+            actor_id=merchant_user_id,
+            metadata={"tx_hash": tx_hash}
+        )
 
         logger.info(f"[P2PWorker] Token release complete — tx: {tx_hash}")
 
@@ -351,15 +616,17 @@ class P2PWorker:
         event_type: str,
         prev_status: str | None,
         new_status: str | None,
-        actor_id: str | None = None
+        actor_id: str | None = None,
+        metadata: dict | None = None
     ):
         try:
             self.supabase.table("settlement_audit_log").insert({
-                "order_id": order_id,
-                "event_type": event_type,
+                "order_id":    order_id,
+                "event_type":  event_type,
                 "prev_status": prev_status,
-                "new_status": new_status,
-                "actor_id": actor_id
+                "new_status":  new_status,
+                "actor_id":    actor_id,
+                **({"metadata": metadata} if metadata else {})
             }).execute()
         except Exception as e:
             logger.warning(f"[P2PWorker] Audit write failed (non-critical): {e}")

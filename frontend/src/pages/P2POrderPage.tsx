@@ -198,6 +198,7 @@ export default function P2POrderPage() {
   const fileRef    = useRef<HTMLInputElement>(null)
   const chatRef    = useRef<HTMLDivElement>(null)
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const expireCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Derived values
   const isBuyer    = order?.buyer_id === user?.id
@@ -240,15 +241,38 @@ export default function P2POrderPage() {
   // Initial load
   useEffect(() => { fetchOrder(); fetchMessages() }, [fetchOrder, fetchMessages])
 
-  // Realtime order updates
+  // Realtime order updates — self-healing on channel error
   useEffect(() => {
     if (!id) return
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
     const ch = supabase.channel(`order:${id}`)
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'p2p_orders', filter: `id=eq.${id}` },
-        p => setOrder(prev => prev ? { ...prev, ...p.new } : prev))
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
+        (p) => {
+          console.log('[Realtime] p2p_orders UPDATE:', p.new)
+          setOrder(prev => prev ? { ...prev, ...p.new } : prev)
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[Realtime] Subscribed to order:${id}`)
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[Realtime] Channel error order:${id}`, err)
+          // Self-heal: re-subscribe after 5s
+          reconnectTimer = setTimeout(() => {
+            console.log(`[Realtime] Reconnecting order:${id}`)
+            ch.subscribe()
+          }, 5000)
+        }
+      })
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      supabase.removeChannel(ch)
+    }
   }, [id])
 
   // Realtime messages
@@ -273,11 +297,24 @@ export default function P2POrderPage() {
         (new Date(order.payment_deadline).getTime() - Date.now()) / 1000
       ))
       setTimeLeft(rem)
-      if (rem === 0) { clearInterval(timerRef.current!); fetchOrder() }
+      if (rem === 0) {
+        clearInterval(timerRef.current!)
+        fetchOrder()  // immediate
+
+        // Worker may take a few seconds to process the expiry job.
+        // Poll again at +3s and +8s to catch the DB update.
+        expireCheckRef.current = setTimeout(() => {
+          fetchOrder()
+          expireCheckRef.current = setTimeout(() => fetchOrder(), 5000)
+        }, 3000)
+      }
     }
     tick()
     timerRef.current = setInterval(tick, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (expireCheckRef.current) clearTimeout(expireCheckRef.current)
+    }
   }, [order?.payment_deadline, order?.status, fetchOrder])
 
   // Scroll chat to bottom on new messages
