@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '@/config/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import {
   ArrowLeft, RefreshCw, AlertTriangle, CheckCircle,
@@ -76,11 +77,42 @@ function AdminOrderModal({ orderId, onClose }: AdminOrderModalProps) {
 
   useEffect(() => {
     if (!orderId) return
+
     setLoading(true)
     apiClient.get(`/api/v1/admin/p2p/orders/${orderId}`)
       .then(r => setData(r.data))
       .catch(() => toast.error('Failed to load order'))
       .finally(() => setLoading(false))
+
+    // Realtime — admin sees ALL messages regardless of visibility
+    const ch = supabase
+      .channel(`admin-msgs:${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'p2p_messages',
+          filter: `order_id=eq.${orderId}`,
+        },
+        (p) => {
+          // Append directly — no visibility filter for admin
+          setData((prev: any) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              messages: [...(prev.messages || []), p.new]
+            }
+          })
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[Admin Realtime] Subscribed to msgs for order ${orderId}`)
+        }
+      })
+
+    return () => { supabase.removeChannel(ch) }
   }, [orderId])
 
   const sendMessage = async () => {
@@ -93,9 +125,8 @@ function AdminOrderModal({ orderId, onClose }: AdminOrderModalProps) {
       })
       toast.success(`Message sent to ${recipient}`)
       setMsgText('')
-      // Refresh messages
-      const r = await apiClient.get(`/api/v1/admin/p2p/orders/${orderId}`)
-      setData(r.data)
+      // No manual re-fetch needed — Realtime subscription above
+      // delivers the new message instantly via postgres_changes INSERT
     } catch {
       toast.error('Failed to send message')
     } finally {

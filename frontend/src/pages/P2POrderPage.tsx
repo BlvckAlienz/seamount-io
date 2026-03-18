@@ -52,6 +52,8 @@ interface Message {
   message: string
   is_system: boolean
   created_at: string
+  visibility: 'all' | 'buyer_admin' | 'merchant_admin' | 'admin_only'
+  sender_role: 'user' | 'system' | 'admin'
 }
 
 // ── STATUS CONFIG — separate desc for buyer vs merchant ───────
@@ -229,13 +231,29 @@ export default function P2POrderPage() {
     finally { setLoading(false) }
   }, [id])
 
+  // Returns true if this user is allowed to see the message
+  const canSeeMessage = useCallback((msg: Partial<Message>): boolean => {
+    const v = msg.visibility ?? 'all'
+    if (v === 'all')             return true
+    if (v === 'admin_only')      return false
+    if (v === 'buyer_admin')     return isBuyer    // only buyer + admin
+    if (v === 'merchant_admin')  return isMerchant // only merchant + admin
+    return true
+  }, [isBuyer, isMerchant])
+
   const fetchMessages = useCallback(async () => {
     if (!id) return
     const { data } = await supabase
-      .from('p2p_messages').select('*')
-      .eq('order_id', id).order('created_at', { ascending: true })
-    if (data) setMessages(data)
-  }, [id])
+      .from('p2p_messages')
+      .select('*')
+      .eq('order_id', id)
+      .order('created_at', { ascending: true })
+    if (data) {
+      // Client-side visibility filter — belt-and-suspenders over RLS
+      // because Supabase Realtime postgres_changes bypasses RLS on INSERT
+      setMessages((data as Message[]).filter(canSeeMessage))
+    }
+  }, [id, canSeeMessage])
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
@@ -281,16 +299,24 @@ export default function P2POrderPage() {
     }
   }, [id])
 
-  // Realtime messages
+  // Realtime messages — filter by visibility on every INSERT
   useEffect(() => {
     if (!id) return
     const ch = supabase.channel(`msgs:${id}`)
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'p2p_messages', filter: `order_id=eq.${id}` },
-        p => setMessages(prev => [...prev, p.new as Message]))
+        (p) => {
+          const msg = p.new as Message
+          // Drop messages this user isn't supposed to see
+          // (Realtime bypasses RLS on INSERT — must filter here)
+          if (!canSeeMessage(msg)) return
+          setMessages(prev => [...prev, msg])
+        }
+      )
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [id])
+  }, [id, canSeeMessage])
 
   // Timer for payment window
   useEffect(() => {
