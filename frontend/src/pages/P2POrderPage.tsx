@@ -631,32 +631,41 @@ export default function P2POrderPage() {
         )}
 
         {/* Dispute button — shown after payment_window ends and tokens not released */}
-        {isBuyer && order.status === 'paid' && (
+        {isBuyer && ['paid', 'confirming', 'disputed'].includes(order.status) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
             <p className="text-xs text-gray-500">
-              Already paid? If the merchant does not release tokens within 15 minutes
-              of confirming your payment, you can raise a dispute.
+              {order.status === 'disputed'
+                ? 'Your dispute has been submitted. Seamount support will contact you within 24 hours.'
+                : 'Paid but tokens not released? You can escalate to Seamount support at any time.'
+              }
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                if (!id || !confirm('Raise a dispute for this order? Our support team will review within 24 hours.')) return
-                try {
-                  await supabase.from('p2p_orders')
-                    .update({ status: 'disputed' }).eq('id', id)
-                  await supabase.from('p2p_messages').insert({
-                    order_id: id, is_system: true,
-                    message: 'Buyer has raised a dispute. Seamount support has been notified.'
-                  })
-                  toast.success('Dispute raised. Support will contact you within 24 hours.')
-                  fetchOrder()
-                } catch { toast.error('Failed to raise dispute') }
-              }}
-              className="w-full text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
-            >
-              ⚠️ Raise a Dispute
-            </Button>
+            {order.status !== 'disputed' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!id || !confirm('Raise a dispute for this order? Our support team will review within 24 hours.')) return
+                  try {
+                    await supabase.from('p2p_orders')
+                        .update({ status: 'disputed' }).eq('id', id)
+                    await supabase.from('p2p_messages').insert({
+                        order_id: id, is_system: true,
+                        message: 'Buyer has raised a dispute. Seamount support has been notified.'
+                    })
+                    toast.success('Dispute raised. Support will contact you within 24 hours.')
+                    fetchOrder()
+                  } catch (error) { toast.error('Failed to raise dispute')}
+                }}
+                className="w-full text-orange-600 border-orange-200 hover:bg-orange-50 text-xs"
+              >
+                ⚠️ Raise a Dispute
+              </Button>
+            )}
+            {order.status === 'disputed' && (
+              <div className="flex items-center gap-2 text-orange-600 text-sm font-medium">
+                <AlertCircle className="h-4 w-4" /> Dispute active — under review
+              </div>
+            )}
           </div>
         )}
 

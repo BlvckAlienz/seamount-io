@@ -1153,10 +1153,12 @@ async def admin_get_order(
     db: DatabaseService = Depends(get_db_service)
 ):
     """
-    Admin full order view — all data, all messages (visibility-aware).
-    Joins p2p_orders with p2p_merchants, user_profiles (buyer + merchant user).
+    Admin full order view.
+    Defensive: blockchain_transactions join is optional —
+    won't 500 if p2p_order_id column doesn't exist yet.
     """
     try:
+        # ── Core order ────────────────────────────────────────
         order_res = db.supabase.table("p2p_orders") \
             .select("*, p2p_merchants(*), p2p_listings(payment_details, payment_methods)") \
             .eq("id", order_id) \
@@ -1185,27 +1187,34 @@ async def admin_get_order(
             .execute()
         merchant_user = merchant_user_res.data[0] if merchant_user_res.data else {}
 
-        # ── All messages (admin sees everything) ─────────────
+        # ── Blockchain tx — defensive, won't crash if column missing ──
+        blockchain_tx = None
+        release_tx_hash = order.get("release_tx_hash")
+        if release_tx_hash:
+            try:
+                bt_res = db.supabase.table("blockchain_transactions") \
+                    .select("status, txn_hash, amount, asset, chain, created_at") \
+                    .eq("txn_hash", release_tx_hash) \
+                    .limit(1) \
+                    .execute()
+                blockchain_tx = bt_res.data[0] if bt_res.data else None
+            except Exception as bt_err:
+                logger.warning(f"[Admin] blockchain_transactions lookup failed: {bt_err}")
+                blockchain_tx = None
+
+        # ── Messages (admin sees all visibility levels) ───────
         msgs_res = db.supabase.table("p2p_messages") \
             .select("*") \
             .eq("order_id", order_id) \
-            .order("created_at", ascending=True) \
+            .order("created_at", desc=False) \
             .execute()
 
         # ── Audit log ─────────────────────────────────────────
         audit_res = db.supabase.table("settlement_audit_log") \
             .select("*") \
             .eq("order_id", order_id) \
-            .order("created_at", ascending=True) \
+            .order("created_at", desc=False) \
             .execute()
-
-        # ── Blockchain tx (if completed) ─────────────────────
-        bt_res = db.supabase.table("blockchain_transactions") \
-            .select("status, txn_hash, amount, asset, chain, created_at") \
-            .eq("p2p_order_id", order_id) \
-            .limit(1) \
-            .execute()
-        blockchain_tx = bt_res.data[0] if bt_res.data else None
 
         return {
             "success": True,

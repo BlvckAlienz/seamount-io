@@ -450,6 +450,18 @@ class P2PWorker:
                 metadata={"tx_hash": tx_hash, "reason": reason}
             )
 
+            # Correct the blockchain_transactions record to 'failed'
+            self._sync_blockchain_tx_status(
+                tx_hash=tx_hash,
+                order_id=order_id,
+                verified=False,
+                reason=reason,
+                token=token,
+                chain=chain,
+                amount=float(order["token_amount"]),
+                buyer_address=buyer_address,
+            )
+
             # Raise so the job retries via _retry_or_fail
             raise Exception(f"On-chain tx failed: {reason}")
 
@@ -485,23 +497,18 @@ class P2PWorker:
         # Status is 'completed' here because we already verified on-chain above.
         # If the order later becomes 'disputed', the admin P2P view uses
         # p2p_orders.status (accurate) not blockchain_transactions.status.
-        try:
-            self.supabase.table("blockchain_transactions").insert({
-                "user_id": order["buyer_id"],
-                "transaction_type": "p2p_release",
-                "status": "completed",
-                "amount": order["token_amount"],
-                "asset": token,
-                "chain": chain,
-                "txn_hash": tx_hash,
-                "to_address": buyer_address,
-                "platform_fee": 0,          # fee not collected yet — see note in p2p_worker
-                "p2p_order_id": order_id,   # FK to join in admin queries
-            }).execute()
-        except Exception as bt_err:
-            # Non-fatal — blockchain_transactions is analytics, not settlement
-            logger.warning(f"[P2PWorker] blockchain_transactions write failed: {bt_err}")
-            
+        # Correct the blockchain_transactions record to 'completed'
+        self._sync_blockchain_tx_status(
+            tx_hash=tx_hash,
+            order_id=order_id,
+            verified=True,
+            reason="SUCCESS",
+            token=token,
+            chain=chain,
+            amount=float(order["token_amount"]),
+            buyer_address=buyer_address,
+        )
+
         logger.info(f"[P2PWorker] Token release complete — tx: {tx_hash}")
 
     # ── Order Expire Handler ───────────────────────────────────
@@ -640,6 +647,66 @@ class P2PWorker:
                 )
         except Exception as e:
             logger.warning(f"[P2PWorker] Stuck job recovery failed: {e}")
+
+    def _sync_blockchain_tx_status(
+        self,
+        tx_hash: str,
+        order_id: str,
+        verified: bool,
+        reason: str,
+        token: str,
+        chain: str,
+        amount: float,
+        buyer_address: str
+    ) -> None:
+        """
+        The WDK send_payment() may already have written a record to
+        blockchain_transactions with status='completed' at broadcast time.
+        This method corrects that record based on actual on-chain result.
+
+        Strategy: try UPDATE first (fixes WDK-written record).
+        If no rows updated (WDK didn't write one), INSERT with verified status.
+        """
+        final_status = "completed" if verified else "failed"
+        now = datetime.now(timezone.utc).isoformat()
+
+        try:
+            # ── Try UPDATE first ───────────────────────────────
+            update_res = self.supabase.table("blockchain_transactions").update({
+                "status":       final_status,
+                "p2p_order_id": order_id,
+                "updated_at":   now,
+            }).eq("txn_hash", tx_hash).execute()
+
+            if update_res.data and len(update_res.data) > 0:
+                logger.info(
+                    f"[P2PWorker] blockchain_transactions updated "
+                    f"tx={tx_hash[:16]}... status={final_status}"
+                )
+                return  # done — existing WDK record corrected
+
+            # ── No existing record — INSERT with verified status ──
+            self.supabase.table("blockchain_transactions").insert({
+                "user_id":          None,   # buyer_id not available here — ok
+                "transaction_type": "p2p_release",
+                "status":           final_status,
+                "amount":           amount,
+                "asset":            token,
+                "chain":            chain,
+                "txn_hash":         tx_hash,
+                "to_address":       buyer_address,
+                "platform_fee":     0,
+                "p2p_order_id":     order_id,
+            }).execute()
+
+            logger.info(
+                f"[P2PWorker] blockchain_transactions inserted "
+                f"tx={tx_hash[:16]}... status={final_status}"
+            )
+
+        except Exception as e:
+            # Non-fatal — analytics table, not settlement
+            logger.warning(f"[P2PWorker] blockchain_transactions sync failed: {e}")
 
     def _write_audit(
         self,
