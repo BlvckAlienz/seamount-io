@@ -136,8 +136,12 @@ function ChatPanel({
 }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
+      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
         <h3 className="font-semibold text-sm text-gray-900 dark:text-white">Order Chat</h3>
+        <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+          <RefreshCw className="h-3 w-3" />
+          Hit refresh above to see new messages
+        </span>
       </div>
       <div className="overflow-y-auto max-h-60 p-3 space-y-2">
         {messages.length === 0 && (
