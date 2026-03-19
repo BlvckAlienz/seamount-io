@@ -191,27 +191,55 @@ function AdminOrderModal({ orderId, onClose }: AdminOrderModalProps) {
               </div>
               <div className="max-h-52 overflow-y-auto p-3 space-y-2">
                 {messages.map((msg: any) => {
-                  const isAdminMsg  = msg.sender_role === 'admin'
-                  const isSystem    = msg.is_system
-                  const visLabel    = msg.visibility === 'buyer_admin'
-                    ? '→ Buyer only 🔒'
+                  const isSystem   = msg.is_system || msg.sender_role === 'system'
+                  const isAdmin    = msg.sender_role === 'admin'
+                  const isBuyerMsg = !isSystem && !isAdmin
+                    && msg.sender_id === order?.buyer_id
+                  const isMerchantMsg = !isSystem && !isAdmin
+                    && msg.sender_id !== order?.buyer_id
+                    && msg.sender_id !== null
+
+                  // Human-readable sender tag
+                  const senderTag = isAdmin
+                    ? { label: '🛡️ Support', color: 'text-purple-400' }
+                    : isBuyerMsg
+                    ? { label: '👤 Buyer', color: 'text-blue-400' }
+                    : isMerchantMsg
+                    ? { label: '🏪 Merchant', color: 'text-green-400' }
+                    : null
+
+                  // Visibility scope label
+                  const visLabel = msg.visibility === 'buyer_admin'
+                    ? '🔒 Buyer only'
                     : msg.visibility === 'merchant_admin'
-                    ? '→ Merchant only 🔒'
+                    ? '🔒 Merchant only'
                     : ''
+
                   return (
-                    <div key={msg.id} className={`flex ${isSystem ? 'justify-center' : isAdminMsg ? 'justify-end' : 'justify-start'}`}>
+                    <div key={msg.id}
+                      className={`flex ${isSystem ? 'justify-center' : isAdmin ? 'justify-end' : 'justify-start'}`}>
                       {isSystem ? (
                         <span className="text-xs text-gray-400 bg-gray-900 px-3 py-1 rounded-full border border-gray-700 max-w-xs text-center">
                           {msg.message}
                         </span>
                       ) : (
-                        <div className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs ${
-                          isAdminMsg
-                            ? 'bg-purple-700 text-white rounded-br-none'
-                            : 'bg-gray-700 text-gray-100 rounded-bl-none'
-                        }`}>
-                          {msg.message}
-                          {visLabel && <div className="text-[10px] text-purple-300 mt-0.5">{visLabel}</div>}
+                        <div className={`max-w-[75%] space-y-0.5`}>
+                          {/* Sender tag above bubble */}
+                          {senderTag && (
+                            <p className={`text-[10px] font-semibold ${senderTag.color} ${isAdmin ? 'text-right' : 'text-left'} px-1`}>
+                              {senderTag.label}
+                              {visLabel && <span className="ml-1.5 text-gray-500 font-normal">{visLabel}</span>}
+                            </p>
+                          )}
+                          <div className={`px-3 py-1.5 rounded-xl text-xs ${
+                            isAdmin
+                              ? 'bg-purple-700 text-white rounded-br-none'
+                              : isBuyerMsg
+                              ? 'bg-blue-600/80 text-white rounded-bl-none'
+                              : 'bg-gray-700 text-gray-100 rounded-bl-none'
+                          }`}>
+                            {msg.message}
+                          </div>
                         </div>
                       )}
                     </div>
