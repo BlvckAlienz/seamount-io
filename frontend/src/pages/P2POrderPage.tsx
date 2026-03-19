@@ -208,6 +208,11 @@ export default function P2POrderPage() {
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const expireCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Tracks which visibility values this user may see.
+  // Using a ref avoids adding it to Realtime useEffect deps
+  // (which would cause channel teardown/re-subscribe on every order load).
+  const allowedVisRef = useRef<string[]>(['all'])
+
   // Derived values
   const isBuyer    = order?.buyer_id === user?.id
   const isMerchant = order?.p2p_merchants?.user_id === user?.id
@@ -247,13 +252,12 @@ export default function P2POrderPage() {
       .from('p2p_messages')
       .select('*')
       .eq('order_id', id)
+      .in('visibility', allowedVisRef.current)  // DB-level filter — primary enforcement
       .order('created_at', { ascending: true })
-    if (data) {
-      // Client-side visibility filter — belt-and-suspenders over RLS
-      // because Supabase Realtime postgres_changes bypasses RLS on INSERT
-      setMessages((data as Message[]).filter(canSeeMessage))
-    }
-  }, [id, canSeeMessage])
+    if (data) setMessages(data as Message[])
+  }, [id])
+  // ↑ NO canSeeMessage / isBuyer / isMerchant in deps.
+  //   allowedVisRef is a ref — reading it never triggers re-render.
 
   const refresh = useCallback(async () => {
     setRefreshing(true)
@@ -264,6 +268,15 @@ export default function P2POrderPage() {
 
   // Initial load
   useEffect(() => { fetchOrder(); fetchMessages() }, [fetchOrder, fetchMessages])
+
+  // Keep the visibility ref up to date whenever order loads.
+  // No re-render side-effects — just a ref write.
+  useEffect(() => {
+    if (!order) return
+    if (isBuyer)         allowedVisRef.current = ['all', 'buyer_admin']
+    else if (isMerchant) allowedVisRef.current = ['all', 'merchant_admin']
+    else                 allowedVisRef.current = ['all']
+  }, [isBuyer, isMerchant, order?.id])
 
   // Realtime order updates — self-healing on channel error
   useEffect(() => {
@@ -299,24 +312,46 @@ export default function P2POrderPage() {
     }
   }, [id])
 
-  // Realtime messages — filter by visibility on every INSERT
+  // Realtime messages — ONLY depends on `id`.
+  // allowedVisRef is a ref so reading it inside the callback is always
+  // fresh without being in the dependency array.
+  // This means the channel is set up ONCE per order and never torn down
+  // due to role changes — fixing the "messages don't drop" bug.
   useEffect(() => {
     if (!id) return
-    const ch = supabase.channel(`msgs:${id}`)
+    const ch = supabase
+      .channel(`msgs:${id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'p2p_messages', filter: `order_id=eq.${id}` },
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'p2p_messages',
+          filter: `order_id=eq.${id}`,
+        },
         (p) => {
           const msg = p.new as Message
-          // Drop messages this user isn't supposed to see
-          // (Realtime bypasses RLS on INSERT — must filter here)
-          if (!canSeeMessage(msg)) return
-          setMessages(prev => [...prev, msg])
+          const v = msg.visibility ?? 'all'
+
+          // Visibility gate — ref always has latest role values
+          if (!allowedVisRef.current.includes(v)) return
+
+          setMessages(prev => {
+            // Deduplicate (Realtime can fire twice on flaky connections)
+            if (prev.some(m => m.id === msg.id)) return prev
+            return [...prev, msg]
+          })
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[Realtime] msgs:${id} error — resubscribing in 3s`)
+          setTimeout(() => ch.subscribe(), 3000)
+        }
+      })
+
     return () => { supabase.removeChannel(ch) }
-  }, [id, canSeeMessage])
+  }, [id])  // ← id ONLY. Stable for the life of the order page.
 
   // Timer for payment window
   useEffect(() => {
