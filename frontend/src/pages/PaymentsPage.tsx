@@ -4,16 +4,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import Sidebar from '@/components/layout/Sidebar'
 import { MerchantListings } from '@/components/p2p/MerchantListings'
+import { SellListings } from '@/components/p2p/SellListings'
 import { FundWalletModal } from '@/components/wallet/FundWalletModal'
 import { SendForm } from '@/components/payments/SendForm'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import {
-  ArrowDownToLine, ShoppingBag, ArrowUpRight,
+  ArrowDownToLine, ArrowDownUp, ShoppingBag, ArrowUpRight,
   ClipboardList, Loader2, ChevronRight
 } from 'lucide-react'
 
-type Tab = 'p2p' | 'fund' | 'send' | 'orders'
+type Tab = 'p2p' | 'sell' | 'fund' | 'send' | 'orders'
 
 const STATUS_PILL: Record<string, string> = {
   payment_window: 'bg-yellow-100 text-yellow-800',
@@ -27,6 +28,7 @@ const STATUS_PILL: Record<string, string> = {
 
 const TABS: { id: Tab; label: string; icon: typeof ShoppingBag }[] = [
   { id: 'p2p',    label: 'Buy via P2P',  icon: ShoppingBag     },
+  { id: 'sell',   label: 'Sell via P2P', icon: ArrowDownUp },
   { id: 'fund',   label: 'Fund Wallet',  icon: ArrowDownToLine },
   { id: 'send',   label: 'Send',         icon: ArrowUpRight    },
   { id: 'orders', label: 'My Orders',    icon: ClipboardList   },
@@ -34,6 +36,7 @@ const TABS: { id: Tab; label: string; icon: typeof ShoppingBag }[] = [
 
 const TAB_DESC: Record<Tab, string> = {
   p2p:    'Buy crypto directly from verified merchants using local payment methods — lowest fees',
+  sell: 'Sell your crypto to verified merchants for local fiat — direct bank or mobile money payout',
   fund:   'Buy crypto instantly with your local currency via card or bank transfer',
   send:   'Send crypto to any wallet address across all supported chains',
   orders: 'Track your P2P buy orders — active and completed',
@@ -196,6 +199,13 @@ const PaymentsPage = () => {
           {activeTab === 'p2p' && (
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               <MerchantListings />
+            </div>
+          )}
+
+          {/* Sell via P2P */}
+          {activeTab === 'sell' && (
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+              <SellListings />
             </div>
           )}
 

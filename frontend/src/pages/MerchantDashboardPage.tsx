@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { MerchantOnboardingModal } from '@/components/p2p/MerchantOnboardingModal'
 import { CreateListingModal } from '@/components/p2p/CreateListingModal'
+import { CreateSellListingModal } from '@/components/p2p/CreateSellListingModal'
 
 // ── TYPES ─────────────────────────────────────────────────────
 interface MerchantProfile {
@@ -84,6 +85,7 @@ export default function MerchantDashboardPage() {
   const [orders,          setOrders]          = useState<Order[]>([])
   const [showOnboarding,    setShowOnboarding]    = useState(false)
   const [showCreateListing, setShowCreateListing] = useState(false)
+  const [showCreateSellListing, setShowCreateSellListing] = useState(false)
   const [togglingId,      setTogglingId]      = useState<string | null>(null)
   const [orderFilter,     setOrderFilter]     = useState<string>('all')
 
@@ -436,12 +438,13 @@ export default function MerchantDashboardPage() {
                 <span className={`w-2 h-2 rounded-full ${merchant.is_online ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
                 {merchant.is_online ? 'Online' : 'Offline'}
               </button>
-              <Button
-                onClick={() => setShowCreateListing(true)}
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 gap-2"
-              >
-                <Plus className="h-4 w-4" /> New Listing
+              <Button onClick={() => setShowCreateSellListing(true)} size="sm"
+                className="bg-orange-600 hover:bg-orange-700 gap-2">
+                <Plus className="h-4 w-4" /> Buy Listing
+              </Button>
+              <Button onClick={() => setShowCreateListing(true)} size="sm"
+                className="bg-blue-600 hover:bg-blue-700 gap-2">
+                <Plus className="h-4 w-4" /> Sell Listing
               </Button>
             </div>
           </div>
@@ -555,6 +558,13 @@ export default function MerchantDashboardPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white">{l.token.split('_')[0]}</span>
                         <span className="text-xs text-gray-500">({l.token})</span>
+                        <Badge className={
+                          l.listing_type === 'sell'
+                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs'
+                            : 'bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs'
+                        }>
+                          {l.listing_type === 'sell' ? 'Buy Listing' : 'Sell Listing'}
+                        </Badge>
                         <Badge className={l.is_active
                           ? 'bg-green-500/20 text-green-400 border-green-500/30 text-xs'
                           : 'bg-gray-600/40 text-gray-400 border-gray-600 text-xs'}>
@@ -711,6 +721,14 @@ export default function MerchantDashboardPage() {
           }}
         />
       )}
+      {merchant && (
+            <CreateSellListingModal
+              merchantId={merchant.id}
+              open={showCreateSellListing}
+              onOpenChange={setShowCreateSellListing}
+              onSuccess={() => { fetchListings(); toast.success('Buy listing live!') }}
+            />
+    )}
     </div>
   )
 }

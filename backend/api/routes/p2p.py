@@ -12,7 +12,11 @@ from backend.dependencies import get_current_user, get_supabase_client
 from backend.services.p2p.order_service import (
     create_p2p_order,
     confirm_payment_sent,
-    merchant_confirm_and_release
+    merchant_confirm_and_release,
+    create_sell_order,
+    seller_confirm_token_sent,
+    merchant_confirm_fiat_sent,
+    seller_confirm_fiat_received
 )
 
 logger = logging.getLogger(__name__)
@@ -613,3 +617,235 @@ async def cancel_order(
     except Exception as e:
         logger.error(f"[P2P] Cancel order error: {e}")
         raise HTTPException(status_code=500, detail="Failed to cancel order")
+
+# ── New Pydantic models ───────────────────────────────────────
+
+class CreateSellOrderRequest(BaseModel):
+    idempotency_key: str
+    listing_id: str
+    fiat_amount: float
+    payment_method: str
+    payout_details: Dict[str, Any]
+
+
+class SellerTokenSentRequest(BaseModel):
+    token_tx_hash: str
+
+
+class CreateSellListingRequest(BaseModel):
+    merchant_id: str
+    token: str
+    fiat_currency: str
+    price_per_token: float
+    min_order_fiat: float
+    max_order_fiat: float
+    available_amount: float          # available fiat to deploy
+    payment_methods: List[str]
+    payment_details: Dict[str, Any]  # how merchant pays fiat to sellers
+    merchant_receive_address: str    # merchant's on-chain address to receive tokens
+    terms: Optional[str] = None
+
+
+# ── GET /api/p2p/sell/listings ────────────────────────────────
+@router.get("/sell/listings")
+async def get_sell_listings(
+    token: Optional[str] = None,
+    fiat_currency: Optional[str] = None,
+    supabase=Depends(get_supabase_client)
+):
+    """Public — returns active sell listings (merchants buying tokens)."""
+    try:
+        query = supabase.table("p2p_listings") \
+            .select("*, p2p_merchants(display_name,verified,total_orders,completion_rate,avg_release_time_mins,is_online)") \
+            .eq("listing_type", "sell") \
+            .eq("is_active", True) \
+            .order("created_at", desc=True)
+
+        if token:
+            query = query.eq("token", token)
+        if fiat_currency:
+            query = query.eq("fiat_currency", fiat_currency)
+
+        res = query.execute()
+        return {"success": True, "listings": res.data or []}
+    except Exception as e:
+        logger.error(f"[P2P] Get sell listings error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch sell listings")
+
+
+# ── POST /api/p2p/sell/listings ───────────────────────────────
+@router.post("/sell/listings")
+async def create_sell_listing(
+    payload: CreateSellListingRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Merchant creates a sell listing (they want to buy tokens, will pay fiat)."""
+    try:
+        m = supabase.table("p2p_merchants") \
+            .select("id, status") \
+            .eq("id", payload.merchant_id) \
+            .eq("user_id", current_user["id"]) \
+            .limit(1).execute()
+        if not m.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if m.data[0].get("status") != "approved":
+            raise HTTPException(status_code=403, detail="Merchant account not approved")
+
+        supabase.table("p2p_listings").insert({
+            "merchant_id":              payload.merchant_id,
+            "listing_type":             "sell",
+            "token":                    payload.token,
+            "fiat_currency":            payload.fiat_currency,
+            "price_per_token":          payload.price_per_token,
+            "min_order_fiat":           payload.min_order_fiat,
+            "max_order_fiat":           payload.max_order_fiat,
+            "available_amount":         payload.available_amount,
+            "payment_methods":          payload.payment_methods,
+            "payment_details":          payload.payment_details,
+            "merchant_receive_address": payload.merchant_receive_address,
+            "terms":                    payload.terms,
+            "is_active":                True,
+        }).execute()
+
+        created = supabase.table("p2p_listings") \
+            .select("*") \
+            .eq("merchant_id", payload.merchant_id) \
+            .eq("listing_type", "sell") \
+            .eq("token", payload.token) \
+            .order("created_at", desc=True) \
+            .limit(1).execute()
+
+        if not created.data:
+            raise Exception("Listing not found after insert")
+
+        return {"success": True, "listing": created.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Create sell listing error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create sell listing")
+
+
+# ── POST /api/p2p/sell/orders ─────────────────────────────────
+@router.post("/sell/orders")
+async def create_sell_order_endpoint(
+    payload: CreateSellOrderRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        from backend.services.p2p.order_service import create_sell_order
+        result = await create_sell_order(
+            idempotency_key=payload.idempotency_key,
+            listing_id=payload.listing_id,
+            seller_id=current_user["id"],
+            fiat_amount=payload.fiat_amount,
+            payment_method=payload.payment_method,
+            payout_details=payload.payout_details,
+        )
+        return {"success": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[P2P] Create sell order error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create sell order")
+
+
+# ── PATCH /api/p2p/sell/orders/{order_id}/token-sent ─────────
+@router.patch("/sell/orders/{order_id}/token-sent")
+async def seller_token_sent(
+    order_id: str,
+    payload: SellerTokenSentRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        from backend.services.p2p.order_service import seller_confirm_token_sent
+        result = await seller_confirm_token_sent(
+            order_id=order_id,
+            seller_id=current_user["id"],
+            token_tx_hash=payload.token_tx_hash,
+        )
+        return {"success": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[P2P] Seller token sent error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update order")
+
+
+# ── POST /api/p2p/sell/orders/{order_id}/fiat-proof ──────────
+@router.post("/sell/orders/{order_id}/fiat-proof")
+async def upload_fiat_proof(
+    order_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Merchant uploads proof of fiat payment."""
+    try:
+        merchant_res = supabase.table("p2p_merchants") \
+            .select("id").eq("user_id", current_user["id"]).limit(1).execute()
+        if not merchant_res.data:
+            raise HTTPException(status_code=403, detail="Merchant not found")
+        merchant_id = merchant_res.data[0]["id"]
+
+        order_res = supabase.table("p2p_orders") \
+            .select("id, status, order_type") \
+            .eq("id", order_id).eq("merchant_id", merchant_id) \
+            .eq("order_type", "sell").limit(1).execute()
+        if not order_res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+        if order_res.data[0]["status"] != "paid":
+            raise HTTPException(status_code=400, detail="Order not in correct state for fiat proof")
+
+        file_bytes = await file.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="File is empty")
+
+        file_ext  = (file.filename or "proof").split(".")[-1]
+        file_path = f"{current_user['id']}/fiat-proofs/{uuid.uuid4()}.{file_ext}"
+
+        supabase.storage.from_("p2p-receipts").upload(
+            path=file_path, file=file_bytes,
+            file_options={"content-type": file.content_type}
+        )
+
+        try:
+            file_url = supabase.storage.from_("p2p-receipts").get_public_url(file_path)
+        except Exception:
+            project_ref = supabase.url.split("//")[1].split(".")[0]
+            file_url = f"https://{project_ref}.supabase.co/storage/v1/object/public/p2p-receipts/{file_path}"
+
+        from backend.services.p2p.order_service import merchant_confirm_fiat_sent
+        result = await merchant_confirm_fiat_sent(
+            order_id=order_id,
+            merchant_user_id=current_user["id"],
+            fiat_proof_url=file_url,
+        )
+        return {"success": True, "fiat_proof_url": file_url, **result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Fiat proof upload error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload fiat proof")
+
+
+# ── PATCH /api/p2p/sell/orders/{order_id}/fiat-received ──────
+@router.patch("/sell/orders/{order_id}/fiat-received")
+async def seller_fiat_received(
+    order_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        from backend.services.p2p.order_service import seller_confirm_fiat_received
+        result = await seller_confirm_fiat_received(
+            order_id=order_id,
+            seller_id=current_user["id"],
+        )
+        return {"success": True, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[P2P] Seller fiat received error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to complete order")
