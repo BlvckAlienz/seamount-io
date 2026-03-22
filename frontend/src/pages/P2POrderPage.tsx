@@ -277,10 +277,17 @@ export default function P2POrderPage() {
   // No re-render side-effects — just a ref write.
   useEffect(() => {
     if (!order) return
+
+    // 1. Update the ref with the correct visibility for this user
     if (isBuyer)         allowedVisRef.current = ['all', 'buyer_admin']
     else if (isMerchant) allowedVisRef.current = ['all', 'merchant_admin']
     else                 allowedVisRef.current = ['all']
-  }, [isBuyer, isMerchant, order?.id])
+
+    // 2. Re-fetch messages now that the ref has the correct visibility.
+    //    The initial fetchMessages() fired before order loaded so it
+    //    only queried visibility='all' — this corrects that.
+    fetchMessages()
+  }, [isBuyer, isMerchant, order?.id, fetchMessages])
 
   // Realtime order updates — self-healing on channel error
   useEffect(() => {
