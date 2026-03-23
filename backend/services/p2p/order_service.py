@@ -162,12 +162,13 @@ async def confirm_payment_sent(
         deadline = deadline.replace(tzinfo=timezone.utc)
 
     if datetime.now(timezone.utc) > deadline:
+        # CHANGE: 'cancelled' → 'expired' to match the dedicated expired status
         supabase.table("p2p_orders") \
-            .update({"status": "cancelled", "updated_at": datetime.now(timezone.utc).isoformat()}) \
+            .update({"status": "expired", "updated_at": datetime.now(timezone.utc).isoformat()}) \
             .eq("id", order_id) \
             .execute()
 
-        await _audit_log(order_id, "state_change", "payment_window", "cancelled", buyer_id)
+        await _audit_log(order_id, "state_change", "payment_window", "expired", buyer_id)
 
         raise ValueError("Payment window expired. Order has been cancelled.")
 
@@ -294,6 +295,11 @@ async def _enqueue_token_release(order_id: str, merchant_user_id: str) -> None:
         logger.error(f"[P2P] Failed to enqueue token release job: {e}")
         raise
 
+
+# ══════════════════════════════════════════════════════════════
+# SELL SIDE
+# ══════════════════════════════════════════════════════════════
+
 async def create_sell_order(
     idempotency_key: str,
     listing_id: str,
@@ -304,59 +310,51 @@ async def create_sell_order(
 ) -> Dict[str, Any]:
     """
     User sells tokens to merchant for fiat.
+    Tokens move via Seamount wallet infrastructure (same as buy side, reversed).
     seller_id stored in buyer_id column for schema compatibility.
     """
     supabase = get_supabase_client()
 
-    # Idempotency check
     existing = supabase.table("p2p_orders") \
-        .select("*") \
-        .eq("idempotency_key", idempotency_key) \
-        .limit(1).execute()
+        .select("*").eq("idempotency_key", idempotency_key).limit(1).execute()
     if existing.data:
-        return {"order": existing.data[0], "merchant_receive_address": None, "is_duplicate": True}
+        return {"order": existing.data[0], "is_duplicate": True}
 
-    # Fetch sell listing
     listing_res = supabase.table("p2p_listings") \
         .select("*, p2p_merchants(*)") \
-        .eq("id", listing_id) \
-        .eq("is_active", True) \
-        .eq("listing_type", "sell") \
+        .eq("id", listing_id).eq("is_active", True).eq("listing_type", "sell") \
         .limit(1).execute()
-
     if not listing_res.data:
         raise ValueError("Listing not available or inactive")
 
     listing = listing_res.data[0]
-
     if not (listing["min_order_fiat"] <= fiat_amount <= listing["max_order_fiat"]):
         raise ValueError(
             f"Amount must be between {listing['min_order_fiat']} "
             f"and {listing['max_order_fiat']} {listing['fiat_currency']}"
         )
 
-    token_amount  = fiat_amount / listing["price_per_token"]
-    deadline      = datetime.now(timezone.utc) + timedelta(minutes=ORDER_TIMEOUT_MINS)
-    order_number  = _gen_order_number()
-    receive_addr  = listing.get("merchant_receive_address", "")
+    token_amount = fiat_amount / listing["price_per_token"]
+    deadline     = datetime.now(timezone.utc) + timedelta(minutes=ORDER_TIMEOUT_MINS)
+    order_number = _gen_order_number()
 
     supabase.table("p2p_orders").insert({
-        "idempotency_key":      idempotency_key,
-        "order_number":         order_number,
-        "listing_id":           listing_id,
-        "buyer_id":             seller_id,        # seller stored in buyer_id
-        "merchant_id":          listing["merchant_id"],
-        "token":                listing["token"],
-        "fiat_currency":        listing["fiat_currency"],
-        "fiat_amount":          fiat_amount,
-        "token_amount":         token_amount,
-        "price_per_token":      listing["price_per_token"],
-        "payment_method":       payment_method,
-        "status":               "payment_window",
-        "order_type":           "sell",
-        "payment_deadline":     deadline.isoformat(),
-        "platform_fee_bps":     0,
-        "seller_payout_method": payment_method,
+        "idempotency_key":       idempotency_key,
+        "order_number":          order_number,
+        "listing_id":            listing_id,
+        "buyer_id":              seller_id,        # seller stored in buyer_id
+        "merchant_id":           listing["merchant_id"],
+        "token":                 listing["token"],
+        "fiat_currency":         listing["fiat_currency"],
+        "fiat_amount":           fiat_amount,
+        "token_amount":          token_amount,
+        "price_per_token":       listing["price_per_token"],
+        "payment_method":        payment_method,
+        "status":                "payment_window",
+        "order_type":            "sell",
+        "payment_deadline":      deadline.isoformat(),
+        "platform_fee_bps":      0,
+        "seller_payout_method":  payment_method,
         "seller_payout_details": payout_details,
     }).execute()
 
@@ -371,33 +369,34 @@ async def create_sell_order(
     supabase.table("p2p_messages").insert({
         "order_id": order["id"], "is_system": True,
         "message": (
-            f"Order {order_number} created. "
-            f"Send exactly {token_amount:.6f} {listing['token'].split('_')[0]} "
-            f"to the merchant's wallet address shown below. "
-            f"Then submit your transaction hash. You have {ORDER_TIMEOUT_MINS} minutes."
+            f"Sell order {order_number} created. "
+            f"Click 'Release Tokens' to send "
+            f"{token_amount:.6f} {listing['token'].split('_')[0]} "
+            f"to the merchant via Seamount. "
+            f"You have {ORDER_TIMEOUT_MINS} minutes."
         )
     }).execute()
 
-    logger.info(f"[P2P] Sell order created: {order['id']} | token: {order['token']}")
-    return {"order": order, "merchant_receive_address": receive_addr, "is_duplicate": False}
+    logger.info(f"[P2P] Sell order created: {order['id']}")
+    return {"order": order, "is_duplicate": False}
 
 
-async def seller_confirm_token_sent(
+async def seller_authorize_token_release(
     order_id: str,
     seller_id: str,
-    token_tx_hash: str,
 ) -> Dict[str, Any]:
-    """Seller marks tokens as sent and provides on-chain tx hash."""
+    """
+    Seller authorises Seamount to move their tokens to the merchant.
+    Enqueues a worker job — mirrors buy side merchant_confirm_and_release.
+    Replaces old seller_confirm_token_sent (external wallet approach removed).
+    """
     supabase = get_supabase_client()
 
     order_res = supabase.table("p2p_orders") \
         .select("*") \
-        .eq("id", order_id) \
-        .eq("buyer_id", seller_id) \
-        .eq("status", "payment_window") \
-        .eq("order_type", "sell") \
+        .eq("id", order_id).eq("buyer_id", seller_id) \
+        .eq("status", "payment_window").eq("order_type", "sell") \
         .limit(1).execute()
-
     if not order_res.data:
         raise ValueError("Order not found or already processed")
 
@@ -407,41 +406,39 @@ async def seller_confirm_token_sent(
         deadline = deadline.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) > deadline:
         supabase.table("p2p_orders").update({
-            "status": "expired",
+            "status":     "expired",
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", order_id).execute()
         raise ValueError("Payment window expired. Order cancelled.")
 
+    # Move to confirming — worker handles the transfer
     supabase.table("p2p_orders").update({
-        "status":           "paid",
-        "token_tx_hash":    token_tx_hash,
-        "updated_at":       datetime.now(timezone.utc).isoformat()
+        "status":     "confirming",
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }).eq("id", order_id).execute()
 
-    await _audit_log(order_id, "state_change", "payment_window", "paid", seller_id)
+    await _audit_log(order_id, "state_change", "payment_window", "confirming", seller_id)
 
-    # Build explorer link based on chain
-    token = order.get("token", "")
-    chain = token.split("_")[-1].lower() if "_" in token else "tron"
-    explorer = {
-        "tron":     f"https://tronscan.org/#/transaction/{token_tx_hash}",
-        "eth":      f"https://etherscan.io/tx/{token_tx_hash}",
-        "polygon":  f"https://polygonscan.com/tx/{token_tx_hash}",
-        "solana":   f"https://solscan.io/tx/{token_tx_hash}",
-        "algorand": f"https://algoexplorer.io/tx/{token_tx_hash}",
-    }.get(chain, f"https://tronscan.org/#/transaction/{token_tx_hash}")
+    # Enqueue sell token transfer job
+    supabase.table("p2p_jobs").insert({
+        "job_type": "token.sell_transfer",
+        "payload": {
+            "order_id":       order_id,
+            "seller_user_id": seller_id,
+            "merchant_id":    order["merchant_id"],
+        },
+        "status":      "pending",
+        "retry_count": 0,
+        "max_retries": 5,
+    }).execute()
 
     supabase.table("p2p_messages").insert({
         "order_id": order_id, "is_system": True,
-        "message": (
-            f"Seller submitted token transfer. "
-            f"Tx: {token_tx_hash[:20]}... "
-            f"Merchant: verify on block explorer then release fiat."
-        )
+        "message": "Token transfer initiated via Seamount. Please wait for on-chain confirmation..."
     }).execute()
 
-    logger.info(f"[P2P] Seller confirmed token sent: {order_id} tx: {token_tx_hash[:16]}...")
-    return {"message": "Token transfer submitted. Awaiting merchant verification.", "explorer_url": explorer}
+    logger.info(f"[P2P] Sell token transfer enqueued: {order_id}")
+    return {"message": "Token transfer in progress. Merchant will be notified upon receipt."}
 
 
 async def merchant_confirm_fiat_sent(
@@ -449,7 +446,7 @@ async def merchant_confirm_fiat_sent(
     merchant_user_id: str,
     fiat_proof_url: str,
 ) -> Dict[str, Any]:
-    """Merchant has verified tokens on-chain and sent fiat. Uploads proof."""
+    """Merchant has received tokens and sent fiat. Uploads proof."""
     supabase = get_supabase_client()
 
     merchant_res = supabase.table("p2p_merchants") \
@@ -458,6 +455,7 @@ async def merchant_confirm_fiat_sent(
         raise ValueError("Merchant profile not found")
     merchant_id = merchant_res.data[0]["id"]
 
+    # Tokens confirmed received = status is 'paid' on sell orders
     order_res = supabase.table("p2p_orders") \
         .select("*") \
         .eq("id", order_id) \

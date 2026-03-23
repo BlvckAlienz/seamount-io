@@ -642,27 +642,17 @@ export default function P2POrderPage() {
 
             return (
               <div className="space-y-3">
-                {/* Seller's tx hash + explorer link */}
-                {order.token_tx_hash && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2 shadow-sm">
-                    <p className="text-sm font-semibold text-gray-900">Seller's Token Transfer</p>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-gray-600 break-all flex-1">
-                        {order.token_tx_hash}
-                      </span>
-                      <button onClick={() => { navigator.clipboard.writeText(order.token_tx_hash!); toast.success('Copied!') }}
-                        className="text-gray-400 hover:text-gray-600 flex-shrink-0">
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {explorerUrl && (
-                      <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-semibold">
-                        Verify on block explorer ↗
-                      </a>
-                    )}
-                  </div>
-                )}
+                {order.order_type === 'sell' && order.status === 'paid' && (
+            <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-sm text-green-800">
+              ✅ <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong>{' '}
+              transferred to your Seamount wallet via platform infrastructure.
+              {order.token_tx_hash && (
+                <span className="block text-xs text-gray-500 font-mono mt-1">
+                  Tx: {order.token_tx_hash.slice(0, 20)}...
+                </span>
+              )}
+            </div>
+          )}
                 <Alert className="bg-amber-500/10 border-amber-500/30 py-2.5">
                   <AlertCircle className="h-4 w-4 text-amber-400" />
                   <AlertDescription className="text-xs text-amber-200">
@@ -776,57 +766,55 @@ export default function P2POrderPage() {
 
         {/* ── SELL ORDER: show wallet address + tx hash input ── */}
         {isBuyer && order.order_type === 'sell' && order.status === 'payment_window' && (() => {
-          const receiveAddr = order.p2p_listings?.merchant_receive_address || ''
-          const [txHash, setTxHash] = useState('')
-          const [submitting, setSubmitting] = useState(false)
-          const handleSubmitTx = async () => {
-            if (!txHash.trim()) { toast.error('Enter your transaction hash'); return }
-            setSubmitting(true)
+          const [releasing, setReleasing] = useState(false)
+          const handleRelease = async () => {
+            if (!confirm(
+              `This will send ${order.token_amount.toFixed(6)} ` +
+              `${order.token.split('_')[0]} from your Seamount wallet ` +
+              `to the merchant. Proceed?`
+            )) return
+            setReleasing(true)
             try {
-              const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/token-sent`, { token_tx_hash: txHash.trim() })
-              if (res.data?.success) { toast.success('Transaction submitted!'); fetchOrder() }
-              else throw new Error(res.data?.detail)
-            } catch (e: any) { toast.error(e.response?.data?.detail ?? e.message) }
-            finally { setSubmitting(false) }
+              const res = await apiClient.patch(
+                `/api/p2p/sell/orders/${id}/release-tokens`
+              )
+              if (res.data?.success) {
+                toast.success('Token transfer initiated!')
+                fetchOrder()
+              } else throw new Error(res.data?.detail)
+            } catch (e: any) {
+              toast.error(e.response?.data?.detail ?? e.message)
+            } finally { setReleasing(false) }
           }
+
           return (
             <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800 p-4 space-y-3">
               <h3 className="font-bold text-orange-900 dark:text-orange-200 text-sm">
-                💸 Step 1 — Send Tokens
+                💸 Release Your Tokens
               </h3>
               <p className="text-xs text-orange-700 dark:text-orange-300">
-                Send exactly <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong> to:
+                Seamount will securely transfer{' '}
+                <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong>{' '}
+                from your wallet to the merchant. The merchant will then
+                send <strong>{order.fiat_amount.toLocaleString()} {order.fiat_currency}</strong>{' '}
+                to your <strong>{order.seller_payout_method}</strong>.
               </p>
-              {receiveAddr ? (
-                <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-lg p-2.5 border border-orange-200">
-                  <span className="font-mono text-xs text-gray-900 dark:text-white break-all flex-1">{receiveAddr}</span>
-                  <button onClick={() => { navigator.clipboard.writeText(receiveAddr); toast.success('Address copied!') }}
-                    className="text-orange-600 hover:text-orange-700 flex-shrink-0">
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-red-500">Merchant receive address not set — contact support</p>
-              )}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-gray-700 dark:text-white">
-                  Step 2 — Enter Transaction Hash
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={txHash}
-                    onChange={e => setTxHash(e.target.value)}
-                    placeholder="Paste your tx hash here..."
-                    className="flex-1 font-mono text-xs h-10"
-                    disabled={submitting}
-                  />
-                  <Button onClick={handleSubmitTx} disabled={submitting || !txHash.trim()}
-                    className="h-10 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold gap-1">
-                    {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                    Confirm
-                  </Button>
-                </div>
-              </div>
+              <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 py-2">
+                <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
+                <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
+                  Tokens are held securely by Seamount until the merchant confirms fiat sent.
+                </AlertDescription>
+              </Alert>
+              <Button
+                onClick={handleRelease}
+                disabled={releasing}
+                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-bold gap-2"
+              >
+                {releasing
+                  ? <><Loader2 className="h-4 w-4 animate-spin" />Transferring...</>
+                  : `🔒 Release ${order.token_amount.toFixed(4)} ${order.token.split('_')[0]} to Seamount`
+                }
+              </Button>
               <Button variant="outline" size="sm" onClick={handleCancel}
                 className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs">
                 Cancel Order

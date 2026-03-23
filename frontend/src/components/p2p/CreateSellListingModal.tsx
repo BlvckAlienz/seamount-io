@@ -15,12 +15,21 @@ import { Loader2, ArrowDownUp } from 'lucide-react'
 
 // Reuse same constants as MerchantOnboardingModal
 const TOKEN_OPTIONS = [
-  { value: 'USDT_TRON', label: 'USDT (Tron)', recommended: true },
-  { value: 'USDT_POLYGON', label: 'USDT (Polygon)' },
-  { value: 'USDC_ETH', label: 'USDC (Ethereum)' },
-  { value: 'USDC_POLYGON', label: 'USDC (Polygon)' },
-  { value: 'BTC', label: 'Bitcoin' },
-  { value: 'ETH', label: 'Ethereum' },
+  { value: 'USDT_TRON',    label: 'USDT (Tron)',        recommended: true  },
+  { value: 'USDT_ALGO',    label: 'USDT (Algorand)',    recommended: false },
+  { value: 'USDCa',        label: 'USD Coin (Algorand)', recommended: false },
+  { value: 'USDT_ETH',     label: 'USDT (Ethereum)',    recommended: false },
+  { value: 'USDC_ETH',     label: 'USDC (Ethereum)',    recommended: false },
+  { value: 'USDT_POLYGON', label: 'USDT (Polygon)',     recommended: false },
+  { value: 'USDC_POLYGON', label: 'USDC (Polygon)',     recommended: false },
+  { value: 'USDT_SOLANA',  label: 'USDT (Solana)',      recommended: false },
+  { value: 'USDC_SOLANA',  label: 'USDC (Solana)',      recommended: false },
+  { value: 'BTC',          label: 'Bitcoin (BTC)',      recommended: false },
+  { value: 'ETH',          label: 'Ethereum (ETH)',     recommended: false },
+  { value: 'SOL',          label: 'Solana (SOL)',       recommended: false },
+  { value: 'MATIC',        label: 'Polygon (MATIC)',    recommended: false },
+  { value: 'TRX',          label: 'TRON (TRX)',         recommended: false },
+  { value: 'ALGO',         label: 'Algorand (ALGO)',    recommended: false },
 ]
 
 const FIAT_OPTIONS = ['KES','NGN','GHS','USD','GBP','EUR']
@@ -48,7 +57,6 @@ export function CreateSellListingModal({ merchantId, open, onOpenChange, onSucce
   const [maxOrderFiat, setMaxOrderFiat] = useState('')
   const [availableFiat, setAvailableFiat] = useState('')
   const [paymentMethods, setPaymentMethods] = useState<string[]>([])
-  const [receiveAddress, setReceiveAddress] = useState('')
   const [terms, setTerms] = useState('')
 
   const tokenDisplay = token.split('_')[0]
@@ -57,8 +65,9 @@ export function CreateSellListingModal({ merchantId, open, onOpenChange, onSucce
   // User should verify/override this
 
   const handleCreate = async () => {
-    if (!pricePerToken || !minOrderFiat || !maxOrderFiat || !availableFiat || !receiveAddress || paymentMethods.length === 0) {
-      toast.error('Fill all required fields including your receive address'); return
+    if (!pricePerToken || !minOrderFiat || !maxOrderFiat || !availableFiat
+        || paymentMethods.length === 0) {
+      toast.error('Fill all required fields'); return
     }
     if (parseFloat(minOrderFiat) >= parseFloat(maxOrderFiat)) {
       toast.error('Min order must be less than max'); return
@@ -75,7 +84,6 @@ export function CreateSellListingModal({ merchantId, open, onOpenChange, onSucce
         available_amount: parseFloat(availableFiat),
         payment_methods: paymentMethods,
         payment_details: {},
-        merchant_receive_address: receiveAddress.trim(),
         terms: terms || null,
       })
       if (res.data?.success) {
@@ -158,14 +166,6 @@ export function CreateSellListingModal({ merchantId, open, onOpenChange, onSucce
             <Label className="text-xs text-gray-400 uppercase">Available Fiat to Deploy ({fiatCurrency})</Label>
             <Input type="number" value={availableFiat} onChange={e => setAvailableFiat(e.target.value)}
               placeholder="How much fiat can you deploy?" className="bg-gray-800 border-gray-600 text-white" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs text-gray-400 uppercase">Your {tokenDisplay} Receive Address</Label>
-            <Input value={receiveAddress} onChange={e => setReceiveAddress(e.target.value)}
-              placeholder={`Your ${tokenDisplay} wallet address`}
-              className="bg-gray-800 border-gray-600 text-white font-mono text-xs" />
-            <p className="text-xs text-yellow-400">⚠️ Sellers will send tokens here. Double-check this address.</p>
           </div>
 
           <div className="space-y-1.5">

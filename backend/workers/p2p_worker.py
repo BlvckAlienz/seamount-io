@@ -5,8 +5,9 @@
 # extra infrastructure (Redis, Celery) needed at bootstrap stage.
 #
 # Jobs handled:
-#   token.release  — sends USDT/USDC to buyer via MultiChainWalletService
-#   order.expire   — cancels orders whose 15-min window has passed
+#   token.release       — sends tokens to buyer (buy side)
+#   token.sell_transfer — sends tokens from seller to merchant (sell side)
+#   order.expire        — marks orders as expired when 15-min window elapses
 
 import asyncio
 import logging
@@ -18,9 +19,19 @@ from supabase import Client
 
 logger = logging.getLogger(__name__)
 
-POLL_INTERVAL_SECONDS = 10      # how often to check for new jobs
-PROCESSING_TIMEOUT_SECS = 120   # max seconds a job can stay in 'processing'
-                                 # before it is treated as stuck and retried
+POLL_INTERVAL_SECONDS   = 10
+PROCESSING_TIMEOUT_SECS = 120
+
+# Shared across both buy and sell token transfer handlers
+ASSET_CHAIN_MAP = {
+    'ALGO': 'algorand', 'USDCa': 'algorand',
+    'goBTC': 'algorand', 'goETH': 'algorand', 'USDT_ALGO': 'algorand',
+    'BTC': 'bitcoin',
+    'ETH': 'ethereum', 'USDT_ETH': 'ethereum', 'USDC_ETH': 'ethereum',
+    'MATIC': 'polygon', 'USDT_POLYGON': 'polygon', 'USDC_POLYGON': 'polygon',
+    'TRX': 'tron', 'USDT': 'tron', 'USDT_TRON': 'tron',
+    'SOL': 'solana', 'USDT_SOLANA': 'solana', 'USDC_SOLANA': 'solana',
+}
 
 
 class P2PWorker:
@@ -31,9 +42,9 @@ class P2PWorker:
     """
 
     def __init__(self, supabase: Client, multi_chain_wallet_service):
-        self.supabase = supabase
+        self.supabase       = supabase
         self.wallet_service = multi_chain_wallet_service
-        self._running = False
+        self._running       = False
 
     # ── Lifecycle ──────────────────────────────────────────────
 
@@ -79,7 +90,7 @@ class P2PWorker:
     # ── Handle a single job ────────────────────────────────────
 
     async def _handle_job(self, job: Dict[str, Any]):
-        job_id = job["id"]
+        job_id   = job["id"]
         job_type = job["job_type"]
 
         # Claim the job — mark as processing so no other worker picks it up
@@ -92,6 +103,8 @@ class P2PWorker:
         try:
             if job_type == "token.release":
                 await self._handle_token_release(job)
+            elif job_type == "token.sell_transfer":
+                await self._handle_sell_token_transfer(job)
             elif job_type == "order.expire":
                 await self._handle_order_expire(job)
             else:
@@ -107,6 +120,8 @@ class P2PWorker:
             logger.error(f"[P2PWorker] ❌ Job {job_id} failed: {e}")
             self._retry_or_fail(job)
 
+    # ── On-chain transaction verifier ─────────────────────────
+
     async def _verify_tx_on_chain(
         self,
         tx_hash: str,
@@ -136,7 +151,7 @@ class P2PWorker:
                         ) as resp:
                             if resp.status != 200:
                                 continue
-                            data = await resp.json()
+                            data         = await resp.json()
                             confirmed    = data.get("confirmed", False)
                             contract_ret = data.get("contractRet", "")
                             if not confirmed:
@@ -166,7 +181,7 @@ class P2PWorker:
                             rpc_urls[chain], json=payload,
                             timeout=aiohttp.ClientTimeout(total=10)
                         ) as resp:
-                            data = await resp.json()
+                            data    = await resp.json()
                             receipt = data.get("result")
                             if receipt is None:
                                 continue  # not mined yet
@@ -186,7 +201,7 @@ class P2PWorker:
                             json=payload,
                             timeout=aiohttp.ClientTimeout(total=10)
                         ) as resp:
-                            data = await resp.json()
+                            data   = await resp.json()
                             result = data.get("result")
                             if result is None:
                                 continue
@@ -220,128 +235,12 @@ class P2PWorker:
 
         return False, "TIMEOUT_UNCONFIRMED"
 
-    # ─────────────────────────────────────────────────────────────
-    # Add _verify_tx_on_chain method
-    # ─────────────────────────────────────────────────────────────
-
-    async def _verify_tx_on_chain(
-        self,
-        tx_hash: str,
-        chain: str,
-        max_attempts: int = 8,
-        delay_secs: int = 5
-    ) -> tuple[bool, str]:
-        """
-        Poll the chain until tx is confirmed or max_attempts exhausted.
-        Returns (success: bool, reason: str).
-        A broadcast-confirmed hash ≠ successful execution (see: OUT_OF_ENERGY).
-        """
-        for attempt in range(1, max_attempts + 1):
-            await asyncio.sleep(delay_secs)
-            logger.info(
-                f"[P2PWorker] Verifying tx {tx_hash[:16]}... "
-                f"on {chain} (attempt {attempt}/{max_attempts})"
-            )
-
-            try:
-                # ── TRON ──────────────────────────────────────
-                if chain == "tron":
-                    url = f"https://apilist.tronscanapi.com/api/transaction-info?hash={tx_hash}"
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            url, timeout=aiohttp.ClientTimeout(total=10)
-                        ) as resp:
-                            if resp.status != 200:
-                                continue
-                            data = await resp.json()
-                            confirmed    = data.get("confirmed", False)
-                            contract_ret = data.get("contractRet", "")
-                            if not confirmed:
-                                logger.info("[P2PWorker] Tron tx not yet confirmed, retrying...")
-                                continue
-                            if contract_ret == "SUCCESS":
-                                return True, "SUCCESS"
-                            elif contract_ret:
-                                # OUT_OF_ENERGY, REVERT, etc.
-                                return False, contract_ret
-                            continue  # contractRet absent — still pending
-
-                # ── EVM (Ethereum, Polygon, Base) ─────────────
-                elif chain in ("ethereum", "polygon", "base"):
-                    rpc_urls = {
-                        "ethereum": "https://eth.drpc.org",
-                        "polygon":  "https://polygon-rpc.com",
-                        "base":     "https://mainnet.base.org",
-                    }
-                    payload = {
-                        "jsonrpc": "2.0", "id": 1,
-                        "method":  "eth_getTransactionReceipt",
-                        "params":  [tx_hash]
-                    }
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(
-                            rpc_urls[chain], json=payload,
-                            timeout=aiohttp.ClientTimeout(total=10)
-                        ) as resp:
-                            data = await resp.json()
-                            receipt = data.get("result")
-                            if receipt is None:
-                                continue  # not mined yet
-                            status = int(receipt.get("status", "0x0"), 16)
-                            return (True, "SUCCESS") if status == 1 else (False, "REVERTED")
-
-                # ── Solana ────────────────────────────────────
-                elif chain == "solana":
-                    payload = {
-                        "jsonrpc": "2.0", "id": 1,
-                        "method":  "getTransaction",
-                        "params":  [tx_hash, {"encoding": "json", "commitment": "confirmed"}]
-                    }
-                    async with aiohttp.ClientSession() as session:
-                        async with session.post(
-                            "https://api.mainnet-beta.solana.com",
-                            json=payload,
-                            timeout=aiohttp.ClientTimeout(total=10)
-                        ) as resp:
-                            data = await resp.json()
-                            result = data.get("result")
-                            if result is None:
-                                continue
-                            err = result.get("meta", {}).get("err")
-                            return (True, "SUCCESS") if err is None else (False, str(err))
-
-                # ── Algorand ──────────────────────────────────
-                elif chain == "algorand":
-                    url = f"https://mainnet-api.algonode.cloud/v2/transactions/{tx_hash}"
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            url, timeout=aiohttp.ClientTimeout(total=10)
-                        ) as resp:
-                            if resp.status == 200:
-                                return True, "SUCCESS"
-                            elif resp.status == 404:
-                                continue
-                            else:
-                                return False, f"HTTP_{resp.status}"
-
-                # ── Unknown chain — don't block forever ───────
-                else:
-                    logger.warning(
-                        f"[P2PWorker] No verifier for chain '{chain}', assuming SUCCESS"
-                    )
-                    return True, "UNVERIFIED"
-
-            except Exception as e:
-                logger.warning(f"[P2PWorker] Verify attempt {attempt} error: {e}")
-                continue
-
-        return False, "TIMEOUT_UNCONFIRMED"
-        
-    # ── Token Release Handler ──────────────────────────────────
+    # ── BUY SIDE: Token Release Handler ───────────────────────
 
     async def _handle_token_release(self, job: Dict[str, Any]):
-        payload = job["payload"]
-        order_id: str = payload["order_id"]
+        """Buy side: merchant wallet → buyer wallet"""
+        payload          = job["payload"]
+        order_id: str    = payload["order_id"]
         merchant_user_id: str = payload["merchant_user_id"]
 
         # Fetch order
@@ -356,20 +255,7 @@ class P2PWorker:
             raise ValueError(f"Order {order_id} not found or not in confirming state")
 
         order = order_res.data[0]
-        token: str = order["token"]  # e.g. USDT_TRON, USDC_POLYGON, BTC
-
-        # ── Resolve chain from token ───────────────────────────
-        # Mirrors MultiChainWalletService.ASSET_CHAIN_MAP exactly
-        ASSET_CHAIN_MAP = {
-            'ALGO': 'algorand', 'USDCa': 'algorand',
-            'goBTC': 'algorand', 'goETH': 'algorand',
-            'USDT_ALGO': 'algorand',
-            'BTC': 'bitcoin',
-            'ETH': 'ethereum', 'USDT_ETH': 'ethereum', 'USDC_ETH': 'ethereum',
-            'MATIC': 'polygon', 'USDT_POLYGON': 'polygon', 'USDC_POLYGON': 'polygon',
-            'TRX': 'tron', 'USDT': 'tron', 'USDT_TRON': 'tron',
-            'SOL': 'solana', 'USDT_SOLANA': 'solana', 'USDC_SOLANA': 'solana',
-        }
+        token: str = order["token"]
         chain = ASSET_CHAIN_MAP.get(token, 'tron')
 
         # ── Fetch buyer wallet address ─────────────────────────
@@ -430,12 +316,12 @@ class P2PWorker:
 
             # Revert to confirming — merchant must fix wallet and retry
             self.supabase.table("p2p_orders").update({
-                "status": "confirming",
+                "status":     "confirming",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", order_id).execute()
 
             self.supabase.table("p2p_messages").insert({
-                "order_id": order_id,
+                "order_id":  order_id,
                 "is_system": True,
                 "message": (
                     f"⚠️ Token transfer failed on-chain ({reason}). "
@@ -459,7 +345,7 @@ class P2PWorker:
                 token=token,
                 chain=chain,
                 amount=float(order["token_amount"]),
-                buyer_address=buyer_address,
+                recipient_address=buyer_address,
             )
 
             # Raise so the job retries via _retry_or_fail
@@ -467,9 +353,9 @@ class P2PWorker:
 
         # ── Verified SUCCESS ──────────────────────────────────
         self.supabase.table("p2p_orders").update({
-            "status": "completed",
+            "status":          "completed",
             "release_tx_hash": tx_hash,
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at":      datetime.now(timezone.utc).isoformat()
         }).eq("id", order_id).execute()
 
         self.supabase.rpc(
@@ -478,7 +364,7 @@ class P2PWorker:
         ).execute()
 
         self.supabase.table("p2p_messages").insert({
-            "order_id": order_id,
+            "order_id":  order_id,
             "is_system": True,
             "message": (
                 f"✅ {order['token_amount']} {token} released to buyer. "
@@ -492,11 +378,6 @@ class P2PWorker:
             metadata={"tx_hash": tx_hash}
         )
 
-        # Write to blockchain_transactions with VERIFIED status only.
-        # This is the source of truth for the admin dashboard.
-        # Status is 'completed' here because we already verified on-chain above.
-        # If the order later becomes 'disputed', the admin P2P view uses
-        # p2p_orders.status (accurate) not blockchain_transactions.status.
         # Correct the blockchain_transactions record to 'completed'
         self._sync_blockchain_tx_status(
             tx_hash=tx_hash,
@@ -506,10 +387,172 @@ class P2PWorker:
             token=token,
             chain=chain,
             amount=float(order["token_amount"]),
-            buyer_address=buyer_address,
+            recipient_address=buyer_address,
         )
 
         logger.info(f"[P2PWorker] Token release complete — tx: {tx_hash}")
+
+    # ── SELL SIDE: Token Transfer Handler ─────────────────────
+
+    async def _handle_sell_token_transfer(self, job: Dict[str, Any]):
+        """
+        Sell side: seller's Seamount wallet → merchant's Seamount wallet.
+        Mirror of _handle_token_release but direction is reversed:
+          buy side:  merchant → buyer
+          sell side: seller  → merchant
+        After success, status moves to 'paid' meaning merchant has the tokens
+        and must now send fiat to the seller.
+        """
+        payload         = job["payload"]
+        order_id        = payload["order_id"]
+        seller_user_id  = payload["seller_user_id"]
+        merchant_id_str = payload["merchant_id"]
+
+        # Fetch order
+        order_res = self.supabase.table("p2p_orders") \
+            .select("*") \
+            .eq("id", order_id) \
+            .eq("status", "confirming") \
+            .eq("order_type", "sell") \
+            .limit(1) \
+            .execute()
+
+        if not order_res.data or len(order_res.data) == 0:
+            raise ValueError(f"Sell order {order_id} not found or wrong status")
+
+        order = order_res.data[0]
+        token = order["token"]
+        chain = ASSET_CHAIN_MAP.get(token, 'tron')
+
+        # ── Fetch merchant's Seamount wallet address (destination) ──
+        merchant_res = self.supabase.table("p2p_merchants") \
+            .select("user_id") \
+            .eq("id", merchant_id_str) \
+            .limit(1) \
+            .execute()
+        if not merchant_res.data or len(merchant_res.data) == 0:
+            raise ValueError("Merchant not found")
+        merchant_user_id = merchant_res.data[0]["user_id"]
+
+        if chain == 'algorand':
+            addr_res = self.supabase.table("user_wallets") \
+                .select("algorand_address") \
+                .eq("user_id", merchant_user_id) \
+                .limit(1) \
+                .execute()
+            merchant_address = (addr_res.data[0] if addr_res.data else {}).get("algorand_address")
+        else:
+            addr_res = self.supabase.table("multi_chain_addresses") \
+                .select("address") \
+                .eq("user_id", merchant_user_id) \
+                .eq("blockchain", chain) \
+                .limit(1) \
+                .execute()
+            merchant_address = (addr_res.data[0] if addr_res.data else {}).get("address")
+
+        if not merchant_address:
+            raise ValueError(f"Merchant has no {chain} Seamount wallet")
+
+        logger.info(
+            f"[P2PWorker] Sell transfer: {order['token_amount']} {token} "
+            f"from seller {seller_user_id[:8]}... "
+            f"to merchant {merchant_address[:10]}... on {chain}"
+        )
+
+        # ── Execute via MultiChainWalletService — FROM seller's wallet ──
+        from decimal import Decimal
+        tx_result = await self.wallet_service.send_payment(
+            user_id=seller_user_id,
+            recipient=merchant_address,
+            asset=token,
+            amount=Decimal(str(order["token_amount"]))
+        )
+
+        if not tx_result or not tx_result.get("success"):
+            raise Exception(
+                f"WDK transfer failed: {tx_result.get('message', 'unknown error')}"
+            )
+
+        tx_hash = tx_result.get("transaction_id", "") or tx_result.get("tx_hash", "")
+
+        # ── On-chain verification ─────────────────────────────
+        verified, reason = await self._verify_tx_on_chain(tx_hash, chain)
+
+        if not verified:
+            logger.error(f"[P2PWorker] Sell tx {tx_hash[:16]}... FAILED on-chain: {reason}")
+
+            # Revert to confirming — seller can retry release
+            self.supabase.table("p2p_orders").update({
+                "status":     "confirming",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }).eq("id", order_id).execute()
+
+            self.supabase.table("p2p_messages").insert({
+                "order_id":  order_id,
+                "is_system": True,
+                "message": (
+                    f"⚠️ Token transfer failed ({reason}). "
+                    f"Please check your wallet balance and try releasing again. "
+                    f"Tx: {tx_hash}"
+                )
+            }).execute()
+
+            self._sync_blockchain_tx_status(
+                tx_hash=tx_hash,
+                order_id=order_id,
+                verified=False,
+                reason=reason,
+                token=token,
+                chain=chain,
+                amount=float(order["token_amount"]),
+                recipient_address=merchant_address,
+            )
+
+            self._write_audit(
+                order_id, "tx_failed", "confirming", "confirming",
+                actor_id=seller_user_id,
+                metadata={"tx_hash": tx_hash, "reason": reason}
+            )
+
+            raise Exception(f"Sell tx failed on-chain: {reason}")
+
+        # ── Verified SUCCESS ──────────────────────────────────
+        # 'paid' on sell orders = tokens in merchant's wallet,
+        # merchant must now send fiat to seller.
+        self.supabase.table("p2p_orders").update({
+            "status":        "paid",
+            "token_tx_hash": tx_hash,
+            "updated_at":    datetime.now(timezone.utc).isoformat()
+        }).eq("id", order_id).execute()
+
+        self.supabase.table("p2p_messages").insert({
+            "order_id":  order_id,
+            "is_system": True,
+            "message": (
+                f"✅ {order['token_amount']} {token} transferred to merchant. "
+                f"Merchant: please send fiat and upload proof. "
+                f"Tx: {tx_hash}"
+            )
+        }).execute()
+
+        self._sync_blockchain_tx_status(
+            tx_hash=tx_hash,
+            order_id=order_id,
+            verified=True,
+            reason="SUCCESS",
+            token=token,
+            chain=chain,
+            amount=float(order["token_amount"]),
+            recipient_address=merchant_address,
+        )
+
+        self._write_audit(
+            order_id, "state_change", "confirming", "paid",
+            actor_id=seller_user_id,
+            metadata={"tx_hash": tx_hash}
+        )
+
+        logger.info(f"[P2PWorker] Sell transfer complete — tx: {tx_hash}")
 
     # ── Order Expire Handler ───────────────────────────────────
 
@@ -531,17 +574,18 @@ class P2PWorker:
             return
 
         self.supabase.table("p2p_orders").update({
-            "status": "expired",                               # ← was 'cancelled'
+            "status":     "expired",
             "updated_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", order_id).execute()
 
-        # System message — fires Realtime INSERT which frontend catches
+        # Insert system message — guarantees Realtime INSERT fires
+        # even if the UPDATE event is missed by the frontend channel.
         try:
             self.supabase.table("p2p_messages").insert({
-                "order_id": order_id,
-                "is_system": True,
+                "order_id":    order_id,
+                "is_system":   True,
                 "sender_role": "system",
-                "visibility": "all",
+                "visibility":  "all",
                 "message": (
                     "⏰ Payment window expired. This order has been automatically "
                     "marked as expired. The merchant's tokens remain available."
@@ -562,7 +606,7 @@ class P2PWorker:
         """
         try:
             res = self.supabase.table("p2p_jobs").update({
-                "status": "processing",
+                "status":     "processing",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", job_id).eq("status", "pending").execute()
             return bool(res.data)
@@ -573,7 +617,7 @@ class P2PWorker:
     def _complete_job(self, job_id: str):
         try:
             self.supabase.table("p2p_jobs").update({
-                "status": "completed",
+                "status":     "completed",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", job_id).execute()
         except Exception as e:
@@ -584,7 +628,7 @@ class P2PWorker:
         Exponential backoff retry.
         Delay grows: 30s → 60s → 120s → 240s → 480s then permanent fail.
         """
-        job_id = job["id"]
+        job_id      = job["id"]
         retry_count = job["retry_count"] + 1
         max_retries = job.get("max_retries", 5)
 
@@ -592,16 +636,13 @@ class P2PWorker:
             self._fail_job(job_id, f"Max retries ({max_retries}) reached")
             return
 
-        # Exponential backoff: 30 * 2^retry_count seconds
         delay_seconds = 30 * (2 ** retry_count)
-        next_attempt = datetime.now(timezone.utc).isoformat()  # simplification —
-        # for true delay scheduling, store next_attempt_at and filter on it
 
         try:
             self.supabase.table("p2p_jobs").update({
-                "status": "pending",          # back to pending for requeue
+                "status":      "pending",
                 "retry_count": retry_count,
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at":  datetime.now(timezone.utc).isoformat()
             }).eq("id", job_id).execute()
             logger.info(
                 f"[P2PWorker] Job {job_id} requeued "
@@ -613,8 +654,8 @@ class P2PWorker:
     def _fail_job(self, job_id: str, error: str):
         try:
             self.supabase.table("p2p_jobs").update({
-                "status": "failed",
-                "error": error,
+                "status":     "failed",
+                "error":      error,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", job_id).execute()
             logger.error(f"[P2PWorker] Job {job_id} permanently failed: {error}")
@@ -634,7 +675,7 @@ class P2PWorker:
 
             res = self.supabase.table("p2p_jobs") \
                 .update({
-                    "status": "pending",
+                    "status":     "pending",
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }) \
                 .eq("status", "processing") \
@@ -642,11 +683,11 @@ class P2PWorker:
                 .execute()
 
             if res.data:
-                logger.warning(
-                    f"[P2PWorker] Recovered {len(res.data)} stuck job(s)"
-                )
+                logger.warning(f"[P2PWorker] Recovered {len(res.data)} stuck job(s)")
         except Exception as e:
             logger.warning(f"[P2PWorker] Stuck job recovery failed: {e}")
+
+    # ── Blockchain TX Status Sync ──────────────────────────────
 
     def _sync_blockchain_tx_status(
         self,
@@ -657,7 +698,7 @@ class P2PWorker:
         token: str,
         chain: str,
         amount: float,
-        buyer_address: str
+        recipient_address: str
     ) -> None:
         """
         The WDK send_payment() may already have written a record to
@@ -668,7 +709,7 @@ class P2PWorker:
         If no rows updated (WDK didn't write one), INSERT with verified status.
         """
         final_status = "completed" if verified else "failed"
-        now = datetime.now(timezone.utc).isoformat()
+        now          = datetime.now(timezone.utc).isoformat()
 
         try:
             # ── Try UPDATE first ───────────────────────────────
@@ -687,14 +728,14 @@ class P2PWorker:
 
             # ── No existing record — INSERT with verified status ──
             self.supabase.table("blockchain_transactions").insert({
-                "user_id":          None,   # buyer_id not available here — ok
+                "user_id":          None,   # not available here — non-critical
                 "transaction_type": "p2p_release",
                 "status":           final_status,
                 "amount":           amount,
                 "asset":            token,
                 "chain":            chain,
                 "txn_hash":         tx_hash,
-                "to_address":       buyer_address,
+                "to_address":       recipient_address,
                 "platform_fee":     0,
                 "p2p_order_id":     order_id,
             }).execute()
@@ -705,8 +746,10 @@ class P2PWorker:
             )
 
         except Exception as e:
-            # Non-fatal — analytics table, not settlement
+            # Non-fatal — analytics table, not settlement critical path
             logger.warning(f"[P2PWorker] blockchain_transactions sync failed: {e}")
+
+    # ── Audit Writer ───────────────────────────────────────────
 
     def _write_audit(
         self,

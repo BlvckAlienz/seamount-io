@@ -752,25 +752,24 @@ async def create_sell_order_endpoint(
 
 
 # ── PATCH /api/p2p/sell/orders/{order_id}/token-sent ─────────
-@router.patch("/sell/orders/{order_id}/token-sent")
-async def seller_token_sent(
+@router.patch("/sell/orders/{order_id}/release-tokens")
+async def seller_release_tokens(
     order_id: str,
-    payload: SellerTokenSentRequest,
     current_user: dict = Depends(get_current_user)
 ):
+    """Seller authorises Seamount to transfer their tokens to the merchant."""
     try:
-        from backend.services.p2p.order_service import seller_confirm_token_sent
-        result = await seller_confirm_token_sent(
+        from backend.services.p2p.order_service import seller_authorize_token_release
+        result = await seller_authorize_token_release(
             order_id=order_id,
             seller_id=current_user["id"],
-            token_tx_hash=payload.token_tx_hash,
         )
         return {"success": True, **result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"[P2P] Seller token sent error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update order")
+        logger.error(f"[P2P] Seller release tokens error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to initiate token transfer")
 
 
 # ── POST /api/p2p/sell/orders/{order_id}/fiat-proof ──────────

@@ -7,15 +7,26 @@ import { ShieldCheck, Star, Clock, ChevronRight, Loader2, RefreshCw } from 'luci
 
 const TOKEN_OPTIONS = [
   { value: '', label: 'All Tokens' },
-  { value: 'USDT_TRON',    label: 'USDT (Tron)'     },
-  { value: 'USDT_POLYGON', label: 'USDT (Polygon)'  },
-  { value: 'USDC_ETH',     label: 'USDC (Ethereum)' },
-  { value: 'USDC_POLYGON', label: 'USDC (Polygon)'  },
-  { value: 'BTC',          label: 'Bitcoin'          },
-  { value: 'ETH',          label: 'Ethereum'         },
+  { value: 'ALGO',         label: 'ALGO'          },
+  { value: 'USDT_ALGO',    label: 'USDT (Algorand)' },
+  { value: 'USDCa',        label: 'USDCa'         },
+  { value: 'goBTC',        label: 'goBTC'         },
+  { value: 'goETH',        label: 'goETH'         },
+  { value: 'BTC',          label: 'BTC'           },
+  { value: 'ETH',          label: 'ETH'           },
+  { value: 'USDT_ETH',     label: 'USDT (ETH)'    },
+  { value: 'USDC_ETH',     label: 'USDC (ETH)'    },
+  { value: 'MATIC',        label: 'MATIC'         },
+  { value: 'USDT_POLYGON', label: 'USDT (Polygon)'},
+  { value: 'USDC_POLYGON', label: 'USDC (Polygon)'},
+  { value: 'TRX',          label: 'TRX'           },
+  { value: 'USDT_TRON',    label: 'USDT (Tron) ⭐' },
+  { value: 'SOL',          label: 'SOL'           },
+  { value: 'USDT_SOLANA',  label: 'USDT (Solana)' },
+  { value: 'USDC_SOLANA',  label: 'USDC (Solana)' },
 ]
 
-const FIAT_OPTIONS = ['', 'KES', 'NGN', 'GHS', 'USD', 'GBP', 'EUR']
+const FIAT_OPTIONS = ['', 'KES', 'NGN', 'GHS', 'UGX', 'TZS', 'ZAR', 'USD', 'GBP', 'EUR']
 
 export function SellListings() {
   const [listings,        setListings]  = useState<any[]>([])
