@@ -14,9 +14,9 @@ from backend.services.p2p.order_service import (
     confirm_payment_sent,
     merchant_confirm_and_release,
     create_sell_order,
-    seller_confirm_token_sent,
+    seller_authorize_token_release,   # ← replaces seller_confirm_token_sent
     merchant_confirm_fiat_sent,
-    seller_confirm_fiat_received
+    seller_confirm_fiat_received,
 )
 
 logger = logging.getLogger(__name__)
@@ -642,7 +642,7 @@ class CreateSellListingRequest(BaseModel):
     available_amount: float          # available fiat to deploy
     payment_methods: List[str]
     payment_details: Dict[str, Any]  # how merchant pays fiat to sellers
-    merchant_receive_address: str    # merchant's on-chain address to receive tokens
+    merchant_receive_address: Optional[str] = None
     terms: Optional[str] = None
 
 
