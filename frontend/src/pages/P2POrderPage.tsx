@@ -228,6 +228,10 @@ export default function P2POrderPage() {
   const [error,        setError]        = useState<string | null>(null)
   const [refreshing,   setRefreshing]   = useState(false)
   const [showReceipt,  setShowReceipt]  = useState(false)      // for merchant receipt toggle
+  const [releasingTokens, setReleasingTokens]   = useState(false)
+  const [confirmingFiat,  setConfirmingFiat]     = useState(false)
+  const [uploadingFiatProof, setUploadingFiatProof] = useState(false)
+  const fiatProofRef = useRef<HTMLInputElement>(null)
 
   const fileRef    = useRef<HTMLInputElement>(null)
   const chatRef    = useRef<HTMLDivElement>(null)
@@ -609,71 +613,73 @@ export default function P2POrderPage() {
           )}
           
           {/* ── SELL ORDER merchant: verify tokens + release fiat ── */}
-          {order.order_type === 'sell' && order.status === 'paid' && (() => {
-            const fiatRef = useRef<HTMLInputElement>(null)
-            const [uploading, setUploading] = useState(false)
-            const token = order.token || ''
-            const chain = token.includes('_') ? token.split('_')[1].toLowerCase() : 'tron'
-            const explorers: Record<string, string> = {
-              tron: 'https://tronscan.org/#/transaction/',
-              eth: 'https://etherscan.io/tx/',
-              polygon: 'https://polygonscan.com/tx/',
-              solana: 'https://solscan.io/tx/',
-              algorand: 'https://algoexplorer.io/tx/',
-            }
-            const explorerUrl = order.token_tx_hash
-              ? `${explorers[chain] || explorers.tron}${order.token_tx_hash}`
-              : null
-
-            const handleFiatProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
-              const file = e.target.files?.[0]; if (!file || !id) return
-              setUploading(true)
-              try {
-                const form = new FormData()
-                form.append('file', file)
-                const res = await apiClient.post(`/api/p2p/sell/orders/${id}/fiat-proof`, form, {
-                  headers: { 'Content-Type': 'multipart/form-data' }
-                })
-                if (res.data?.success) { toast.success('Fiat proof uploaded! Order moved to confirming.'); fetchOrder() }
-                else throw new Error(res.data?.detail ?? 'Upload failed')
-              } catch (e: any) { toast.error(e.response?.data?.detail ?? e.message) }
-              finally { setUploading(false); if (fiatRef.current) fiatRef.current.value = '' }
-            }
-
-            return (
-              <div className="space-y-3">
-                {order.order_type === 'sell' && order.status === 'paid' && (
-            <div className="bg-green-50 rounded-xl border border-green-200 p-3 text-sm text-green-800">
-              ✅ <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong>{' '}
-              transferred to your Seamount wallet via platform infrastructure.
+          {order.order_type === 'sell' && order.status === 'paid' && (
+            <div className="space-y-3">
               {order.token_tx_hash && (
-                <span className="block text-xs text-gray-500 font-mono mt-1">
-                  Tx: {order.token_tx_hash.slice(0, 20)}...
-                </span>
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-900">
+                    ✅ Tokens received in your Seamount wallet
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-gray-600 break-all flex-1">
+                      {order.token_tx_hash}
+                    </span>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(order.token_tx_hash!); toast.success('Copied!') }}
+                      className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               )}
+              <Alert className="bg-amber-500/10 border-amber-500/30 py-2.5">
+                <AlertCircle className="h-4 w-4 text-amber-400" />
+                <AlertDescription className="text-xs text-amber-200">
+                  Tokens have been received. Send{' '}
+                  {order.fiat_amount.toLocaleString()} {order.fiat_currency}{' '}
+                  to the seller's {order.seller_payout_method} and upload proof below.
+                </AlertDescription>
+              </Alert>
+              <input
+                ref={fiatProofRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file || !id) return
+                  setUploadingFiatProof(true)
+                  try {
+                    const form = new FormData()
+                    form.append('file', file)
+                    const res = await apiClient.post(
+                      `/api/p2p/sell/orders/${id}/fiat-proof`, form,
+                      { headers: { 'Content-Type': 'multipart/form-data' } }
+                    )
+                    if (res.data?.success) {
+                      toast.success('Fiat proof uploaded! Order moved to confirming.')
+                      fetchOrder()
+                    } else throw new Error(res.data?.detail ?? 'Upload failed')
+                  } catch (e: any) {
+                    toast.error(e.response?.data?.detail ?? e.message)
+                  } finally {
+                    setUploadingFiatProof(false)
+                    if (fiatProofRef.current) fiatProofRef.current.value = ''
+                  }
+                }}
+              />
+              <Button
+                onClick={() => fiatProofRef.current?.click()}
+                disabled={uploadingFiatProof}
+                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
+              >
+                {uploadingFiatProof
+                  ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</>
+                  : "💸 I've Sent Fiat — Upload Payment Proof"
+                }
+              </Button>
             </div>
           )}
-                <Alert className="bg-amber-500/10 border-amber-500/30 py-2.5">
-                  <AlertCircle className="h-4 w-4 text-amber-400" />
-                  <AlertDescription className="text-xs text-amber-200">
-                    Verify the token transfer above before sending fiat. Only proceed once confirmed on-chain.
-                  </AlertDescription>
-                </Alert>
-                <input ref={fiatRef} type="file" accept="image/*,application/pdf"
-                  className="hidden" onChange={handleFiatProof} />
-                <Button
-                  onClick={() => fiatRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
-                >
-                  {uploading
-                    ? <><Loader2 className="h-4 w-4 animate-spin" />Uploading...</>
-                    : '💸 I\'ve Sent Fiat — Upload Payment Proof'
-                  }
-                </Button>
-              </div>
-            )
-          })()}
 
           {/* Release action */}
           {order.status === 'paid' && (
@@ -765,103 +771,104 @@ export default function P2POrderPage() {
         )}
 
         {/* ── SELL ORDER: show wallet address + tx hash input ── */}
-        {isBuyer && order.order_type === 'sell' && order.status === 'payment_window' && (() => {
-          const [releasing, setReleasing] = useState(false)
-          const handleRelease = async () => {
-            if (!confirm(
-              `This will send ${order.token_amount.toFixed(6)} ` +
-              `${order.token.split('_')[0]} from your Seamount wallet ` +
-              `to the merchant. Proceed?`
-            )) return
-            setReleasing(true)
-            try {
-              const res = await apiClient.patch(
-                `/api/p2p/sell/orders/${id}/release-tokens`
-              )
-              if (res.data?.success) {
-                toast.success('Token transfer initiated!')
-                fetchOrder()
-              } else throw new Error(res.data?.detail)
-            } catch (e: any) {
-              toast.error(e.response?.data?.detail ?? e.message)
-            } finally { setReleasing(false) }
-          }
-
-          return (
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800 p-4 space-y-3">
-              <h3 className="font-bold text-orange-900 dark:text-orange-200 text-sm">
-                💸 Release Your Tokens
-              </h3>
-              <p className="text-xs text-orange-700 dark:text-orange-300">
-                Seamount will securely transfer{' '}
-                <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong>{' '}
-                from your wallet to the merchant. The merchant will then
-                send <strong>{order.fiat_amount.toLocaleString()} {order.fiat_currency}</strong>{' '}
-                to your <strong>{order.seller_payout_method}</strong>.
-              </p>
-              <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 py-2">
-                <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
-                <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
-                  Tokens are held securely by Seamount until the merchant confirms fiat sent.
-                </AlertDescription>
-              </Alert>
-              <Button
-                onClick={handleRelease}
-                disabled={releasing}
-                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-bold gap-2"
-              >
-                {releasing
-                  ? <><Loader2 className="h-4 w-4 animate-spin" />Transferring...</>
-                  : `🔒 Release ${order.token_amount.toFixed(4)} ${order.token.split('_')[0]} to Seamount`
-                }
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCancel}
-                className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs">
-                Cancel Order
-              </Button>
-            </div>
-          )
-        })()}
+        {isBuyer && order.order_type === 'sell' && order.status === 'payment_window' && (
+          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800 p-4 space-y-3">
+            <h3 className="font-bold text-orange-900 dark:text-orange-200 text-sm">
+              💸 Release Your Tokens
+            </h3>
+            <p className="text-xs text-orange-700 dark:text-orange-300">
+              Seamount will securely transfer{' '}
+              <strong>{order.token_amount.toFixed(6)} {order.token.split('_')[0]}</strong>{' '}
+              from your wallet to the merchant. The merchant will then send{' '}
+              <strong>{order.fiat_amount.toLocaleString()} {order.fiat_currency}</strong>{' '}
+              to your <strong>{order.seller_payout_method}</strong>.
+            </p>
+            <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 py-2">
+              <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
+              <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
+                Tokens are held securely by Seamount until the merchant confirms fiat sent.
+              </AlertDescription>
+            </Alert>
+            <Button
+              onClick={async () => {
+                if (!confirm(
+                  `This will send ${order.token_amount.toFixed(6)} ` +
+                  `${order.token.split('_')[0]} from your Seamount wallet ` +
+                  `to the merchant. Proceed?`
+                )) return
+                setReleasingTokens(true)
+                try {
+                  const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/release-tokens`)
+                  if (res.data?.success) {
+                    toast.success('Token transfer initiated!')
+                    fetchOrder()
+                  } else throw new Error(res.data?.detail)
+                } catch (e: any) {
+                  toast.error(e.response?.data?.detail ?? e.message)
+                } finally { setReleasingTokens(false) }
+              }}
+              disabled={releasingTokens}
+              className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-bold gap-2"
+            >
+              {releasingTokens
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Transferring...</>
+                : `🔒 Release ${order.token_amount.toFixed(4)} ${order.token.split('_')[0]} to Seamount`
+              }
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCancel}
+              className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs">
+              Cancel Order
+            </Button>
+          </div>
+        )}
 
         {/* ── SELL ORDER: seller confirms fiat received ── */}
-        {isBuyer && order.order_type === 'sell' && order.status === 'confirming' && (() => {
-          const [confirming, setConfirming] = useState(false)
-          const handleConfirm = async () => {
-            setConfirming(true)
-            try {
-              const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/fiat-received`)
-              if (res.data?.success) { toast.success('Order completed!'); fetchOrder() }
-              else throw new Error(res.data?.detail)
-            } catch (e: any) { toast.error(e.response?.data?.detail ?? e.message) }
-            finally { setConfirming(false) }
-          }
-          return (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-              <h3 className="font-bold text-gray-900 dark:text-white text-sm">
-                ✅ Confirm Fiat Receipt
-              </h3>
-              <p className="text-xs text-gray-500">
-                The merchant has sent {order.fiat_amount.toLocaleString()} {order.fiat_currency} to your{' '}
-                <strong>{order.seller_payout_method}</strong>.
-                {order.seller_payout_details && Object.entries(order.seller_payout_details).map(([k, v]) => (
+        {isBuyer && order.order_type === 'sell' && order.status === 'confirming' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+            <h3 className="font-bold text-gray-900 dark:text-white text-sm">
+              ✅ Confirm Fiat Receipt
+            </h3>
+            <p className="text-xs text-gray-500">
+              The merchant has sent{' '}
+              {order.fiat_amount.toLocaleString()} {order.fiat_currency}{' '}
+              to your <strong>{order.seller_payout_method}</strong>.
+              {order.seller_payout_details &&
+                Object.entries(order.seller_payout_details).map(([k, v]) => (
                   <span key={k} className="block mt-0.5">
                     {k.replace(/_/g, ' ')}: <strong>{String(v)}</strong>
                   </span>
-                ))}
-              </p>
-              {order.fiat_proof_url && (
-                <a href={order.fiat_proof_url} target="_blank" rel="noopener noreferrer"
-                  className="block text-xs text-blue-600 hover:underline">
-                  View payment proof ↗
-                </a>
-              )}
-              <Button onClick={handleConfirm} disabled={confirming}
-                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2">
-                {confirming ? <><Loader2 className="h-4 w-4 animate-spin" />Confirming...</> : '✓ I\'ve Received My Fiat'}
-              </Button>
-            </div>
-          )
-        })()}
+                ))
+              }
+            </p>
+            {order.fiat_proof_url && (
+              <a href={order.fiat_proof_url} target="_blank" rel="noopener noreferrer"
+                className="block text-xs text-blue-600 hover:underline">
+                View payment proof ↗
+              </a>
+            )}
+            <Button
+              onClick={async () => {
+                setConfirmingFiat(true)
+                try {
+                  const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/fiat-received`)
+                  if (res.data?.success) {
+                    toast.success('Order completed!')
+                    fetchOrder()
+                  } else throw new Error(res.data?.detail)
+                } catch (e: any) {
+                  toast.error(e.response?.data?.detail ?? e.message)
+                } finally { setConfirmingFiat(false) }
+              }}
+              disabled={confirmingFiat}
+              className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
+            >
+              {confirmingFiat
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Confirming...</>
+                : "✓ I've Received My Fiat"
+              }
+            </Button>
+          </div>
+        )}
 
         {/* Receipt upload + Cancel */}
         {isBuyer && order.status === 'payment_window' && (
