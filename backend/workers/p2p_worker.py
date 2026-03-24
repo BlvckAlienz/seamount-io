@@ -71,9 +71,11 @@ class P2PWorker:
     # ── Fetch and dispatch pending jobs ───────────────────────
 
     async def _process_pending_jobs(self):
+        now = datetime.now(timezone.utc).isoformat()
         res = self.supabase.table("p2p_jobs") \
             .select("*") \
             .eq("status", "pending") \
+            .or_(f"run_after.is.null,run_after.lte.{now}") \
             .order("created_at", desc=False) \
             .limit(10) \
             .execute()
@@ -569,8 +571,14 @@ class P2PWorker:
             logger.warning(f"[P2PWorker] Expire job: order {order_id} not found")
             return
 
-        if order_res.data[0]["status"] != "payment_window":
-            # Already paid or cancelled — nothing to do
+        current_status = order_res.data[0]["status"]
+        if current_status != "payment_window":
+            # Order already progressed (paid, confirming, completed, cancelled)
+            # or was already expired — nothing to do
+            logger.info(
+                f"[P2PWorker] Expire job skipped for {order_id} "
+                f"— already in status '{current_status}'"
+            )
             return
 
         self.supabase.table("p2p_orders").update({

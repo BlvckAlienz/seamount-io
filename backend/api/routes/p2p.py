@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
+from backend.dependencies import get_multi_chain_wallet_service
 from backend.dependencies import get_current_user, get_supabase_client
 from backend.services.p2p.order_service import (
     create_p2p_order,
@@ -731,14 +732,55 @@ async def create_sell_listing(
 @router.post("/sell/orders")
 async def create_sell_order_endpoint(
     payload: CreateSellOrderRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    wallet_service=Depends(get_multi_chain_wallet_service),
+    supabase=Depends(get_supabase_client)
 ):
     try:
-        from backend.services.p2p.order_service import create_sell_order
+        user_id = current_user["id"]
+
+        # ── Balance pre-check ─────────────────────────────────
+        # Resolve which chain/token the listing uses
+        listing_res = supabase.table("p2p_listings") \
+            .select("token, price_per_token") \
+            .eq("id", payload.listing_id) \
+            .limit(1).execute()
+
+        if not listing_res.data:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        token        = listing_res.data[0]["token"]
+        token_needed = payload.fiat_amount / listing_res.data[0]["price_per_token"]
+
+        # Fetch live balances from Seamount wallet
+        try:
+            balances     = await wallet_service.get_user_balances(user_id)
+            assets       = {a["symbol"]: a["balance"] for a in balances.get("assets", [])}
+            token_symbol = token.split("_")[0]   # e.g. USDT_TRON → USDT
+
+            # Check both the full key (e.g. USDT_TRON) and the base symbol (USDT)
+            available = assets.get(token, assets.get(token_symbol, 0))
+
+            if available < token_needed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Insufficient balance. You need {token_needed:.6f} {token_symbol} "
+                        f"but your Seamount wallet only has {available:.6f} {token_symbol}. "
+                        f"Please buy or deposit {token_symbol} to your wallet first."
+                    )
+                )
+        except HTTPException:
+            raise
+        except Exception as bal_err:
+            # Balance check failed — log but don't block order creation
+            logger.warning(f"[P2P] Balance pre-check failed (non-blocking): {bal_err}")
+
+        # ── Create order ──────────────────────────────────────
         result = await create_sell_order(
             idempotency_key=payload.idempotency_key,
             listing_id=payload.listing_id,
-            seller_id=current_user["id"],
+            seller_id=user_id,
             fiat_amount=payload.fiat_amount,
             payment_method=payload.payment_method,
             payout_details=payload.payout_details,
@@ -746,10 +788,11 @@ async def create_sell_order_endpoint(
         return {"success": True, **result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[P2P] Create sell order error: {e}")
         raise HTTPException(status_code=500, detail="Failed to create sell order")
-
 
 # ── PATCH /api/p2p/sell/orders/{order_id}/token-sent ─────────
 @router.patch("/sell/orders/{order_id}/release-tokens")
@@ -847,4 +890,57 @@ async def seller_fiat_received(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"[P2P] Seller fiat received error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to complete order")
+        raise HTTPException(status_code=500, detail="Failed to complete order") 
+
+@router.patch("/sell/orders/{order_id}/cancel")
+async def cancel_sell_order(
+    order_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """Seller cancels a sell order still in payment_window."""
+    try:
+        user_id = current_user["id"]
+
+        order_res = supabase.table("p2p_orders") \
+            .select("id, status, buyer_id, order_type") \
+            .eq("id", order_id) \
+            .eq("buyer_id", user_id) \
+            .eq("order_type", "sell") \
+            .limit(1).execute()
+
+        if not order_res.data:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order_res.data[0]["status"] != "payment_window":
+            raise HTTPException(
+                status_code=400,
+                detail="Only orders awaiting token release can be cancelled"
+            )
+
+        supabase.table("p2p_orders").update({
+            "status":     "cancelled",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).eq("id", order_id).execute()
+
+        supabase.table("p2p_messages").insert({
+            "order_id": order_id, "is_system": True,
+            "message":  "Seller cancelled the order."
+        }).execute()
+
+        supabase.table("settlement_audit_log").insert({
+            "order_id":    order_id,
+            "event_type":  "state_change",
+            "prev_status": "payment_window",
+            "new_status":  "cancelled",
+            "actor_id":    user_id
+        }).execute()
+
+        logger.info(f"[P2P] Sell order {order_id} cancelled by seller")
+        return {"success": True, "message": "Order cancelled"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Cancel sell order error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel order")

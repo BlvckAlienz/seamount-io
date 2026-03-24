@@ -632,6 +632,32 @@ export default function P2POrderPage() {
                   </div>
                 </div>
               )}
+              {order.seller_payout_method && (
+                <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 space-y-2 shadow-sm">
+                  <p className="text-sm font-semibold text-blue-900">
+                    💸 Send fiat to seller
+                  </p>
+                  <div className="text-sm text-blue-800">
+                    <span className="font-bold">
+                      {order.fiat_amount?.toLocaleString()} {order.fiat_currency}
+                    </span>
+                    {' '}via <strong>{order.seller_payout_method}</strong>
+                  </div>
+                  {order.seller_payout_details &&
+                    Object.entries(order.seller_payout_details).map(([k, v]) => (
+                      <div key={k} className="flex justify-between text-xs text-blue-700">
+                        <span className="capitalize">{k.replace(/_/g, ' ')}</span>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(String(v)); toast.success('Copied!') }}
+                          className="font-mono font-bold flex items-center gap-1 hover:text-blue-900"
+                        >
+                          {String(v)} <Copy className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
               <Alert className="bg-amber-500/10 border-amber-500/30 py-2.5">
                 <AlertCircle className="h-4 w-4 text-amber-400" />
                 <AlertDescription className="text-xs text-amber-200">
@@ -823,50 +849,67 @@ export default function P2POrderPage() {
         )}
 
         {/* ── SELL ORDER: seller confirms fiat received ── */}
-        {isBuyer && order.order_type === 'sell' && order.status === 'confirming' && (
+        {isBuyer && order.order_type === 'sell'
+          && order.status === 'confirming'
+          && order.fiat_proof_url && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm">
               ✅ Confirm Fiat Receipt
             </h3>
             <p className="text-xs text-gray-500">
               The merchant has sent{' '}
-              {order.fiat_amount.toLocaleString()} {order.fiat_currency}{' '}
+              <strong>{order.fiat_amount.toLocaleString()} {order.fiat_currency}</strong>{' '}
               to your <strong>{order.seller_payout_method}</strong>.
               {order.seller_payout_details &&
                 Object.entries(order.seller_payout_details).map(([k, v]) => (
-                  <span key={k} className="block mt-0.5">
+                  <span key={k} className="block mt-0.5 text-gray-600 dark:text-gray-400">
                     {k.replace(/_/g, ' ')}: <strong>{String(v)}</strong>
                   </span>
                 ))
               }
             </p>
-            {order.fiat_proof_url && (
-              <a href={order.fiat_proof_url} target="_blank" rel="noopener noreferrer"
-                className="block text-xs text-blue-600 hover:underline">
-                View payment proof ↗
-              </a>
-            )}
-            <Button
-              onClick={async () => {
-                setConfirmingFiat(true)
-                try {
-                  const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/fiat-received`)
-                  if (res.data?.success) {
-                    toast.success('Order completed!')
+            <a href={order.fiat_proof_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline font-semibold">
+              <Eye className="h-3.5 w-3.5" /> View merchant payment proof ↗
+            </a>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  setConfirmingFiat(true)
+                  try {
+                    const res = await apiClient.patch(`/api/p2p/sell/orders/${id}/fiat-received`)
+                    if (res.data?.success) { toast.success('Order completed!'); fetchOrder() }
+                    else throw new Error(res.data?.detail)
+                  } catch (e: any) { toast.error(e.response?.data?.detail ?? e.message) }
+                  finally { setConfirmingFiat(false) }
+                }}
+                disabled={confirmingFiat}
+                className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
+              >
+                {confirmingFiat
+                  ? <><Loader2 className="h-4 w-4 animate-spin" />Confirming...</>
+                  : '✓ Payment Received'
+                }
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (!id || !confirm('Raise a dispute? Support will review within 24 hours.')) return
+                  try {
+                    await supabase.from('p2p_orders').update({ status: 'disputed' }).eq('id', id)
+                    await supabase.from('p2p_messages').insert({
+                      order_id: id, is_system: true,
+                      message: 'Seller raised a dispute. Seamount support has been notified.'
+                    })
+                    toast.success('Dispute raised. Support will contact you within 24 hours.')
                     fetchOrder()
-                  } else throw new Error(res.data?.detail)
-                } catch (e: any) {
-                  toast.error(e.response?.data?.detail ?? e.message)
-                } finally { setConfirmingFiat(false) }
-              }}
-              disabled={confirmingFiat}
-              className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
-            >
-              {confirmingFiat
-                ? <><Loader2 className="h-4 w-4 animate-spin" />Confirming...</>
-                : "✓ I've Received My Fiat"
-              }
-            </Button>
+                  } catch { toast.error('Failed to raise dispute') }
+                }}
+                className="flex-1 h-11 text-orange-600 border-orange-200 hover:bg-orange-50 font-semibold text-sm"
+              >
+                ⚠️ Dispute
+              </Button>
+            </div>
           </div>
         )}
 
@@ -893,15 +936,29 @@ export default function P2POrderPage() {
                 </Button>
               </>
             )}
-            <Button variant="outline" size="sm" onClick={handleCancel}
-              className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs">
-              Cancel Order
-            </Button>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!id || !confirm('Cancel this sell order?')) return
+                  try {
+                    await apiClient.patch(`/api/p2p/sell/orders/${id}/cancel`)
+                    toast.success('Order cancelled')
+                    fetchOrder()
+                  } catch (e: any) {
+                    toast.error(e.response?.data?.detail ?? 'Failed to cancel')
+                  }
+                }}
+                className="w-full text-red-600 border-red-200 hover:bg-red-50 text-xs"
+              >
+                Cancel Order
+              </Button>
           </div>
         )}
 
         {/* Dispute button — shown after payment_window ends and tokens not released */}
-        {isBuyer && ['paid', 'confirming', 'disputed'].includes(order.status) && (
+        {isBuyer && order.order_type !== 'sell'
+          && ['paid', 'confirming', 'disputed'].includes(order.status) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
             <p className="text-xs text-gray-500">
               {order.status === 'disputed'

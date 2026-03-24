@@ -36,10 +36,10 @@ const TABS: { id: Tab; label: string; icon: typeof ShoppingBag }[] = [
 
 const TAB_DESC: Record<Tab, string> = {
   p2p:    'Buy crypto directly from verified merchants using local payment methods — lowest fees',
-  sell: 'Sell your crypto to verified merchants for local fiat — direct bank or mobile money payout',
+  sell:   'Sell your crypto to verified merchants for local fiat — direct bank or mobile money payout',
   fund:   'Buy crypto instantly with your local currency via card or bank transfer',
   send:   'Send crypto to any wallet address across all supported chains',
-  orders: 'Track your P2P buy orders — active and completed',
+  orders: 'Track your P2P buy and sell orders — active, completed and expired',
 }
 
 // ── Order History Component ────────────────────────────────────
@@ -56,7 +56,7 @@ function OrderHistory() {
     try {
       const { data } = await supabase
         .from('p2p_orders')
-        .select('id, order_number, token, fiat_currency, fiat_amount, token_amount, status, created_at, p2p_merchants(display_name)')
+        .select('id, order_number, token, fiat_currency, fiat_amount, token_amount, status, order_type, created_at, p2p_merchants(display_name)')
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false })
       setOrders(data ?? [])
@@ -115,8 +115,13 @@ function OrderHistory() {
                 className="w-full bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center gap-4 hover:border-blue-300 hover:shadow-sm transition text-left">
                 {/* Left: token + merchant */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-gray-900 text-sm">{tokenDisplay}</span>
+                    {o.order_type === 'sell' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">
+                        SELL
+                      </span>
+                    )}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_PILL[o.status] ?? 'bg-gray-100 text-gray-500'}`}>
                       {o.status === 'payment_window' ? 'Pending' : o.status}
                     </span>

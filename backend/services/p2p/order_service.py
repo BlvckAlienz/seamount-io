@@ -122,6 +122,8 @@ async def create_p2p_order(
         )
     }).execute()
 
+    await _enqueue_order_expire(order["id"], deadline.isoformat())
+
     logger.info(f"[P2P] Order created: {order['id']} | token: {order['token']}")
 
     # payment_details only returned here — never exposed in listing fetch
@@ -295,6 +297,22 @@ async def _enqueue_token_release(order_id: str, merchant_user_id: str) -> None:
         logger.error(f"[P2P] Failed to enqueue token release job: {e}")
         raise
 
+async def _enqueue_order_expire(order_id: str, deadline_iso: str) -> None:
+    """Enqueue an order expiry job — picked up by worker after deadline passes."""
+    try:
+        supabase = get_supabase_client()
+        supabase.table("p2p_jobs").insert({
+            "job_type":   "order.expire",
+            "payload":    {"order_id": order_id},
+            "status":     "pending",
+            "retry_count": 0,
+            "max_retries": 1,
+            "run_after":   deadline_iso,   # worker skips job until this time passes
+        }).execute()
+        logger.info(f"[P2P] Expire job enqueued for order {order_id}")
+    except Exception as e:
+        logger.warning(f"[P2P] Failed to enqueue expire job (non-fatal): {e}")
+
 
 # ══════════════════════════════════════════════════════════════
 # SELL SIDE
@@ -376,6 +394,8 @@ async def create_sell_order(
             f"You have {ORDER_TIMEOUT_MINS} minutes."
         )
     }).execute()
+
+    await _enqueue_order_expire(order["id"], deadline.isoformat())
 
     logger.info(f"[P2P] Sell order created: {order['id']}")
     return {"order": order, "is_duplicate": False}
@@ -481,8 +501,11 @@ async def merchant_confirm_fiat_sent(
     supabase.table("p2p_messages").insert({
         "order_id": order_id, "is_system": True,
         "message": (
-            f"Merchant has sent fiat payment. "
-            f"Check your {payout_method} account and confirm receipt below."
+            f"💸 Merchant has sent {order.get('fiat_amount', '')} "
+            f"{order.get('fiat_currency', '')} to your "
+            f"{payout_method}. "
+            f"Payment proof: {fiat_proof_url} — "
+            f"Please check your account and confirm receipt below."
         )
     }).execute()
 
