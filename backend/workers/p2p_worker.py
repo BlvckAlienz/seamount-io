@@ -63,6 +63,7 @@ class P2PWorker:
         while self._running:
             try:
                 await self._recover_stuck_jobs()
+                await self._expire_overdue_orders()   # direct scan — no jobs needed
                 await self._process_pending_jobs()
             except Exception as e:
                 logger.error(f"[P2PWorker] Loop error: {e}")
@@ -72,20 +73,38 @@ class P2PWorker:
 
     async def _process_pending_jobs(self):
         now = datetime.now(timezone.utc).isoformat()
-        res = self.supabase.table("p2p_jobs") \
+
+        # Query 1: jobs with no run_after (immediate jobs)
+        res1 = self.supabase.table("p2p_jobs") \
             .select("*") \
             .eq("status", "pending") \
-            .or_(f"run_after.is.null,run_after.lte.{now}") \
+            .is_("run_after", "null") \
             .order("created_at", desc=False) \
             .limit(10) \
             .execute()
 
-        jobs = res.data or []
+        # Query 2: jobs whose run_after has passed
+        res2 = self.supabase.table("p2p_jobs") \
+            .select("*") \
+            .eq("status", "pending") \
+            .not_.is_("run_after", "null") \
+            .lte("run_after", now) \
+            .order("created_at", desc=False) \
+            .limit(10) \
+            .execute()
+
+        # Merge and deduplicate by id
+        seen = set()
+        jobs = []
+        for job in (res1.data or []) + (res2.data or []):
+            if job["id"] not in seen:
+                seen.add(job["id"])
+                jobs.append(job)
+
         if not jobs:
             return
 
         logger.info(f"[P2PWorker] Processing {len(jobs)} pending job(s)")
-
         for job in jobs:
             asyncio.create_task(self._handle_job(job))
 
@@ -669,6 +688,41 @@ class P2PWorker:
             logger.error(f"[P2PWorker] Job {job_id} permanently failed: {error}")
         except Exception as e:
             logger.warning(f"[P2PWorker] Failed to mark job {job_id} as failed: {e}")
+
+    async def _expire_overdue_orders(self):
+        """
+        Direct DB scan — expires any payment_window orders past deadline.
+        Runs every poll cycle. Completely independent of p2p_jobs table.
+        Fixes: orders with no expire job, jobs with bad run_after filter,
+               and any orders created before the expire job feature existed.
+        """
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+
+            overdue_res = self.supabase.table("p2p_orders") \
+                .select("id") \
+                .eq("status", "payment_window") \
+                .lt("payment_deadline", now) \
+                .execute()
+
+            orders = overdue_res.data or []
+            if not orders:
+                return
+
+            logger.info(f"[P2PWorker] Found {len(orders)} overdue order(s) to expire")
+
+            for row in orders:
+                try:
+                    await self._handle_order_expire({
+                        "payload": {"order_id": row["id"]}
+                    })
+                except Exception as e:
+                    logger.warning(
+                        f"[P2PWorker] Failed to expire order {row['id']}: {e}"
+                    )
+
+        except Exception as e:
+            logger.warning(f"[P2PWorker] Overdue order scan failed: {e}")
 
     async def _recover_stuck_jobs(self):
         """

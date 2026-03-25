@@ -257,13 +257,24 @@ export default function P2POrderPage() {
     try {
       const { data, error: e } = await supabase
         .from('p2p_orders')
-        .select(`*, p2p_merchants(id,display_name,verified,avg_release_time_mins,user_id), p2p_listings(payment_details)`)
+        .select(`
+          *,
+          p2p_merchants(id,display_name,verified,avg_release_time_mins,user_id),
+          p2p_listings(payment_details,merchant_receive_address)
+        `)
         .eq('id', id)
         .single()
       if (e) throw e
       setOrder(data as Order)
-    } catch (e: any) { setError(e.message) }
-    finally { setLoading(false) }
+      setError(null)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      // Only clear loading on INITIAL load, not on re-fetches.
+      // Calling setLoading(false) on every re-fetch interferes with
+      // optimistic updates and causes the page to flash.
+      setLoading(false)
+    }
   }, [id])
 
   // Returns true if this user is allowed to see the message
@@ -473,7 +484,11 @@ export default function P2POrderPage() {
     if (!id || !confirm('Cancel this order?')) return
     try {
       await apiClient.patch(`/api/p2p/orders/${id}/cancel`)
-      toast.success('Order cancelled'); fetchOrder()
+      // Optimistic update — don't wait for DB round-trip to show change
+      setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev)
+      toast.success('Order cancelled')
+      // Re-fetch after short delay to confirm DB state
+      setTimeout(() => fetchOrder(), 800)
     } catch (e: any) {
       toast.error(e.response?.data?.detail ?? 'Failed')
     }
@@ -943,8 +958,10 @@ export default function P2POrderPage() {
                   if (!id || !confirm('Cancel this sell order?')) return
                   try {
                     await apiClient.patch(`/api/p2p/sell/orders/${id}/cancel`)
+                    // Optimistic update
+                    setOrder(prev => prev ? { ...prev, status: 'cancelled' } : prev)
                     toast.success('Order cancelled')
-                    fetchOrder()
+                    setTimeout(() => fetchOrder(), 800)
                   } catch (e: any) {
                     toast.error(e.response?.data?.detail ?? 'Failed to cancel')
                   }
