@@ -370,7 +370,9 @@ const AuthProviderContent: React.FC<{ children: ReactNode }> = ({ children }) =>
         isResettingPassword: false,
       });
       
-      navigate('/');
+      // Hard reload guarantees ALL React state resets and localStorage is re-read clean
+      // navigate('/') leaves stale consentGiven/sessionId state after inactivity logout
+      window.location.href = '/';
       
     } catch (error) {
       console.error('[Auth] Sign out error:', error);

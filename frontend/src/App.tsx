@@ -75,6 +75,25 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
+  // ─── ADD THIS: Reset consent + session state on logout ───────────
+  // Hard reload in signOut() handles most cases, but this is belt+suspenders
+  // for any path that clears localStorage without a full reload
+  useEffect(() => {
+    if (!authSession) {
+      // Delay 300ms — localStorage.clear() in signOut() runs async after
+      // supabase.auth.signOut() which triggers this effect via SIGNED_OUT
+      const timer = window.setTimeout(() => {
+        const stored = localStorage.getItem('seamount_consent_given');
+        const hasConsent = stored === 'true';
+        setConsentGiven(hasConsent);
+        if (!hasConsent) {
+          setSessionId(null); // triggers initializeAnonymousSession re-run
+        }
+      }, 300);
+      return () => window.clearTimeout(timer);
+    }
+  }, [authSession]);
+
   useEffect(() => {
     const initializeAnonymousSession = async () => {
       try {
