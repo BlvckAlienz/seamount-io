@@ -994,7 +994,7 @@ except ImportError as e:
 
 # ===== CORE API ENDPOINTS =====
 
-@app.get("/api/v1/health", tags=["System"])
+@app.api_route("/api/v1/health", methods=["GET", "HEAD"], tags=["System"])
 @limiter.limit("10/minute")
 async def health_check(request: Request):
     """Enhanced multi-chain health check endpoint"""

@@ -2,6 +2,10 @@
 // ✅ FIXED: Removed duplicate BrowserRouter
 
 import './polyfills';
+import { warmUpServer } from './config/api';
+
+// Fire warm-up immediately — don't await, don't block render
+warmUpServer();
 
 // ============================================================================
 // 🔇 SUPPRESS HARMLESS CONSOLE ERRORS
