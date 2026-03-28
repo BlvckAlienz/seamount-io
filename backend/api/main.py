@@ -701,6 +701,27 @@ async def lifespan(app: FastAPI):
     # Store services for cleanup
     app.state.quota_service = quota_service if 'quota_service' in locals() else None
 
+    # ── Self-keepalive: prevents Render from suspending after 90 days ──
+    async def self_keepalive():
+        """Pings own /ping endpoint every 13 minutes as last-resort warmup."""
+        _settings = get_settings()
+        _base = _settings.API_BASE_URL.rstrip('/')
+        await asyncio.sleep(60)  # Wait 60s for server to fully start first
+        while True:
+            try:
+                async with aiohttp.ClientSession() as _session:
+                    async with _session.get(
+                        f"{_base}/ping",
+                        timeout=aiohttp.ClientTimeout(total=10)
+                    ) as resp:
+                        logger.debug(f"✅ Self-keepalive: {resp.status}")
+            except Exception as _e:
+                logger.warning(f"⚠️ Self-keepalive failed (non-fatal): {_e}")
+            await asyncio.sleep(13 * 60)  # 13 minutes
+
+    asyncio.create_task(self_keepalive())
+    logger.info("✅ Self-keepalive task started (13min interval)")
+
     yield
 
     # ============================================================================
@@ -748,6 +769,13 @@ app = FastAPI(
     description="Multi-chain cross-border payment and treasury platform",
     lifespan=lifespan
 )
+
+# ===== LIGHTWEIGHT KEEPALIVE ENDPOINT =====
+# 📍 No rate limit, no auth, no service deps — pure process-alive check
+# Used by cron-job.org every 14 minutes to prevent Render cold starts
+@app.api_route("/ping", methods=["GET", "HEAD"], tags=["System"])
+async def ping():
+    return {"ok": True}
 
 # ===== SECURITY MIDDLEWARE =====
 app.state.limiter = limiter
