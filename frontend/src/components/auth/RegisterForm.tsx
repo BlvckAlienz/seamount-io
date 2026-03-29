@@ -10,6 +10,7 @@ import countryList from 'react-select-country-list';
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/config/api';
 import logger from '@/utils/logger';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 
 interface IRegisterFormProps {
   onSuccess?: () => void;
@@ -498,6 +499,9 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
           )}
         </Button>
       </form>
+
+      {/* ── Social & Web3 Auth ── */}
+      <SocialAuthButtons mode="signup" />
 
       {/* Login Link */}
       <div className="text-center mt-4">

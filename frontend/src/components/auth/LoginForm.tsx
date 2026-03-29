@@ -3,6 +3,7 @@ import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button.tsx';
 import ResetPassword from '@/components/auth/ResetPassword';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import toast from 'react-hot-toast';
 
 interface LoginFormProps {
@@ -40,7 +41,7 @@ const LoginForm: React.FC<LoginFormProps> = ({
   };
 
   return (
-    <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+    <div className="w-full max-w-sm p-6 bg-gray-900 rounded-lg">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Sign In</h2>
         <p className="text-gray-600 mt-2">Welcome back to Seamount</p>
@@ -145,6 +146,10 @@ const LoginForm: React.FC<LoginFormProps> = ({
           }}
         />
       </form>
+
+      {/* ── Social & Web3 Auth ── */}
+      <SocialAuthButtons mode="login" />
+
     </div>
   );
 };

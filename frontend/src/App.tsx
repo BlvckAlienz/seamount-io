@@ -11,6 +11,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import TerminalPage from './pages/TerminalPage';
 import CompliancePage from './pages/CompliancePage';
 import MeterXpressPage from '@/pages/MeterXpressPage';
+import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 
 // ✅ ADD THESE IMPORTS
 import { WagmiProvider } from 'wagmi';
@@ -141,6 +142,8 @@ const AppContent: React.FC = () => {
         <Route path="/contact" element={<InvestorContact />} />
         <Route path="/debug-auth" element={<AuthDebugPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        {/* OAuth callback handler */}
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         
         {/* Protected Routes */}
         <Route 

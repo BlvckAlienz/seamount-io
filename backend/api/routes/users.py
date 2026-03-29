@@ -26,12 +26,16 @@ async def create_user_profile(
         user_id = data.get('id')
         
         # 🚨 CRITICAL FIX: Properly extract ALL data from frontend
+        # Web3 users have no email — use placeholder to satisfy DB constraint
+        raw_email = data.get('email', '') or f"{user_id}@web3.local"
+
         insert_data = {
             "id": user_id,
-            "email": data.get('email', ''),
-            "first_name": data.get('firstName', data.get('first_name', '')),  # Handle both formats
-            "last_name": data.get('lastName', data.get('last_name', '')),
+            "email": raw_email,
+            "first_name": data.get('firstName', data.get('first_name', '')) or '',
+            "last_name": data.get('lastName', data.get('last_name', '')) or '',
             "country_code": (data.get('countryCode') or data.get('country_code') or 'US').upper(),
+            "auth_provider": data.get('provider', 'email'),  # track how they signed up
             "phone": data.get('phone', ''),
             "kyc_status": "not_started",
             "kyc_level": 0,

@@ -3,6 +3,7 @@ import { X, Mail, Lock, User, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { authService } from '@/services/authService';
 import { Button } from '@/components/ui/button.tsx';
 import { Card } from '@/components/ui/card.tsx';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -190,7 +191,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) =
           </Button>
         </form>
 
-        <div className="mt-6 text-center">
+        {/* ── Social & Web3 Auth ── */}
+        <SocialAuthButtons mode={mode} />
+
+        <div className="mt-4 text-center">
           <button
             onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
             className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
