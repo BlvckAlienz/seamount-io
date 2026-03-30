@@ -45,6 +45,7 @@ interface Listing {
   payment_methods: string[]
   is_active: boolean
   created_at: string
+  listing_type: string
 }
 
 interface Order {
@@ -87,6 +88,14 @@ export default function MerchantDashboardPage() {
   const [showCreateListing, setShowCreateListing] = useState(false)
   const [showCreateSellListing, setShowCreateSellListing] = useState(false)
   const [togglingId,      setTogglingId]      = useState<string | null>(null)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
+  const [editFields, setEditFields] = useState<{
+    price_per_token:  string
+    min_order_fiat:   string
+    max_order_fiat:   string
+    available_amount: string
+  }>({ price_per_token: '', min_order_fiat: '', max_order_fiat: '', available_amount: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
   const [orderFilter,     setOrderFilter]     = useState<string>('all')
 
   // ── Fetch merchant profile ────────────────────────────────
@@ -194,6 +203,55 @@ export default function MerchantDashboardPage() {
       toast.success('Listing deleted')
     } catch (err: any) {
       toast.error(err.response?.data?.detail ?? 'Failed to delete')
+    }
+  }
+
+  const startEdit = (l: Listing) => {
+    setEditingId(l.id)
+    setEditFields({
+      price_per_token:  String(l.price_per_token),
+      min_order_fiat:   String(l.min_order_fiat),
+      max_order_fiat:   String(l.max_order_fiat),
+      available_amount: String(l.available_amount),
+    })
+  }
+
+  const saveEdit = async (listingId: string, fiatCurrency: string) => {
+    const { price_per_token, min_order_fiat, max_order_fiat, available_amount } = editFields
+    if (!price_per_token || !min_order_fiat || !max_order_fiat || !available_amount) {
+      toast.error('All fields are required'); return
+    }
+    if (parseFloat(min_order_fiat) >= parseFloat(max_order_fiat)) {
+      toast.error('Min order must be less than max order'); return
+    }
+    setSavingEdit(true)
+    try {
+      const res = await apiClient.patch(`/api/p2p/listings/${listingId}/price`, {
+        price_per_token:  parseFloat(price_per_token),
+        min_order_fiat:   parseFloat(min_order_fiat),
+        max_order_fiat:   parseFloat(max_order_fiat),
+        available_amount: parseFloat(available_amount),
+      })
+      if (res.data?.success) {
+        // Optimistic update
+        setListings(prev => prev.map(l =>
+          l.id === listingId ? {
+            ...l,
+            price_per_token:  parseFloat(price_per_token),
+            min_order_fiat:   parseFloat(min_order_fiat),
+            max_order_fiat:   parseFloat(max_order_fiat),
+            available_amount: parseFloat(available_amount),
+          } : l
+        ))
+        toast.success('Listing updated')
+        setEditingId(null)
+      } else {
+        throw new Error(res.data?.detail ?? 'Update failed')
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail ?? err.message ?? 'Failed to update')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -553,54 +611,159 @@ export default function MerchantDashboardPage() {
                 <div key={l.id}
                   className={`bg-gray-800/50 rounded-xl border p-4 transition
                     ${l.is_active ? 'border-gray-700' : 'border-gray-700/40 opacity-60'}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+
+                  {editingId === l.id ? (
+                    // ── EDIT MODE ──────────────────────────────────
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold text-white">
+                          Editing: {l.token.split('_')[0]} / {l.fiat_currency}
+                          {l.listing_type === 'sell' && (
+                            <span className="ml-2 text-xs text-orange-400">(Buy Listing)</span>
+                          )}
+                        </span>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="text-gray-500 hover:text-white text-xs"
+                        >
+                          ✕ Cancel
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs text-gray-400 uppercase tracking-wide">
+                            Price per {l.token.split('_')[0]} ({l.fiat_currency})
+                          </label>
+                          <input
+                            type="number"
+                            value={editFields.price_per_token}
+                            onChange={e => setEditFields(p => ({ ...p, price_per_token: e.target.value }))}
+                            className="w-full bg-gray-700 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-gray-400 uppercase tracking-wide">
+                            Available ({l.token.split('_')[0]})
+                          </label>
+                          <input
+                            type="number"
+                            value={editFields.available_amount}
+                            onChange={e => setEditFields(p => ({ ...p, available_amount: e.target.value }))}
+                            className="w-full bg-gray-700 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-gray-400 uppercase tracking-wide">
+                            Min Order ({l.fiat_currency})
+                          </label>
+                          <input
+                            type="number"
+                            value={editFields.min_order_fiat}
+                            onChange={e => setEditFields(p => ({ ...p, min_order_fiat: e.target.value }))}
+                            className="w-full bg-gray-700 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-gray-400 uppercase tracking-wide">
+                            Max Order ({l.fiat_currency})
+                          </label>
+                          <input
+                            type="number"
+                            value={editFields.max_order_fiat}
+                            onChange={e => setEditFields(p => ({ ...p, max_order_fiat: e.target.value }))}
+                            className="w-full bg-gray-700 border border-gray-600 text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => saveEdit(l.id, l.fiat_currency)}
+                          disabled={savingEdit}
+                          className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition flex items-center justify-center gap-2"
+                        >
+                          {savingEdit
+                            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving...</>
+                            : '✓ Save Changes'
+                          }
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                  ) : (
+                    // ── VIEW MODE ──────────────────────────────────
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">{l.token.split('_')[0]}</span>
+                          <span className="text-xs text-gray-500">({l.token})</span>
+                          {l.listing_type === 'sell' && (
+                            <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
+                              Buy Listing
+                            </Badge>
+                          )}
+                          <Badge className={l.is_active
+                            ? 'bg-green-500/20 text-green-400 border-green-500/30 text-xs'
+                            : 'bg-gray-600/40 text-gray-400 border-gray-600 text-xs'}>
+                            {l.is_active ? 'Active' : 'Paused'}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-4 mt-1 text-sm text-gray-400">
+                          <span className="text-white font-semibold">
+                            {l.price_per_token.toLocaleString()} {l.fiat_currency}
+                            <span className="text-gray-500 font-normal text-xs ml-1">/ token</span>
+                          </span>
+                          <span>
+                            {l.min_order_fiat.toLocaleString()}–{l.max_order_fiat.toLocaleString()} {l.fiat_currency}
+                          </span>
+                          <span>{l.available_amount} {l.token.split('_')[0]}</span>
+                        </div>
+                      </div>
+
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{l.token.split('_')[0]}</span>
-                        <span className="text-xs text-gray-500">({l.token})</span>
-                        <Badge className={
-                          l.listing_type === 'sell'
-                            ? 'bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs'
-                            : 'bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs'
-                        }>
-                          {l.listing_type === 'sell' ? 'Buy Listing' : 'Sell Listing'}
-                        </Badge>
-                        <Badge className={l.is_active
-                          ? 'bg-green-500/20 text-green-400 border-green-500/30 text-xs'
-                          : 'bg-gray-600/40 text-gray-400 border-gray-600 text-xs'}>
-                          {l.is_active ? 'Active' : 'Paused'}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-4 mt-1 text-sm text-gray-400">
-                        <span>{l.price_per_token.toLocaleString()} {l.fiat_currency}/token</span>
-                        <span>Limit: {l.min_order_fiat.toLocaleString()}–{l.max_order_fiat.toLocaleString()} {l.fiat_currency}</span>
-                        <span>Available: {l.available_amount} {l.token.split('_')[0]}</span>
+                        {/* Edit button */}
+                        <button
+                          onClick={() => startEdit(l)}
+                          className="p-2 rounded-lg text-blue-400 hover:bg-blue-500/10 transition"
+                          title="Edit listing"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+
+                        {/* Toggle active/paused */}
+                        <button
+                          onClick={() => toggleListing(l.id, l.is_active)}
+                          disabled={togglingId === l.id}
+                          className={`p-2 rounded-lg transition ${l.is_active
+                            ? 'text-yellow-400 hover:bg-yellow-500/10'
+                            : 'text-green-400 hover:bg-green-500/10'
+                          }`}
+                          title={l.is_active ? 'Pause' : 'Activate'}
+                        >
+                          {togglingId === l.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : l.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />
+                          }
+                        </button>
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => deleteListing(l.id)}
+                          className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleListing(l.id, l.is_active)}
-                        disabled={togglingId === l.id}
-                        className={`p-2 rounded-lg transition ${l.is_active
-                          ? 'text-yellow-400 hover:bg-yellow-500/10'
-                          : 'text-green-400 hover:bg-green-500/10'
-                        }`}
-                        title={l.is_active ? 'Pause' : 'Activate'}
-                      >
-                        {togglingId === l.id
-                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : l.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />
-                        }
-                      </button>
-                      <button
-                        onClick={() => deleteListing(l.id)}
-                        className="p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
