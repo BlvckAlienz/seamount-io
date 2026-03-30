@@ -301,9 +301,9 @@ const RegisterForm: React.FC<IRegisterFormProps> = ({ onSuccess, onLoginClick })
   };
 
   return (
-    <div className="w-full max-w-sm p-6 bg-white rounded-lg shadow-md">
+    <div className="w-full p-4 sm:p-6 bg-white rounded-lg">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Create Account</h2>
         <p className="text-gray-600 mt-2">Join Seamount and start your journey</p>
       </div>
 
