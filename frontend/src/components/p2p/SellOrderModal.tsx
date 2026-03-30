@@ -129,24 +129,24 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] max-w-[95vw] bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[520px] max-w-[95vw] bg-white border-2 border-gray-200 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">
+          <DialogTitle className="text-lg font-bold text-gray-900">
             Sell {tokenDisplay}
           </DialogTitle>
-          <DialogDescription className="text-gray-500 dark:text-gray-400 text-sm">
+          <DialogDescription className="text-gray-500 text-sm">
             You send tokens → merchant sends you fiat
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-3">
           {/* Merchant Summary */}
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <div className="w-9 h-9 rounded-full bg-orange-600 flex items-center justify-center text-white font-bold text-sm">
               {m.display_name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 font-semibold text-gray-900 dark:text-white text-sm">
+              <div className="flex items-center gap-1 font-semibold text-gray-900 text-sm">
                 <span className="truncate">{m.display_name}</span>
                 {m.verified && <ShieldCheck className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />}
               </div>
@@ -157,7 +157,7 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="text-base font-bold text-gray-900 dark:text-white">
+              <div className="text-base font-bold text-gray-900">
                 {listing.price_per_token.toLocaleString()} {listing.fiat_currency}
               </div>
               <div className="text-xs text-gray-500">per {tokenDisplay}</div>
@@ -165,15 +165,16 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
           </div>
 
           {listing.terms && (
-            <div className="text-xs text-gray-600 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2.5">
-              <span className="font-bold text-yellow-700 dark:text-yellow-400">Terms: </span>{listing.terms}
+            <div className="text-xs text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
+              <span className="font-bold text-yellow-700">Terms: </span>
+              {listing.terms}
             </div>
           )}
 
           {/* Amount inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">I will receive</Label>
+              <Label className="text-xs font-semibold text-gray-700">I will receive</Label>
               <div className="relative">
                 <Input
                   type="number"
@@ -192,11 +193,11 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
               </p>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">I will send</Label>
+              <Label className="text-xs font-semibold text-gray-700">I will send</Label>
               <div className="relative">
                 <Input readOnly value={tokenAmount}
-                  className="pr-20 h-11 text-base font-bold bg-gray-50 dark:bg-gray-900 cursor-not-allowed" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-orange-600 dark:text-orange-400 text-sm">
+                  className="pr-20 h-11 text-base font-bold bg-gray-50 cursor-not-allowed" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-orange-600 text-sm">
                   {tokenDisplay}
                 </span>
               </div>
@@ -205,16 +206,16 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
 
           {/* Payout method */}
           <div className="space-y-1">
-            <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+            <Label className="text-xs font-semibold text-gray-700">
               How should merchant pay you?
             </Label>
             <Select value={payoutMethod} onValueChange={handlePayoutMethodChange} disabled={loading}>
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="Select your payout method" />
               </SelectTrigger>
-              <SelectContent className="max-h-60 z-[300] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+              <SelectContent className="max-h-60 z-[300] bg-white border border-gray-200">
                 {PAYOUT_METHOD_OPTIONS.map(opt => (
-                  <SelectItem key={opt} value={opt} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-2.5">
+                  <SelectItem key={opt} value={opt} className="text-gray-900 hover:bg-gray-100 py-2.5">
                     {opt}
                   </SelectItem>
                 ))}
@@ -236,9 +237,9 @@ export function SellOrderModal({ listing, open, onOpenChange }: Props) {
             </div>
           ))}
 
-          <Alert className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 py-2.5">
+          <Alert className="bg-orange-50 border border-orange-200 py-2.5">
             <AlertCircle className="h-3.5 w-3.5 text-orange-600 flex-shrink-0" />
-            <AlertDescription className="text-xs text-gray-700 dark:text-gray-300">
+            <AlertDescription className="text-xs text-gray-700">
               After placing the order, you have <strong>15 minutes</strong> to send your tokens
               to the merchant's wallet. Merchant's address will be shown on the order page.
             </AlertDescription>

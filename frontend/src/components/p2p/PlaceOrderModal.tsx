@@ -115,13 +115,13 @@ export function PlaceOrderModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] max-w-[95vw] w-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[520px] max-w-[95vw] w-full bg-white border-2 border-gray-200 max-h-[90vh] overflow-y-auto">
 
         <DialogHeader className="border-b pb-3">
-          <DialogTitle className="text-lg font-bold text-gray-900 dark:text-white">
+          <DialogTitle className="text-lg font-bold text-gray-900">
             Buy {tokenDisplay}
           </DialogTitle>
-          <DialogDescription className="text-gray-500 dark:text-gray-400 text-sm">
+          <DialogDescription className="text-gray-500 text-sm">
             Review the merchant's terms and place your order.
           </DialogDescription>
         </DialogHeader>
@@ -129,12 +129,12 @@ export function PlaceOrderModal({
         <div className="space-y-4 py-3">
 
           {/* Merchant Summary */}
-          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {m.display_name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 font-semibold text-gray-900 dark:text-white text-sm">
+              <div className="flex items-center gap-1 font-semibold text-gray-900 text-sm">
                 <span className="truncate">{m.display_name}</span>
                 {m.verified && (
                   <ShieldCheck className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
@@ -153,7 +153,7 @@ export function PlaceOrderModal({
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <div className="text-base font-bold text-gray-900 dark:text-white">
+              <div className="text-base font-bold text-gray-900">
                 {listing.price_per_token.toLocaleString()} {fiatCurrency}
               </div>
               <div className="text-xs text-gray-500">per {tokenDisplay}</div>
@@ -162,8 +162,8 @@ export function PlaceOrderModal({
 
           {/* Terms */}
           {listing.terms && (
-            <div className="text-xs text-gray-600 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-2.5">
-              <span className="font-bold text-yellow-700 dark:text-yellow-400">Terms: </span>
+            <div className="text-xs text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
+              <span className="font-bold text-yellow-700">Terms: </span>
               {listing.terms}
             </div>
           )}
@@ -171,7 +171,7 @@ export function PlaceOrderModal({
           {/* Amount inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+              <Label className="text-xs font-semibold text-gray-700">
                 I will pay
               </Label>
               <div className="relative">
@@ -200,9 +200,9 @@ export function PlaceOrderModal({
                 <Input
                   readOnly
                   value={tokenAmount}
-                  className="pr-20 h-11 text-base font-bold bg-gray-50 dark:bg-gray-900 cursor-not-allowed"
+                  className="pr-20 h-11 text-base font-bold bg-gray-50 cursor-not-allowed"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-blue-600 dark:text-blue-400 text-sm">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-blue-600 text-sm">
                   {tokenMeta?.icon} {tokenDisplay}
                 </span>
               </div>
@@ -211,7 +211,7 @@ export function PlaceOrderModal({
 
           {/* Payment Method */}
           <div className="space-y-1">
-            <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+            <Label className="text-xs font-semibold text-gray-700">
               Payment Method
             </Label>
             <Select
@@ -219,11 +219,11 @@ export function PlaceOrderModal({
               onValueChange={setPaymentMethod}
               disabled={loading}
             >
-              <SelectTrigger className="h-11 w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
+              <SelectTrigger className="h-11 w-full bg-white border-gray-300 text-gray-900">
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent
-                className="z-[300] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-xl"
+                className="z-[300] bg-white border border-gray-200 shadow-xl"
                 position="popper"
                 sideOffset={4}
               >
@@ -231,7 +231,7 @@ export function PlaceOrderModal({
                   <SelectItem
                     key={pm}
                     value={pm}
-                    className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-2.5"
+                    className="text-gray-900 hover:bg-gray-100 py-2.5"
                   >
                     {pm}
                   </SelectItem>
@@ -243,7 +243,7 @@ export function PlaceOrderModal({
           {/* Info */}
           <Alert className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 py-2.5">
             <AlertCircle className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
-            <AlertDescription className="text-xs text-gray-700 dark:text-gray-300">
+            <AlertDescription className="text-xs text-gray-700">
               You have <strong>15 minutes</strong> to complete payment after placing
               the order. Payment details revealed only after placement.
             </AlertDescription>
