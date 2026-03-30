@@ -193,7 +193,7 @@ export function PlaceOrderModal({
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-gray-700 dark:text-white">
+              <Label className="text-xs font-semibold text-gray-700">
                 I will receive
               </Label>
               <div className="relative">
