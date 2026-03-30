@@ -191,7 +191,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       title: "🌐 Digital Payments & Yield",
       description: "Global settlement with multi-chain smart wallets",
       features: [
-        "Multi-chain wallets (Algorand, Bitcoin, Ethereum, Polygon, Tron)",
+        "Multi-chain wallets (Algorand, Bitcoin, Ethereum, Polygon, Tron, Solana)",
         "24/7 settlements plus earn yields (up to 8.2% APY)",
         "Local payment rails integration (Flutterwave, Paystack)",
         "Enterprise treasury management"
@@ -216,18 +216,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'tokenization'
     },
     prediction: {
-      title: "👩‍🚀 Crowdfunding",
-      description: "Raise capital from a global pool of investors",
+      title: "🔄 P2P Trading",
+      description: "Peer-to-peer crypto trading with secure escrow and dispute resolution",
       features: [
-        "List your business for equity crowdfunding",
-        "Access investors who value diverse leadership",
-        "Digital-first capital raising reduces bias",
-        "Real-time settlement for investor payouts"
+        "Buy and sell crypto directly with other users",
+        "Escrow-protected trades with automatic settlement",
+        "Multi-currency support (USD, NGN, KES, ZAR, GHS)",
+        "Dispute resolution system for safe trading"
       ],
-      icon: <Target className="h-12 w-12" />,
+      icon: <ArrowRight className="h-12 w-12" />,
       color: "from-orange-500 to-yellow-500",
       gradient: "bg-gradient-to-br from-orange-500/20 to-yellow-500/20",
-      imageKey: 'secondary'
+      imageKey: 'p2p'
     },
     audit: {
       title: "📊 Regulatory Compliance",
@@ -258,11 +258,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
     },
     {
       question: "Is Seamount regulated?",
-      answer: "Seamount operates in Nigeria via partnership with a licensed VASP under regulatory oversight of the SEC's ISA 2025. We are also registered with the NFIU. Globally, we are pursuing licenses under frameworks such as Kenya (VASP Act), South Africa (FSCA), and the UAE (DFSA)."
+      answer: "Seamount operates in Nigeria via partnership with a licensed VASP under regulatory oversight of the SEC's ISA 2025. We are also registered with the NFIU. Globally, we are pursuing licenses under frameworks such as Kenya (VASP Act) and South Africa (FSCA)."
     },
     {
       question: "What markets do you currently operate in?",
-      answer: "Our infrastructure is live in Nigeria (via Quidax partnership). We're expanding to Kenya, Ghana, and South Africa soon."
+      answer: "Our infrastructure is live in Nigeria (via Quidax partnership). We're expanding to Kenya, Rwanda, and South Africa soon."
     }
   ];
 
@@ -774,7 +774,139 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
             </div>
           );
-          
+        
+        case 'p2p':
+          return (
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-yellow-600 p-6 overflow-hidden">
+              {/* Floating particles for dynamic feel */}
+              <div className="absolute inset-0">
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 bg-white/40 rounded-full"
+                    initial={{ x: Math.random() * 256, y: Math.random() * 256 }}
+                    animate={{
+                      y: [null, Math.random() * 256],
+                      x: [null, Math.random() * 256],
+                      opacity: [0.2, 0.8, 0.2]
+                    }}
+                    transition={{
+                      duration: 3 + Math.random() * 2,
+                      repeat: Infinity
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div className="h-full flex flex-col justify-between text-white relative z-10">
+                <motion.div 
+                  className="flex justify-between items-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <span className="text-xs font-medium">P2P Marketplace</span>
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  >
+                    <ArrowRight className="h-6 w-6 opacity-80" />
+                  </motion.div>
+                </motion.div>
+
+                <div className="space-y-3">
+                  <motion.div 
+                    className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs opacity-70">Active Offers</span>
+                      <motion.span
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        💱
+                      </motion.span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { action: 'Buy BTC', price: '$67,458', color: 'bg-green-400/20' },
+                        { action: 'Sell ETH', price: '$2,054', color: 'bg-blue-400/20' }
+                      ].map((item, idx) => (
+                        <div key={idx} className={`${item.color} rounded-lg p-2 text-center`}>
+                          <div className="text-xs">{item.action}</div>
+                          <div className="text-sm font-semibold">{item.price}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+
+                  <div className="flex justify-center">
+                    <motion.div 
+                      className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center backdrop-blur"
+                      animate={{ 
+                        scale: [1, 1.1, 1],
+                        rotate: [0, 5, -5, 0]
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <span className="text-xl">↺</span>
+                    </motion.div>
+                  </div>
+
+                  <motion.div 
+                    className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-xs opacity-70">Escrow Balance</div>
+                        <motion.div 
+                          className="text-2xl font-bold"
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                        >
+                          $245,890
+                        </motion.div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs opacity-70">Trades Today</div>
+                        <div className="text-sm font-semibold text-green-300">127</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1 bg-white/20 rounded-full overflow-hidden">
+                      <motion.div 
+                        className="h-full bg-green-400"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
+                    </div>
+                  </motion.div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {[
+                    { emoji: '🛡️', label: 'Escrow' },
+                    { emoji: '⚖️', label: 'Dispute' }
+                  ].map((item, idx) => (
+                    <motion.div 
+                      key={item.label}
+                      className="bg-white/10 backdrop-blur rounded-lg p-2 text-center border border-white/20 cursor-pointer"
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.8 + idx * 0.1 }}
+                      whileHover={{ scale: 1.1, y: -5 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <div className="text-2xl mb-1">{item.emoji}</div>
+                      <div className="text-xs">{item.label}</div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+
         default:
           return null;
       }
@@ -945,7 +1077,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full text-sm font-medium mb-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-gray-700">Powered by Algorand + Tether + Circle</span>
+                <span className="text-gray-700">Powered by Algorand + Tether WDK + XRP Ledger</span>
               </div>
             </div>
             
@@ -1158,11 +1290,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">Receive Tokens or Fund Wallet</h3>
               <p className="text-gray-600 text-sm mb-4">
-                Send tokens to your wallets or buy with Naira, Cedi, Shillings—we support local currencies.
+                Send tokens to your wallets or buy from P2P merchants—we support local currencies.
               </p>
               <div className="flex items-center gap-2 text-xs">
                 <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Paystack</span>
                 <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Flutterwave</span>
+                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">P2P Trading</span>
               </div>
             </motion.div>
 
@@ -1298,7 +1431,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* 📍 COMPLETE CALCULATOR SECTION (from old version) */}
+      {/* 📍 COMPLETE CALCULATOR SECTION (updated with fixed components for both tiers) */}
       <section id="calculator" className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={8} section="calculator" />
         <div className="max-w-6xl mx-auto relative z-10">
@@ -1344,88 +1477,65 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <div className="bg-gray-50 rounded-xl p-4 border-2 border-gray-200">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-gray-600 flex items-center font-medium">
-                      {calc.period === '90' ? 'Live Market Data (Alpha Tier)' : 'Fixed Rate Strategy'}
+                      Fixed Rate Strategy
                       <button onClick={() => setShowFundingInfo(!showFundingInfo)} className="ml-1">
                         <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                       </button>
                     </span>
-                    {calc.period === '90' && (
-                      <span className="text-xs text-green-600 flex items-center font-medium">
-                        {oracleData.loading ? (
-                          <>Loading...</>
-                        ) : oracleData.error ? (
-                          <span className="text-amber-600">Cached</span>
-                        ) : (
-                          <>
-                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                            Live
-                          </>
-                        )}
-                      </span>
-                    )}
                   </div>
                   {showFundingInfo && (
                     <div className="mb-3 p-3 bg-blue-50 rounded-lg text-xs text-gray-700 border border-blue-200">
                       {calc.period === '90' ? (
-                        <><strong>Alpha Tier (Securitize Apollo Fund):</strong> 10.9% gross APY. Invests in diversified structured credit across multiple sectors. Managed by Apollo Global Management. Seamount charges 0.5% annual + 20% performance fee (2.70% total). Your net: 8.20% APY. Yields reflect credit market conditions and may include return of capital. Quarterly liquidity allows redemptions every 90 days.</>
+                        <><strong>Alpha Tier (Securitize Apollo Fund):</strong> Diversified credit fund targeting 10.9% gross APY. Managed by Apollo Global Management. Seamount charges 0.5% annual + 20% performance fee (approx. 2.70% total). Your net: 8.20% APY. Quarterly liquidity allows redemptions every 90 days.</>
                       ) : (
                         <><strong>Prime Tier (Hamilton Lane Fund):</strong> 6.57% gross APY. Targets senior secured loans and credit instruments for stable, risk-adjusted returns. Managed by Hamilton Lane with $150B+ AUM. Seamount charges 0.5% annual + 20% performance fee (1.32% total). Your net: 5.25% APY. Instant liquidity—withdraw anytime.</>
                       )}
                     </div>
                   )}
-                  {calc.period === '90' ? (
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-gray-500 text-xs font-medium mb-1">BTC Price</div>
-                        <div className="font-semibold text-gray-900" suppressHydrationWarning>
-                          ${oracleData.loading ? '...' : oracleData.btcPrice.toLocaleString(undefined, {maximumFractionDigits: 0})}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs font-medium mb-1">Volatility</div>
-                        <div className="font-semibold text-amber-600" suppressHydrationWarning>
-                          {oracleData.loading ? '...' : `${oracleData.btcVolatility.toFixed(1)}%`}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs font-medium mb-1">Funding Rate</div>
-                        <div className={`font-semibold ${oracleData.fundingRate > 10 ? 'text-green-600' : oracleData.fundingRate > 5 ? 'text-amber-600' : 'text-red-600'}`} suppressHydrationWarning>
-                          {oracleData.loading ? '...' : `${oracleData.fundingRate.toFixed(1)}%`}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500 text-xs font-medium mb-1">Credit Spread</div>
-                        <div className="font-semibold text-purple-600">2.5-3.5%</div>
-                      </div>
+                  <div className="text-sm text-center py-4">
+                    <div className="text-gray-400 mb-2">Fixed Strategy Components</div>
+                    <div className="space-y-2">
+                      {calc.period === '90' ? (
+                        <>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Diversified Credit Fund</span>
+                            <span className="text-blue-500 font-semibold">10.5-11.5%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Management Fee</span>
+                            <span className="text-gray-500 font-semibold">-2.00%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Seamount Fee</span>
+                            <span className="text-indigo-500 font-semibold">-2.70%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
+                            <span className="text-gray-900 font-medium">Your Net APY</span>
+                            <span className="text-green-600 font-bold">8.20%</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Senior Secured Loans</span>
+                            <span className="text-blue-500 font-semibold">7.5-8.5%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Management Fee</span>
+                            <span className="text-gray-500 font-semibold">-1.75%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Seamount Fee</span>
+                            <span className="text-indigo-500 font-semibold">-1.32%</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
+                            <span className="text-gray-900 font-medium">Your Net APY</span>
+                            <span className="text-green-600 font-bold">5.25%</span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-sm text-center py-4">
-                      <div className="text-gray-400 mb-2">Fixed Strategy Components</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500">Senior Secured Loans</span>
-                          <span className="text-blue-500 font-semibold">7.5-8.5%</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500">Management Fee</span>
-                          <span className="text-gray-500 font-semibold">-1.75%</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-500">Seamount Fee</span>
-                          <span className="text-indigo-500 font-semibold">-1.32%</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
-                          <span className="text-gray-900 font-medium">Your Net APY</span>
-                          <span className="text-green-600 font-bold">5.25%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {calc.period === '90' && oracleData.lastUpdate && (
-                    <div className="mt-2 text-xs text-gray-500 text-center">
-                      Last updated: {oracleData.lastUpdate.toLocaleTimeString()}
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1790,7 +1900,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <img src="/seamount-logo.jpeg" alt="Seamount Logo" className="w-10 h-10 object-contain rounded-lg" />
                 <span className="text-xl font-bold text-white">Seamount</span>
               </div>
-              <p className="text-gray-400 text-sm">Where entrepreneurs and SMEs become the economy's engine</p>
+              <p className="text-gray-400 text-sm">Where creatives and SMEs become the economy's engine</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
