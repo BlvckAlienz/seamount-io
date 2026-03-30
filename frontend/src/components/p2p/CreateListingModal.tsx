@@ -19,14 +19,29 @@ import {
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 
 const TOKEN_OPTIONS = [
-  { value: 'USDT_TRON',    label: 'USDT (Tron)',     recommended: true  },
-  { value: 'USDT_POLYGON', label: 'USDT (Polygon)',  recommended: false },
-  { value: 'USDC_ETH',     label: 'USDC (Ethereum)', recommended: false },
-  { value: 'USDC_POLYGON', label: 'USDC (Polygon)',  recommended: false },
-  { value: 'USDT_SOLANA',  label: 'USDT (Solana)',   recommended: false },
-  { value: 'BTC',          label: 'Bitcoin (BTC)',   recommended: false },
-  { value: 'ETH',          label: 'Ethereum (ETH)',  recommended: false },
-  { value: 'SOL',          label: 'Solana (SOL)',    recommended: false },
+  // Tron
+  { value: 'USDT_TRON',    label: 'USDT (Tron) ⭐',       recommended: true  },
+  { value: 'TRX',          label: 'TRON (TRX)',            recommended: false },
+  // Algorand
+  { value: 'ALGO',         label: 'Algorand (ALGO)',       recommended: false },
+  { value: 'USDT_ALGO',    label: 'USDT (Algorand)',       recommended: false },
+  { value: 'USDCa',        label: 'USD Coin (Algorand)',   recommended: false },
+  { value: 'goBTC',        label: 'Wrapped BTC (Algorand)',recommended: false },
+  { value: 'goETH',        label: 'Wrapped ETH (Algorand)',recommended: false },
+  // Bitcoin
+  { value: 'BTC',          label: 'Bitcoin (BTC)',         recommended: false },
+  // Ethereum
+  { value: 'ETH',          label: 'Ethereum (ETH)',        recommended: false },
+  { value: 'USDT_ETH',     label: 'USDT (Ethereum)',       recommended: false },
+  { value: 'USDC_ETH',     label: 'USDC (Ethereum)',       recommended: false },
+  // Polygon
+  { value: 'MATIC',        label: 'Polygon (MATIC)',       recommended: false },
+  { value: 'USDT_POLYGON', label: 'USDT (Polygon)',        recommended: false },
+  { value: 'USDC_POLYGON', label: 'USDC (Polygon)',        recommended: false },
+  // Solana
+  { value: 'SOL',          label: 'Solana (SOL)',          recommended: false },
+  { value: 'USDT_SOLANA',  label: 'USDT (Solana)',         recommended: false },
+  { value: 'USDC_SOLANA',  label: 'USDC (Solana)',         recommended: false },
 ]
 
 const FIAT_OPTIONS = [
