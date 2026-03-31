@@ -444,8 +444,6 @@ async def update_listing(
                     detail="min_order_fiat must be less than max_order_fiat"
                 )
 
-        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-
         supabase.table("p2p_listings") \
             .update(updates) \
             .eq("id", listing_id) \
