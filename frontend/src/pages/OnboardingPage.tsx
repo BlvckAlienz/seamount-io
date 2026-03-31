@@ -536,6 +536,9 @@ const OnboardingPage = () => {
 
       await apiClient.put('/api/v1/user/profile', profileData);
 
+      // ✅ REFRESH PROFILE to get latest data
+      await refreshProfile();
+
       toast.success('🎯 Profile saved!', { id: toastId });
       setStep('identity');
       

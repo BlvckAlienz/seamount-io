@@ -4,6 +4,8 @@ import {
   CheckCircle, AlertCircle, ChevronRight 
 } from 'lucide-react';
 import { BUSINESS_SECTORS } from '@/data/businessSectors';
+import { apiClient } from '@/config/api';
+import toast from 'react-hot-toast';
 
 interface QuestionnaireData {
   accountType: 'individual' | 'business' | '';
@@ -39,6 +41,10 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
 
   const [errors, setErrors] = useState<Partial<Record<keyof QuestionnaireData, string>>>({});
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Document upload state
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
 
   // Character limits for text fields
   const CHAR_LIMITS = {
@@ -51,6 +57,33 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const uploadDocument = async (file: File, documentType: string) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('category', 'C'); // Category C = Understanding Business
+      formData.append('document_type', documentType);
+
+      const response = await apiClient.post('/api/v1/compliance/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        const docId = response.data.document_id;
+        setUploadedDocs(prev => ({ ...prev, [documentType]: docId }));
+        toast.success(`${file.name} uploaded successfully`);
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(`Failed to upload ${file.name}: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -84,6 +117,15 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
 
   const handleNext = () => {
     if (!validateStep()) return;
+
+    // ✅ Check if mandatory document is uploaded when corporate docs exist
+    if (data.accountType === 'business' && data.hasCorporateDocs === true && !uploadedDocs['company_registration_certificate']) {
+      setErrors(prev => ({ ...prev, hasCorporateDocs: 'Please upload the Company Registration Certificate before completing.' }));
+      // Scroll to error
+      const errorEl = document.querySelector('[data-error="hasCorporateDocs"]');
+      if (errorEl) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
 
     // ✅ FIX: ALL users (individual + business) proceed to KYC
     if (data.accountType === 'individual') {
@@ -446,14 +488,95 @@ const BusinessQuestionnaireStep: React.FC<Props> = ({ onComplete, onSkip }) => {
               </button>
             </div>
             {errors.hasCorporateDocs && (
-              <p className="text-red-400 text-sm mt-1">{errors.hasCorporateDocs}</p>
+              <div data-error="hasCorporateDocs" className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4 inline-block mr-1" />
+                {errors.hasCorporateDocs}
+              </div>
             )}
           </div>
+
+          {/* 🆕 Document Upload Section (only when user has corporate docs) */}
+          {data.hasCorporateDocs === true && (
+            <div className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
+              <h4 className="text-white font-semibold mb-3">Required Corporate Documents</h4>
+              <p className="text-xs text-gray-400 mb-4">
+                Upload the following documents (PDF format, max 10MB each). 
+                <span className="text-red-400 ml-1">Company Registration Certificate is mandatory to proceed.</span>
+              </p>
+              
+              <div className="space-y-3">
+                {/* Mandatory: Company Registration Certificate */}
+                <div className="flex items-center justify-between p-3 bg-gray-900 rounded-lg">
+                  <div>
+                    <div className="text-white text-sm font-medium">Company Registration Certificate</div>
+                    <div className="text-xs text-gray-400">CAC certificate, incorporation documents</div>
+                  </div>
+                  {uploadedDocs['company_registration_certificate'] ? (
+                    <span className="text-green-400 text-sm flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" /> Uploaded
+                    </span>
+                  ) : (
+                    <label className={`cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {uploading ? 'Uploading...' : 'Upload'}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) uploadDocument(file, 'company_registration_certificate');
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                
+                {/* Optional documents (can be uploaded later) */}
+                <div className="border-t border-gray-700 pt-3 mt-2">
+                  <p className="text-xs text-gray-500 mb-2">Optional documents (can be uploaded later)</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Articles of Association', type: 'memorandum_articles' },
+                      { label: 'Directors/Share Capital Registry', type: 'register_of_members' },
+                      { label: 'ID of a Director', type: 'director_id' },
+                      { label: 'Director Proof of Address', type: 'director_proof_of_address' },
+                      { label: 'Business License/Permit', type: 'license' },
+                      { label: 'Tax Certificate', type: 'tax_certificate' },
+                      { label: 'AML Policy', type: 'aml_policy' }
+                    ].map(doc => (
+                      <div key={doc.type} className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">{doc.label}</span>
+                        {uploadedDocs[doc.type] ? (
+                          <span className="text-green-400 text-xs">Uploaded</span>
+                        ) : (
+                          <label className={`cursor-pointer bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-lg text-xs transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                            Upload
+                            <input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="hidden"
+                              disabled={uploading}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) uploadDocument(file, doc.type);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <button
           onClick={handleNext}
-          className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+          disabled={data.hasCorporateDocs === true && !uploadedDocs['company_registration_certificate']}
+          className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           Complete Questionnaire
           <CheckCircle className="h-5 w-5" />

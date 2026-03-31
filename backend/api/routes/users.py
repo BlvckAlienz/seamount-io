@@ -108,12 +108,25 @@ async def update_user_profile(
         'onboarding_complete'
     ]
     
+    # ✅ Allowed business types (matching DB constraint)
+    ALLOWED_BUSINESS_TYPES = {'custodian', 'asset_owner', 'broker_dealer', 
+                              'retail_investor', 'auction_house', 'ngo', 'other'}
+    
     """Update user profile"""
     try:
         data = await request.json()
         user_id = current_user.get('id')
         
         logger.info(f"[Profile Update] User {user_id} updating fields: {list(data.keys())}")
+        
+        # ✅ Validate business_type if present
+        if 'business_type' in data:
+            business_type = data['business_type']
+            if business_type not in ALLOWED_BUSINESS_TYPES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid business_type. Allowed values: {', '.join(ALLOWED_BUSINESS_TYPES)}"
+                )
         
         update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
         
