@@ -383,6 +383,85 @@ async def delete_listing(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to delete listing")
+    
+class UpdateListingRequest(BaseModel):
+    price_per_token:  Optional[float] = None
+    min_order_fiat:   Optional[float] = None
+    max_order_fiat:   Optional[float] = None
+    available_amount: Optional[float] = None
+    terms:            Optional[str]   = None
+
+@router.patch("/listings/{listing_id}/price")
+async def update_listing(
+    listing_id: str,
+    payload: UpdateListingRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """
+    Merchant updates price and/or limits on any listing (buy or sell).
+    Only non-None fields are updated — partial update safe.
+    Registered early (before sell routes) to guarantee route registration.
+    """
+    try:
+        # Verify ownership via merchant join
+        listing_res = supabase.table("p2p_listings") \
+            .select("id, merchant_id") \
+            .eq("id", listing_id) \
+            .limit(1).execute()
+
+        if not listing_res.data:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        merchant_res = supabase.table("p2p_merchants") \
+            .select("id") \
+            .eq("id", listing_res.data[0]["merchant_id"]) \
+            .eq("user_id", current_user["id"]) \
+            .limit(1).execute()
+
+        if not merchant_res.data:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Build update dict — only fields explicitly provided
+        updates: dict = {
+            k: v for k, v in {
+                "price_per_token":  payload.price_per_token,
+                "min_order_fiat":   payload.min_order_fiat,
+                "max_order_fiat":   payload.max_order_fiat,
+                "available_amount": payload.available_amount,
+                "terms":            payload.terms,
+            }.items() if v is not None
+        }
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        # Validate min < max if both provided
+        if "min_order_fiat" in updates and "max_order_fiat" in updates:
+            if updates["min_order_fiat"] >= updates["max_order_fiat"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="min_order_fiat must be less than max_order_fiat"
+                )
+
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        supabase.table("p2p_listings") \
+            .update(updates) \
+            .eq("id", listing_id) \
+            .execute()
+
+        logger.info(
+            f"[P2P] Listing {listing_id} updated by {current_user['id']}: "
+            f"{list(updates.keys())}"
+        )
+        return {"success": True, "updated_fields": list(updates.keys())}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[P2P] Update listing error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update listing")
 
 
 # ── REQUEST MODELS ────────────────────────────────────────────
@@ -645,13 +724,6 @@ class CreateSellListingRequest(BaseModel):
     payment_details: Dict[str, Any]  # how merchant pays fiat to sellers
     merchant_receive_address: Optional[str] = None
     terms: Optional[str] = None
-
-class UpdateListingRequest(BaseModel):
-    price_per_token: Optional[float] = None
-    min_order_fiat:  Optional[float] = None
-    max_order_fiat:  Optional[float] = None
-    available_amount: Optional[float] = None
-    terms:           Optional[str]   = None
 
 
 # ── GET /api/p2p/sell/listings ────────────────────────────────
@@ -951,74 +1023,3 @@ async def cancel_sell_order(
     except Exception as e:
         logger.error(f"[P2P] Cancel sell order error: {e}")
         raise HTTPException(status_code=500, detail="Failed to cancel order")
-    
-@router.patch("/listings/{listing_id}/price")
-async def update_listing(
-    listing_id: str,
-    payload: UpdateListingRequest,
-    current_user: dict = Depends(get_current_user),
-    supabase=Depends(get_supabase_client)
-):
-    """
-    Merchant updates price and/or limits on any listing (buy or sell).
-    Only non-None fields are updated — partial update safe.
-    """
-    try:
-        # Verify ownership via merchant join
-        listing_res = supabase.table("p2p_listings") \
-            .select("id, merchant_id") \
-            .eq("id", listing_id) \
-            .limit(1).execute()
-
-        if not listing_res.data:
-            raise HTTPException(status_code=404, detail="Listing not found")
-
-        merchant_res = supabase.table("p2p_merchants") \
-            .select("id") \
-            .eq("id", listing_res.data[0]["merchant_id"]) \
-            .eq("user_id", current_user["id"]) \
-            .limit(1).execute()
-
-        if not merchant_res.data:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        # Build update dict — only fields explicitly provided
-        updates: dict = {
-            k: v for k, v in {
-                "price_per_token":  payload.price_per_token,
-                "min_order_fiat":   payload.min_order_fiat,
-                "max_order_fiat":   payload.max_order_fiat,
-                "available_amount": payload.available_amount,
-                "terms":            payload.terms,
-            }.items() if v is not None
-        }
-
-        if not updates:
-            raise HTTPException(status_code=400, detail="No fields to update")
-
-        # Validate min < max if both provided
-        if "min_order_fiat" in updates and "max_order_fiat" in updates:
-            if updates["min_order_fiat"] >= updates["max_order_fiat"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail="min_order_fiat must be less than max_order_fiat"
-                )
-
-        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-        supabase.table("p2p_listings") \
-            .update(updates) \
-            .eq("id", listing_id) \
-            .execute()
-
-        logger.info(
-            f"[P2P] Listing {listing_id} updated by {current_user['id']}: "
-            f"{list(updates.keys())}"
-        )
-        return {"success": True, "updated_fields": list(updates.keys())}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[P2P] Update listing error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update listing")
