@@ -140,6 +140,7 @@ export function MerchantListings() {
             completion_rate, avg_release_time_mins, is_online
           )
         `)
+        .eq('listing_type', 'buy')
         .eq('token', selectedToken)
         .eq('fiat_currency', fiatCurrency)
         .eq('is_active', true)
