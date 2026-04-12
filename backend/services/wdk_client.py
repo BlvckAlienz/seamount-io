@@ -131,24 +131,19 @@ class WDKClient:
         self.settings = get_settings()
         
         # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
-        CORRECT_URL = "https://seamount-wdk-ne5i.onrender.com"
-        WRONG_URL_PATTERN = "seamount-wdk-ne5i"
-        
-        self.base_url = self.settings.WDK_SERVICE_URL
-        
-        # Detect and fix common misconfigurations
-        if not self.base_url or "localhost" in str(self.base_url):
-            self.base_url = CORRECT_URL
-            logger.warning("⚠️ Using fallback WDK URL - ENV variable not set properly")
-        elif WRONG_URL_PATTERN in str(self.base_url):
-            # 🚨 NUCLEAR OPTION: Override wrong URL from environment
-            logger.error(f"❌ WRONG URL DETECTED: {self.base_url}")
-            logger.error(f"   This is the OLD Render service URL!")
-            self.base_url = CORRECT_URL
-            logger.warning(f"✅ AUTO-CORRECTED to: {self.base_url}")
-            logger.warning("   UPDATE YOUR .env FILE: WDK_SERVICE_URL=https://seamount-wdk-ne5i.onrender.com")
-        
-        logger.info(f"🎯 WDK Service URL configured: {self.base_url}")
+        # ── WDK server pool — tried in order on failure ──
+        self._wdk_pool = [
+            "https://seamount-wdk-ne5i.onrender.com",   # primary
+            "https://seamount-wdk.onrender.com",         # backup 1
+            "https://seamount-wdk1.onrender.com",        # backup 2
+            "https://seamount-wdk2.onrender.com",        # backup 3
+            "https://seamount-wdk3.onrender.com",        # backup 4
+            "https://seamount-wdk4.onrender.com",        # backup 5
+            "https://seamount-wdk5.onrender.com",        # backup 6
+        ]
+        self._wdk_health: dict = {}  # url -> {fail_count, dead_until}
+        self.base_url = self._wdk_pool[0]
+        logger.info(f"🎯 WDK pool configured: {len(self._wdk_pool)} servers")
 
         
         # ✅ CRITICAL: Get API key from environment (no fallback)
@@ -197,23 +192,50 @@ class WDKClient:
         else:
             logger.warning(f"⚠️ WDK Indexer DISABLED - no API key configured")
     
+    def _get_healthy_wdk_pool(self) -> list:
+        """Return WDK servers not currently in cooldown."""
+        import time
+        now = time.time()
+        healthy = [
+            url for url in self._wdk_pool
+            if now >= self._wdk_health.get(url, {}).get('dead_until', 0)
+        ]
+        return healthy if healthy else self._wdk_pool  # fallback: try all
+
+    def _record_wdk_success(self, url: str) -> None:
+        self._wdk_health[url] = {'fail_count': 0, 'dead_until': 0}
+        if self.base_url != url:
+            self.base_url = url
+            logger.info(f"✅ WDK active server: {url}")
+
+    def _record_wdk_failure(self, url: str) -> None:
+        import time
+        h = self._wdk_health.get(url, {'fail_count': 0, 'dead_until': 0})
+        h['fail_count'] += 1
+        if h['fail_count'] >= 2:
+            h['dead_until'] = time.time() + 60  # 60s cooldown
+            logger.warning(f"⚡ WDK {url} marked dead for 60s")
+        self._wdk_health[url] = h
+
     async def _validate_service_connection(self):
-        """Validate WDK service is reachable on startup"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.base_url}/health", timeout=10) as response:
-                    if response.status == 200:
-                        logger.info("✅ WDK Service is ONLINE and reachable")
-                        self.service_healthy = True
-                        health_data = await response.json()
-                        logger.info(f"   Service health: {health_data}")
-                    else:
-                        logger.warning(f"⚠️ WDK Service returned {response.status}")
-                        self.service_healthy = False
-        except Exception as e:
-            logger.error(f"❌ WDK Service OFFLINE: {e}")
-            self.service_healthy = False
-            # Don't raise - allow graceful degradation
+        """Ping all pool members on startup — mark first healthy one as active."""
+        timeout = aiohttp.ClientTimeout(total=15)
+        for url in self._wdk_pool:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"{url}/ping", timeout=timeout) as response:
+                        if response.status == 200:
+                            self.base_url = url
+                            self.service_healthy = True
+                            logger.info(f"✅ WDK online: {url}")
+                            return
+                        else:
+                            logger.warning(f"⚠️ WDK {url} returned {response.status}")
+            except Exception as e:
+                logger.warning(f"⚠️ WDK {url} unreachable: {e}")
+
+        self.service_healthy = False
+        logger.error("❌ All WDK pool servers unreachable on startup")
     
     async def _make_request_with_retry(
         self, 
@@ -238,114 +260,115 @@ class WDKClient:
             }
         
         last_exception = None
-        
-        for attempt in range(max_retries):
-            try:
-                # Choose base URL
-                if use_indexer:
-                    if not self.indexer_url:
-                        raise Exception("WDK Indexer API key not configured")
-                    base = self.indexer_url
-                else:
-                    base = self.base_url
-                
-                url = f"{base}{endpoint}"
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
-                }
-                # ===== DEBUG: Log API key being sent to Node.js service =====
-                # Only log first 10 chars for security
-                key_preview = headers['X-API-Key'][:10] + '...'
-                logger.info(f"🔑 DEBUG: Sending request to {method} {url} with X-API-Key: {key_preview} (use_indexer={use_indexer})")
-                # ===== END DEBUG =====
 
-                # Log request details (mask sensitive data)
-                safe_data = data.copy() if data else {}
-                if 'plaintext_seed' in safe_data:
-                    safe_data['plaintext_seed'] = '***REDACTED***'
-                logger.debug(f"🔍 WDK request: {method} {url} data={safe_data}")
+        # Indexer uses single URL with retries; WDK pool iterates servers
+        if use_indexer:
+            if not self.indexer_url:
+                raise Exception("WDK Indexer API key not configured")
+            candidates = [self.indexer_url]
+            attempts_per_server = max_retries
+        else:
+            candidates = self._get_healthy_wdk_pool()
+            attempts_per_server = 1  # one attempt per server, move on if it fails
 
-                async with aiohttp.ClientSession() as session:
-                    if method == 'GET':
-                        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                            if response.status in [502, 503, 504]:
-                                raise aiohttp.ClientResponseError(
-                                    request_info=response.request_info,
-                                    history=response.history,
-                                    status=response.status,
-                                    message=f"Service unavailable: {response.status}"
-                                )
-                            response.raise_for_status()
-                            result = await response.json()
-                            
-                            # Success - record it in circuit breaker
-                            self.circuit_breaker.record_success()
-                            self.service_healthy = True
-                            return result
-                    else:  # POST, PUT, etc.
-                        async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                            response_text = await response.text()
+        for base in candidates:
+            for attempt in range(attempts_per_server):
+                try:
+                    url = f"{base}{endpoint}"
 
-                            # 4xx = client error — surface immediately, DO NOT retry
-                            if 400 <= response.status < 500:
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': self.api_key if use_indexer else '5a2de129c82deb82d71667613c3a76a7d69f9f4536b779f36f03deb572061ed7'
+                    }
+
+                    # Log first 10 chars only for security
+                    key_preview = headers['X-API-Key'][:10] + '...'
+                    logger.info(f"🔑 DEBUG: {method} {url} X-API-Key: {key_preview} (indexer={use_indexer})")
+
+                    safe_data = data.copy() if data else {}
+                    if 'plaintext_seed' in safe_data:
+                        safe_data['plaintext_seed'] = '***REDACTED***'
+                    logger.debug(f"🔍 WDK request: {method} {url} data={safe_data}")
+
+                    async with aiohttp.ClientSession() as session:
+                        if method == 'GET':
+                            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                                if response.status in [502, 503, 504]:
+                                    raise aiohttp.ClientResponseError(
+                                        request_info=response.request_info,
+                                        history=response.history,
+                                        status=response.status,
+                                        message=f"Service unavailable: {response.status}"
+                                    )
+                                response.raise_for_status()
+                                result = await response.json()
+                                self.circuit_breaker.record_success()
+                                self.service_healthy = True
+                                if not use_indexer:
+                                    self._record_wdk_success(base)
+                                return result
+
+                        else:  # POST
+                            async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                                response_text = await response.text()
+
+                                # 4xx = client error — surface immediately, do NOT try other servers
+                                if 400 <= response.status < 500:
+                                    try:
+                                        import json as _json
+                                        err_body = _json.loads(response_text)
+                                        err_msg = err_body.get('error') or err_body.get('detail') or response_text
+                                    except Exception:
+                                        err_msg = response_text
+                                    logger.error(f"❌ WDK {response.status} on {method} {endpoint}: {err_msg[:400]}")
+                                    raise Exception(f"WDK error ({response.status}): {err_msg}")
+
+                                # 5xx = server error — try next server
+                                if response.status in [502, 503, 504]:
+                                    raise aiohttp.ClientResponseError(
+                                        request_info=response.request_info,
+                                        history=response.history,
+                                        status=response.status,
+                                        message=f"Service unavailable: {response.status}"
+                                    )
+
                                 try:
                                     import json as _json
-                                    err_body = _json.loads(response_text)
-                                    err_msg = err_body.get('error') or err_body.get('detail') or response_text
+                                    result = _json.loads(response_text) if response_text else {}
                                 except Exception:
-                                    err_msg = response_text
-                                logger.error(f"❌ WDK {response.status} on {method} {endpoint}: {err_msg[:400]}")
-                                raise Exception(f"WDK error ({response.status}): {err_msg}")
+                                    result = {'raw': response_text}
 
-                            # 5xx = server error — retry
-                            if response.status in [502, 503, 504]:
-                                raise aiohttp.ClientResponseError(
-                                    request_info=response.request_info,
-                                    history=response.history,
-                                    status=response.status,
-                                    message=f"Service unavailable: {response.status}"
-                                )
+                                self.circuit_breaker.record_success()
+                                self.service_healthy = True
+                                if not use_indexer:
+                                    self._record_wdk_success(base)
+                                return result
 
-                            try:
-                                import json as _json
-                                result = _json.loads(response_text) if response_text else {}
-                            except Exception:
-                                result = {'raw': response_text}
+                except aiohttp.ClientResponseError as e:
+                    last_exception = e
+                    logger.warning(f"⚠️ WDK {base} failed (attempt {attempt + 1}/{attempts_per_server}): {e.status} {e.message}")
 
-                            # Success - record it in circuit breaker
-                            self.circuit_breaker.record_success()
-                            self.service_healthy = True
-                            return result
-                            
-            except aiohttp.ClientResponseError as e:
-                # Try to read response body
-                try:
-                    body = await e.request_info.response.text()
-                except:
-                    body = "No body"
-                logger.error(f"❌ WDK request failed: {e.status} {e.message} – Body: {body}")
-                last_exception = e
-                logger.warning(f"⚠️ WDK request failed (attempt {attempt + 1}/{max_retries}): {e}")
-                
-                # ===== FIX: Only penalize circuit breaker for Node service failures =====
-                # Indexer failures (403) should not open the circuit
-                if not use_indexer:
-                    self.circuit_breaker.record_failure()
-                    self.service_healthy = False
-                # ===== END FIX =====
-                
-                if attempt < max_retries - 1:
-                    # Exponential backoff with jitter
-                    delay = base_delay * (2 ** attempt) * (0.5 + 0.5 * asyncio.get_event_loop().time() % 1)
-                    logger.info(f"Retrying WDK request in {delay:.2f} seconds...")
-                    await asyncio.sleep(delay)
-                else:
-                    logger.error(f"❌ All {max_retries} attempts failed for {method} {endpoint}")
-        
-        # All retries failed
-        raise Exception(f"WDK service unavailable after {max_retries} attempts: {str(last_exception)}")
+                    if not use_indexer:
+                        self.circuit_breaker.record_failure()
+                        self.service_healthy = False
+                        self._record_wdk_failure(base)
+                        break  # move to next server in pool immediately
+
+                    # Indexer: exponential backoff between retries
+                    if attempt < attempts_per_server - 1:
+                        delay = base_delay * (2 ** attempt) * (0.5 + 0.5 * asyncio.get_event_loop().time() % 1)
+                        logger.info(f"Retrying indexer in {delay:.2f}s...")
+                        await asyncio.sleep(delay)
+
+                except Exception as e:
+                    last_exception = e
+                    logger.error(f"❌ WDK {base} unexpected error: {e}")
+                    if not use_indexer:
+                        self._record_wdk_failure(base)
+                        break  # move to next server
+
+        logger.error(f"❌ All WDK servers exhausted for {method} {endpoint}")
+        raise Exception(f"WDK service unavailable after trying {len(candidates)} server(s): {str(last_exception)}")
     
     # Alias for backward compatibility
     _make_request = _make_request_with_retry
@@ -1918,7 +1941,7 @@ class WDKClient:
                 'wdk_service': result,
                 'indexer_enabled': self.indexer_url is not None,
                 'supported_chains': self.SUPPORTED_CHAINS,
-                'circuit_breaker': self.circuit_breaker.state
+                'circuit_breaker': self.state
             }
         except Exception as e:
             return {

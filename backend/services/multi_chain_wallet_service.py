@@ -1,12 +1,12 @@
 # File: backend/services/multi_chain_wallet_service.py
 """
 Multi-Chain Wallet Service - PRODUCTION READY v2.0
-âœ… Fixed all duplications
-âœ… Removed unsupported chains (arbitrum, ton)
-âœ… Added Solana support
-âœ… Added robust error handling
-âœ… Fixed asset key normalization
-âœ… Added comprehensive logging
+Fixed all duplications
+Removed unsupported chains (arbitrum, ton)
+Added Solana support
+Added robust error handling
+Fixed asset key normalization
+Added comprehensive logging
 """
 
 from itertools import chain

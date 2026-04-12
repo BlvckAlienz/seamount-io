@@ -5,70 +5,50 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { supabase } from '../lib/supabase';
 
 // ─── Endpoint Registry ─────────────────────────────────────────────────────
-const SERVERS = {
-  api: {
-    primary: import.meta.env.VITE_API_BASE_URL || 'https://seamount-io-pr8a.onrender.com',
-    backup:  import.meta.env.VITE_API_BASE_URL_BACKUP || 'https://seamount-api.onrender.com',
-  },
-};
+// All 7 API servers — tried in order, round-robin on failure
+const API_POOL: string[] = [
+  import.meta.env.VITE_API_BASE_URL        || 'https://seamount-io-pr8a.onrender.com',
+  import.meta.env.VITE_API_BASE_URL_BACKUP || 'https://seamount-api.onrender.com',
+  'https://seamount-main.onrender.com',
+  'https://seamount-main2.onrender.com',
+  'https://seamount-main3.onrender.com',
+  'https://seamount-api2.onrender.com',
+  'https://seamount-api3.onrender.com',
+];
 
-// ─── Circuit Breaker State (in-memory) ─────────────────────────────────────
-interface CircuitState {
-  usePrimary: boolean;
-  failCount: number;
-  lastFailTime: number;
-  recovering: boolean;
+// ─── Pool Circuit Breaker ──────────────────────────────────────────────────
+// Tracks which servers are healthy. Tries each in order on failure.
+const poolHealth: Record<string, { failCount: number; deadUntil: number }> = {};
+const FAIL_THRESHOLD    = 2;
+const DEAD_WINDOW_MS    = 60_000; // 60s cooldown before retrying a dead server
+
+function getHealthyPool(): string[] {
+  const now = Date.now();
+  return API_POOL.filter(url => {
+    const h = poolHealth[url];
+    if (!h) return true;                      // never failed — healthy
+    if (h.deadUntil && now < h.deadUntil) return false; // in cooldown
+    return true;
+  });
 }
 
-const circuit: CircuitState = {
-  usePrimary: true,
-  failCount: 0,
-  lastFailTime: 0,
-  recovering: false,
-};
+function recordServerSuccess(url: string): void {
+  poolHealth[url] = { failCount: 0, deadUntil: 0 };
+}
 
-const FAIL_THRESHOLD = 2;         // Switch to backup after N consecutive failures
-const RECOVERY_INTERVAL = 60_000; // Re-test primary after 60s
+function recordServerFailure(url: string): void {
+  const h = poolHealth[url] || { failCount: 0, deadUntil: 0 };
+  h.failCount++;
+  if (h.failCount >= FAIL_THRESHOLD) {
+    h.deadUntil = Date.now() + DEAD_WINDOW_MS;
+    console.warn(`[API] ⚡ ${url} marked dead for 60s (${h.failCount} failures)`);
+  }
+  poolHealth[url] = h;
+}
 
+// Kept for warmUpServer compatibility
 function getActiveBase(): string {
-  // Periodically attempt primary recovery
-  if (!circuit.usePrimary && Date.now() - circuit.lastFailTime > RECOVERY_INTERVAL && !circuit.recovering) {
-    circuit.recovering = true;
-    pingPrimary(); // non-blocking
-  }
-  return circuit.usePrimary ? SERVERS.api.primary : SERVERS.api.backup;
-}
-
-function recordSuccess(): void {
-  if (!circuit.usePrimary) return;
-  circuit.failCount = 0;
-  circuit.recovering = false;
-}
-
-function recordFailure(): void {
-  circuit.failCount++;
-  circuit.lastFailTime = Date.now();
-  if (circuit.failCount >= FAIL_THRESHOLD) {
-    if (circuit.usePrimary) {
-      console.warn(`[API] ⚡ Primary down (${circuit.failCount} failures) → switching to backup`);
-    }
-    circuit.usePrimary = false;
-  }
-}
-
-async function pingPrimary(): Promise<void> {
-  try {
-    await fetch(`${SERVERS.api.primary}/api/v1/health`, {
-      signal: AbortSignal.timeout(5_000),
-      method: 'GET',
-    });
-    console.info('[API] ✅ Primary recovered — switching back');
-    circuit.usePrimary = true;
-    circuit.failCount = 0;
-    circuit.recovering = false;
-  } catch {
-    circuit.recovering = false;
-  }
+  return getHealthyPool()[0] || API_POOL[0];
 }
 
 // ─── Warm-Up (fight Render cold starts) ────────────────────────────────────
@@ -78,16 +58,15 @@ export async function warmUpServer(): Promise<void> {
   if (warmedUp) return;
   warmedUp = true;
 
-  const targets = [SERVERS.api.primary, SERVERS.api.backup];
-
-  for (const url of targets) {
-    fetch(`${url}/api/v1/health`, {
-      signal: AbortSignal.timeout(35_000), // generous for cold start
+  // Ping all 7 servers in parallel — non-blocking
+  API_POOL.forEach(url => {
+    fetch(`${url}/ping`, {
+      signal: AbortSignal.timeout(35_000),
       method: 'GET',
     })
       .then(() => console.info(`[WarmUp] ✅ ${url} is awake`))
       .catch(() => console.warn(`[WarmUp] ⚠️ ${url} did not respond`));
-  }
+  });
 }
 
 // Kick off warm-up immediately on import
@@ -130,42 +109,42 @@ async function executeWithFallback<T>(
 ): Promise<{ data: T; status: number }> {
 
   const authConfig = await injectAuthHeader({ ...(config || {}) });
+  const candidates = getHealthyPool();
 
-  // ── Attempt primary (or whichever is currently active) ──
-  const activeBase = getActiveBase();
-  const instance = createAxiosInstance(activeBase);
+  // If ALL servers are in cooldown, reset and try all anyway
+  const pool = candidates.length > 0 ? candidates : API_POOL;
 
-  try {
-    console.log(`[API] → ${method.toUpperCase()} ${activeBase}${endpoint}`);
-    const response = await instance[method]<T>(endpoint, method === 'get' ? authConfig : data, authConfig);
-    recordSuccess();
-    return { data: response.data, status: response.status };
-  } catch (primaryErr: unknown) {
-    const axiosErr = primaryErr as { code?: string; response?: { status: number } };
-    const isNetworkError = !axiosErr.response || RETRYABLE_ERRORS.has(axiosErr.code || '');
+  let lastErr: unknown;
 
-    if (!isNetworkError) {
-      // 4xx etc — don't fallback, surface to caller
-      throw primaryErr;
-    }
-
-    recordFailure();
-    console.warn(`[API] ⚡ Primary failed (${axiosErr.code}) — trying backup`);
-
-    // ── Fallback to the OTHER server ──
-    const fallbackBase = circuit.usePrimary ? SERVERS.api.primary : SERVERS.api.backup;
-    const fallbackInstance = createAxiosInstance(fallbackBase);
-
+  for (const baseUrl of pool) {
+    const instance = createAxiosInstance(baseUrl);
     try {
-      const fallbackAuthConfig = await injectAuthHeader({ ...(config || {}) });
-      const response = await fallbackInstance[method]<T>(endpoint, method === 'get' ? fallbackAuthConfig : data, fallbackAuthConfig);
-      console.info(`[API] ✅ Backup responded successfully`);
+      console.log(`[API] → ${method.toUpperCase()} ${baseUrl}${endpoint}`);
+      const response = await instance[method]<T>(
+        endpoint,
+        method === 'get' ? authConfig : data,
+        authConfig,
+      );
+      recordServerSuccess(baseUrl);
       return { data: response.data, status: response.status };
-    } catch (backupErr) {
-      console.error(`[API] ❌ Both servers failed for ${endpoint}`);
-      throw backupErr;
+
+    } catch (err: unknown) {
+      const axiosErr = err as { code?: string; response?: { status: number } };
+      const isNetworkError = !axiosErr.response || RETRYABLE_ERRORS.has(axiosErr.code || '');
+
+      if (!isNetworkError) {
+        // 4xx client error — don't try other servers, surface immediately
+        throw err;
+      }
+
+      recordServerFailure(baseUrl);
+      console.warn(`[API] ⚡ ${baseUrl} failed (${axiosErr.code}) — trying next server`);
+      lastErr = err;
     }
   }
+
+  console.error(`[API] ❌ All ${pool.length} servers failed for ${endpoint}`);
+  throw lastErr;
 }
 
 // ─── Public API Client Interface ───────────────────────────────────────────
