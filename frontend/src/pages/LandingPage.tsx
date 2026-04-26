@@ -1077,7 +1077,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="inline-flex items-center gap-2 px-4 py-2 glass-card rounded-full text-sm font-medium mb-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-gray-700">Powered by Algorand + Tether WDK + XRP Ledger</span>
+                <span className="text-gray-700">Powered by Tether WDK + Circle Arc + XRP Ledger</span>
               </div>
             </div>
             
