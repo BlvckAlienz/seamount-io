@@ -342,6 +342,15 @@ except ImportError as e:
     logger.error(f"❌ WDK Protocols router import error: {e}")
     routers_available['wdk_protocols'] = None
 
+try:
+    from backend.api.routes.circle_bridge_routes import router as circle_bridge_router
+    from backend.api.routes.circle_swap_routes   import router as circle_swap_router
+    app.include_router(circle_bridge_router, prefix="/api/v1", tags=["Circle Bridge"])
+    app.include_router(circle_swap_router,   prefix="/api/v1", tags=["Circle Swap"])
+    logger.info("✅ Circle App Kit routers registered at /api/v1/circle/bridge + /circle/swap")
+except ImportError as e:
+    logger.error(f"❌ Circle App Kit routes import error: {e}")
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}

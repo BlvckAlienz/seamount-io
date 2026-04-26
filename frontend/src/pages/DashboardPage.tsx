@@ -13,6 +13,7 @@ import {
   Clock,
   Target,
   ArrowUpRight,
+  ArrowRight,
   ArrowDownToLine,
   Download
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { EarnModal } from '@/components/modals/EarnModal';
 import ReceiveModal from '@/components/wallet/ReceiveModal';  // ✅ ADD THIS
 import { TransactionHistoryModal } from '@/components/wallet/TransactionHistoryModal';
 import { formatCurrencyUSD } from '@/utils/formatters';
+import { CircleBridgeModal } from '@/components/bridge/CircleBridgeModal'
 
 // KYC Banner Component
 interface KYCPromptBannerProps {
@@ -103,6 +105,7 @@ const DashboardPage = () => {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showBridgeModal, setShowBridgeModal] = useState(false)
   const [showEarnModal, setShowEarnModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);  // ✅ ADD THIS
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -311,6 +314,14 @@ const DashboardPage = () => {
               <RefreshCw className="h-4 w-4" />
               <span className="hidden sm:inline">Swap</span>
             </button>
+
+            <button
+              onClick={() => setShowBridgeModal(true)}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
+            >
+              <ArrowRight className="h-4 w-4" />
+              <span className="hidden sm:inline">Bridge</span>
+            </button>
             
             <button 
               onClick={() => setShowWithdrawModal(true)}
@@ -406,6 +417,7 @@ const DashboardPage = () => {
       <SendForm open={showSendModal} onOpenChange={setShowSendModal} />
       <SwapModal open={showSwapModal} onOpenChange={setShowSwapModal} />
       <EarnModal open={showEarnModal} onOpenChange={setShowEarnModal} />
+      <CircleBridgeModal open={showBridgeModal} onOpenChange={setShowBridgeModal} />
       <ReceiveModal 
         isOpen={showReceiveModal} 
         onClose={() => {

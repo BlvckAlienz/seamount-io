@@ -657,6 +657,11 @@ class Settings(BaseSettings):
         description="Official Tether WDK Indexer API for blockchain queries"
     )
 
+    CIRCLE_KIT_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Circle App Kit key from console.circle.com — format: KIT_KEY:id:secret"
+    )
+    
     WDK_API_KEY: Optional[SecretStr] = Field(
         default=None,
         description="Tether WDK API Key from https://wdk-api.tether.io"
