@@ -1402,6 +1402,16 @@ function getExplorerUrl(chain, txHash) {
     return explorers[chain] || `https://etherscan.io/tx/${txHash}`;
 }
 
+// ── WDK Protocol Extensions (Velora/ParaSwap Swap, Aave Lending, MoonPay Fiat)
+const wdkProtocols = require('./wdk-protocols');
+app.use('/wdk', validateApiKey, wdkProtocols);
+console.log('✅ WDK Protocols registered at /wdk (swap, lend, fiat, prices)');
+
+// ── Circle App Kit (CCTP Bridge, Circle Swap, Enhanced Send)
+const appKitService = require('./appkit-service');
+app.use('/appkit', appKitService);  // appkit-service.js validates API key internally
+console.log('✅ Circle App Kit registered at /appkit (bridge, swap, send)');
+
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('❌ Server error:', err);
@@ -1432,4 +1442,6 @@ app.listen(PORT, () => {
     console.log(`   - Token sends: ERC-20 (ETH/Polygon), TRC-20 (Tron), SPL (Solana)`);
     console.log(`📊 Health: http://localhost:${PORT}/health`);
     console.log('='.repeat(60));
+    console.log(`🌉 Circle App Kit: /appkit (bridge, swap, send)`);
+    console.log(`💱 WDK Protocols:  /wdk    (ParaSwap swap, Aave lend, MoonPay)`);
 });

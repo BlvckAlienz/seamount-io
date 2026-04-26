@@ -101,7 +101,30 @@ async function injectAuthHeader(config: AxiosRequestConfig): Promise<AxiosReques
 // ─── Resilient Request Executor ────────────────────────────────────────────
 const RETRYABLE_ERRORS = new Set(['ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK', 'ERR_NAME_NOT_RESOLVED']);
 
+// ── In-flight deduplicator — prevents identical concurrent GETs ───────────
+const inFlight = new Map<string, Promise<{ data: unknown; status: number }>>();
+
 async function executeWithFallback<T>(
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete',
+  endpoint: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<{ data: T; status: number }> {
+  // Only deduplicate GETs — POSTs/PUTs must always fire
+  if (method === 'get') {
+    const key = `GET:${endpoint}`;
+    if (inFlight.has(key)) {
+      return inFlight.get(key) as Promise<{ data: T; status: number }>;
+    }
+    const promise = _executeWithFallback<T>(method, endpoint, data, config)
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, promise as Promise<{ data: unknown; status: number }>);
+    return promise;
+  }
+  return _executeWithFallback<T>(method, endpoint, data, config);
+}
+
+async function _executeWithFallback<T>(
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
   endpoint: string,
   data?: unknown,
