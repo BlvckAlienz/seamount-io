@@ -70,10 +70,16 @@ export async function warmUpServer(): Promise<void> {
       .catch(() => console.warn(`[WarmUp] ⚠️ ${url} did not respond`));
   });
 
-  // Warm WDK servers — critical for wallet/balances not timing out
+    // Warm WDK servers — use the /health endpoint that actually exists
   WDK_POOL.forEach(url => {
-    fetch(`${url}/ping`, { signal: AbortSignal.timeout(35_000), method: 'GET' })
-      .then(() => console.info(`[WarmUp] ✅ WDK ${url} is awake`))
+    fetch(`${url}/health`, { signal: AbortSignal.timeout(35_000), method: 'GET' })
+      .then(res => {
+        if (res.ok) {
+          console.info(`[WarmUp] ✅ WDK ${url} is awake`);
+        } else {
+          console.warn(`[WarmUp] ⚠️ WDK ${url} responded with ${res.status} – may be unhealthy`);
+        }
+      })
       .catch(() => console.warn(`[WarmUp] ⚠️ WDK ${url} did not respond`));
   });
 }

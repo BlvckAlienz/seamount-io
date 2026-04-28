@@ -218,7 +218,7 @@ class WDKClient:
         for url in self._wdk_pool:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{url}/ping", timeout=timeout) as response:
+                    async with session.get(f"{url}/health", timeout=timeout) as response:
                         if response.status == 200:
                             self.base_url = url
                             self.service_healthy = True
