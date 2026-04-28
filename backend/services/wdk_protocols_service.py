@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from uuid import uuid4
 
-from backend.wdk_client import WDKClient
+from backend.services.wdk_client import WDKClient
 from backend.services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
