@@ -1,33 +1,34 @@
 // frontend/src/config/api.ts
-// RESILIENT API CLIENT — Primary/Backup failover + cold-start warmup
+// RESILIENT API CLIENT — 2-server active pool, fast-fail, deduplication
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { supabase } from '../lib/supabase';
 
-// ─── Endpoint Registry ─────────────────────────────────────────────────────
-// All 7 API servers — tried in order, round-robin on failure
+// ─── Active Server Pool — ordered by health ────────────────────────────────
+// ONLY servers that are confirmed deployed and active
 const API_POOL: string[] = [
-  import.meta.env.VITE_API_BASE_URL        || 'https://seamount-io-pr8a.onrender.com',
-  import.meta.env.VITE_API_BASE_URL_BACKUP || 'https://seamount-api.onrender.com',
-  'https://seamount-main.onrender.com',
-  'https://seamount-main2.onrender.com',
-  'https://seamount-main3.onrender.com',
-  'https://seamount-api2.onrender.com',
-  'https://seamount-api3.onrender.com',
+  'https://seamount-main.onrender.com',   // PRIMARY — confirmed warm
+  'https://seamount-api2.onrender.com',   // BACKUP  — confirmed warm
 ];
 
-// ─── Pool Circuit Breaker ──────────────────────────────────────────────────
-// Tracks which servers are healthy. Tries each in order on failure.
+// Dead servers kept here for reference — NOT in the active pool
+// 'https://seamount-io-pr8a.onrender.com' — CORS issues, suspended
+// 'https://seamount-api.onrender.com'     — CORS issues, suspended
+// 'https://seamount-main2.onrender.com'   — unconfirmed
+// 'https://seamount-main3.onrender.com'   — unconfirmed
+// 'https://seamount-api3.onrender.com'    — unconfirmed
+
+// ─── Pool Health Tracker ───────────────────────────────────────────────────
 const poolHealth: Record<string, { failCount: number; deadUntil: number }> = {};
-const FAIL_THRESHOLD    = 2;
-const DEAD_WINDOW_MS    = 60_000; // 60s cooldown before retrying a dead server
+const FAIL_THRESHOLD = 2;
+const DEAD_WINDOW_MS = 90_000; // 90s cooldown — longer than WDK cold start
 
 function getHealthyPool(): string[] {
   const now = Date.now();
   return API_POOL.filter(url => {
     const h = poolHealth[url];
-    if (!h) return true;                      // never failed — healthy
-    if (h.deadUntil && now < h.deadUntil) return false; // in cooldown
+    if (!h) return true;
+    if (h.deadUntil && now < h.deadUntil) return false;
     return true;
   });
 }
@@ -41,39 +42,54 @@ function recordServerFailure(url: string): void {
   h.failCount++;
   if (h.failCount >= FAIL_THRESHOLD) {
     h.deadUntil = Date.now() + DEAD_WINDOW_MS;
-    console.warn(`[API] ⚡ ${url} marked dead for 60s (${h.failCount} failures)`);
+    console.warn(`[API] ⚡ ${url} marked dead for 90s (${h.failCount} failures)`);
   }
   poolHealth[url] = h;
 }
 
-// Kept for warmUpServer compatibility
-function getActiveBase(): string {
+export function getActiveBase(): string {
   return getHealthyPool()[0] || API_POOL[0];
 }
 
-// ─── Warm-Up (fight Render cold starts) ────────────────────────────────────
+// ─── Warm-Up — ping both servers + both WDK servers ───────────────────────
+const WDK_POOL: string[] = [
+  'https://seamount-wdk1.onrender.com',
+  'https://seamount-wdk4.onrender.com',  // paired with seamount-api2
+];
+
 let warmedUp = false;
 
 export async function warmUpServer(): Promise<void> {
   if (warmedUp) return;
   warmedUp = true;
 
-  // Ping all 7 servers in parallel — non-blocking
+  // Warm API servers
   API_POOL.forEach(url => {
-    fetch(`${url}/ping`, {
-      signal: AbortSignal.timeout(35_000),
-      method: 'GET',
-    })
+    fetch(`${url}/ping`, { signal: AbortSignal.timeout(35_000), method: 'GET' })
       .then(() => console.info(`[WarmUp] ✅ ${url} is awake`))
       .catch(() => console.warn(`[WarmUp] ⚠️ ${url} did not respond`));
   });
+
+  // Warm WDK servers — critical for wallet/balances not timing out
+  WDK_POOL.forEach(url => {
+    fetch(`${url}/ping`, { signal: AbortSignal.timeout(35_000), method: 'GET' })
+      .then(() => console.info(`[WarmUp] ✅ WDK ${url} is awake`))
+      .catch(() => console.warn(`[WarmUp] ⚠️ WDK ${url} did not respond`));
+  });
 }
 
-// Kick off warm-up immediately on import
 warmUpServer();
 
 // ─── Axios Factory ─────────────────────────────────────────────────────────
-function createAxiosInstance(baseURL: string, timeoutMs = 45_000): AxiosInstance {
+// IMPORTANT: wallet/balances needs longer timeout due to WDK dependency
+const SLOW_ENDPOINTS = new Set([
+  '/api/v1/wallet/balances',
+  '/api/v1/wallet/create',
+  '/api/v1/xrp/balances',
+]);
+
+function createAxiosInstance(baseURL: string, endpoint: string): AxiosInstance {
+  const timeoutMs = SLOW_ENDPOINTS.has(endpoint) ? 60_000 : 20_000;
   return axios.create({
     baseURL,
     timeout: timeoutMs,
@@ -98,11 +114,13 @@ async function injectAuthHeader(config: AxiosRequestConfig): Promise<AxiosReques
   return config;
 }
 
-// ─── Resilient Request Executor ────────────────────────────────────────────
-const RETRYABLE_ERRORS = new Set(['ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK', 'ERR_NAME_NOT_RESOLVED']);
-
-// ── In-flight deduplicator — prevents identical concurrent GETs ───────────
+// ─── In-flight deduplicator ────────────────────────────────────────────────
 const inFlight = new Map<string, Promise<{ data: unknown; status: number }>>();
+
+// ─── Resilient Request Executor ────────────────────────────────────────────
+const RETRYABLE_ERRORS = new Set([
+  'ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK', 'ERR_NAME_NOT_RESOLVED'
+]);
 
 async function executeWithFallback<T>(
   method: 'get' | 'post' | 'put' | 'patch' | 'delete',
@@ -110,7 +128,6 @@ async function executeWithFallback<T>(
   data?: unknown,
   config?: AxiosRequestConfig,
 ): Promise<{ data: T; status: number }> {
-  // Only deduplicate GETs — POSTs/PUTs must always fire
   if (method === 'get') {
     const key = `GET:${endpoint}`;
     if (inFlight.has(key)) {
@@ -132,15 +149,12 @@ async function _executeWithFallback<T>(
 ): Promise<{ data: T; status: number }> {
 
   const authConfig = await injectAuthHeader({ ...(config || {}) });
-  const candidates = getHealthyPool();
-
-  // If ALL servers are in cooldown, reset and try all anyway
-  const pool = candidates.length > 0 ? candidates : API_POOL;
+  const pool = getHealthyPool().length > 0 ? getHealthyPool() : API_POOL;
 
   let lastErr: unknown;
 
   for (const baseUrl of pool) {
-    const instance = createAxiosInstance(baseUrl);
+    const instance = createAxiosInstance(baseUrl, endpoint);
     try {
       console.log(`[API] → ${method.toUpperCase()} ${baseUrl}${endpoint}`);
       const response = await instance[method]<T>(
@@ -156,8 +170,7 @@ async function _executeWithFallback<T>(
       const isNetworkError = !axiosErr.response || RETRYABLE_ERRORS.has(axiosErr.code || '');
 
       if (!isNetworkError) {
-        // 4xx client error — don't try other servers, surface immediately
-        throw err;
+        throw err; // 4xx — surface immediately
       }
 
       recordServerFailure(baseUrl);
@@ -170,25 +183,21 @@ async function _executeWithFallback<T>(
   throw lastErr;
 }
 
-// ─── Public API Client Interface ───────────────────────────────────────────
+// ─── Public API Client ─────────────────────────────────────────────────────
 export const apiClient = {
   get: <T = unknown>(endpoint: string, config?: AxiosRequestConfig) =>
     executeWithFallback<T>('get', endpoint, undefined, config),
-
   post: <T = unknown>(endpoint: string, data?: unknown, config?: AxiosRequestConfig) =>
     executeWithFallback<T>('post', endpoint, data, config),
-
   put: <T = unknown>(endpoint: string, data?: unknown, config?: AxiosRequestConfig) =>
     executeWithFallback<T>('put', endpoint, data, config),
-
   patch: <T = unknown>(endpoint: string, data?: unknown, config?: AxiosRequestConfig) =>
     executeWithFallback<T>('patch', endpoint, data, config),
-
   delete: <T = unknown>(endpoint: string, config?: AxiosRequestConfig) =>
     executeWithFallback<T>('delete', endpoint, undefined, config),
 };
 
-// ─── Named endpoint modules (unchanged API surface) ───────────────────────
+// ─── Endpoint Modules ──────────────────────────────────────────────────────
 export const API_ENDPOINTS = {
   AUTH:    { RESET_PASSWORD: '/api/v1/auth/reset-password' },
   LEADS:   { BUSINESS_CONTACT: '/api/v1/leads/business-contact' },
@@ -229,7 +238,6 @@ export const userAPI = {
   updateProfile:    (data: unknown) => apiClient.put(API_ENDPOINTS.USER.PROFILE, data),
   provisionWallets: () => apiClient.post(API_ENDPOINTS.USER.PROVISION_WALLETS),
 };
-
 export const kycAPI = {
   checkProfile:      () => apiClient.get(API_ENDPOINTS.KYC.CHECK_PROFILE),
   startVerification: () => apiClient.post(API_ENDPOINTS.KYC.START_VERIFICATION),
@@ -237,20 +245,18 @@ export const kycAPI = {
   getStatus:         (userId?: string) => apiClient.get(`${API_ENDPOINTS.KYC.GET_STATUS}${userId ? `/${userId}` : ''}`),
   getRequirements:   () => apiClient.get(API_ENDPOINTS.KYC.REQUIREMENTS),
 };
-
-export const walletAPI = { create: () => apiClient.post(API_ENDPOINTS.WALLET.CREATE) };
+export const walletAPI    = { create: () => apiClient.post(API_ENDPOINTS.WALLET.CREATE) };
 export const portfolioAPI = { getSummary: () => apiClient.get(API_ENDPOINTS.portfolio.SUMMARY) };
-export const tradingAPI = {
+export const tradingAPI   = {
   swap: (data: unknown) => apiClient.post(API_ENDPOINTS.TRADING.SWAP, data),
   buy:  (data: unknown) => apiClient.post(API_ENDPOINTS.TRADING.BUY, data),
   sell: (data: unknown) => apiClient.post(API_ENDPOINTS.TRADING.SELL, data),
 };
-
 export const xrpAPI = {
-  getBalances:    () => apiClient.get(API_ENDPOINTS.XRP.BALANCES),
-  getDepositInfo: () => apiClient.get(API_ENDPOINTS.XRP.DEPOSIT_INFO),
-  transfer:       (data: unknown) => apiClient.post(API_ENDPOINTS.XRP.TRANSFER, data),
-  withdraw:       (data: unknown) => apiClient.post(API_ENDPOINTS.XRP.WITHDRAW, data),
+  getBalances:     () => apiClient.get(API_ENDPOINTS.XRP.BALANCES),
+  getDepositInfo:  () => apiClient.get(API_ENDPOINTS.XRP.DEPOSIT_INFO),
+  transfer:        (data: unknown) => apiClient.post(API_ENDPOINTS.XRP.TRANSFER, data),
+  withdraw:        (data: unknown) => apiClient.post(API_ENDPOINTS.XRP.WITHDRAW, data),
   getTransactions: (params?: unknown) => apiClient.get(API_ENDPOINTS.XRP.TRANSACTIONS, { params } as AxiosRequestConfig),
   health:          () => apiClient.get(API_ENDPOINTS.XRP.HEALTH),
   getPools:        () => apiClient.get(API_ENDPOINTS.XRP.YIELD_POOLS),
@@ -259,12 +265,10 @@ export const xrpAPI = {
   withdrawYield:   (data: unknown) => apiClient.post(API_ENDPOINTS.XRP.YIELD_WITHDRAW, data),
   getYieldHistory: (params?: unknown) => apiClient.get(API_ENDPOINTS.XRP.YIELD_HISTORY, { params } as AxiosRequestConfig),
 };
-
 export const seedAPI = {
   getRecoverySeeds: () => apiClient.get('/api/v1/seeds/recovery'),
   getAccessLog:     () => apiClient.get('/api/v1/seeds/access-log'),
 };
-
 export const initializeSession = async (): Promise<string> => {
   try {
     const response = await apiClient.post<{ session_id: string }>(API_ENDPOINTS.SESSION.INITIALIZE);
