@@ -897,7 +897,7 @@ class Settings(BaseSettings):
     # Harbor (OwlPay) - Multi-chain crypto gateway
     HARBOR_API_KEY: Optional[SecretStr] = Field(None, env="HARBOR_API_KEY")
     HARBOR_WEBHOOK_URL: Optional[str] = Field(
-        "https://seamount-io-pr8a.onrender.comapi/v1/webhooks/owlpay",
+        "https://seamount-main.onrender.comapi/v1/webhooks/owlpay",
         env="HARBOR_WEBHOOK_URL"
     )
     # ✅ Webhook secret is OPTIONAL (Harbor doesn't provide one)
@@ -930,7 +930,7 @@ class Settings(BaseSettings):
         description="Pretium Tron settlement wallet address"
     )
     PRETIUM_WEBHOOK_URL: str = Field(
-        default="https://seamount-io-pr8a.onrender.comwebhooks/pretium",
+        default="https://seamount-main.onrender.comwebhooks/pretium",
         description="Pretium webhook callback URL"
     )
     PRETIUM_CALLBACK_URL: str = Field(
@@ -966,7 +966,7 @@ class Settings(BaseSettings):
     # Operational
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
-    API_BASE_URL: str = Field(default="https://seamount-io-pr8a.onrender.com")
+    API_BASE_URL: str = Field(default="https://seamount-main.onrender.com")
     FRONTEND_URL: str = Field(default="http://localhost:3000")
     
     # Business Model
