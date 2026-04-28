@@ -89,7 +89,7 @@ const SLOW_ENDPOINTS = new Set([
 ]);
 
 function createAxiosInstance(baseURL: string, endpoint: string): AxiosInstance {
-  const timeoutMs = SLOW_ENDPOINTS.has(endpoint) ? 60_000 : 20_000;
+  const timeoutMs = SLOW_ENDPOINTS.has(endpoint) ? 30_000 : 20_000;
   return axios.create({
     baseURL,
     timeout: timeoutMs,

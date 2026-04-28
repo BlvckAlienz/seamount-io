@@ -133,13 +133,8 @@ class WDKClient:
         # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
         # ── WDK server pool — tried in order on failure ──
         self._wdk_pool = [
-            "https://seamount-wdk-ne5i.onrender.com",   # primary
-            "https://seamount-wdk.onrender.com",         # backup 1
-            "https://seamount-wdk1.onrender.com",        # backup 2
-            "https://seamount-wdk2.onrender.com",        # backup 3
-            "https://seamount-wdk3.onrender.com",        # backup 4
-            "https://seamount-wdk4.onrender.com",        # backup 5
-            "https://seamount-wdk5.onrender.com",        # backup 6
+            "https://seamount-wdk1.onrender.com",        # PRIMARY – active & warmed
+            "https://seamount-wdk4.onrender.com",        # BACKUP  – active & warmed
         ]
         self._wdk_health: dict = {}  # url -> {fail_count, dead_until}
         self.base_url = self._wdk_pool[0]
@@ -292,7 +287,7 @@ class WDKClient:
 
                     async with aiohttp.ClientSession() as session:
                         if method == 'GET':
-                            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
                                 if response.status in [502, 503, 504]:
                                     raise aiohttp.ClientResponseError(
                                         request_info=response.request_info,
