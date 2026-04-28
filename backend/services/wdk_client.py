@@ -133,7 +133,7 @@ class WDKClient:
         # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
         # ── WDK server pool — tried in order on failure ──
         self._wdk_pool = [
-            "https://seamount-wdk1.onrender.com",        # PRIMARY – active & warmed
+            "https://seamount-wdk3.onrender.com",        # PRIMARY – active & warmed
             "https://seamount-wdk4.onrender.com",        # BACKUP  – active & warmed
         ]
         self._wdk_health: dict = {}  # url -> {fail_count, dead_until}
@@ -1884,8 +1884,8 @@ class WDKClient:
         addresses: Dict[str, str]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Fetch balances for all chains CONCURRENTLY with a hard deadline.
-        Returns partial results if deadline exceeded – no more full timeout.
+        Fetch balances for all chains CONCURRENTLY with a 25s total deadline.
+        Returns partial results even if some chains time out – no more total API failure.
         """
         balances = {}
         if self.indexer_url:
@@ -1898,7 +1898,7 @@ class WDKClient:
                 )
                 return result.get('balances', {})
             except Exception:
-                pass
+                pass  # fall through to concurrent per-chain
 
         async def fetch_one(chain: str, address: str):
             try:
@@ -1923,11 +1923,9 @@ class WDKClient:
             timeout=25,
             return_when=asyncio.ALL_COMPLETED
         )
-
         for coro in done:
             chain, data = coro.result()
             balances[chain] = data
-
         for chain in addresses:
             if chain not in balances:
                 balances[chain] = {
@@ -1935,7 +1933,6 @@ class WDKClient:
                     'error': 'timeout (backend deadline)',
                     'success': False
                 }
-
         return balances
     
     # ========== UTILITY METHODS ==========

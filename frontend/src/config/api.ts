@@ -7,16 +7,9 @@ import { supabase } from '../lib/supabase';
 // ─── Active Server Pool — ordered by health ────────────────────────────────
 // ONLY servers that are confirmed deployed and active
 const API_POOL: string[] = [
-  'https://seamount-main.onrender.com',   // PRIMARY — confirmed warm
+  'https://seamount-main3.onrender.com',   // PRIMARY — confirmed warm
   'https://seamount-api2.onrender.com',   // BACKUP  — confirmed warm
 ];
-
-// Dead servers kept here for reference — NOT in the active pool
-// 'https://seamount-io-pr8a.onrender.com' — CORS issues, suspended
-// 'https://seamount-api.onrender.com'     — CORS issues, suspended
-// 'https://seamount-main2.onrender.com'   — unconfirmed
-// 'https://seamount-main3.onrender.com'   — unconfirmed
-// 'https://seamount-api3.onrender.com'    — unconfirmed
 
 // ─── Pool Health Tracker ───────────────────────────────────────────────────
 const poolHealth: Record<string, { failCount: number; deadUntil: number }> = {};
@@ -53,7 +46,7 @@ export function getActiveBase(): string {
 
 // ─── Warm-Up — ping both servers + both WDK servers ───────────────────────
 const WDK_POOL: string[] = [
-  'https://seamount-wdk1.onrender.com',
+  'https://seamount-wdk3.onrender.com',
   'https://seamount-wdk4.onrender.com',  // paired with seamount-api2
 ];
 
