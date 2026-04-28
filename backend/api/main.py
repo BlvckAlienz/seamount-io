@@ -344,11 +344,13 @@ except ImportError as e:
 try:
     from backend.api.routes.circle_bridge_routes import router as circle_bridge_router
     from backend.api.routes.circle_swap_routes   import router as circle_swap_router
-    app.include_router(circle_bridge_router, prefix="/api/v1", tags=["Circle Bridge"])
-    app.include_router(circle_swap_router,   prefix="/api/v1", tags=["Circle Swap"])
-    logger.info("✅ Circle App Kit routers registered at /api/v1/circle/bridge + /circle/swap")
+    routers_available['circle_bridge'] = circle_bridge_router
+    routers_available['circle_swap']   = circle_swap_router
+    logger.info("✅ Circle App Kit routers imported")
 except ImportError as e:
     logger.error(f"❌ Circle App Kit routes import error: {e}")
+    routers_available['circle_bridge'] = None
+    routers_available['circle_swap']   = None
 
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
@@ -811,6 +813,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Circle App Kit routers ──
+if routers_available.get('circle_bridge'):
+    app.include_router(routers_available['circle_bridge'], prefix="/api/v1", tags=["Circle Bridge"])
+    logger.info("✅ Circle bridge router registered")
+if routers_available.get('circle_swap'):
+    app.include_router(routers_available['circle_swap'], prefix="/api/v1", tags=["Circle Swap"])
+    logger.info("✅ Circle swap router registered")
+    
 # Seed Retrieval Routes - ADD HERE
 try:
     from backend.api.routes.seed_routes import router as seed_routes_router
