@@ -1005,12 +1005,15 @@ class WDKClient:
                     'error': 'Direct RPC failed for native asset',
                     'source': 'fallback'
                 }
-        
+
         # ═════════════════════════════════════════════════════════════════════
         # PATH 2: TOKEN ASSETS → Try Tether Indexer First
         # ═════════════════════════════════════════════════════════════════════
         token_identifier = tether_token_map.get(asset.upper() if asset else None)
         
+        # Disable broken Tether Indexer in production
+        use_indexer = False
+
         if use_indexer and self.indexer_url and token_identifier:
             try:
                 logger.info(f"📡 TIER 1: Querying Tether Indexer for {token_identifier} on {chain}...")
