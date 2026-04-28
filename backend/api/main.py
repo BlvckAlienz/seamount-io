@@ -1,7 +1,6 @@
 # File: backend/api/main.py
 # Self-Healing Import Path (Edge Computing Pattern)
 
-# 🔵 CRITICAL: Fix import path BEFORE any other imports
 import sys
 import os
 from pathlib import Path
