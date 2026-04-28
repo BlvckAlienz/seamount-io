@@ -1442,6 +1442,6 @@ app.listen(PORT, () => {
     console.log(`   - Token sends: ERC-20 (ETH/Polygon), TRC-20 (Tron), SPL (Solana)`);
     console.log(`📊 Health: http://localhost:${PORT}/health`);
     console.log('='.repeat(60));
-    console.log(`🌉 Circle App Kit: /appkit (bridge, swap, send)`);
-    console.log(`💱 WDK Protocols:  /wdk    (ParaSwap swap, Aave lend, MoonPay)`);
+    console.log(`🌉 Circle App Kit: /appkit/bridge | /appkit/swap | /appkit/send`);
+    console.log(`💱 WDK Protocols:  /wdk/swap    | /wdk/lend   | /wdk/fiat`);
 });
