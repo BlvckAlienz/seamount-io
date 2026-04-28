@@ -1879,15 +1879,17 @@ class WDKClient:
                 'chain': chain
             }
         
-    async def get_balances_multi_chain(
+        async def get_balances_multi_chain(
         self, 
         addresses: Dict[str, str]
     ) -> Dict[str, Dict[str, Any]]:
-        """Get balances across multiple chains efficiently"""
-        
+        """
+        Fetch balances for all chains CONCURRENTLY with a hard deadline.
+        Returns partial results if deadline exceeded – no more full timeout.
+        """
+
+        # Try batch indexer first (still sequential but fast if available)
         balances = {}
-        
-        # Try batch query via Indexer
         if self.indexer_url:
             try:
                 result = await self._make_request(
@@ -1897,24 +1899,50 @@ class WDKClient:
                     use_indexer=True
                 )
                 return result.get('balances', {})
-            except Exception as e:
-                logger.warning(f"⚠️ Batch indexer query failed: {e}")
-        
-        # Fallback: Query each chain individually
-        for chain, address in addresses.items():
+            except Exception:
+                pass  # fall through to concurrent per-chain
+
+        # Concurrent per‑chain queries with a 25 s total deadline
+        async def fetch_one(chain: str, address: str):
             try:
-                balance_data = await self.get_balance(address, chain, use_indexer=False)
-                balance = Decimal(str(balance_data.get('balance', '0')))
-                balances[chain] = {
-                    'balance': float(balance),
+                bal = await self.get_balance(address, chain, use_indexer=False)
+                return chain, {
+                    'balance': float(Decimal(str(bal.get('balance', '0')))),
                     'address': address,
                     'chain': chain,
-                    'success': balance_data.get('success', False)
+                    'success': bal.get('success', False)
                 }
             except Exception as e:
                 logger.error(f"❌ Balance query failed for {chain}: {e}")
-                balances[chain] = {'balance': 0.0, 'error': str(e), 'success': False}
+                return chain, {
+                    'balance': 0.0,
+                    'error': str(e),
+                    'success': False
+                }
+
+        tasks = [fetch_one(chain, addr) for chain, addr in addresses.items()]
         
+        # 25 s overall deadline – enough for 2 warm servers × 2 attempts each,
+        # but won't starve the frontend (which gives 30 s).
+        done, _ = await asyncio.wait(
+            tasks,
+            timeout=25,
+            return_when=asyncio.ALL_COMPLETED
+        )
+
+        for coro in done:
+            chain, data = coro.result()
+            balances[chain] = data
+
+        # Mark missing chains as timed out
+        for chain in addresses:
+            if chain not in balances:
+                balances[chain] = {
+                    'balance': 0.0,
+                    'error': 'timeout (backend deadline)',
+                    'success': False
+                }
+
         return balances
     
     # ========== UTILITY METHODS ==========
