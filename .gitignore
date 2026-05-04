@@ -46,4 +46,11 @@ Thumbs.db
 test-reports/
 coverage/
 .vercel
-*.pem
+backend/data/fraud_sources/
+backend/data/*.csv
+backend/data/*.pdf
+*.csv
+*.pdf
+*.pem          # 🚨 CRITICAL — your RSA private keys must NEVER be committed
+moonpay_private.pem
+private_key.pem
