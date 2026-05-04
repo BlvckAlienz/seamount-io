@@ -1,7 +1,7 @@
 # File: backend/services/fee_collection_scheduler.py
 """
 Production‑ready fee collection scheduler.
-Runs every 15 minutes (configurable) to collect pending fees from all supported chains.
+Runs every 45 minutes (configurable) to collect pending fees from all supported chains.
 """
 
 import asyncio
@@ -31,10 +31,10 @@ NATIVE_DECIMALS: Dict[str, int] = {
 class FeeCollectionScheduler:
     """
     Background task that collects pending fees from fees_owed.
-    Runs at a fixed interval (default 15 minutes).
+    Runs at a fixed interval (default 45 minutes).
     """
 
-    def __init__(self, interval_minutes: int = 15):
+    def __init__(self, interval_minutes: int = 45):
         self.interval = interval_minutes * 60
         self.running = False
         self.task: Optional[asyncio.Task] = None

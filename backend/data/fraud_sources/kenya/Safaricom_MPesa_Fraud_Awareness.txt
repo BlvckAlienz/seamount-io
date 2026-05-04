@@ -1,0 +1,162 @@
+ATM fraud
+ Published: June 14, 2021 at 5:16 AM | Last Updated: June 30, 2022 at 1:41 PM
+An unlawful act whereby one mischievously attempts to withdraw funds from another individual’s bank account via M-pesa. It is important to follow the ATM withdrawal instructions within the Safaricom app and only disclose the code used for withdrawal in the app.
+
+
+M-PESA USSD fraud
+ Published: June 14, 2021 at 5:17 AM | Last Updated: June 30, 2022 at 1:41 PM
+This is where fraudsters target M-PESA customers to follow instructions for send money via USSD to a fraudster number.
+
+USSD is a communication technology used to send a text between a mobile device and an application program in the network.Fraudsters have gained expertise in intercepting mobile banking data during transmission. This is easier for them as data is not encrypted when being transferred over the network
+
+As Safaricom, we have a network system with built-in encryption mechanisms, encoding all data that passes through the network.
+
+
+Fake/old M-PESA Message
+ Published: June 14, 2021 at 5:17 AM | Last Updated: December 3, 2025 at 9:46 AM
+This is among one of the frequent scamming methods experienced by Safaricom users. A common M-PESA message received would look authentic, however, the ‘new M-PESA balance’ would be read as *LOCKED*.Avoid calling back the number of the sender or attempting to reverse the erroneously sent money, even upon their request.
+
+Note that a genuine M-PESA message is sent from M-PESA and not a customer’s line.
+
+Do not refund the money, instead request the sender to forward the message to 456 or call Safaricom for assistance.
+
+Upon receiving a fake message, forward it to 333 to ensure the numbers are blocked and other customers may not be defrauded in future.
+
+
+Fake Reversal Instructions
+ Published: June 14, 2021 at 5:18 AM | Last Updated: December 3, 2025 at 9:45 AM
+Fraudsters direct customers to the nearest agent so that they can use the customer’s number to defraud the agent by pretending to be customer care.
+
+M-PESA Reversal is the process of sending back money to an individual who may have accidentally sent you money.Fraudsters, in this case, direct a customer to the nearest agent so that they can use the customer’s number to defraud the agent by pretending to be customer care
+
+Customer care will never call you and instruct you to visit the nearest agent for a reversal transaction.
+
+
+Fake Promotions
+ Published: June 14, 2021 at 5:19 AM | Last Updated: December 3, 2025 at 9:45 AM
+The message tends to take a similar structure to Safaricom’s or other institutions messaging as well as include genuine contacts to attempt to legitimize it. In some instances, customers will get multiple messages from the same number in the same day.
+
+A fake promotion is an erroneous advertising strategy created by fraudsters. They are often received through messages, emails, WhatsApp or social media platforms. Some of the counterfeit promotions announced include Safaricom’s Loyal Customer Prize, which Safaricom publicly disowned, and other data and airtime prizes. When a customer participates and receives no prize, this causes distrust between the user and the service provider.
+
+Be wary of messages from unknown senders saying that you have won a prize or been selected to participate in a competition.
+
+
+Fake Relief Payments
+ Published: June 14, 2021 at 5:20 AM | Last Updated: December 3, 2025 at 9:45 AM
+The message is usually unsolicited with content aimed to stir one’s emotion. The fraudster will claim that they can provide some sort of relief like fake CDF cash, fake covid relief, fake retirement payments and so on.
+
+Scammers fake messages to Safaricom customers claiming to award a relief payment.They come up with realistic circumstances such as fake Constituency Development Fund (CDF) cash, fake COVID-19 relief cash and fake retirement payments.It is expected for customers to fall for these tricks, especially those in need of funds.
+
+Never send money to unlock prizes, loans, jobs or relief
+
+
+Fake Loans
+ Published: June 14, 2021 at 5:20 AM | Last Updated: December 3, 2025 at 9:45 AM
+The message is usually unsolicited with claims that they can offer fake loans at low interests. To attempt to legitimize the message, fraudsters include genuine contacts and mention Safaricom products like M-Shwari.
+
+Swindlers send messages containing information on false loans available through platforms like M-Shwari and KCB M-PESA. The loans may be stated to have very low interest rates or no interest rates at all. This channel may be used to intercept you M-PESA account and result in loss of money.
+
+Whenever you receive a fake message, forward it to 333 to block users from defrauding other customers.
+
+
+Fake Recipient
+ Published: June 14, 2021 at 5:21 AM | Last Updated: December 3, 2025 at 9:45 AM
+The message will usually ask you to do something – like call back a certain number or urgently remind you to send money to a certain number. Often, the request will require you to respond immediately.
+
+As a Safaricom user, you may have received a message like ‘Tuma kwa hii number ile ingine ikona shida’. The only and most important thing to do is, do not send any money.
+
+
+Extortion Messages
+ Published: June 14, 2021 at 5:23 AM | Last Updated: December 3, 2025 at 9:43 AM
+These are fake messages from fraudsters that aim to defraud the customer with fake threats.
+
+
+Curiosity Text
+ Published: June 14, 2021 at 5:23 AM | Last Updated: December 3, 2025 at 9:43 AM
+The message is usually framed with click-bait like content pertaining one’s personal life. Fraudsters will often claim that they can offer up information if paid.
+
+
+False Emergencies
+ Published: June 14, 2021 at 5:24 AM | Last Updated: December 3, 2025 at 9:44 AM
+The message is usually framed with content that sells a fake emergency story. Often, the request will require you to respond immediately or urgently require you to send money to a certain number.
+
+
+Fake Job Opportunities
+ Published: June 14, 2021 at 5:24 AM | Last Updated: December 3, 2025 at 9:45 AM
+Fraudsters send texts or make calls with fake job opportunities that require you to pay a fee.
+
+
+Fake International Payments
+ Published: June 14, 2021 at 5:25 AM | Last Updated: December 3, 2025 at 9:44 AM
+A fraudster sends a fake IMT message, for example, a fake western union receipt acknowledging receipt of money for clearance of containers or goods worth a lot of money. A customer is called to establish rapport and they are later conned to send money.
+
+
+Tips for staying safe
+To confirm the phone numbers registered in your name dial *106#.
+To prevent your sim being swapped without you present dial *100*100#.
+If someone tries to register a new line using your ID you will receive an SMS from 707 asking you to confirm that you are registering a new line.
+Recognize Safaricom’s official contacts. Safaricom only calls from 0722000000.
+Safaricom staff will never ask you to share your MPESA PIN, SIM passcodes or password. Do not divulge your personal information to anyone.
+Notify Safaricom of imposters and suspicious branded links/websites/social media handles. Do not share any personal details with anyone on such platforms.
+Always protect your personal information such as ID number, date of birth, full names, address etc.
+Do not follow or key in instructions from unknown callers. Safaricom customer care will never call you and then send you to the nearest agent for a reversal.
+Do not divulge any other information such as your one-time passcodes to anyone. Examples include ATM withdrawal code, authentication code for Safaricom app or other service.
+A genuine M-PESA message is sent from M-PESA and not a customer’s line.
+Do not refund. Request the person calling to forward the message to 456 or to call Safaricom for assistance.
+When you receive the fake messages forward them to 333. This helps ensure the numbers are blocked and that other customers are not defrauded.
+Be wary of messages from unknown senders saying you have won, or they can give you cash or help.
+Never send money to unlock prizes, loans, jobs, relief etc.
+Be wary of messages from callers who threaten you. Report threats to the police.
+Never send money to unknown callers.
+Be wary of too good to be true offers or texts. They are from fraudsters and are not genuine. Do not engage the sender/fraudster.
+Customers should also send a text to 333 with the details of the line that texted them. This helps ensure the numbers are blocked and that other customers are not defrauded.
+
+
+Sim swap fraud
+ Published: June 7, 2021 at 8:47 AM | Last Updated: June 30, 2022 at 1:54 PM
+Fraudsters replace and take over the customer line.
+
+Identity theft can be categorized into various sections, one of them being Sim Swap Fraud.
+
+Fraudsters go to the extent of registering an existing number on a new SIM card in order to intercept notifications, one-time passwords, online banking profile and transactions as well as changing the account security settings.
+
+To avoid this disastrous activity, it is key to ensure your SIM card has an active SIM lock, use strong passwords and keep personal information off social media.
+
+
+Impersonating Safaricom staff
+ Published: June 7, 2021 at 8:48 AM | Last Updated: June 30, 2022 at 1:54 PM
+A fraudster pretends to be a Safaricom employee or customer care agent with the aim of defrauding the customer. Fraudsters often call the customer from a personal line. In a number of these calls, fraudsters already know the targeted customer by name and other personal identifiers collected from various sources or unconsciously provided by the customer while on the call.
+
+In this situation, one calls pretending to be working with Safaricom as one of their staff, requesting for personal details including your M-pesa pin.
+
+In other circumstances, they may hack your mobile device in the process of their mischievous conversation.
+
+To avoid this, kindly note that Safaricom staff will NEVER ask you to share your M-PESA PIN, SIM, passcodes or passwords
+
+
+Fake Safaricom Branded Links/websites
+ Published: June 7, 2021 at 8:50 AM | Last Updated: December 3, 2025 at 9:46 AM
+This is where fraudsters use fake links with the aim of mining personal information from customers. Often, the links mimic Safaricom products but they are always misspelt with one or two words missing.
+
+A fake branded link or website is one that poses as Safaricom’s authentic website, that may apply mechanisms to create bugs and malware on one’s device. Such links and websites destroy the reputation of our organization, due to the inconveniences caused.
+
+Always ensure to notify Safaricom of imposters and suspicious branded links/websites/social media handles.
+
+
+Fake Safaricom Branded Pages
+ Published: June 7, 2021 at 8:51 AM | Last Updated: December 3, 2025 at 9:46 AM
+An illegal practice of attempting to impersonate Safaricom, by setting up a fake branded page to communicate with our clients to collect personal information putting them at risk.
+
+This is where fraudsters use lifted Safaricom logos to create fake pages through pseudo accounts. The fraudsters have been found to mimic Safaricom’s social handles and ask customers to DM them after which they are conned to disclose information used to defraud them.
+
+Do not share any personal details with anyone on such platforms.
+
+
+Fake Social Media Handles
+ Published: June 7, 2021 at 8:52 AM | Last Updated: December 3, 2025 at 9:46 AM
+A fake social media account created to imitate the real account in order to lure and trick users in ways such as requesting for personal information, announce non-existent offers and promotions.
+
+This, however, goes a long way in destroying the prominence of the Safaricom brand.
+
+To avoid this, notify Safaricom of impersonating social media pages and do not communicate with anyone through the assumed platform.
+

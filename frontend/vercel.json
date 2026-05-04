@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://seamount-main.onrender.com/api/$1"
+      "destination": "https://seamount-main3.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

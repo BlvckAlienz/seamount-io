@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-main.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-main3.onrender.com';
 
 export interface TokenizeAssetRequest {
   custodian_id: string;

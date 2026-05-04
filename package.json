@@ -12,6 +12,7 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "@moonpay/moonpay-js": "^0.7.6",
     "@supabase/supabase-js": "^2.57.4",
     "@tetherto/wdk": "^1.0.0-beta.3",
     "@tetherto/wdk-wallet-btc": "^1.0.0-beta.3",

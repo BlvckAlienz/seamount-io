@@ -352,6 +352,14 @@ except ImportError as e:
     routers_available['circle_bridge'] = None
     routers_available['circle_swap']   = None
 
+try:
+    from backend.api.routes.moonpay import router as moonpay_router
+    routers_available['moonpay'] = moonpay_router
+    logger.info("✅ MoonPay router imported")
+except ImportError as e:
+    logger.error(f"❌ MoonPay router import error: {e}")
+    routers_available['moonpay'] = None
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}
@@ -969,7 +977,11 @@ if routers_available.get('xrp_yield'):
 if routers_available.get('wdk_protocols'):
     app.include_router(routers_available['wdk_protocols'], prefix="/api/v1", tags=["WDK Protocols"])
     logger.info("✅ WDK Protocols router registered at /api/v1/wdk")
-     
+
+if routers_available.get('moonpay'):
+    app.include_router(routers_available['moonpay'], prefix="/api/v1", tags=["MoonPay"])
+    logger.info("✅ MoonPay router registered at /api/v1/moonpay")
+        
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
