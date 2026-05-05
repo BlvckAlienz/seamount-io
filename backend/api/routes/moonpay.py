@@ -26,6 +26,21 @@ logger = logging.getLogger(__name__)
 
 def _moonpay_service() -> MoonPayService:
     s = get_settings()
+
+    missing = [
+        k for k, v in {
+            'MOONPAY_PUBLISHABLE_KEY': s.MOONPAY_PUBLISHABLE_KEY,
+            'MOONPAY_SECRET_KEY':      s.MOONPAY_SECRET_KEY,
+            'MOONPAY_WEBHOOK_KEY':     s.MOONPAY_WEBHOOK_KEY,
+        }.items() if not v
+    ]
+    if missing:
+        logger.error(f"❌ MoonPay env vars not set: {missing}")
+        raise HTTPException(
+            500,
+            f"MoonPay not configured. Missing env vars: {', '.join(missing)}"
+        )
+
     return MoonPayService(
         publishable_key=s.MOONPAY_PUBLISHABLE_KEY,
         secret_key=s.MOONPAY_SECRET_KEY.get_secret_value(),
