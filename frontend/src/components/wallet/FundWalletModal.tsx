@@ -219,26 +219,39 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       if (!moonPayInit) throw new Error('MoonPay SDK failed to load')
 
       const widget = moonPayInit({
-        flow:        'buy',
+        flow:        'buy',   // or 'sell'
         environment: 'production',
         variant:     'overlay',
         params:      res.params,
         handlers: {
           async onTransactionCompleted() {
-            toast.success('🎉 Purchase complete! Crypto arriving shortly.')
+            toast.success('🎉 Purchase complete!')
             onOpenChange(false)
           },
           onCloseOverlay() {
-            // user closed — no action needed
+            onOpenChange(false)
+          },
+          // ✅ This fires when MoonPay hits a fatal error
+          // Without it, the overlay freezes and can't be dismissed
+          onError(error: any) {
+            logger.error?.('MoonPay error:', error)
+            // Force-kill the frozen overlay after 300ms
+            setTimeout(() => {
+              const iframe = document.querySelector('iframe[src*="moonpay"]')
+              iframe?.parentElement?.remove()
+            }, 300)
+            setError('MoonPay encountered an error. Please try again.')
+            onOpenChange(false)
           },
         },
       })
-      widget?.show()
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'MoonPay failed to launch'
-      setError(msg); toast.error(msg)
-    } finally {
-      setLoading(false)
+
+      if (!widget) {
+        throw new Error('MoonPay widget failed to initialize')
+      }
+
+      widget.show()
+      setLoading(false) // ✅ Release button immediately so user can retry
     }
   }
 

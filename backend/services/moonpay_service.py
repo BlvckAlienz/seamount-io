@@ -1,7 +1,7 @@
 # File: backend/services/moonpay_service.py
 """
 MoonPay Service — URL Signing, Webhook Verification, Asset Mapping
-MATIC→POL migration handled transparently here.
+FIXED: Alphabetical param sort + quote() encoding for v3/verify_widget_signature
 """
 import hmac
 import hashlib
@@ -15,34 +15,25 @@ logger = logging.getLogger(__name__)
 
 # ── Seamount Internal Key → MoonPay Currency Code ─────────────────────────────
 SEAMOUNT_TO_MOONPAY: Dict[str, str] = {
-    # Algorand
-    'ALGO':         'algo',
-    # Bitcoin
-    'BTC':          'btc',
-    # Ethereum
-    'ETH':          'eth',
-    'USDT_ETH':     'usdt',
-    'USDC_ETH':     'usdc',
-    # Polygon — MATIC→POL migration: display stays 'MATIC', API uses 'pol_polygon'
-    'MATIC':         'pol_polygon',
+    'ALGO':          'algo',
+    'BTC':           'btc',
+    'ETH':           'eth',
+    'USDT_ETH':      'usdt',
+    'USDC_ETH':      'usdc',
+    'MATIC':         'pol_polygon',   # MATIC→POL migration
     'USDT_POLYGON':  'usdt_polygon',
     'USDC_POLYGON':  'usdc_polygon',
-    # Tron
     'TRX':           'trx',
     'USDT_TRON':     'usdt_trx',
-    # Solana
     'SOL':           'sol',
     'USDT_SOLANA':   'usdt_sol',
     'USDC_SOLANA':   'usdc_sol',
-    # XRP / RLUSD
     'XRP':           'xrp',
     'RLUSD':         'rlusd_xrp',
 }
 
-# MoonPay → Seamount (for webhook parsing)
 MOONPAY_TO_SEAMOUNT: Dict[str, str] = {v: k for k, v in SEAMOUNT_TO_MOONPAY.items()}
 
-# Offramp-supported assets (ALGO excluded — MoonPay doesn't support ALGO sell)
 OFFRAMP_ASSETS = frozenset({
     'BTC', 'ETH', 'USDT_ETH', 'USDC_ETH',
     'MATIC', 'USDT_POLYGON', 'USDC_POLYGON',
@@ -51,10 +42,8 @@ OFFRAMP_ASSETS = frozenset({
     'XRP', 'RLUSD',
 })
 
-# Onramp-supported assets (all above + ALGO)
 ONRAMP_ASSETS = frozenset(SEAMOUNT_TO_MOONPAY.keys())
 
-# Asset → blockchain (for wallet address lookup)
 ASSET_TO_BLOCKCHAIN: Dict[str, str] = {
     'ALGO':         'algorand',
     'BTC':          'bitcoin',
@@ -79,26 +68,46 @@ MOONPAY_SELL_URL = "https://sell.moonpay.com"
 
 class MoonPayService:
 
-    def __init__(self, publishable_key: str, secret_key: str, webhook_key: str,
-                 environment: str = "production"):
+    def __init__(
+        self,
+        publishable_key: str,
+        secret_key: str,
+        webhook_key: str,
+        environment: str = "production",
+    ):
         self.publishable_key = publishable_key
         self.secret_key      = secret_key
         self.webhook_key     = webhook_key
         self.environment     = environment
 
-    # ── URL Signing ────────────────────────────────────────────────────────────
+    # ── Core signing helpers ───────────────────────────────────────────────────
 
-    def _sign_query(self, query_string: str) -> str:
+    def _build_query(self, params: Dict[str, Any]) -> str:
         """
-        HMAC-SHA256 sign of '?<query_string>' using MoonPay secret key.
-        MoonPay requires the leading '?' in the signed content.
+        Build a URL query string that matches MoonPay's verification logic:
+          1. Drop None values and stringify everything else
+          2. Sort keys alphabetically  ← FIX: was insertion-order
+          3. Encode with quote()       ← FIX: was quote_plus (spaces→+)
+
+        MoonPay's /v3/verify_widget_signature does exactly the same on their
+        side before computing the expected signature.
         """
-        sig = hmac.new(
+        clean = {k: str(v) for k, v in params.items() if v is not None}
+        return urlencode(sorted(clean.items()), quote_via=quote)
+
+    def _sign(self, query_string: str) -> str:
+        """
+        HMAC-SHA256(?<query_string>, secret_key) → Base64.
+        The leading '?' is required by MoonPay's spec.
+        """
+        mac = hmac.new(
             self.secret_key.encode('utf-8'),
             f"?{query_string}".encode('utf-8'),
-            hashlib.sha256
-        ).digest()
-        return base64.b64encode(sig).decode('utf-8')
+            hashlib.sha256,
+        )
+        return base64.b64encode(mac.digest()).decode('utf-8')
+
+    # ── Onramp ────────────────────────────────────────────────────────────────
 
     def generate_onramp_url(
         self,
@@ -108,45 +117,67 @@ class MoonPayService:
         base_currency_code: Optional[str] = None,
         base_currency_amount: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """
-        Generate signed MoonPay buy URL.
-        MATIC transparently maps to pol_polygon.
-        """
+        """Generate signed MoonPay buy URL + params for Web SDK overlay."""
         if asset not in ONRAMP_ASSETS:
             raise ValueError(f"'{asset}' not supported for MoonPay onramp")
 
         moonpay_code = SEAMOUNT_TO_MOONPAY[asset]
 
+        # Build params — all keys that MoonPay will see
         params: Dict[str, Any] = {
             'apiKey':        self.publishable_key,
+            'colorCode':     '%230061FF',   # pre-encoded # to avoid double-encode
             'currencyCode':  moonpay_code,
-            'walletAddress': wallet_address,
-            'colorCode':     '#0061FF',
             'theme':         'dark',
-            'redirectURL':   'https://seamount.io/wallet',
+            'walletAddress': wallet_address,
         }
-        if email:
-            params['email'] = email
-        if base_currency_code:
-            params['baseCurrencyCode'] = base_currency_code.lower()
+        # Optional params — only add if provided (absent keys never affect sig)
         if base_currency_amount and base_currency_amount > 0:
             params['baseCurrencyAmount'] = str(base_currency_amount)
+        if base_currency_code:
+            params['baseCurrencyCode'] = base_currency_code.lower()
+        if email:
+            params['email'] = email
 
-        query_string = urlencode(params)
-        signature    = self._sign_query(query_string)
-        signed_url   = f"{MOONPAY_BUY_URL}?{query_string}&signature={quote(signature)}"
+        # Sign
+        query_string = self._build_query(params)
+        signature    = self._sign(query_string)
+
+        # Full redirect URL (not used by SDK overlay, but useful for fallback)
+        signed_url = (
+            f"{MOONPAY_BUY_URL}?{query_string}"
+            f"&signature={quote(signature, safe='')}"
+        )
 
         logger.info(
-            f"✅ MoonPay onramp URL generated | "
-            f"asset={asset} moonpay_code={moonpay_code} "
-            f"wallet={wallet_address[:10]}..."
+            f"✅ MoonPay onramp signed | asset={asset} code={moonpay_code} "
+            f"wallet={wallet_address[:10]}... qs_len={len(query_string)}"
         )
-        return {
-            'url':           signed_url,
-            'moonpay_code':  moonpay_code,
-            'asset':         asset,
-            'params':        {**params, 'signature': signature},
+
+        # Return raw (un-URL-encoded) params for the JS SDK + signature
+        raw_params = {
+            'apiKey':        self.publishable_key,
+            'colorCode':     '#0061FF',
+            'currencyCode':  moonpay_code,
+            'theme':         'dark',
+            'walletAddress': wallet_address,
         }
+        if base_currency_amount and base_currency_amount > 0:
+            raw_params['baseCurrencyAmount'] = str(base_currency_amount)
+        if base_currency_code:
+            raw_params['baseCurrencyCode'] = base_currency_code.lower()
+        if email:
+            raw_params['email'] = email
+        raw_params['signature'] = signature
+
+        return {
+            'url':          signed_url,
+            'moonpay_code': moonpay_code,
+            'asset':        asset,
+            'params':       raw_params,
+        }
+
+    # ── Offramp ───────────────────────────────────────────────────────────────
 
     def generate_offramp_url(
         self,
@@ -156,15 +187,11 @@ class MoonPayService:
         quote_currency_code: Optional[str] = None,
         base_currency_amount: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """
-        Generate signed MoonPay sell URL.
-        baseCurrencyCode = the crypto being sold.
-        quoteCurrencyCode = the fiat to receive.
-        """
+        """Generate signed MoonPay sell URL + params for Web SDK overlay."""
         if asset not in OFFRAMP_ASSETS:
             raise ValueError(
                 f"'{asset}' not supported for MoonPay offramp. "
-                f"Note: ALGO cannot be sold via MoonPay."
+                f"ALGO cannot be sold via MoonPay."
             )
 
         moonpay_code = SEAMOUNT_TO_MOONPAY[asset]
@@ -172,33 +199,52 @@ class MoonPayService:
         params: Dict[str, Any] = {
             'apiKey':              self.publishable_key,
             'baseCurrencyCode':    moonpay_code,
-            'walletAddress':       wallet_address,
-            'refundWalletAddress': wallet_address,  # refund if sell fails
-            'colorCode':           '#0061FF',
+            'colorCode':           '%230061FF',
+            'refundWalletAddress': wallet_address,
             'theme':               'dark',
-            'redirectURL':         'https://seamount.io/wallet',
+            'walletAddress':       wallet_address,
         }
+        if base_currency_amount and base_currency_amount > 0:
+            params['baseCurrencyAmount'] = str(base_currency_amount)
         if email:
             params['email'] = email
         if quote_currency_code:
             params['quoteCurrencyCode'] = quote_currency_code.lower()
-        if base_currency_amount and base_currency_amount > 0:
-            params['baseCurrencyAmount'] = str(base_currency_amount)
 
-        query_string = urlencode(params)
-        signature    = self._sign_query(query_string)
-        signed_url   = f"{MOONPAY_SELL_URL}?{query_string}&signature={quote(signature)}"
+        query_string = self._build_query(params)
+        signature    = self._sign(query_string)
+
+        signed_url = (
+            f"{MOONPAY_SELL_URL}?{query_string}"
+            f"&signature={quote(signature, safe='')}"
+        )
 
         logger.info(
-            f"✅ MoonPay offramp URL generated | "
-            f"asset={asset} moonpay_code={moonpay_code} "
-            f"wallet={wallet_address[:10]}..."
+            f"✅ MoonPay offramp signed | asset={asset} code={moonpay_code} "
+            f"wallet={wallet_address[:10]}... qs_len={len(query_string)}"
         )
+
+        raw_params = {
+            'apiKey':              self.publishable_key,
+            'baseCurrencyCode':    moonpay_code,
+            'colorCode':           '#0061FF',
+            'refundWalletAddress': wallet_address,
+            'theme':               'dark',
+            'walletAddress':       wallet_address,
+        }
+        if base_currency_amount and base_currency_amount > 0:
+            raw_params['baseCurrencyAmount'] = str(base_currency_amount)
+        if email:
+            raw_params['email'] = email
+        if quote_currency_code:
+            raw_params['quoteCurrencyCode'] = quote_currency_code.lower()
+        raw_params['signature'] = signature
+
         return {
             'url':          signed_url,
             'moonpay_code': moonpay_code,
             'asset':        asset,
-            'params':       {**params, 'signature': signature},
+            'params':       raw_params,
         }
 
     # ── Webhook Verification ───────────────────────────────────────────────────
@@ -210,11 +256,10 @@ class MoonPayService:
         Rejects replays older than 5 minutes.
         """
         try:
-            parts = dict(p.split('=', 1) for p in signature_header.split(','))
-            ts_ms = parts.get('t', '0')
-            sig   = parts.get('s', '')
+            parts  = dict(p.split('=', 1) for p in signature_header.split(','))
+            ts_ms  = parts.get('t', '0')
+            sig    = parts.get('s', '')
 
-            # Replay guard
             age_seconds = abs(time.time() - int(ts_ms) / 1000)
             if age_seconds > 300:
                 logger.warning(f"⚠️ MoonPay webhook too old: {age_seconds:.0f}s")
@@ -224,7 +269,7 @@ class MoonPayService:
             expected = hmac.new(
                 self.webhook_key.encode('utf-8'),
                 signed_payload.encode('utf-8'),
-                hashlib.sha256
+                hashlib.sha256,
             ).hexdigest()
 
             valid = hmac.compare_digest(expected, sig)
