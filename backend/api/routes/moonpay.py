@@ -17,6 +17,7 @@ from backend.dependencies import get_current_user, get_db_service
 from backend.services.moonpay_service import (
     MoonPayService, ASSET_TO_BLOCKCHAIN, OFFRAMP_ASSETS, ONRAMP_ASSETS
 )
+from backend.services.moonpay_service import MoonPayService
 
 router = APIRouter(prefix="/moonpay", tags=["MoonPay"])
 logger = logging.getLogger(__name__)
@@ -48,6 +49,108 @@ def _moonpay_service() -> MoonPayService:
         environment=s.MOONPAY_ENVIRONMENT,
     )
 
+# ── Debug endpoint — REMOVE BEFORE GO-LIVE ────────────────────────────────────
+
+@router.get("/debug/signature-test")
+async def debug_signature_test(
+    db=Depends(get_db_service),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    🔍 SIGNATURE DEBUG ENDPOINT
+    Generates a test signature and returns full trace.
+    Logs everything to Render. Remove before production go-live.
+    GET /api/v1/moonpay/debug/signature-test
+    """
+    import os
+    from backend.config import get_settings
+
+    s = get_settings()
+
+    # ── Key health check ──────────────────────────────────────────
+    pub_key    = s.MOONPAY_PUBLISHABLE_KEY or ""
+    secret_key = s.MOONPAY_SECRET_KEY
+    webhook_key= s.MOONPAY_WEBHOOK_KEY
+
+    # Handle SecretStr
+    sk_value = secret_key.get_secret_value() if hasattr(secret_key, 'get_secret_value') else (secret_key or "")
+    wk_value = webhook_key.get_secret_value() if hasattr(webhook_key, 'get_secret_value') else (webhook_key or "")
+
+    key_health = {
+        "publishable_key_present": bool(pub_key),
+        "publishable_key_preview": pub_key[:12] + "..." if pub_key else "MISSING",
+        "publishable_key_length":  len(pub_key),
+        "secret_key_present":      bool(sk_value),
+        "secret_key_length":       len(sk_value),
+        "webhook_key_present":     bool(wk_value),
+        "webhook_key_length":      len(wk_value),
+        "environment":             getattr(s, 'MOONPAY_ENVIRONMENT', 'unknown'),
+    }
+
+    logger.info(f"🔍 DEBUG /debug/signature-test | key_health={key_health}")
+
+    if not pub_key or not sk_value:
+        logger.error("❌ DEBUG: Keys missing — cannot generate test signature")
+        return {
+            "status":     "error",
+            "key_health": key_health,
+            "error":      "Keys missing. Check Render environment variables.",
+        }
+
+    # ── Generate test signature ───────────────────────────────────
+    try:
+        svc = MoonPayService(
+            publishable_key=pub_key,
+            secret_key=sk_value,
+            webhook_key=wk_value,
+            environment=getattr(s, 'MOONPAY_ENVIRONMENT', 'production'),
+        )
+
+        # Use a fixed test wallet to isolate signature logic
+        test_wallet = "UBNIXQOQQPMCRRUMISBYYHPOZ7B4N6G7ZBDAQHRGKWJNBN6QSPQ7XGGOGE"
+        result = svc.generate_onramp_url(
+            asset="USDT_TRON",
+            wallet_address=test_wallet,
+        )
+
+        # Reproduce the exact string that was signed
+        from urllib.parse import urlencode, quote as url_quote
+        signed_params = {
+            'apiKey':        pub_key,
+            'currencyCode':  'usdt_trx',
+            'walletAddress': test_wallet,
+        }
+        clean = {k: str(v) for k, v in sorted(signed_params.items())}
+        qs = urlencode(clean, quote_via=url_quote)
+        signed_string = f"?{qs}"
+
+        logger.info(f"🔍 DEBUG test signed_string : {signed_string}")
+        logger.info(f"🔍 DEBUG test signature     : {result['params']['signature']}")
+        logger.info(f"🔍 DEBUG test sdk_params    : {result['params']}")
+
+        return {
+            "status":           "ok",
+            "key_health":       key_health,
+            "test_asset":       "USDT_TRON",
+            "signed_params_keys": sorted(signed_params.keys()),
+            "query_string":     qs,
+            "signed_string":    signed_string,
+            "signature_preview":result['params']['signature'][:20] + "...",
+            "sdk_params_keys":  sorted(result['params'].keys()),
+            "instruction": (
+                "Copy the full signed_string to "
+                "https://www.freeformatter.com/hmac-generator.html "
+                "with your secret key to verify the HMAC matches."
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"❌ DEBUG signature test failed: {e}", exc_info=True)
+        return {
+            "status":     "error",
+            "key_health": key_health,
+            "error":      str(e),
+        }
 
 async def _resolve_wallet_address(db, user_id: str, asset: str) -> str:
     """

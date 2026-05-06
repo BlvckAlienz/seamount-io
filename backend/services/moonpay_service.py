@@ -1,7 +1,7 @@
 # File: backend/services/moonpay_service.py
 """
 MoonPay Service — URL Signing, Webhook Verification, Asset Mapping
-FIXED: Alphabetical param sort + quote() encoding for v3/verify_widget_signature
+DEBUG VERSION: Full signature trace in logs
 """
 import hmac
 import hashlib
@@ -13,14 +13,13 @@ from urllib.parse import urlencode, quote
 
 logger = logging.getLogger(__name__)
 
-# ── Seamount Internal Key → MoonPay Currency Code ─────────────────────────────
 SEAMOUNT_TO_MOONPAY: Dict[str, str] = {
     'ALGO':          'algo',
     'BTC':           'btc',
     'ETH':           'eth',
     'USDT_ETH':      'usdt',
     'USDC_ETH':      'usdc',
-    'MATIC':         'pol_polygon',   # MATIC→POL migration
+    'MATIC':         'pol_polygon',
     'USDT_POLYGON':  'usdt_polygon',
     'USDC_POLYGON':  'usdc_polygon',
     'TRX':           'trx',
@@ -80,32 +79,46 @@ class MoonPayService:
         self.webhook_key     = webhook_key
         self.environment     = environment
 
-    # ── Core signing helpers ───────────────────────────────────────────────────
+        # ✅ Log key health at init — shows up in Render on every cold start
+        pk_preview = publishable_key[:8] if publishable_key else "MISSING"
+        sk_len     = len(secret_key) if secret_key else 0
+        wk_len     = len(webhook_key) if webhook_key else 0
+        logger.info(
+            f"🔑 MoonPayService init | "
+            f"publishable_key={pk_preview}... | "
+            f"secret_key_len={sk_len} | "
+            f"webhook_key_len={wk_len} | "
+            f"env={environment}"
+        )
+        if sk_len == 0:
+            logger.error("❌ MOONPAY_SECRET_KEY is empty — ALL signatures will fail")
+        if wk_len == 0:
+            logger.error("❌ MOONPAY_WEBHOOK_KEY is empty — webhook verification disabled")
+
+    # ── Core helpers ───────────────────────────────────────────────────────────
 
     def _build_query(self, params: Dict[str, Any]) -> str:
         """
-        Build a URL query string that matches MoonPay's verification logic:
-          1. Drop None values and stringify everything else
-          2. Sort keys alphabetically  ← FIX: was insertion-order
-          3. Encode with quote()       ← FIX: was quote_plus (spaces→+)
-
-        MoonPay's /v3/verify_widget_signature does exactly the same on their
-        side before computing the expected signature.
+        Alphabetically sorted, quote()-encoded query string.
+        MoonPay's verify_widget_signature does the same sort before checking HMAC.
         """
-        clean = {k: str(v) for k, v in params.items() if v is not None}
-        return urlencode(sorted(clean.items()), quote_via=quote)
+        clean = {k: str(v) for k, v in sorted(params.items()) if v is not None}
+        qs = urlencode(clean, quote_via=quote)
+        logger.debug(f"📋 _build_query sorted keys: {list(clean.keys())}")
+        logger.debug(f"📋 _build_query result: {qs[:200]}")
+        return qs
 
     def _sign(self, query_string: str) -> str:
-        """
-        HMAC-SHA256(?<query_string>, secret_key) → Base64.
-        The leading '?' is required by MoonPay's spec.
-        """
+        """HMAC-SHA256(?<qs>, secret_key) → Base64."""
+        to_sign = f"?{query_string}"
         mac = hmac.new(
             self.secret_key.encode('utf-8'),
-            f"?{query_string}".encode('utf-8'),
+            to_sign.encode('utf-8'),
             hashlib.sha256,
         )
-        return base64.b64encode(mac.digest()).decode('utf-8')
+        sig = base64.b64encode(mac.digest()).decode('utf-8')
+        logger.debug(f"✍️  _sign | to_sign_len={len(to_sign)} | sig_preview={sig[:16]}...")
+        return sig
 
     # ── Onramp ────────────────────────────────────────────────────────────────
 
@@ -117,64 +130,62 @@ class MoonPayService:
         base_currency_code: Optional[str] = None,
         base_currency_amount: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generate signed MoonPay buy URL + params for Web SDK overlay."""
         if asset not in ONRAMP_ASSETS:
             raise ValueError(f"'{asset}' not supported for MoonPay onramp")
 
         moonpay_code = SEAMOUNT_TO_MOONPAY[asset]
 
-        # Build params — all keys that MoonPay will see
-        params: Dict[str, Any] = {
+        # ── Build the params that get signed ──────────────────────────────────
+        # CRITICAL: These must exactly match what the JS SDK sends to MoonPay.
+        # Do NOT include colorCode or theme — they are cosmetic and NOT signed.
+        signed_params: Dict[str, Any] = {
             'apiKey':        self.publishable_key,
-            'colorCode':     '%230061FF',   # pre-encoded # to avoid double-encode
             'currencyCode':  moonpay_code,
-            'theme':         'dark',
             'walletAddress': wallet_address,
         }
-        # Optional params — only add if provided (absent keys never affect sig)
         if base_currency_amount and base_currency_amount > 0:
-            params['baseCurrencyAmount'] = str(base_currency_amount)
+            signed_params['baseCurrencyAmount'] = str(base_currency_amount)
         if base_currency_code:
-            params['baseCurrencyCode'] = base_currency_code.lower()
+            signed_params['baseCurrencyCode'] = base_currency_code.lower()
         if email:
-            params['email'] = email
+            signed_params['email'] = email
 
-        # Sign
-        query_string = self._build_query(params)
+        query_string = self._build_query(signed_params)
         signature    = self._sign(query_string)
 
-        # Full redirect URL (not used by SDK overlay, but useful for fallback)
+        # ── Full URL (for redirect fallback) ──────────────────────────────────
         signed_url = (
             f"{MOONPAY_BUY_URL}?{query_string}"
             f"&signature={quote(signature, safe='')}"
         )
 
-        logger.info(
-            f"✅ MoonPay onramp signed | asset={asset} code={moonpay_code} "
-            f"wallet={wallet_address[:10]}... qs_len={len(query_string)}"
-        )
-
-        # Return raw (un-URL-encoded) params for the JS SDK + signature
-        raw_params = {
-            'apiKey':        self.publishable_key,
-            'colorCode':     '#0061FF',
-            'currencyCode':  moonpay_code,
-            'theme':         'dark',
-            'walletAddress': wallet_address,
+        # ── Params returned to JS SDK ─────────────────────────────────────────
+        # Add cosmetic params AFTER signing — they are NOT part of the HMAC
+        sdk_params = {
+            **signed_params,
+            'colorCode': '#0061FF',
+            'theme':     'dark',
+            'signature': signature,
         }
-        if base_currency_amount and base_currency_amount > 0:
-            raw_params['baseCurrencyAmount'] = str(base_currency_amount)
-        if base_currency_code:
-            raw_params['baseCurrencyCode'] = base_currency_code.lower()
-        if email:
-            raw_params['email'] = email
-        raw_params['signature'] = signature
+
+        # ── FULL TRACE LOG (visible in Render logs) ───────────────────────────
+        logger.info("=" * 60)
+        logger.info(f"🌙 MoonPay ONRAMP signature trace")
+        logger.info(f"   asset          : {asset}")
+        logger.info(f"   moonpay_code   : {moonpay_code}")
+        logger.info(f"   wallet         : {wallet_address[:12]}...")
+        logger.info(f"   signed_params  : {sorted(signed_params.keys())}")
+        logger.info(f"   query_string   : {query_string}")
+        logger.info(f"   signed_string  : ?{query_string[:80]}...")
+        logger.info(f"   signature      : {signature[:20]}...")
+        logger.info(f"   sdk_param_keys : {sorted(sdk_params.keys())}")
+        logger.info("=" * 60)
 
         return {
             'url':          signed_url,
             'moonpay_code': moonpay_code,
             'asset':        asset,
-            'params':       raw_params,
+            'params':       sdk_params,
         }
 
     # ── Offramp ───────────────────────────────────────────────────────────────
@@ -187,7 +198,6 @@ class MoonPayService:
         quote_currency_code: Optional[str] = None,
         base_currency_amount: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Generate signed MoonPay sell URL + params for Web SDK overlay."""
         if asset not in OFFRAMP_ASSETS:
             raise ValueError(
                 f"'{asset}' not supported for MoonPay offramp. "
@@ -196,22 +206,20 @@ class MoonPayService:
 
         moonpay_code = SEAMOUNT_TO_MOONPAY[asset]
 
-        params: Dict[str, Any] = {
+        signed_params: Dict[str, Any] = {
             'apiKey':              self.publishable_key,
             'baseCurrencyCode':    moonpay_code,
-            'colorCode':           '%230061FF',
             'refundWalletAddress': wallet_address,
-            'theme':               'dark',
             'walletAddress':       wallet_address,
         }
         if base_currency_amount and base_currency_amount > 0:
-            params['baseCurrencyAmount'] = str(base_currency_amount)
+            signed_params['baseCurrencyAmount'] = str(base_currency_amount)
         if email:
-            params['email'] = email
+            signed_params['email'] = email
         if quote_currency_code:
-            params['quoteCurrencyCode'] = quote_currency_code.lower()
+            signed_params['quoteCurrencyCode'] = quote_currency_code.lower()
 
-        query_string = self._build_query(params)
+        query_string = self._build_query(signed_params)
         signature    = self._sign(query_string)
 
         signed_url = (
@@ -219,42 +227,35 @@ class MoonPayService:
             f"&signature={quote(signature, safe='')}"
         )
 
-        logger.info(
-            f"✅ MoonPay offramp signed | asset={asset} code={moonpay_code} "
-            f"wallet={wallet_address[:10]}... qs_len={len(query_string)}"
-        )
-
-        raw_params = {
-            'apiKey':              self.publishable_key,
-            'baseCurrencyCode':    moonpay_code,
-            'colorCode':           '#0061FF',
-            'refundWalletAddress': wallet_address,
-            'theme':               'dark',
-            'walletAddress':       wallet_address,
+        sdk_params = {
+            **signed_params,
+            'colorCode': '#0061FF',
+            'theme':     'dark',
+            'signature': signature,
         }
-        if base_currency_amount and base_currency_amount > 0:
-            raw_params['baseCurrencyAmount'] = str(base_currency_amount)
-        if email:
-            raw_params['email'] = email
-        if quote_currency_code:
-            raw_params['quoteCurrencyCode'] = quote_currency_code.lower()
-        raw_params['signature'] = signature
+
+        logger.info("=" * 60)
+        logger.info(f"🌙 MoonPay OFFRAMP signature trace")
+        logger.info(f"   asset          : {asset}")
+        logger.info(f"   moonpay_code   : {moonpay_code}")
+        logger.info(f"   wallet         : {wallet_address[:12]}...")
+        logger.info(f"   signed_params  : {sorted(signed_params.keys())}")
+        logger.info(f"   query_string   : {query_string}")
+        logger.info(f"   signed_string  : ?{query_string[:80]}...")
+        logger.info(f"   signature      : {signature[:20]}...")
+        logger.info(f"   sdk_param_keys : {sorted(sdk_params.keys())}")
+        logger.info("=" * 60)
 
         return {
             'url':          signed_url,
             'moonpay_code': moonpay_code,
             'asset':        asset,
-            'params':       raw_params,
+            'params':       sdk_params,
         }
 
     # ── Webhook Verification ───────────────────────────────────────────────────
 
     def verify_webhook(self, raw_body: bytes, signature_header: str) -> bool:
-        """
-        Verify MoonPay webhook signature.
-        Header format: 't=<unix_ms>,s=<hmac_hex>'
-        Rejects replays older than 5 minutes.
-        """
         try:
             parts  = dict(p.split('=', 1) for p in signature_header.split(','))
             ts_ms  = parts.get('t', '0')
