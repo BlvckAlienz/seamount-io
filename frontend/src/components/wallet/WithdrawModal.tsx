@@ -294,9 +294,15 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
       const signRes = await api.post('/api/v1/moonpay/sign', { query_string: queryString })
       if (!signRes?.success) throw new Error('Signature generation failed')
 
-      // 4. Apply signature and show
+      // 4. Apply signature, then close modal and show widget
       widget.updateSignature(signRes.signature)
-      widget.show()
+
+      // Close the Seamount modal before showing MoonPay overlay ── prevents frozen widget
+      onOpenChange(false)
+      setTimeout(() => {
+        widget.show()
+      }, 100)
+
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'
       setError(msg)

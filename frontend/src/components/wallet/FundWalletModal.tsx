@@ -253,9 +253,14 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       const signRes = await api.post('/api/v1/moonpay/sign', { query_string: queryString })
       if (!signRes?.success) throw new Error('Signature generation failed')
 
-      // 5. Apply the signature and show widget
+      // 5. Apply signature, then close modal and show widget
       widget.updateSignature(signRes.signature)
-      widget.show()
+
+      // Close the Seamount modal before showing MoonPay overlay ── prevents frozen widget
+      onOpenChange(false)
+      setTimeout(() => {
+        widget.show()
+      }, 100)
 
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'
