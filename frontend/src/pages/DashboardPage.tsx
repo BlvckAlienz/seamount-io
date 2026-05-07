@@ -288,7 +288,7 @@ const DashboardPage = () => {
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
             >
               <ArrowDownToLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Fund</span>
+              <span className="hidden sm:inline">Buy</span>
             </button>
             
             <button 
@@ -328,7 +328,7 @@ const DashboardPage = () => {
               className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-3 md:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors"
             >
               <ArrowDownToLine className="h-4 w-4" />
-              <span className="hidden sm:inline">Withdraw</span>
+              <span className="hidden sm:inline">Sell</span>
             </button>
 
             <button 

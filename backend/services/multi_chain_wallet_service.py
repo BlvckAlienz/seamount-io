@@ -10,6 +10,7 @@ Added comprehensive logging
 """
 
 from itertools import chain
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
@@ -691,7 +692,35 @@ class MultiChainWalletService:
 
             except Exception as db_err:
                 logger.error(f"❌ Database logging failed (transaction still succeeded on chain): {db_err}")
-                
+
+            # ================================================================
+            # AML SCORING — non-blocking, fire-and-forget
+            # Runs AFTER the transaction is confirmed on-chain and recorded
+            # in DB. Uses asyncio.create_task so it NEVER delays the payment
+            # response to the user. Any exception is swallowed inside the
+            # scoring service — it will never interrupt a payment.
+            # ================================================================
+            try:
+                from backend.services.aml_scoring_service import score_transaction as _aml_score
+
+                _aml_payload = {
+                    'tx_id':       result['tx_id'],
+                    'user_id':     user_id,
+                    'amount':      float(amount),
+                    'asset':       asset,
+                    'chain':       optimal_chain,
+                    'recipient':   recipient,
+                    'memo':        memo or '',
+                    'created_at':  datetime.utcnow().isoformat(),
+                }
+                asyncio.create_task(_aml_score(_aml_payload, self.db))
+                logger.info(f"🔍 AML scoring queued for {result['tx_id']}")
+
+            except Exception as _aml_err:
+                # Import error or task creation failure — log and continue.
+                # The payment has already succeeded; this must never block it.
+                logger.warning(f"⚠️ AML hook failed to attach (non-fatal): {_aml_err}")
+                   
             # ============================================================================
             # STEP 7: RETURN SUCCESS RESPONSE
             # ============================================================================

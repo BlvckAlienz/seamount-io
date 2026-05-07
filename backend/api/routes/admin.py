@@ -1344,3 +1344,188 @@ async def admin_list_orders(
     except Exception as e:
         logger.error(f"[Admin] List orders error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# AML INTELLIGENCE ENDPOINTS
+# ============================================================
+
+class AMLAlertReview(BaseModel):
+    action: str             # 'confirmed_fraud' | 'dismissed' | 'escalated'
+    note:   Optional[str] = None
+
+
+@router.get("/aml/alerts")
+async def get_aml_alerts(
+    hours:  int            = Query(24, ge=1, le=168),
+    status: Optional[str]  = Query(None),
+    band:   Optional[str]  = Query(None),
+    limit:  int            = Query(50, ge=1, le=200),
+    admin:  dict           = Depends(require_admin),
+    db:     DatabaseService = Depends(get_db_service),
+):
+    """
+    🛡️  AML Alert Feed — RED + AMBER alerts from aml_risk_scores.
+    Filters: hours, status ('open'|'confirmed_fraud'|'dismissed'), band ('RED'|'AMBER').
+    Each row is enriched with user email from user_profiles.
+    """
+    try:
+        time_filter = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+
+        query = (
+            db.supabase.table('aml_risk_scores')
+            .select('*')
+            .gte('created_at', time_filter)
+            .neq('band', 'GREEN')
+            .order('created_at', desc=True)
+            .limit(limit)
+        )
+        if status:
+            query = query.eq('status', status)
+        if band:
+            query = query.eq('band', band)
+
+        res  = query.execute()
+        rows = res.data or []
+
+        # Enrich with user profile (one query per alert — acceptable for ≤50 alerts)
+        enriched = []
+        for row in rows:
+            uid = row.get('user_id')
+            user_data = {}
+            if uid:
+                try:
+                    ur = db.supabase.table('user_profiles')\
+                        .select('email, first_name, last_name')\
+                        .eq('user_id', uid)\
+                        .maybe_single().execute()
+                    user_data = ur.data or {}
+                except Exception:
+                    pass
+            row['user_email'] = user_data.get('email', 'unknown')
+            row['user_name']  = (
+                f"{user_data.get('first_name','')} {user_data.get('last_name','')}".strip()
+            )
+            enriched.append(row)
+
+        summary = {
+            'total':           len(enriched),
+            'red_open':        sum(1 for r in enriched
+                                   if r.get('band') == 'RED' and r.get('status') == 'open'),
+            'amber_open':      sum(1 for r in enriched
+                                   if r.get('band') == 'AMBER' and r.get('status') == 'open'),
+            'confirmed_fraud': sum(1 for r in enriched
+                                   if r.get('status') == 'confirmed_fraud'),
+            'dismissed':       sum(1 for r in enriched
+                                   if r.get('status') == 'dismissed'),
+        }
+
+        return {
+            'success':    True,
+            'summary':    summary,
+            'alerts':     enriched,
+            'time_range': hours,
+            'timestamp':  datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"[Admin] AML alerts failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/aml/alerts/{alert_id}")
+async def review_aml_alert(
+    alert_id: str,
+    payload:  AMLAlertReview,
+    admin:    dict           = Depends(require_admin),
+    db:       DatabaseService = Depends(get_db_service),
+):
+    """
+    ✅  Review an AML alert.
+    action: 'confirmed_fraud' | 'dismissed' | 'escalated'
+    Writes a full audit trail entry to aml_audit_log.
+    """
+    valid_actions = {'confirmed_fraud', 'dismissed', 'escalated'}
+    if payload.action not in valid_actions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"action must be one of: {valid_actions}",
+        )
+
+    try:
+        existing = (
+            db.supabase.table('aml_risk_scores')
+            .select('id, tx_id, status, band, combined_score')
+            .eq('id', alert_id)
+            .maybe_single()
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Alert not found")
+
+        prev_status = existing.data.get('status', 'open')
+
+        # Update alert row
+        db.supabase.table('aml_risk_scores').update({
+            'status':      payload.action,
+            'reviewed_by': str(admin.get('id', '')),
+            'reviewed_at': datetime.utcnow().isoformat(),
+            'review_note': payload.note,
+        }).eq('id', alert_id).execute()
+
+        # Immutable audit trail
+        db.supabase.table('aml_audit_log').insert({
+            'alert_id':        alert_id,
+            'tx_id':           existing.data.get('tx_id'),
+            'action':          f'review_{payload.action}',
+            'actor_id':        str(admin.get('id', '')),
+            'actor_email':     admin.get('email', 'unknown'),
+            'previous_status': prev_status,
+            'new_status':      payload.action,
+            'note':            payload.note,
+            'metadata': {
+                'band':          existing.data.get('band'),
+                'combined_score': existing.data.get('combined_score'),
+                'reviewed_via':  'admin_dashboard',
+            },
+        }).execute()
+
+        logger.info(
+            f"[Admin] AML {alert_id[:8]} → {payload.action} "
+            f"by {admin.get('email')} (was: {prev_status})"
+        )
+        return {
+            'success':         True,
+            'alert_id':        alert_id,
+            'action':          payload.action,
+            'previous_status': prev_status,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Admin] AML review failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/aml/health")
+async def get_aml_health(
+    admin: dict           = Depends(require_admin),
+    db:    DatabaseService = Depends(get_db_service),
+):
+    """
+    🏥  AML engine health — QVAC liveness, pattern cache status, open alert count.
+    Polled every 30 s by the admin dashboard.
+    """
+    try:
+        from backend.services.aml_scoring_service import health_check
+        status = await health_check(db)
+        return {'success': True, **status}
+    except Exception as e:
+        logger.error(f"[Admin] AML health check failed: {e}")
+        return {
+            'success': False,
+            'status':  'offline',
+            'qvac':    'offline',
+            'error':   str(e),
+        }
