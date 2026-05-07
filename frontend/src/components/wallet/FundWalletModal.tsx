@@ -213,7 +213,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       const walletRes = await api.post('/api/v1/moonpay/url/onramp', {
         asset,
         base_currency_code: mpCurrency,
-        base_currency_amount: amount ? parseFloat(amount) : undefined,
+        // base_currency_amount intentionally omitted — let MoonPay widget set the amount
       })
       if (!walletRes?.success) throw new Error('Failed to get wallet params')
 
