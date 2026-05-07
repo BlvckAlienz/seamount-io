@@ -207,22 +207,27 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const handleMoonPay = async () => {
     if (!session) { toast.error('Sign in to buy crypto'); return }
     setLoading(true); setError(null)
+
     try {
-      const res = await api.post('/api/v1/moonpay/url/onramp', {
+      // 1. Resolve wallet address and other user data from backend
+      const walletRes = await api.post('/api/v1/moonpay/url/onramp', {
         asset,
-        base_currency_code:   mpCurrency,
+        base_currency_code: mpCurrency,
         base_currency_amount: amount ? parseFloat(amount) : undefined,
       })
-      if (!res?.success) throw new Error(res?.detail || 'Failed to initialize MoonPay')
+      if (!walletRes?.success) throw new Error('Failed to get wallet params')
 
+      // 2. Initialize the MoonPay SDK (WITHOUT signature)
       const moonPayInit = await loadMoonPay()
       if (!moonPayInit) throw new Error('MoonPay SDK failed to load')
 
+      // Use the params from backend, but exclude signature
+      const { signature: _, ...sdkParams } = walletRes.params
       const widget = moonPayInit({
-        flow:        'buy',
+        flow: 'buy',
         environment: 'production',
-        variant:     'overlay',
-        params:      res.params,          // signature is included here but will be ignored
+        variant: 'overlay',
+        params: sdkParams,           // NO signature yet
         handlers: {
           async onTransactionCompleted() {
             toast.success('🎉 Purchase complete!')
@@ -233,24 +238,25 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           },
           onError(error: any) {
             logger.error?.('MoonPay error:', error)
-            setTimeout(() => {
-              const iframe = document.querySelector('iframe[src*="moonpay"]')
-              iframe?.parentElement?.remove()
-            }, 300)
             setError('MoonPay encountered an error. Please try again.')
             onOpenChange(false)
           },
         },
       })
 
-      if (!widget) {
-        throw new Error('MoonPay widget failed to initialize')
-      }
+      // 3. Generate the exact URL the SDK will use
+      const urlToSign: string = widget.generateUrlForSigning()
+      const urlObj = new URL(urlToSign)
+      const queryString = urlObj.search.slice(1)   // remove leading '?'
 
-      // ✅ THIS IS THE CRITICAL LINE
-      widget.updateSignature(res.params.signature)
+      // 4. Send only the query string to backend for signing
+      const signRes = await api.post('/api/v1/moonpay/sign', { query_string: queryString })
+      if (!signRes?.success) throw new Error('Signature generation failed')
 
+      // 5. Apply the signature and show widget
+      widget.updateSignature(signRes.signature)
       widget.show()
+
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'
       setError(msg)

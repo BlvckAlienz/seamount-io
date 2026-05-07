@@ -249,20 +249,23 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
     setLoading(true); setError(null)
     try {
-      const res = await api.post('/api/v1/moonpay/url/offramp', {
+      // 1. Get wallet / params from offramp endpoint
+      const walletRes = await api.post('/api/v1/moonpay/url/offramp', {
         asset,
         quote_currency_code: mpFiat,
       })
-      if (!res?.success) throw new Error(res?.detail || 'Failed to initialize MoonPay')
+      if (!walletRes?.success) throw new Error(walletRes?.detail || 'Failed to initialize')
 
+      // 2. Initialize MoonPay SDK WITHOUT signature
       const moonPayInit = await loadMoonPay()
       if (!moonPayInit) throw new Error('MoonPay SDK failed to load')
 
+      const { signature: _, ...sdkParams } = walletRes.params
       const widget = moonPayInit({
-        flow:        'sell',
+        flow: 'sell',
         environment: 'production',
-        variant:     'overlay',
-        params:      res.params,
+        variant: 'overlay',
+        params: sdkParams,
         handlers: {
           async onTransactionCompleted() {
             toast.success('🎉 Sale complete!')
@@ -283,12 +286,16 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
         },
       })
 
-      if (!widget) {
-        throw new Error('MoonPay widget failed to initialize')
-      }
+      // 3. Generate exact URL from SDK and sign it
+      const urlToSign: string = widget.generateUrlForSigning()
+      const urlObj = new URL(urlToSign)
+      const queryString = urlObj.search.slice(1)
 
-      widget.updateSignature(res.params.signature)   // ✅ add this line
-      
+      const signRes = await api.post('/api/v1/moonpay/sign', { query_string: queryString })
+      if (!signRes?.success) throw new Error('Signature generation failed')
+
+      // 4. Apply signature and show
+      widget.updateSignature(signRes.signature)
       widget.show()
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'
