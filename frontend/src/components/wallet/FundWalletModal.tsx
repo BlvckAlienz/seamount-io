@@ -222,7 +222,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         flow:        'buy',
         environment: 'production',
         variant:     'overlay',
-        params:      res.params,
+        params:      res.params,          // signature is included here but will be ignored
         handlers: {
           async onTransactionCompleted() {
             toast.success('🎉 Purchase complete!')
@@ -246,6 +246,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       if (!widget) {
         throw new Error('MoonPay widget failed to initialize')
       }
+
+      // ✅ THIS IS THE CRITICAL LINE
+      widget.updateSignature(res.params.signature)
 
       widget.show()
     } catch (err: any) {

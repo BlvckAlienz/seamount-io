@@ -287,6 +287,8 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
         throw new Error('MoonPay widget failed to initialize')
       }
 
+      widget.updateSignature(res.params.signature)   // ✅ add this line
+      
       widget.show()
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'

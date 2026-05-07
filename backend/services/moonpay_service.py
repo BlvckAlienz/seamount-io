@@ -102,10 +102,10 @@ class MoonPayService:
         return urlencode(sorted(clean.items()), quote_via=quote)
 
     def _sign(self, query_string: str) -> str:
-        """HMAC-SHA256 of query_string, secret_key → Base64."""
+        """HMAC-SHA256 of ?query_string, secret_key → Base64."""
         mac = hmac.new(
             self.secret_key.encode('utf-8'),
-            query_string.encode('utf-8'),          # ✅ no leading '?'
+            f"?{query_string}".encode('utf-8'),   # ✅ include the '?'
             hashlib.sha256,
         )
         return base64.b64encode(mac.digest()).decode('utf-8')
