@@ -230,19 +230,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       imageKey: 'p2p'
     },
     audit: {
-      title: "📊 Regulatory Compliance",
-      description: "Compliance infrastructure for SMEs",
+      title: "🛡️ Real-Time AML Intelligence",
+      description: "On-premise AI fraud detection for every transaction",
       features: [
-        "Pre-Audit Checks",
-        "Tax returns preparation and regulatory filing",
-        "Professional audit reports",
-        "Tax exemptions optimization",
-        "Data room setup for funding readiness"
+        "12K+ fraud signatures: EFCC, CBN, Kenya DCI, curated typologies",
+        "Real-time embedding & cosine similarity matching",
+        "5-factor scoring: pattern, structuring, velocity, counterparty, time",
+        "Instant Suspicious Transaction Reports — anti-hallucination AI",
+        "100% on-premise: zero transaction data leaves your servers"
       ],
       icon: <Shield className="h-12 w-12" />,
       color: "from-green-500 to-emerald-500",
       gradient: "bg-gradient-to-br from-green-500/20 to-emerald-500/20",
-      imageKey: 'compliance'
+      imageKey: 'aml'
     }
   };
 
@@ -662,123 +662,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
             </div>
           );
-          
-        case 'compliance':
-          return (
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 p-6 overflow-hidden">
-              <div className="absolute inset-0">
-                <motion.div
-                  className="absolute w-full h-1 bg-white/30"
-                  initial={{ y: 0 }}
-                  animate={{ y: 256 }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                />
-                {[...Array(5)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-full h-px bg-white/10"
-                    style={{ top: `${20 + i * 15}%` }}
-                    animate={{ opacity: [0.1, 0.3, 0.1] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
-                  />
-                ))}
-              </div>
-              
-              <div className="h-full flex flex-col justify-between text-white relative z-10">
-                <motion.div 
-                  className="flex justify-between items-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <span className="text-xs font-medium">Audit Status</span>
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  >
-                    <Shield className="h-6 w-6 opacity-80" />
-                  </motion.div>
-                </motion.div>
-                
-                <motion.div 
-                  className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20"
-                  whileHover={{ boxShadow: "0 0 30px rgba(255,255,255,0.3)" }}
-                >
-                  <div className="text-xs opacity-70 mb-2">Audit Readiness</div>
-                  <motion.div 
-                    className="text-4xl font-bold mb-3"
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                  >
-                    33%
-                  </motion.div>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Documents', status: 'Complete', complete: true, delay: 0 },
-                      { label: 'Tax Returns', status: 'Pending', complete: false, delay: 0.2 },
-                      { label: 'Tax Filing', status: 'Pending', complete: false, delay: 0.4 }
-                    ].map((item) => (
-                      <motion.div 
-                        key={item.label} 
-                        className="flex items-center justify-between"
-                        initial={{ x: -20, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        transition={{ delay: item.delay }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <motion.div 
-                            className={`w-4 h-4 rounded border flex items-center justify-center ${
-                              item.complete ? 'bg-green-400 border-green-300' : 'bg-white/20 border-white/40'
-                            }`}
-                            whileHover={{ scale: 1.2, rotate: 360 }}
-                          >
-                            {item.complete && <span className="text-white text-xs font-bold">✓</span>}
-                          </motion.div>
-                          <span className="text-xs">{item.label}</span>
-                        </div>
-                        <span className={`text-xs ${item.complete ? 'text-green-300 font-semibold' : 'opacity-70'}`}>
-                          {item.status}
-                        </span>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-                
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { emoji: '📄', label: 'Upload Docs' },
-                    { emoji: '📊', label: 'Tax Filing' }
-                  ].map((item, idx) => (
-                    <motion.div 
-                      key={item.label}
-                      className="bg-white/10 backdrop-blur rounded-lg p-3 text-center border border-white/20 cursor-pointer"
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.8 + idx * 0.1 }}
-                      whileHover={{ scale: 1.1, y: -5 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <motion.div 
-                        className="text-2xl mb-1"
-                        animate={{ rotate: [0, 10, -10, 0] }}
-                        transition={{ 
-                          duration: 2,
-                          repeat: Infinity
-                        }}
-                      >
-                        {item.emoji}
-                      </motion.div>
-                      <div className="text-xs">{item.label}</div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        
+
         case 'p2p':
           return (
             <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-yellow-600 p-6 overflow-hidden">
-              {/* Floating particles for dynamic feel */}
               <div className="absolute inset-0">
                 {[...Array(12)].map((_, i) => (
                   <motion.div
@@ -903,6 +790,134 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </motion.div>
                   ))}
                 </div>
+              </div>
+            </div>
+          );
+
+        case 'aml':
+          return (
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 p-6 overflow-hidden">
+              <div className="absolute inset-0">
+                {/* Animated transaction lines */}
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute h-0.5 w-16 bg-white/30"
+                    style={{ top: `${15 + i * 10}%`, left: '10%' }}
+                    initial={{ x: -50, opacity: 0 }}
+                    animate={{ x: 300, opacity: [0.2, 0.6, 0.2] }}
+                    transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.4 }}
+                  />
+                ))}
+                {/* Scanning shield */}
+                <motion.div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                  <Shield className="h-24 w-24 text-white/20" />
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-center"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                  >
+                    <div className="w-16 h-16 border-2 border-white/40 rounded-full" />
+                  </motion.div>
+                  <motion.div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-red-400 rounded-full"
+                    animate={{ scale: [1, 1.5, 1], opacity: [1, 0.6, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                </motion.div>
+              </div>
+              
+              <div className="h-full flex flex-col justify-between text-white relative z-10">
+                <motion.div 
+                  className="flex justify-between items-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <span className="text-xs font-medium">Transaction Scanner</span>
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Shield className="h-6 w-6 opacity-80" />
+                  </motion.div>
+                </motion.div>
+                
+                <div className="space-y-3">
+                  <motion.div 
+                    className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="text-xs opacity-70 mb-1">Pattern Library</div>
+                    <motion.div className="text-xl font-bold">12,389</motion.div>
+                    <div className="flex gap-1 mt-1">
+                      {['EFCC','CBN','DCI','Typologies'].map((s,i) => (
+                        <span key={i} className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{s}</span>
+                      ))}
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs opacity-70">Scanning tx...</span>
+                      <motion.span 
+                        className="text-xs font-semibold text-red-300"
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      >
+                        LIVE
+                      </motion.span>
+                    </div>
+                    <div className="flex justify-between mt-2">
+                      <span className="text-xs">Factor</span>
+                      <span className="text-xs">Score</span>
+                    </div>
+                    {[
+                      { name: 'Pattern', val: '1.00', color: 'bg-red-400' },
+                      { name: 'Structuring', val: '1.00', color: 'bg-red-400' },
+                      { name: 'Velocity', val: '0.00', color: 'bg-emerald-400' },
+                    ].map((f, i) => (
+                      <div key={i} className="flex justify-between items-center mt-1">
+                        <span className="text-xs">{f.name}</span>
+                        <div className="flex items-center gap-1">
+                          <div className="w-12 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <motion.div 
+                              className={`h-full ${f.color} rounded-full`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${parseFloat(f.val)*100}%` }}
+                              transition={{ duration: 0.8, delay: i * 0.2 }}
+                            />
+                          </div>
+                          <span className="text-xs font-mono">{f.val}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                </div>
+                
+                <motion.div 
+                  className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
+                  whileHover={{ boxShadow: "0 0 20px rgba(255,255,255,0.3)" }}
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="text-xs opacity-70">Alert</div>
+                      <motion.div 
+                        className="text-lg font-bold text-red-300"
+                        animate={{ opacity: [0.7, 1, 0.7] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        AMBER
+                      </motion.div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs opacity-70">STR Generated</div>
+                      <div className="text-xs font-semibold text-green-300">3.2s</div>
+                    </div>
+                  </div>
+                </motion.div>
               </div>
             </div>
           );
@@ -1718,9 +1733,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       description: "Market data, on-chain analytics, and actionable insights to optimize your DeFi strategy"
                     },
                     {
-                      icon: "📊",
-                      title: "Regulatory Compliance",
-                      description: "Full statutory audits, tax compliance, and regulatory reporting"
+                      icon: "🛡️",
+                      title: "Real-Time AML & Fraud Detection",
+                      description: "AI-powered transaction monitoring, pattern matching, and automated STR generation running entirely on-premise."
                     }
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors">

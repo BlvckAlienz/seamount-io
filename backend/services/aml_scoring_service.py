@@ -269,27 +269,37 @@ async def _complete(messages: List[Dict]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 async def _load_pattern_cache(db_service) -> _PatternCache:
-    """Load scoring patterns from Supabase. Paginated. Tier 3 excluded."""
+    """
+    Load all tier 1+2 patterns from Supabase.
+    Uses cursor-based pagination (order by pattern_id + gt) –
+    robust against data growth and Supabase page size limits.
+    """
     patterns: List[Dict] = []
-    page_size, offset = 200, 0
+    last_id = None
+    page_size = 500
 
     while True:
-        chunk = await asyncio.to_thread(
-            lambda o=offset: db_service.supabase
-                .table('aml_fraud_patterns')
-                .select('pattern_id, label, tier, scoring_weight, embedding')
-                .neq('excluded_from_scoring', True)
-                .range(o, o + page_size - 1)
-                .execute()
+        query = (
+            db_service.supabase.table('aml_fraud_patterns')
+            .select('pattern_id, label, tier, scoring_weight, embedding')
+            .in_('tier', [1, 2])
+            .order('pattern_id')
+            .limit(page_size)
         )
+        if last_id is not None:
+            query = query.gt('pattern_id', last_id)
+
+        chunk = await asyncio.to_thread(lambda: query.execute())
         rows = chunk.data or []
+        if not rows:
+            break   # no more rows
+
         for p in rows:
             emb = p.get('embedding')
             if emb and len(emb) == 1024 and p.get('tier') in (None, 1, 2):
                 patterns.append(p)
-        if len(rows) < page_size:
-            break
-        offset += page_size
+
+        last_id = rows[-1].get('pattern_id')
 
     if not patterns:
         raise RuntimeError(
