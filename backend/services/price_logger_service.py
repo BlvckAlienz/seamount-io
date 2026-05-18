@@ -22,17 +22,17 @@ class PriceLoggerService:
     REFRESH_CONFIG = {
         'crypto': {
             'assets': ['bitcoin', 'ethereum', 'algorand', 'tron'],
-            'interval_seconds': 30,  # Every 30 seconds (volatile)
-            'preferred_sources': ['binance', 'coingecko_free']  # Unlimited APIs only
+            'interval_seconds': 300,  # Every 5 minutes (still real-time enough for fraud)
+            'preferred_sources': ['binance', 'coingecko_free']
         },
         'precious_metals': {
             'assets': ['XAU', 'XAG', 'XPT', 'XPD'],
-            'interval_seconds': 300,  # Every 5 minutes
+            'interval_seconds': 600,  # Every 5 minutes
             'preferred_sources': ['yahoo_finance']  # Skip metals_dev in background
         },
         'industrial_metals': {
             'assets': ['COPP', 'ALUM', 'NICK', 'ZINC'],
-            'interval_seconds': 900,  # Every 15 minutes (slower markets)
+            'interval_seconds': 1200,  # Every 15 minutes (slower markets)
             'preferred_sources': ['yahoo_finance']
         },
         'critical_minerals': {

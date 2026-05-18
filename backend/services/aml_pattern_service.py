@@ -219,46 +219,204 @@ def chunk_text(text: str, max_chars: int = MAX_CHUNK) -> List[str]:
     return chunks or [text[:max_chars]]
 
 # ---------------------------------------------------------------------------
-# PARSERS
+# OFAC SDN LEGACY FLAT-FILE COLUMN NAMES
+# These are NOT in the CSV files — they must be supplied manually per
+# https://ofac.treasury.gov/media/29976/download?inline
 # ---------------------------------------------------------------------------
+OFAC_SDN_FIELDNAMES = [
+    "ent_num", "sdn_name", "sdn_type", "program",
+    "title", "call_sign", "vess_type", "tonnage", "grt",
+    "vess_flag", "vess_owner", "remarks",
+]
+
+OFAC_ADD_FIELDNAMES = [
+    "ent_num", "add_num", "address1", "addr2", "addr3",
+    "city", "state", "postal_code", "country", "add_remarks",
+]
+
+OFAC_ALT_FIELDNAMES = [
+    "ent_num", "alt_num", "alt_type", "alt_name", "alt_remarks",
+]
+
 
 def parse_ofac_files(ofac_dir: str) -> List[Dict[str, str]]:
     patterns = []
-    base     = Path(ofac_dir)
-    sdn_path = base / "sdn.csv"
-    if not sdn_path.exists():
-        return patterns
+    base = Path(ofac_dir)
 
-    with open(sdn_path, 'r', encoding='utf-8', errors='ignore') as f:
-        for row in csv.DictReader(f):
-            name = row.get('sdn_name', '').strip()
-            if not name:
-                continue
-            combined = clean_text(
-                f"{name} | {row.get('sdn_type','')} | {row.get('program','')} | {row.get('remarks','')}"
-            )
-            patterns.append({
-                "pattern_id": f"ofac_{row.get('sdn_id','')}",
-                "label":      "OFAC Sanction",
-                "description": combined,
-                "source":     "ofac_sdn",
-            })
+    sdn_path = base / "sdn.csv"
+    if sdn_path.exists():
+        with open(sdn_path, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.DictReader(f, fieldnames=OFAC_SDN_FIELDNAMES, restkey='__extra__')
+            for row in reader:
+                name = (row.get('sdn_name') or '').strip()
+                if not name:
+                    continue
+                ent_num = (row.get('ent_num') or '').strip()
+                sdn_type = (row.get('sdn_type') or '')
+                program = (row.get('program') or '')
+                remarks = (row.get('remarks') or '')
+                combined = clean_text(
+                    f"OFAC SDN: {name} | type:{sdn_type} "
+                    f"| program:{program} | remarks:{remarks}"
+                )
+                patterns.append({
+                    "pattern_id": f"ofac_sdn_{ent_num}",
+                    "label":      "OFAC Sanction (SDN)",
+                    "description": combined,
+                    "source":     "ofac_sdn",
+                })
 
     alt_path = base / "alt.csv"
     if alt_path.exists():
         with open(alt_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for row in csv.DictReader(f):
-                alt = row.get('alt_name', '').strip()
-                if not alt:
+            reader = csv.DictReader(f, fieldnames=OFAC_ALT_FIELDNAMES, restkey='__extra__')
+            for row in reader:
+                alt_name = (row.get('alt_name') or '').strip()
+                if not alt_name:
                     continue
+                ent_num = (row.get('ent_num') or '').strip()
+                alt_num = (row.get('alt_num') or '').strip()
+                alt_type = (row.get('alt_type') or '')
+                combined = clean_text(
+                    f"OFAC Alias: {alt_name} | type:{alt_type} | ent_num:{ent_num}"
+                )
                 patterns.append({
-                    "pattern_id": f"ofac_alt_{row.get('ent_num',row.get('sdn_id',''))}_{row.get('alt_name','').replace(' ','_')[:20]}",
-                    "label":      "OFAC Alias",
-                    "description": clean_text(alt),
+                    "pattern_id": f"ofac_alt_{ent_num}_{alt_num}",
+                    "label":      "OFAC Sanction Alias",
+                    "description": combined,
                     "source":     "ofac_alt",
                 })
+
+    add_path = base / "add.csv"
+    if add_path.exists():
+        with open(add_path, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.DictReader(f, fieldnames=OFAC_ADD_FIELDNAMES, restkey='__extra__')
+            for row in reader:
+                addr1 = (row.get('address1') or '').strip()
+                city  = (row.get('city') or '').strip()
+                state = (row.get('state') or '').strip()
+                country = (row.get('country') or '').strip()
+                addr_parts = [addr1, city, state, country]
+                addr_str = ', '.join(p for p in addr_parts if p)
+                if not addr_str:
+                    continue
+                ent_num = (row.get('ent_num') or '').strip()
+                add_num = (row.get('add_num') or '').strip()
+                add_remarks = (row.get('add_remarks') or '')
+                combined = clean_text(f"OFAC Address: {addr_str} | remarks:{add_remarks}")
+                patterns.append({
+                    "pattern_id": f"ofac_add_{ent_num}_{add_num}",
+                    "label":      "OFAC Sanction Address",
+                    "description": combined,
+                    "source":     "ofac_add",
+                })
+
+    # Deduplicate
+    seen = {}
+    for p in patterns:
+        seen[p['pattern_id']] = p
+    logger.info(f"OFAC parsed: {len(seen)} unique entities (SDN+aliases+addresses)")
+    return list(seen.values())
+
+# ---------------------------------------------------------------------------
+# ELLIPTIC++ WALLET FEATURES (Behavioral Signatures from Labeled Wallets)
+# ---------------------------------------------------------------------------
+
+ELLIPTIC_FEATURE_NAMES = [str(i) for i in range(55)]  # 55 numeric feature columns
+
+
+def parse_elliptic_wallets(data_dir: str) -> List[Dict[str, str]]:
+    """Embed every illicit wallet (class=2) and a sample of licit ones (class=1)."""
+    patterns = []
+    base = Path(data_dir)
+    csv_path = base / "wallets_features_classes_combined.csv"
+    if not csv_path.exists():
+        logger.warning(f"Elliptic++ CSV not found at {csv_path}")
+        return patterns
+
+    with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+        reader = csv.DictReader(f)
+        # The columns we do NOT want to treat as features
+        SKIP_KEYS = {'address', 'Time step', 'class'}
+        feature_names = [k for k in reader.fieldnames or [] if k not in SKIP_KEYS]
+
+        illicit_count = 0
+        licit_count  = 0
+        total        = 0
+
+        for row in reader:
+            total += 1
+            cls_label = (row.get('class') or '').strip()
+            address   = (row.get('address') or '').strip()
+            time_step = (row.get('Time step') or '0').strip()
+
+            if cls_label == '2':   # 2 = illicit
+                feature_snippet = summarize_features(row, feature_names)
+                combined = clean_text(
+                    f"Blockchain illicit wallet: {address} | time_step:{time_step} | features:{feature_snippet}"
+                )
+                patterns.append({
+                    "pattern_id": f"elliptic_illicit_{illicit_count:06d}",
+                    "label":      "Elliptic Illicit Wallet",
+                    "description": combined,
+                    "source":     "elliptic_illicit",
+                })
+                illicit_count += 1
+
+            elif cls_label == '1': # 1 = licit
+                if licit_count % 500 == 0:
+                    feature_snippet = summarize_features(row, feature_names)
+                    combined = clean_text(
+                        f"Blockchain licit wallet: {address} | time_step:{time_step} | features:{feature_snippet}"
+                    )
+                    patterns.append({
+                        "pattern_id": f"elliptic_licit_{licit_count:06d}",
+                        "label":      "Elliptic Licit Wallet",
+                        "description": combined,
+                        "source":     "elliptic_licit",
+                    })
+                licit_count += 1
+
+            if total % 100_000 == 0:
+                print(f"  Elliptic: {total//1000}k rows scanned, {illicit_count} illicit", end='\r')
+
+    print()
+    logger.info(
+        f"Elliptic++: {total} wallets scanned, "
+        f"{illicit_count} illicit, {licit_count} licit, "
+        f"{len(patterns)} patterns created"
+    )
     return patterns
 
+
+def summarize_features(row: Dict[str, str], feature_names: List[str]) -> str:
+    """Compute mean, std, and top-5 largest features from the row's numeric columns."""
+    import math
+    values = []
+    for k in feature_names:
+        val_str = (row.get(k) or '').strip()
+        if val_str == '':
+            val = 0.0
+        else:
+            try:
+                val = float(val_str)
+            except ValueError:
+                val = 0.0
+        values.append(val)
+
+    if not values:
+        return "no_features"
+
+    mean_val = sum(values) / len(values)
+    var = sum((v - mean_val) ** 2 for v in values) / len(values)
+    std_val = math.sqrt(var)
+
+    indexed = [(i, abs(values[i])) for i in range(len(values))]
+    indexed.sort(key=lambda x: x[1], reverse=True)
+    top5 = [(i, values[i]) for i, _ in indexed[:5]]
+    top_str = ' '.join(f"{feature_names[i]}:{values[i]:.4f}" for i, _ in top5)
+
+    return f"mean:{mean_val:.6f} std:{std_val:.6f} top5:{{{top_str}}}"
 
 def parse_cryptoscamdb(data_dir: str) -> List[Dict[str, str]]:
     """
@@ -416,6 +574,74 @@ def ingest_fraud_patterns(db_service):
 
     # 5) Kenya docs
     all_sources.append(("Kenya", parse_country_documents(str(DATA_DIR / "kenya"), "kenya")))
+
+    # 6) Elliptic++ labeled wallets (ground-truth behavioral signatures)
+    elliptic_dir = DATA_DIR / "elliptic"
+    if elliptic_dir.exists():
+        source_name = "Elliptic++ Wallets"
+        all_patterns = parse_elliptic_wallets(str(elliptic_dir))
+
+        # ── STRATIFIED SAMPLING ──────────────────────────────────
+        illicit_patterns = [p for p in all_patterns if p['source'] == 'elliptic_illicit']
+        licit_patterns   = [p for p in all_patterns if p['source'] == 'elliptic_licit']
+
+        MAX_PATTERNS = 5000
+        # 1) Take all illicit wallets (ground truth)
+        selected = list(illicit_patterns)
+        remaining_slots = MAX_PATTERNS - len(selected)
+
+        # 2) Stratify licit wallets by Time step and sample evenly
+        if remaining_slots > 0 and licit_patterns:
+            # Group licit wallets by Time step (extracted from pattern_id or description)
+            from collections import defaultdict
+            by_step = defaultdict(list)
+            for p in licit_patterns:
+                # pattern_id format: elliptic_licit_XXXXXX
+                # But we need the Time step from the description.
+                # We'll parse it from the description text.
+                desc = p['description']
+                import re
+                match = re.search(r'time_step:(\d+)', desc)
+                step = int(match.group(1)) if match else 0
+                by_step[step].append(p)
+
+            num_steps = len(by_step)
+            if num_steps > 0:
+                per_step = max(1, remaining_slots // num_steps)
+                for step, step_patterns in by_step.items():
+                    import random
+                    random.seed(42)  # reproducibility
+                    sample_size = min(per_step, len(step_patterns))
+                    selected.extend(random.sample(step_patterns, sample_size))
+                    if len(selected) >= MAX_PATTERNS:
+                        break
+
+        # Trim if we overshot (shouldn't happen, but safe)
+        if len(selected) > MAX_PATTERNS:
+            selected = selected[:MAX_PATTERNS]
+
+        patterns = selected
+        logger.info(
+            f"Elliptic stratified sample: {len(illicit_patterns)} illicit, "
+            f"{len(licit_patterns)} licit → selected {len(patterns)} patterns"
+        )
+        # ──────────────────────────────────────────────────────────
+
+        pending = [p for p in patterns if p['pattern_id'] not in done_ids]
+        if pending:
+            print(f"\n🔄 {source_name}: {len(pending)} pending / {len(patterns)} total")
+            ELLIPTIC_BATCH_SIZE = 50
+            for i in range(0, len(pending), ELLIPTIC_BATCH_SIZE):
+                batch_patterns = pending[i:i + ELLIPTIC_BATCH_SIZE]
+                texts          = [f"{p['label']}: {p['description']}" for p in batch_patterns]
+                embeddings     = embed_batch(texts)
+                pairs = list(zip(batch_patterns, embeddings))
+                ok, fail = upsert_batch(db_service, pairs, done_ids)
+                total_ok   += ok
+                total_fail += fail
+                pct = (i + len(batch_patterns)) / len(pending) * 100
+                print(f"  {source_name}: {i + len(batch_patterns)}/{len(pending)} ({pct:.0f}%) | ✅{ok} ❌{fail}", end='\r')
+            print()
 
     for source_name, patterns in all_sources:
         # Skip already-done

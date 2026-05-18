@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 // ─── Active Server Pool — ordered by health ────────────────────────────────
 // ONLY servers that are confirmed deployed and active
 const API_POOL: string[] = [
-  'https://seamount-main3.onrender.com',   // PRIMARY — confirmed warm
+  'https://seamount-main.onrender.com',   // PRIMARY — confirmed warm
   'https://seamount-api2.onrender.com',   // BACKUP  — confirmed warm
 ];
 
@@ -46,7 +46,7 @@ export function getActiveBase(): string {
 
 // ─── Warm-Up — ping both servers + both WDK servers ───────────────────────
 const WDK_POOL: string[] = [
-  'https://seamount-wdk3.onrender.com',
+  'https://seamount-wdk1.onrender.com',
   'https://seamount-wdk4.onrender.com',  // paired with seamount-api2
 ];
 
