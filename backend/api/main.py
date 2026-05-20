@@ -360,6 +360,14 @@ except ImportError as e:
     logger.error(f"❌ MoonPay router import error: {e}")
     routers_available['moonpay'] = None
 
+try:
+    from backend.api.routes.learn import router as learn_router
+    routers_available['learn'] = learn_router
+    logger.info("✅ Financial Literacy router imported (quests, wellbeing, guild)")
+except ImportError as e:
+    logger.error(f"❌ Financial Literacy router import error: {e}")
+    routers_available['learn'] = None
+
 # ===== SECURITY COMPONENTS =====
 limiter = Limiter(key_func=get_remote_address)
 suspicious_activity: Dict[str, list] = {}
@@ -1041,6 +1049,11 @@ try:
 except ImportError as e:
     logger.error(f"❌ Tax Intelligence router import error: {e}")
     routers_available['tax'] = None
+
+# 🎓 Financial Literacy Routes (Quests, Wellbeing Coach, Signal Guild)
+if routers_available.get('learn'):
+    app.include_router(routers_available['learn'])
+    logger.info("✅ Financial Literacy router registered at /api/v1/learn")
 
 # ===== ADMIN ROUTES =====
 try:

@@ -12,6 +12,7 @@ import TerminalPage from './pages/TerminalPage';
 import CompliancePage from './pages/CompliancePage';
 import MeterXpressPage from '@/pages/MeterXpressPage';
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
+import LearnPage from './pages/LearnPage';
 
 // ✅ ADD THESE IMPORTS
 import { WagmiProvider } from 'wagmi';
@@ -159,6 +160,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/learn" 
+          element={
+            <ProtectedRoute>
+              <LearnPage />
             </ProtectedRoute>
           } 
         />
