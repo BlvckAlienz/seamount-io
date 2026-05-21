@@ -4,8 +4,9 @@
 import os
 import logging
 import asyncio
-from typing import Any, Dict, Optional
-
+import json
+from typing import Any, Dict, Optional, AsyncGenerator
+ 
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -216,3 +217,33 @@ async def aml_analyze(
         retries=1,
         read_timeout=120.0,
     )
+
+
+async def stream_qvac_response(path: str, payload: Dict[str, Any]) -> AsyncGenerator[str, None]:
+    """
+    Streams the QVAC response token-by-token to prevent proxy timeouts
+    and provide a real-time UI experience.
+    """
+    url = f"{_base_url()}{path}"
+    payload["stream"] = True
+    timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream("POST", url, json=payload, headers=_headers()) as response:
+            if response.status_code != 200:
+                error_text = await response.aread()
+                logger.error(f"[QVAC Stream Error] {response.status_code}: {error_text}")
+                yield "⚠️ The AI engine is currently overloaded. Please try again in a moment."
+                return
+            
+            async for line in response.aiter_lines():
+                if line.startswith("data: "):
+                    data_str = line[6:].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                        if "token" in data:
+                            yield data["token"]
+                    except Exception:
+                        continue

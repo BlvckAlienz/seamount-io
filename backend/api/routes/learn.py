@@ -10,12 +10,15 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from fastapi.responses import StreamingResponse
+
 from backend.dependencies import get_current_user, get_supabase_client
 from backend.services.qvac_service import (
     tutor_ask,
     coach_analyze,
     generate_wellbeing_score,
     validate_signal,
+    stream_qvac_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -192,19 +195,28 @@ async def get_quest_module(
 async def ask_tutor(
     body:         TutorAskRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    supabase                     = Depends(get_supabase_client),
 ):
-    """Ask the QVAC tutor a question in the context of a quest module."""
-    user_id  = current_user["id"]
-    context  = {"module_id": body.module_id} if body.module_id else {}
+    """Ask the QVAC tutor a question via real-time stream."""
+    user_id = current_user["id"]
+    context = {"module_id": body.module_id} if body.module_id else {}
+    
+    logger.info(f"[Tutor] User {user_id[:8]} asking (streaming): {body.message[:60]}")
+    
+    payload = {
+        "message": body.message,
+        "context": context,
+        "device_tier": body.device_tier
+    }
 
-    try:
-        response = await tutor_ask(body.message, context, body.device_tier)
-        logger.info(f"[Tutor] User {user_id[:8]} asked: {body.message[:60]}")
-        return {"success": True, "response": response}
-    except Exception as e:
-        logger.error(f"[Tutor] Error for user {user_id}: {e}")
-        raise HTTPException(status_code=503, detail="AI tutor temporarily unavailable. Please try again.")
+    async def event_generator():
+        try:
+            async for token in stream_qvac_response("/v1/tutor/ask", payload):
+                yield token
+        except Exception as e:
+            logger.error(f"[Tutor Stream Error] {e}")
+            yield "\n\n⚠️ Connection interrupted. Please try again."
+
+    return StreamingResponse(event_generator(), media_type="text/plain")
 
 
 @router.post("/quests/answer")
@@ -434,7 +446,7 @@ async def ask_coach(
     current_user: Dict[str, Any] = Depends(get_current_user),
     supabase                     = Depends(get_supabase_client),
 ):
-    """Ask the wellbeing coach a question using the user's profile as context."""
+    """Ask the wellbeing coach a question via real-time stream."""
     user_id = current_user["id"]
 
     profile_result = (
@@ -445,13 +457,22 @@ async def ask_coach(
         .execute()
     )
     profile = profile_result.data or {}
+    
+    payload = {
+        "message": body.message,
+        "profile": profile,
+        "device_tier": body.device_tier
+    }
 
-    try:
-        response = await coach_analyze(body.message, profile, body.device_tier)
-        return {"success": True, "response": response}
-    except Exception as e:
-        logger.error(f"[Coach] Error for user {user_id}: {e}")
-        raise HTTPException(status_code=503, detail="Coach temporarily unavailable. Please try again.")
+    async def event_generator():
+        try:
+            async for token in stream_qvac_response("/v1/coach/analyze", payload):
+                yield token
+        except Exception as e:
+            logger.error(f"[Coach Stream Error] {e}")
+            yield "\n\n⚠️ Connection interrupted. Please try again."
+
+    return StreamingResponse(event_generator(), media_type="text/plain")
 
 
 @router.get("/wellbeing/nudges")
