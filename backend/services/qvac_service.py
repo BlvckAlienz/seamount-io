@@ -1,9 +1,7 @@
 # FILE: backend/services/qvac_service.py
 # QVAC HTTP client — shared service for all QVAC inference calls
-# Handles retries, timeouts, and mobile/desktop routing
 
 import os
-import json
 import logging
 import asyncio
 from typing import Any, Dict, Optional
@@ -12,42 +10,65 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-QVAC_API_URL = os.getenv("QVAC_API_URL", "http://localhost:11434")
-QVAC_API_KEY = os.getenv("QVAC_API_KEY", "qvac-local-key")
-QVAC_TIMEOUT = int(os.getenv("QVAC_TIMEOUT_SECONDS", "60"))
-QVAC_MAX_RETRIES = int(os.getenv("QVAC_MAX_RETRIES", "3"))
+# ── Config — read at call time so env vars are always fresh ──────────────────
+def _base_url() -> str:
+    return os.getenv("QVAC_API_URL", "http://localhost:11435").rstrip("/")
 
-_HEADERS = {
-    "Content-Type": "application/json",
-    "X-API-Key": QVAC_API_KEY,
-}
+def _api_key() -> str:
+    return os.getenv("QVAC_API_KEY", "qvac-local-key")
+
+def _headers() -> Dict[str, str]:
+    return {
+        "Content-Type": "application/json",
+        "X-API-Key":    _api_key(),
+    }
 
 
 async def _post_with_retry(
     path: str,
     payload: Dict[str, Any],
-    retries: int = QVAC_MAX_RETRIES,
-    timeout: int = QVAC_TIMEOUT,
+    retries: int = 1,
+    read_timeout: float = 120.0,
 ) -> Dict[str, Any]:
-    """POST to QVAC with exponential backoff retry."""
-    url = f"{QVAC_API_URL}{path}"
+    """
+    POST to QVAC with explicit per-segment timeout and minimal retries.
+    read_timeout controls how long to wait for the LLM to finish responding.
+    """
+    url        = f"{_base_url()}{path}"
+    timeout    = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=5.0)
     last_error = None
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(1, retries + 1):
             try:
                 logger.info(f"[QVAC] POST {path} (attempt {attempt}/{retries})")
-                response = await client.post(url, json=payload, headers=_HEADERS)
+                response = await client.post(url, json=payload, headers=_headers())
                 response.raise_for_status()
                 return response.json()
 
             except httpx.HTTPStatusError as e:
                 last_error = e
-                logger.error(f"[QVAC] HTTP {e.response.status_code} on {path}: {e.response.text[:200]}")
-                if e.response.status_code in (400, 401, 422):
-                    raise  # Don't retry client errors
+                logger.error(
+                    f"[QVAC] HTTP {e.response.status_code} on {path}: "
+                    f"{e.response.text[:300]}"
+                )
+                # Never retry auth or client errors
+                if e.response.status_code in (400, 401, 403, 422):
+                    raise
                 if attempt < retries:
                     await asyncio.sleep(2 ** attempt)
+
+            except httpx.ReadTimeout as e:
+                last_error = e
+                logger.error(
+                    f"[QVAC] ReadTimeout on {path} after {read_timeout}s "
+                    f"(attempt {attempt}/{retries}) — model still generating"
+                )
+                # Don't retry timeouts — model is still working, retry = duplicate queue entry
+                raise RuntimeError(
+                    f"QVAC response timeout after {read_timeout}s. "
+                    "The model is under load — please try again in a moment."
+                ) from e
 
             except (httpx.ConnectError, httpx.TimeoutException) as e:
                 last_error = e
@@ -55,17 +76,25 @@ async def _post_with_retry(
                 if attempt < retries:
                     await asyncio.sleep(2 ** attempt)
 
-    raise RuntimeError(f"QVAC unreachable after {retries} retries: {last_error}")
+    raise RuntimeError(
+        f"QVAC unreachable after {retries} attempt(s). "
+        f"Last error: {last_error}"
+    )
 
+
+# ── Health ────────────────────────────────────────────────────────────────────
 
 async def health_check() -> Dict[str, Any]:
-    """Check QVAC server health."""
-    async with httpx.AsyncClient(timeout=5) as client:
-        try:
-            r = await client.get(f"{QVAC_API_URL}/health", headers=_HEADERS)
+    """Check QVAC server health. Never raises — returns error dict on failure."""
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5.0, read=5.0, write=5.0, pool=5.0)
+        ) as client:
+            r = await client.get(f"{_base_url()}/health", headers=_headers())
             return r.json()
-        except Exception as e:
-            return {"status": "unreachable", "error": str(e)}
+    except Exception as e:
+        logger.warning(f"[QVAC] Health check failed: {e}")
+        return {"status": "unreachable", "error": str(e)}
 
 
 # ── Loop A: Finance Quest Tutor ───────────────────────────────────────────────
@@ -75,17 +104,19 @@ async def tutor_ask(
     context: Optional[Dict] = None,
     device_tier: str = "desktop",
 ) -> str:
-    """
-    Ask the QVAC tutor a financial literacy question.
-    Returns plain-text response.
-    """
+    """Ask the QVAC tutor a financial literacy question."""
     payload = {
         "message":     message,
         "context":     context or {},
         "stream":      False,
         "device_tier": device_tier,
     }
-    result = await _post_with_retry("/v1/tutor/ask", payload)
+    result = await _post_with_retry(
+        "/v1/tutor/ask",
+        payload,
+        retries=1,
+        read_timeout=120.0,
+    )
     return result.get("response", "")
 
 
@@ -96,17 +127,19 @@ async def coach_analyze(
     profile: Dict[str, Any],
     device_tier: str = "desktop",
 ) -> str:
-    """
-    Ask the coach to analyze a financial situation with user profile context.
-    Returns plain-text coaching response.
-    """
+    """Ask the coach to analyse a financial situation with user profile context."""
     payload = {
         "message":     message,
         "profile":     profile,
         "stream":      False,
         "device_tier": device_tier,
     }
-    result = await _post_with_retry("/v1/coach/analyze", payload)
+    result = await _post_with_retry(
+        "/v1/coach/analyze",
+        payload,
+        retries=1,
+        read_timeout=120.0,
+    )
     return result.get("response", "")
 
 
@@ -115,12 +148,19 @@ async def generate_wellbeing_score(profile: Dict[str, Any]) -> Dict[str, Any]:
     Generate a structured Wellbeing Score (0-100) with breakdown.
     Returns: { score, breakdown, summary, top_action, risk_flags }
     """
-    payload = {"profile": profile}
-    result  = await _post_with_retry("/v1/coach/score", payload, timeout=90)
+    result = await _post_with_retry(
+        "/v1/coach/score",
+        {"profile": profile},
+        retries=1,
+        read_timeout=120.0,
+    )
 
     if result.get("fallback"):
-        logger.warning("[QVAC] Wellbeing score generation fell back — LLM parse error")
-        raise RuntimeError("Score generation failed — try again shortly")
+        logger.warning("[QVAC] Wellbeing score fell back — LLM parse error")
+        raise RuntimeError("Score generation failed — please try again shortly")
+
+    if result.get("score") is None:
+        raise RuntimeError("Score generation returned no data — please try again")
 
     return {
         "score":      result.get("score", 0),
@@ -142,24 +182,24 @@ async def validate_signal(
     Returns: { quality_score, risk_reward_ratio, thesis_clarity,
                manipulation_flags, plain_explanation, recommendation, disclaimer }
     """
-    payload = {
-        "signal":          signal,
-        "submitter_stats": submitter_stats or {},
-    }
-    result = await _post_with_retry("/v1/validator/score", payload, timeout=90)
+    result = await _post_with_retry(
+        "/v1/validator/score",
+        {"signal": signal, "submitter_stats": submitter_stats or {}},
+        retries=1,
+        read_timeout=90.0,
+    )
 
-    # Hard safety check — anything flagged as SCAM_ALERT by QVAC
-    # is auto-rejected regardless of what the caller does with it
     if result.get("recommendation") == "SCAM_ALERT":
         logger.warning(
-            f"[QVAC] SCAM_ALERT on signal: {signal.get('asset_symbol')} "
-            f"user={signal.get('user_id')} flags={result.get('manipulation_flags')}"
+            f"[QVAC] SCAM_ALERT: {signal.get('asset_symbol')} "
+            f"user={signal.get('user_id')} "
+            f"flags={result.get('manipulation_flags')}"
         )
 
     return result
 
 
-# ── AML (existing fraud detection, unchanged) ─────────────────────────────────
+# ── AML — fraud detection ─────────────────────────────────────────────────────
 
 async def aml_analyze(
     transaction: Dict[str, Any],
@@ -167,10 +207,12 @@ async def aml_analyze(
 ) -> Dict[str, Any]:
     """
     AML transaction analysis.
-    Returns: { risk_level, risk_score, flags, str_required, str_narrative, recommended_action }
+    Returns: { risk_level, risk_score, flags, str_required,
+               str_narrative, recommended_action }
     """
-    payload = {
-        "transaction": transaction,
-        "patterns":    patterns or [],
-    }
-    return await _post_with_retry("/v1/aml/analyze", payload, timeout=120)
+    return await _post_with_retry(
+        "/v1/aml/analyze",
+        {"transaction": transaction, "patterns": patterns or []},
+        retries=1,
+        read_timeout=120.0,
+    )
