@@ -1049,7 +1049,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur opacity-30"></div>
               <img src="/seamount-logo.jpeg" alt="Seamount" className="relative w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-lg" />
             </div>
-            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Seamount</span>
+            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-green-600 to-purple-600 bg-clip-text text-transparent">Seamount</span>
           </div>
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
