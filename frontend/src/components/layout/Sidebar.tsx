@@ -53,7 +53,7 @@ const Sidebar: React.FC = () => {
     { label: 'My Assets', icon: Briefcase, path: '/my-assets', adminOnly: true },
     { label: 'Tokenization', icon: Coins, path: '/tokenization', badge: 'NEW', adminOnly: true },
     { label: 'Market', icon: TrendingUp, path: '/trading', adminOnly: true },
-    { label: 'Financial Literacy', icon: Brain, path: '/learn', badge: 'NEW' },
+    { label: 'AI Tutor', icon: Brain, path: '/learn', badge: 'NEW' },
     { label: 'Terminal', icon: Activity, path: '/terminal' },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];

@@ -197,8 +197,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         "Enterprise treasury management"
       ],
       icon: <Globe2 className="h-12 w-12" />,
-      color: "from-blue-500 to-cyan-500",
-      gradient: "bg-gradient-to-br from-blue-500/20 to-cyan-500/20",
+      color: "from-emerald-500 to-teal-500",
+      gradient: "bg-gradient-to-br from-emerald-500/20 to-teal-500/20",
       imageKey: 'wallets'
     },
     tokenization: {
@@ -211,8 +211,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         "Transparent, merit-based capital allocation"
       ],
       icon: <PieChart className="h-12 w-12" />,
-      color: "from-purple-500 to-pink-500",
-      gradient: "bg-gradient-to-br from-purple-500/20 to-pink-500/20",
+      color: "from-green-500 to-lime-500",
+      gradient: "bg-gradient-to-br from-green-500/20 to-lime-500/20",
       imageKey: 'tokenization'
     },
     prediction: {
@@ -225,8 +225,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         "Dispute resolution system for safe trading"
       ],
       icon: <ArrowRight className="h-12 w-12" />,
-      color: "from-orange-500 to-yellow-500",
-      gradient: "bg-gradient-to-br from-orange-500/20 to-yellow-500/20",
+      color: "from-teal-500 to-cyan-500",
+      gradient: "bg-gradient-to-br from-teal-500/20 to-cyan-500/20",
       imageKey: 'p2p'
     },
     audit: {
@@ -321,7 +321,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       switch(serviceKey) {
         case 'wallets':
           return (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-cyan-600 p-6 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 p-6 overflow-hidden">
               <div className="absolute inset-0">
                 {[...Array(15)].map((_, i) => (
                   <motion.div
@@ -378,9 +378,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   </motion.div>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { token: 'ALGO', value: '$4,250', color: 'from-blue-400 to-blue-600' },
-                      { token: 'BTC', value: '$5,892', color: 'from-orange-400 to-orange-600' },
-                      { token: 'ETH', value: '$2,345', color: 'from-purple-400 to-purple-600' }
+                      { token: 'ALGO', value: '$4,250', color: 'from-emerald-400 to-teal-600' },
+                      { token: 'BTC', value: '$5,892', color: 'from-lime-400 to-green-600' },
+                      { token: 'ETH', value: '$2,345', color: 'from-teal-400 to-cyan-600' }
                     ].map((item, idx) => (
                       <motion.div 
                         key={item.token} 
@@ -400,9 +400,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { icon: '↓', label: 'Fund', color: 'hover:bg-green-500/30' }, 
-                    { icon: '↑', label: 'Send', color: 'hover:bg-blue-500/30' }, 
-                    { icon: '⇄', label: 'Swap', color: 'hover:bg-purple-500/30' }, 
-                    { icon: '📈', label: 'Earn', color: 'hover:bg-yellow-500/30' }
+                    { icon: '↑', label: 'Send', color: 'hover:bg-emerald-500/30' }, 
+                    { icon: '⇄', label: 'Swap', color: 'hover:bg-teal-500/30' }, 
+                    { icon: '📈', label: 'Earn', color: 'hover:bg-lime-500/30' }
                   ].map((action, idx) => (
                     <motion.div 
                       key={action.label} 
@@ -424,7 +424,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           
         case 'tokenization':
           return (
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-600 p-6 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-lime-600 p-6 overflow-hidden">
               <div className="absolute inset-0">
                 {[...Array(8)].map((_, i) => (
                   <motion.div
@@ -508,7 +508,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       {[1,2,3,4].map(i => (
                         <motion.div 
                           key={i} 
-                          className="h-6 bg-gradient-to-br from-yellow-400/40 to-orange-400/40 rounded"
+                          className="h-6 bg-gradient-to-br from-lime-400/40 to-green-400/40 rounded"
                           initial={{ opacity: 0, scale: 0 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: i * 0.2, repeat: Infinity, repeatDelay: 2 }}
@@ -549,123 +549,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
           );
           
-        case 'secondary':
-          return (
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-yellow-600 p-6 overflow-hidden">
-              <div className="absolute inset-0">
-                {[...Array(12)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-2 h-2 bg-white/40 rounded-full"
-                    initial={{ x: Math.random() * 256, y: 256 }}
-                    animate={{ y: -50, opacity: [0, 1, 0] }}
-                    transition={{
-                      duration: 2 + Math.random() * 2,
-                      repeat: Infinity,
-                      delay: Math.random() * 2
-                    }}
-                  />
-                ))}
-              </div>
-              
-              <div className="h-full flex flex-col justify-between text-white relative z-10">
-                <motion.div 
-                  className="flex justify-between items-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <span className="text-xs font-medium">Active Offers</span>
-                  <motion.div
-                    animate={{ y: [0, -5, 0], rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <TrendingUp className="h-6 w-6 opacity-80" />
-                  </motion.div>
-                </motion.div>
-                
-                <div className="space-y-3">
-                  <motion.div 
-                    className="bg-white/10 backdrop-blur rounded-xl p-3 border border-white/20"
-                    whileHover={{ scale: 1.05 }}
-                  >
-                    <div className="text-xs opacity-70 mb-1">Market Value</div>
-                    <motion.div 
-                      className="text-2xl font-bold mb-2"
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                    >
-                      $25M
-                    </motion.div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
-                        <motion.div 
-                          className="h-full bg-gradient-to-r from-green-400 to-emerald-400"
-                          initial={{ width: "0%" }}
-                          animate={{ width: "75%" }}
-                          transition={{ duration: 1.5 }}
-                        />
-                      </div>
-                      <span className="text-xs">75%</span>
-                    </div>
-                  </motion.div>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <motion.div 
-                      className="bg-white/10 backdrop-blur rounded-lg p-3 border border-white/20"
-                      initial={{ x: -20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      whileHover={{ scale: 1.1, rotate: 3 }}
-                    >
-                      <div className="text-xs opacity-70 mb-1">Active</div>
-                      <motion.div 
-                        className="text-xl font-bold"
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      >
-                        5
-                      </motion.div>
-                    </motion.div>
-                    <motion.div 
-                      className="bg-white/10 backdrop-blur rounded-lg p-3 border border-white/20"
-                      initial={{ x: 20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      whileHover={{ scale: 1.1, rotate: -3 }}
-                    >
-                      <div className="text-xs opacity-70 mb-1">Settlement</div>
-                      <div className="text-xl font-bold">2-4m</div>
-                    </motion.div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  {[1,2,3].map(i => (
-                    <motion.div 
-                      key={i} 
-                      className="bg-white/10 backdrop-blur rounded-lg p-2 flex items-center justify-between border border-white/20"
-                      initial={{ x: -50, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      transition={{ delay: 0.6 + i * 0.1 }}
-                      whileHover={{ x: 5, scale: 1.02 }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <motion.div 
-                          className="w-6 h-6 bg-gradient-to-br from-orange-300 to-yellow-300 rounded"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 10, repeat: Infinity }}
-                        />
-                        <div className="text-xs">Asset #{i}</div>
-                      </div>
-                      <div className="text-xs font-semibold">$213</div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-
         case 'p2p':
           return (
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-yellow-600 p-6 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-teal-500 to-cyan-600 p-6 overflow-hidden">
               <div className="absolute inset-0">
                 {[...Array(12)].map((_, i) => (
                   <motion.div
@@ -717,7 +603,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { action: 'Buy BTC', price: '$67,458', color: 'bg-green-400/20' },
-                        { action: 'Sell ETH', price: '$2,054', color: 'bg-blue-400/20' }
+                        { action: 'Sell ETH', price: '$2,054', color: 'bg-teal-400/20' }
                       ].map((item, idx) => (
                         <div key={idx} className={`${item.color} rounded-lg p-2 text-center`}>
                           <div className="text-xs">{item.action}</div>
@@ -798,7 +684,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           return (
             <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 p-6 overflow-hidden">
               <div className="absolute inset-0">
-                {/* Animated transaction lines */}
                 {[...Array(8)].map((_, i) => (
                   <motion.div
                     key={i}
@@ -809,7 +694,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.4 }}
                   />
                 ))}
-                {/* Scanning shield */}
                 <motion.div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                   <Shield className="h-24 w-24 text-white/20" />
                   <motion.div
@@ -951,7 +835,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         }
         
         .gradient-text {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 25%, #ec4899 50%, #f59e0b 75%, #10b981 100%);
+          background: linear-gradient(135deg, #059669 0%, #10b981 25%, #14b8a6 50%, #84cc16 75%, #22c55e 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -989,8 +873,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         }
         
         @keyframes face-pulse {
-          0% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.5); }
-          100% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4); }
+          0% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
+          100% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.8), 0 0 60px rgba(5, 150, 105, 0.4); }
         }
         
         .cyber-block {
@@ -1046,29 +930,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <div className="max-w-7xl mx-auto px-2 sm:px-6 py-2 sm:py-4 flex justify-between items-center gap-2">
           <div className="flex items-center space-x-1.5 sm:space-x-3">
             <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg blur opacity-30"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg blur opacity-30"></div>
               <img src="/seamount-logo.jpeg" alt="Seamount" className="relative w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-lg" />
             </div>
-            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Seamount</span>
+            <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Seamount</span>
           </div>
           
           <nav className="hidden md:flex space-x-8 text-sm font-medium">
-            <a href="#services" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Services</a>
-            <a href="#how-it-works" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">How It Works</a>
-            <a href="#calculator" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Calculator</a>
-            <a href="#business" className="text-gray-700 hover:text-blue-600 transition-all hover:scale-105">Business</a>
+            <a href="#services" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">Services</a>
+            <a href="#how-it-works" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">How It Works</a>
+            <a href="#calculator" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">Calculator</a>
+            <a href="#business" className="text-gray-700 hover:text-green-600 transition-all hover:scale-105">Business</a>
           </nav>
           
           <div className="flex items-center space-x-1.5 sm:space-x-3">
             <button 
               onClick={() => onOpenAuth('login')} 
-              className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 hover:text-blue-600 transition-all"
+              className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 hover:text-green-600 transition-all"
             >
               Sign In
             </button>
             <button 
               onClick={() => onOpenAuth('register')} 
-              className="px-3 sm:px-6 py-1.5 sm:py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs sm:text-base font-semibold rounded-lg hover:shadow-xl hover:scale-105 transition-all whitespace-nowrap"
+              className="px-3 sm:px-6 py-1.5 sm:py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs sm:text-base font-semibold rounded-lg hover:shadow-xl hover:scale-105 transition-all whitespace-nowrap"
             >
               Get Started
             </button>
@@ -1079,7 +963,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       {/* Hero Section */}
       <section ref={heroRef} className="pt-20 sm:pt-24 pb-12 sm:pb-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={12} section="hero" />
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 opacity-50"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 opacity-50"></div>
         <div className="max-w-7xl mx-auto relative z-10">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -1111,14 +995,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-6 sm:mb-8 px-4">
               <motion.button 
                 onClick={() => onOpenAuth('register')} 
-                className="group px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base font-semibold rounded-xl transition-all duration-300"
+                className="group px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm sm:text-base font-semibold rounded-xl transition-all duration-300"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 animate={{ 
                   boxShadow: [
-                    "0 0 0 0 rgba(59, 130, 246, 0)",
-                    "0 0 0 10px rgba(59, 130, 246, 0.1)",
-                    "0 0 0 0 rgba(59, 130, 246, 0)"
+                    "0 0 0 0 rgba(5, 150, 105, 0)",
+                    "0 0 0 10px rgba(5, 150, 105, 0.1)",
+                    "0 0 0 0 rgba(5, 150, 105, 0)"
                   ]
                 }}
                 transition={{ 
@@ -1140,14 +1024,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </motion.button>
             </div>
             
-            {/* 🎨 CYBERPUNK WEB3 GLIDER */}
+            {/* 🎨 GLIDER WITH GREEN THEME */}
             <div className="relative h-48 flex items-center justify-center">
-              {/* Particle Trail */}
               <div className="absolute inset-0 overflow-hidden">
                 {[...Array(20)].map((_, i) => (
                   <div
                     key={i}
-                    className="absolute w-1 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full particle"
+                    className="absolute w-1 h-1 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full particle"
                     style={{
                       left: `${Math.random() * 100}%`,
                       animationDelay: `${Math.random() * 3}s`,
@@ -1157,15 +1040,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 ))}
               </div>
               
-              {/* Main Glider Character */}
               <div className="relative z-10 glider-float">
-                {/* Holographic Glow */}
-                <div className="absolute -inset-8 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-pink-500/30 rounded-full blur-2xl animate-pulse"></div>
+                <div className="absolute -inset-8 bg-gradient-to-r from-green-500/30 via-emerald-500/30 to-teal-500/30 rounded-full blur-2xl animate-pulse"></div>
                 
-                {/* 3D Blockchain Cube */}
                 <div className="relative w-24 h-24 cyber-cube">
-                  {/* Front Face */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg transform rotate-12 cyber-face border-2 border-white/30">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg transform rotate-12 cyber-face border-2 border-white/30">
                     <div className="absolute inset-2 border border-white/20 rounded">
                       <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 gap-1 p-1">
                         {[...Array(9)].map((_, i) => (
@@ -1175,10 +1054,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </div>
                   </div>
                   
-                  {/* Side Face */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg transform -rotate-6 translate-x-2 translate-y-2 cyber-face border-2 border-white/20 opacity-60"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg transform -rotate-6 translate-x-2 translate-y-2 cyber-face border-2 border-white/20 opacity-60"></div>
                   
-                  {/* Orbiting Coins */}
                   <div className="absolute inset-0 orbit">
                     <div className="absolute top-0 left-1/2 w-3 h-3 -ml-1.5 bg-yellow-400 rounded-full shadow-lg shadow-yellow-400/50"></div>
                   </div>
@@ -1188,12 +1065,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </div>
               </div>
               
-              {/* Scroll Prompt */}
               <button 
                 onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
                 className="absolute bottom-0 left-1/2 -translate-x-1/2 group cursor-pointer"
               >
-                <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+                <div className="flex flex-col items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
                   <span className="text-sm font-medium">Explore Services</span>
                   <div className="w-8 h-12 border-2 border-current rounded-full flex items-start justify-center p-2 scroll-indicator">
                     <div className="w-1.5 h-3 bg-current rounded-full scroll-dot"></div>
@@ -1206,7 +1082,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       </section>
 
       {/* How It Works Section */}
-      <section id="how-it-works" className="py-16 px-3 sm:px-6 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
+      <section id="how-it-works" className="py-16 px-3 sm:px-6 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 relative overflow-hidden">
         <FloatingCrypto count={8} section="how-it-works" />
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-16">
@@ -1219,52 +1095,52 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {/* Step 1: Sign Up & KYC */}
+            {/* Step 1 */}
             <motion.div 
-              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-blue-300"
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-green-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
                   1
                 </div>
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
-                  <Users className="h-8 w-8 text-blue-500" />
+                  <Users className="h-8 w-8 text-green-500" />
                 </motion.div>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">Sign Up & Verify</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Create your account in 2 minutes. Complete KYC now or skip and verify later—your choice.
               </p>
-              <div className="flex items-center gap-2 text-xs text-blue-600 font-medium">
+              <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
                 <CheckCircle className="h-4 w-4" />
                 <span>Email verification required</span>
               </div>
             </motion.div>
 
-            {/* Step 2: Multi-Chain Wallets */}
+            {/* Step 2 */}
             <motion.div 
-              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-purple-300"
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-emerald-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
                   2
                 </div>
                 <motion.div
                   animate={{ rotate: [0, 360] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
                 >
-                  <Wallet className="h-8 w-8 text-purple-500" />
+                  <Wallet className="h-8 w-8 text-emerald-500" />
                 </motion.div>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">6 Smart Wallets Created</h3>
@@ -1275,7 +1151,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 {['ALGO', 'BTC', 'ETH', 'POL', 'TRX', 'SOL'].map((chain, idx) => (
                   <div 
                     key={chain} 
-                    className="text-xs font-semibold text-center py-1 bg-purple-50 rounded text-purple-700"
+                    className="text-xs font-semibold text-center py-1 bg-emerald-50 rounded text-emerald-700"
                     style={{ animationDelay: `${idx * 0.1}s` }}
                   >
                     {chain}
@@ -1284,23 +1160,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
             </motion.div>
 
-            {/* Step 3: Fund Your Wallets */}
+            {/* Step 3 */}
             <motion.div 
-              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-green-300"
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-teal-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
                   3
                 </div>
                 <motion.div
                   animate={{ y: [0, -5, 0] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 >
-                  <CreditCard className="h-8 w-8 text-green-500" />
+                  <CreditCard className="h-8 w-8 text-teal-500" />
                 </motion.div>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">Receive Tokens or Fund Wallet</h3>
@@ -1308,43 +1184,42 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 Send tokens to your wallets or buy from P2P merchants—we support local currencies.
               </p>
               <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Paystack</span>
-                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">Flutterwave</span>
-                <span className="px-2 py-1 bg-green-50 text-green-700 rounded font-medium">P2P Trading</span>
+                <span className="px-2 py-1 bg-teal-50 text-teal-700 rounded font-medium">Paystack</span>
+                <span className="px-2 py-1 bg-teal-50 text-teal-700 rounded font-medium">Flutterwave</span>
+                <span className="px-2 py-1 bg-teal-50 text-teal-700 rounded font-medium">P2P Trading</span>
               </div>
             </motion.div>
 
-            {/* Step 4: Trade & Withdraw */}
+            {/* Step 4 */}
             <motion.div 
-              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-orange-300"
+              className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-lime-300"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-12 h-12 bg-gradient-to-br from-lime-500 to-lime-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
                   4
                 </div>
                 <motion.div
                   animate={{ rotate: [0, 10, -10, 0] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
-                  <TrendingUp className="h-8 w-8 text-orange-500" />
+                  <TrendingUp className="h-8 w-8 text-lime-500" />
                 </motion.div>
               </div>
               <h3 className="text-xl font-bold mb-3 text-gray-900">Send & Withdraw</h3>
               <p className="text-gray-600 text-sm mb-4">
                 Make global payments, earn yields, swap tokens. Withdraw anytime back to local fiat—seamlessly.
               </p>
-              <div className="flex items-center gap-2 text-xs text-orange-600 font-medium">
+              <div className="flex items-center gap-2 text-xs text-lime-600 font-medium">
                 <Sparkles className="h-4 w-4" />
                 <span>Instant off-ramps available</span>
               </div>
             </motion.div>
           </div>
 
-          {/* Call to Action */}
           <motion.div 
             className="text-center mt-12"
             initial={{ opacity: 0, y: 20 }}
@@ -1354,7 +1229,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           >
             <button 
               onClick={() => onOpenAuth('register')} 
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+              className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
             >
               Get Started Now <ArrowRight className="inline h-5 w-5 ml-2" />
             </button>
@@ -1365,7 +1240,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* Services Section WITH IMAGES */}
+      {/* Services Section */}
       <section id="services" ref={servicesRef} className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={10} section="services" />
         <div className="max-w-7xl mx-auto relative z-10">
@@ -1429,13 +1304,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     
                     <button 
                       onClick={() => onOpenAuth('register')} 
-                      className="mt-8 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
+                      className="mt-8 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg hover:scale-105 transition-all"
                     >
                       Get Started
                     </button>
                   </div>
                   
-                  {/* 📍 SERVICE IMAGE DISPLAY */}
                   <div className="hidden sm:block">
                     <ServiceImage serviceKey={services[activeService].imageKey} />
                   </div>
@@ -1446,7 +1320,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-      {/* 📍 COMPLETE CALCULATOR SECTION (updated with fixed components for both tiers) */}
+      {/* Calculator Section */}
       <section id="calculator" className="py-12 sm:py-20 px-3 sm:px-6 bg-gray-50 relative overflow-hidden">
         <FloatingCrypto count={8} section="calculator" />
         <div className="max-w-6xl mx-auto relative z-10">
@@ -1472,7 +1346,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     type="number" 
                     value={calc.amount}
                     onChange={(e) => setCalc({...calc, amount: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-lg focus:border-blue-600 focus:outline-none transition"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-lg focus:border-green-600 focus:outline-none transition"
                     placeholder="10000"
                   />
                 </div>
@@ -1482,7 +1356,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <select 
                     value={calc.period}
                     onChange={(e) => setCalc({...calc, period: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-lg focus:border-blue-600 focus:outline-none transition"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-lg focus:border-green-600 focus:outline-none transition"
                   >
                     <option value="0">Prime Tier - 5.25% Net APY (Instant Liquidity)</option>
                     <option value="90">Alpha Tier - 8.20% Net APY (Quarterly Liquidity)</option>
@@ -1499,7 +1373,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </span>
                   </div>
                   {showFundingInfo && (
-                    <div className="mb-3 p-3 bg-blue-50 rounded-lg text-xs text-gray-700 border border-blue-200">
+                    <div className="mb-3 p-3 bg-green-50 rounded-lg text-xs text-gray-700 border border-green-200">
                       {calc.period === '90' ? (
                         <><strong>Alpha Tier (Securitize Apollo Fund):</strong> Diversified credit fund targeting 10.9% gross APY. Managed by Apollo Global Management. Seamount charges 0.5% annual + 20% performance fee (approx. 2.70% total). Your net: 8.20% APY. Quarterly liquidity allows redemptions every 90 days.</>
                       ) : (
@@ -1514,7 +1388,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         <>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Diversified Credit Fund</span>
-                            <span className="text-blue-500 font-semibold">10.5-11.5%</span>
+                            <span className="text-green-500 font-semibold">10.5-11.5%</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Management Fee</span>
@@ -1522,7 +1396,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Seamount Fee</span>
-                            <span className="text-indigo-500 font-semibold">-2.70%</span>
+                            <span className="text-emerald-500 font-semibold">-2.70%</span>
                           </div>
                           <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
                             <span className="text-gray-900 font-medium">Your Net APY</span>
@@ -1533,7 +1407,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                         <>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Senior Secured Loans</span>
-                            <span className="text-blue-500 font-semibold">7.5-8.5%</span>
+                            <span className="text-green-500 font-semibold">7.5-8.5%</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Management Fee</span>
@@ -1541,7 +1415,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                           </div>
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Seamount Fee</span>
-                            <span className="text-indigo-500 font-semibold">-1.32%</span>
+                            <span className="text-emerald-500 font-semibold">-1.32%</span>
                           </div>
                           <div className="flex justify-between items-center text-xs border-t border-gray-300 pt-2">
                             <span className="text-gray-900 font-medium">Your Net APY</span>
@@ -1556,7 +1430,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </div>
             
             {/* Right Results Panel */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-4 sm:p-8 border-2 border-blue-200 shadow-sm">
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 sm:p-8 border-2 border-green-200 shadow-sm">
               <h3 className="text-2xl font-bold mb-6 flex items-center text-gray-900">
                 <TrendingUp className="h-6 w-6 text-green-500 mr-2" />
                 Estimated Returns
@@ -1583,8 +1457,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
 
               <div className="space-y-4">
-                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                  <div className="text-xs text-blue-700 font-medium mb-2">Fee Breakdown</div>
+                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                  <div className="text-xs text-green-700 font-medium mb-2">Fee Breakdown</div>
                   <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Gross Fund APY:</span>
@@ -1594,17 +1468,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Seamount Platform Fee:</span>
-                      <span className="font-semibold text-indigo-600">0.50%</span>
+                      <span className="font-semibold text-emerald-600">0.50%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Performance Fee (20%):</span>
-                      <span className="font-semibold text-indigo-600" suppressHydrationWarning>
+                      <span className="font-semibold text-emerald-600" suppressHydrationWarning>
                         {((yieldData.grossAPY * 0.20) * 100).toFixed(2)}%
                       </span>
                     </div>
-                    <div className="flex justify-between pt-1 border-t border-blue-300">
+                    <div className="flex justify-between pt-1 border-t border-green-300">
                       <span className="text-gray-900 font-semibold">Total Seamount Fee:</span>
-                      <span className="font-bold text-indigo-600" suppressHydrationWarning>
+                      <span className="font-bold text-emerald-600" suppressHydrationWarning>
                         {(yieldData.seamountFee * 100).toFixed(2)}%
                       </span>
                     </div>
@@ -1619,14 +1493,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-700 font-medium">Fund Manager</span>
-                  <span className="font-semibold text-indigo-600">
+                  <span className="font-semibold text-emerald-600">
                     {calc.period === '90' ? 'Apollo Global' : 'Hamilton Lane'}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-700 font-medium">Platform Partner</span>
-                  <span className="font-semibold text-purple-600">Securitize Capital</span>
+                  <span className="font-semibold text-emerald-600">Securitize Capital</span>
                 </div>
 
                 <div className="flex justify-between items-center text-sm">
@@ -1663,7 +1537,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                       </div>
                       <div className="flex justify-between">
                         <span>Liquidity Risk:</span>
-                        <span className="text-blue-600">{calc.period === '0' ? '15 pts' : '20 pts'}</span>
+                        <span className="text-green-600">{calc.period === '0' ? '15 pts' : '20 pts'}</span>
                       </div>
                     </div>
                   </div>
@@ -1695,7 +1569,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
-       {/* Business Section WITH FORM */}
+      {/* Business Section */}
       <section id="business" className="py-12 sm:py-20 px-3 sm:px-6 relative overflow-hidden">
         <FloatingCrypto count={10} section="business" />
         <div className="max-w-7xl mx-auto relative z-10">
@@ -1709,10 +1583,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
           </div>
           
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-12">
-            {/* Business Solutions */}
             <div>
               <div className="glass-card rounded-2xl p-4 sm:p-8 mb-6 sm:mb-8">
-                <Briefcase className="h-12 w-12 text-blue-600 mb-6" />
+                <Briefcase className="h-12 w-12 text-green-600 mb-6" />
                 <h3 className="text-2xl font-bold mb-6 text-gray-900">Business Solutions</h3>
                 
                 <div className="space-y-6">
@@ -1749,27 +1622,26 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 </div>
               </div>
               
-              {/* Contact Info */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="glass-card rounded-xl p-4 text-center">
-                  <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <MapPin className="h-6 w-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MapPin className="h-6 w-6 text-green-600" />
                   </div>
                   <div className="text-sm font-medium text-gray-900">Our Office</div>
                   <div className="text-xs text-gray-600">Wood Avenue, Kilimani</div>
                 </div>
                 
                 <div className="glass-card rounded-xl p-4 text-center">
-                  <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Mail className="h-6 w-6 text-green-600" />
+                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Mail className="h-6 w-6 text-emerald-600" />
                   </div>
                   <div className="text-sm font-medium text-gray-900">Email Us</div>
                   <div className="text-xs text-gray-600">business@seamount.io</div>
                 </div>
                 
                 <div className="glass-card rounded-xl p-4 text-center">
-                  <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Phone className="h-6 w-6 text-purple-600" />
+                  <div className="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Phone className="h-6 w-6 text-teal-600" />
                   </div>
                   <div className="text-sm font-medium text-gray-900">Call Us</div>
                   <div className="text-xs text-gray-600">+254 751 875 374</div>
@@ -1777,7 +1649,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </div>
             </div>
             
-            {/* Contact Form */}
             <div className="glass-card rounded-2xl p-4 sm:p-8 shadow-sm">
               <h3 className="text-2xl font-bold mb-6 text-gray-900">Get in Touch</h3>
               <div className="space-y-4">
@@ -1787,7 +1658,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     type="text"
                     value={formState.name}
                     onChange={(e) => setFormState({...formState, name: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-blue-600 focus:outline-none transition"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-green-600 focus:outline-none transition"
                     placeholder="John Doe"
                     required
                   />
@@ -1798,7 +1669,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     type="text"
                     value={formState.businessName}
                     onChange={(e) => setFormState({...formState, businessName: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-blue-600 focus:outline-none transition"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-green-600 focus:outline-none transition"
                     placeholder="Your Company Ltd."
                     required
                   />
@@ -1809,7 +1680,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     type="email"
                     value={formState.email}
                     onChange={(e) => setFormState({...formState, email: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-blue-600 focus:outline-none transition"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-green-600 focus:outline-none transition"
                     placeholder="john@company.com"
                     required
                   />
@@ -1819,7 +1690,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                   <textarea
                     value={formState.message}
                     onChange={(e) => setFormState({...formState, message: e.target.value})}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-blue-600 focus:outline-none transition resize-none"
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-300 rounded-xl text-gray-900 text-sm focus:border-green-600 focus:outline-none transition resize-none"
                     rows={4}
                     placeholder="Tell us about your business needs..."
                     required
@@ -1828,7 +1699,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 <button
                   onClick={handleContactSubmit}
                   disabled={formStatus === 'sending'}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition disabled:opacity-50"
+                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-lg transition disabled:opacity-50"
                 >
                   {formStatus === 'sending' ? 'Sending...' : formStatus === 'success' ? 'Message Sent!' : formStatus === 'error' ? 'Failed, Try Again' : 'Send Message'}
                 </button>
@@ -1861,8 +1732,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                 >
                   <h3 className="font-semibold text-gray-900">{faq.question}</h3>
                   {expandedFaqs.includes(index) ? 
-                    <ChevronUp className="h-5 w-5 text-blue-600" /> : 
-                    <ChevronDown className="h-5 w-5 text-blue-600" />
+                    <ChevronUp className="h-5 w-5 text-green-600" /> : 
+                    <ChevronDown className="h-5 w-5 text-green-600" />
                   }
                 </button>
                 {expandedFaqs.includes(index) && (
@@ -1881,7 +1752,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
         <FloatingCrypto count={15} section="cta" />
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-30"></div>
+            <div className="absolute -inset-1 bg-gradient-to-r from-green-600 to-emerald-600 rounded-3xl blur opacity-30"></div>
             <div className="relative glass-card rounded-3xl p-6 sm:p-12">
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 text-gray-900 px-2">
                 Building an <span className="gradient-text">Ownership Economy</span> for Everyone
@@ -1891,13 +1762,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               </p>
               <button 
                 onClick={() => onOpenAuth('register')} 
-                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
+                className="px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
               >
                 Start Your Journey Today
               </button>
               <p className="mt-6 text-sm text-gray-500">
                 Already part of the tribe?{' '}
-                <button onClick={() => onOpenAuth('login')} className="text-blue-600 hover:underline font-semibold">
+                <button onClick={() => onOpenAuth('login')} className="text-green-600 hover:underline font-semibold">
                   Sign In
                 </button>
               </p>
@@ -1920,22 +1791,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#services" className="hover:text-white transition">Features</a></li>
-                <li><a href="#calculator" className="hover:text-white transition">Calculator</a></li>
+                <li><a href="#services" className="hover:text-green-400 transition">Features</a></li>
+                <li><a href="#calculator" className="hover:text-green-400 transition">Calculator</a></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#services" className="hover:text-white transition">Services</a></li>
-                <li><a href="#business" className="hover:text-white transition">Business</a></li>
+                <li><a href="#services" className="hover:text-green-400 transition">Services</a></li>
+                <li><a href="#business" className="hover:text-green-400 transition">Business</a></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/legal/privacy-policy.html" className="hover:text-white transition">Privacy Policy</a></li>
-                <li><a href="/legal/terms-of-service.html" className="hover:text-white transition">Terms of Service</a></li>
+                <li><a href="/legal/privacy-policy.html" className="hover:text-green-400 transition">Privacy Policy</a></li>
+                <li><a href="/legal/terms-of-service.html" className="hover:text-green-400 transition">Terms of Service</a></li>
               </ul>
             </div>
           </div>
@@ -1944,7 +1815,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
               <p>© {new Date().getFullYear()} Seamount Technologies Ltd. All rights reserved.</p>
               <div className="flex gap-4">
                 <div className="flex items-center text-sm"><Shield className="h-4 w-4 mr-1 text-green-400" /><span>Regulated</span></div>
-                <div className="flex items-center text-sm"><Lock className="h-4 w-4 mr-1 text-blue-400" /><span>Self-Custody</span></div>
+                <div className="flex items-center text-sm"><Lock className="h-4 w-4 mr-1 text-green-400" /><span>Self-Custody</span></div>
               </div>
             </div>
           </div>
