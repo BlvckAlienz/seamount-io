@@ -924,6 +924,34 @@ class Settings(BaseSettings):
         description="'production' or 'sandbox'"
     )
 
+    # ── Busha ─────────────────────────────────────────────────────────────────
+    BUSHA_SECRET_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Busha secret key (sk_live_... or sk_test_...)"
+    )
+    BUSHA_PUBLIC_KEY: str = Field(
+        default="",
+        description="Busha public key (pk_live_... or pk_test_...)"
+    )
+    BUSHA_ENVIRONMENT: str = Field(
+        default="sandbox",
+        description="'sandbox' or 'production'"
+    )
+
+    # ── Kotani Pay ────────────────────────────────────────────────────────────
+    KOTANI_API_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Kotani Pay API key from dashboard"
+    )
+    KOTANI_WEBHOOK_SECRET: Optional[SecretStr] = Field(
+        default=None,
+        description="Kotani Pay webhook signing secret"
+    )
+    KOTANI_ENVIRONMENT: str = Field(
+        default="sandbox",
+        description="'sandbox' or 'production'"
+    )
+
     # Harbor (OwlPay) - Multi-chain crypto gateway
     HARBOR_API_KEY: Optional[SecretStr] = Field(None, env="HARBOR_API_KEY")
     HARBOR_WEBHOOK_URL: Optional[str] = Field(

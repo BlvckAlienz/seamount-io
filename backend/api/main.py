@@ -361,6 +361,22 @@ except ImportError as e:
     routers_available['moonpay'] = None
 
 try:
+    from backend.api.routes.busha import router as busha_router
+    routers_available['busha'] = busha_router
+    logger.info("✅ Busha router imported")
+except ImportError as e:
+    logger.error(f"❌ Busha router import error: {e}")
+    routers_available['busha'] = None
+ 
+try:
+    from backend.api.routes.kotani import router as kotani_router
+    routers_available['kotani'] = kotani_router
+    logger.info("✅ Kotani Pay router imported")
+except ImportError as e:
+    logger.error(f"❌ Kotani router import error: {e}")
+    routers_available['kotani'] = None
+
+try:
     from backend.api.routes.learn import router as learn_router
     routers_available['learn'] = learn_router
     logger.info("✅ Financial Literacy router imported (quests, wellbeing, guild)")
@@ -989,7 +1005,15 @@ if routers_available.get('wdk_protocols'):
 if routers_available.get('moonpay'):
     app.include_router(routers_available['moonpay'], prefix="/api/v1", tags=["MoonPay"])
     logger.info("✅ MoonPay router registered at /api/v1/moonpay")
-        
+
+if routers_available.get('busha'):
+    app.include_router(routers_available['busha'], prefix="/api/v1", tags=["Busha"])
+    logger.info("✅ Busha router registered at /api/v1/busha")
+ 
+if routers_available.get('kotani'):
+    app.include_router(routers_available['kotani'], prefix="/api/v1", tags=["Kotani Pay"])
+    logger.info("✅ Kotani Pay router registered at /api/v1/kotani")
+    
     # Register quota router (/api/v1/quota/...)
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
