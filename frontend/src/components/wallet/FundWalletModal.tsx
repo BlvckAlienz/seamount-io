@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription,
   DialogHeader, DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import { Loader2, Wallet, Info, AlertCircle, ShieldCheck, Globe, Banknote } from 'lucide-react'
+import { Loader2, Wallet, Info, AlertCircle, ShieldCheck, Globe, Banknote, X } from 'lucide-react'
 
 interface FundWalletModalProps {
   open: boolean
@@ -288,14 +288,23 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         {/* Sticky Header */}
         <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-5 pt-5 pb-4 rounded-t-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
-              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              Buy Crypto
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
+                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30">
+                  <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                Buy Crypto
+              </DialogTitle>
+              <button
+                onClick={() => onOpenChange(false)}
+                className="rounded-full p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
             <DialogDescription className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Choose how you want to pay.
+              Card, bank transfer, Apple Pay & Google Pay. 160+ countries.
             </DialogDescription>
           </DialogHeader>
         </div>
