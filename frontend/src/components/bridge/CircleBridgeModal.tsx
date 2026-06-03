@@ -150,10 +150,10 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
         {step.state === 'success' && <CheckCircle2 className="text-green-400 w-5 h-5" />}
         {step.state === 'error'   && <AlertCircle  className="text-red-400   w-5 h-5" />}
         {step.state === 'pending' && <Loader2       className="text-blue-400  w-5 h-5 animate-spin" />}
-        {step.state === 'noop'    && <div className="w-5 h-5 rounded-full border border-gray-600" />}
+        {step.state === 'noop' && <div className="w-5 h-5 rounded-full border border-gray-300 dark:border-gray-600" />}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white font-medium">{STEP_LABELS[step.name] || step.name}</p>
+        <p className="text-sm text-gray-900 dark:text-white font-medium">{STEP_LABELS[step.name] || step.name}</p>
         {step.explorerUrl && (
           <a href={step.explorerUrl} target="_blank" rel="noopener noreferrer"
              className="text-xs text-blue-400 hover:text-blue-300 truncate block">
@@ -168,8 +168,8 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
   // ── Fee row helper ──────────────────────────────────────────────────────────
   const FeeRow = ({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) => (
     <div className="flex justify-between text-sm py-1">
-      <span className="text-gray-400">{label}</span>
-      <span className={highlight ? 'text-green-400 font-semibold' : 'text-white'}>{value}</span>
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className={highlight ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-900 dark:text-white'}>{value}</span>
     </div>
   )
 
@@ -182,20 +182,20 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
          onClick={e => e.target === e.currentTarget && onOpenChange(false)}>
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl w-full max-w-md border border-blue-500/30 shadow-2xl">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md border border-gray-200 dark:border-gray-700 shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-700">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <ArrowRight className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-white font-bold text-lg">Bridge USDC</h2>
-              <p className="text-xs text-gray-400">Circle CCTP — Cross-chain transfer</p>
+              <h2 className="text-gray-900 dark:text-white font-bold text-lg">Bridge USDC</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Circle CCTP — Cross-chain transfer</p>
             </div>
           </div>
           <button onClick={() => onOpenChange(false)}
-                  className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors">
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -204,9 +204,9 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
           {/* From / To chain selectors */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-400 font-medium mb-1 block">From</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">From</label>
               <select value={fromChain} onChange={e => handleFromChain(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
                 {BRIDGE_CHAINS.map(c => (
                   <option key={c.id} value={c.id} disabled={c.id === toChain}>
                     {c.icon} {c.label}
@@ -215,9 +215,9 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 font-medium mb-1 block">To</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">To</label>
               <select value={toChain} onChange={e => handleToChain(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
                 {BRIDGE_CHAINS.map(c => (
                   <option key={c.id} value={c.id} disabled={c.id === fromChain}>
                     {c.icon} {c.label}
@@ -229,14 +229,14 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
 
           {/* Amount */}
           <div>
-            <label className="text-xs text-gray-400 font-medium mb-1 block">Amount (USDC)</label>
+            <label className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1 block">Amount (USDC)</label>
             <div className="relative">
               <input
                 type="number" min="1" step="0.01"
                 placeholder="Minimum 1.00"
                 value={amount}
                 onChange={e => { setAmount(e.target.value); setEstimate(null); setBridgeState('idle') }}
-                className="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2.5 text-sm pr-16 focus:border-blue-500 focus:outline-none"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg px-3 py-2.5 text-sm pr-16 focus:border-blue-500 focus:outline-none"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDC</span>
             </div>
@@ -244,24 +244,24 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
 
           {/* Steps (during/after bridge) */}
           {steps.length > 0 && (
-            <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700 space-y-0.5">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 border border-gray-200 dark:border-gray-700 space-y-0.5">
               {steps.map((s, i) => <StepRow key={i} step={s} />)}
             </div>
           )}
 
           {/* Fee estimate */}
           {estimate && bridgeState === 'ready' && (
-            <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 space-y-1">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-500/30 rounded-xl p-4 space-y-1">
               <div className="flex items-center gap-2 mb-2">
-                <Info className="w-4 h-4 text-blue-400" />
-                <span className="text-xs text-blue-300 font-semibold uppercase tracking-wide">Fee Breakdown</span>
+                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wide">Fee Breakdown</span>
               </div>
               <FeeRow label="You send"          value={`${amountNum.toFixed(2)} USDC`} />
               <FeeRow label="Seamount fee (0.5%)" value={`-${seamountFee.toFixed(4)} USDC`} />
               {cctpFeeAmt !== null && (
                 <FeeRow label="CCTP protocol fee" value={`-${cctpFeeAmt.toFixed(4)} USDC`} />
               )}
-              <div className="border-t border-blue-500/20 pt-2 mt-2">
+              <div className="border-t border-blue-200 dark:border-blue-500/20 pt-2 mt-2">
                 <FeeRow label="You receive (est.)" value={`~${estimatedReceive.toFixed(2)} USDC`} highlight />
               </div>
             </div>
@@ -269,14 +269,14 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
 
           {/* Error display */}
           {error && (
-            <div className="flex items-start gap-2 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 rounded-lg p-3">
+              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 
           {/* Info */}
-          <div className="flex items-start gap-2 text-xs text-gray-500">
+          <div className="flex items-start gap-2 text-xs text-gray-400 dark:text-gray-500">
             <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <span>FAST transfers: ~2–5 min. USDC only. Powered by Circle CCTP.</span>
           </div>
@@ -307,7 +307,7 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
                 Confirm Bridge  {amount} USDC
               </button>
               <button onClick={() => { setEstimate(null); setBridgeState('idle') }}
-                      className="w-full text-gray-400 hover:text-white py-2 text-sm transition-colors">
+                      className="w-full text-gray-400 hover:text-gray-700 dark:hover:text-white py-2 text-sm transition-colors">
                 ← Change amount
               </button>
             </>
@@ -335,7 +335,7 @@ export const CircleBridgeModal: React.FC<CircleBridgeModalProps> = ({ open, onOp
                 </button>
               )}
               <button onClick={() => { setError(''); setBridgeState('idle'); setEstimate(null) }}
-                      className={`bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-semibold ${!bridgeResult ? 'col-span-2' : ''}`}>
+                      className={`bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white py-3 rounded-xl font-semibold ${!bridgeResult ? 'col-span-2' : ''}`}>
                 Start Over
               </button>
             </div>
