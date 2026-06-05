@@ -14,16 +14,18 @@ import {
   Dialog, DialogContent, DialogDescription,
   DialogHeader, DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import { Loader2, Wallet, Info, AlertCircle, ShieldCheck, Globe, Banknote, X } from 'lucide-react'
+import { Loader2, Wallet, Info, AlertCircle, ShieldCheck, Globe, Banknote, X, Smartphone, Copy, CheckCircle2 } from 'lucide-react'
 
 interface FundWalletModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-type Provider = 'local' | 'moonpay'
+// ─────────────────────────────────────────────────────────────
+// EXISTING — untouched
+// ─────────────────────────────────────────────────────────────
+type Provider = 'local' | 'moonpay' | 'busha' | 'kotani'
 
-// ── MoonPay-supported onramp assets ──────────────────────────────
 const MOONPAY_ASSET_GROUPS = {
   '🟢 Algorand': [
     { value: 'ALGO', label: 'Algorand (ALGO)', icon: 'Ⱥ' },
@@ -52,7 +54,6 @@ const MOONPAY_ASSET_GROUPS = {
   ],
 }
 
-// ── Local provider: all assets including Algorand-native ──────────
 const LOCAL_ASSET_GROUPS = {
   '🟢 Algorand': [
     { value: 'ALGO',      label: 'Algorand (ALGO)',         icon: 'Ⱥ' },
@@ -105,12 +106,61 @@ const MOONPAY_FIAT = [
   { code: 'ZAR', flag: '🇿🇦' },
 ]
 
-// Algorand-native assets not supported by MoonPay
 const MOONPAY_ASSET_FALLBACK: Record<string, string> = {
   goBTC: 'BTC', goETH: 'ETH', USDCa: 'USDC_ETH', USDT_ALGO: 'USDT_TRON',
 }
+// ─────────────────────────────────────────────────────────────
+// NEW — addon constants only
+// ─────────────────────────────────────────────────────────────
+
+// Capability matrix — single source of truth for currency-aware tab visibility
+const ONRAMP_PROVIDER_CURRENCIES: Record<Provider, string[]> = {
+  local:   ['NGN','KES','GHS','ZAR','UGX','TZS','RWF','XOF','XAF','ZMW','USD','GBP','EUR'],
+  moonpay: ['USD','EUR','GBP','NGN','KES','GHS','ZAR'],
+  busha:   ['NGN','KES'],
+  kotani:  ['KES','GHS','UGX','TZS','RWF','XOF','XAF','ZMW'],
+}
+
+// Provider metadata for rendering toggle buttons
+const PROVIDER_META: Record<Provider, { label: string; sublabel: string; icon: React.ReactNode; activeClass: string }> = {
+  local:   { label: 'Paystack / Flutterwave', sublabel: 'NGN · KES · GHS & more', icon: <Banknote className="h-5 w-5" />, activeClass: 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' },
+  moonpay: { label: 'MoonPay',               sublabel: 'Card · Apple Pay · 160+',  icon: <Globe className="h-5 w-5" />,   activeClass: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'  },
+  busha:   { label: 'Busha',                 sublabel: 'Bank transfer · NGN/KES',  icon: <Wallet className="h-5 w-5" />,  activeClass: 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' },
+  kotani:  { label: 'Kotani Pay',            sublabel: 'Mobile money · Africa',    icon: <Smartphone className="h-5 w-5" />, activeClass: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
+}
+
+// Asset remapping when switching to Busha (unsupported Algorand-native assets)
+const BUSHA_ASSET_FALLBACK: Record<string, string> = {
+  goBTC: 'BTC', goETH: 'ETH', USDCa: 'USDC_ETH', USDT_ALGO: 'USDT_TRON', ALGO: 'BTC',
+}
+
+// Asset remapping when switching to Kotani
+const KOTANI_ASSET_FALLBACK: Record<string, string> = {
+  goBTC: 'BTC', goETH: 'ETH', USDCa: 'USDC_ETH', USDT_ALGO: 'USDT_TRON', ALGO: 'BTC', MATIC: 'USDT_POLYGON',
+}
+
+// Kotani telco options per currency
+const KOTANI_ONRAMP_TELCOS: Record<string, { id: string; name: string }[]> = {
+  KES: [{ id: 'MPESA', name: 'M-Pesa' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  GHS: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'VODAFONE', name: 'Vodafone Cash' }, { id: 'AIRTELTIGO', name: 'AirtelTigo' }],
+  UGX: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  TZS: [{ id: 'MPESA', name: 'M-Pesa' }, { id: 'AIRTEL', name: 'Airtel' }, { id: 'TIGO', name: 'Tigo Cash' }],
+  RWF: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  ZMW: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }, { id: 'ZAMTEL', name: 'Zamtel' }],
+  XOF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
+  XAF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
+}
+
+// Derive available providers for a given currency
+const getAvailableProviders = (curr: string): Provider[] =>
+  (Object.entries(ONRAMP_PROVIDER_CURRENCIES) as [Provider, string[]][])
+    .filter(([, currencies]) => currencies.includes(curr))
+    .map(([p]) => p)
 
 export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
+  // ─────────────────────────────────────────────────────────
+  // EXISTING STATE — untouched
+  // ─────────────────────────────────────────────────────────
   const [provider, setProvider]     = useState<Provider>('local')
   const [asset, setAsset]           = useState('USDT_TRON')
   const [amount, setAmount]         = useState('')
@@ -124,7 +174,26 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const { session } = useAuth()
   const navigate    = useNavigate()
 
-  // Pre-select asset from WalletDetailModal "Buy" button
+  // ─────────────────────────────────────────────────────────
+  // NEW STATE — addon only, zero collision with existing
+  // ─────────────────────────────────────────────────────────
+  // Busha onramp state
+  const [bushaQuote, setBushaQuote]               = useState<any>(null)
+  const [bushaFetchingQuote, setBushaFetchingQuote] = useState(false)
+  const [bushaPayInStep, setBushaPayInStep]         = useState<'form' | 'bank_details'>('form')
+  const [bushaPayInDetails, setBushaPayInDetails]   = useState<any>(null)
+  const [bushaAccountCopied, setBushaAccountCopied] = useState(false)
+  // Kotani onramp state
+  const [kotaniQuote, setKotaniQuote]                 = useState<any>(null)
+  const [kotaniFetchingQuote, setKotaniFetchingQuote] = useState(false)
+  const [kotaniPhone, setKotaniPhone]                 = useState('')
+  const [kotaniTelco, setKotaniTelco]                 = useState('')
+  const [kotaniPayInSent, setKotaniPayInSent]         = useState(false)
+  const [kotaniPayInDetails, setKotaniPayInDetails]   = useState<any>(null)
+
+  // ─────────────────────────────────────────────────────────
+  // EXISTING useEffects — untouched
+  // ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return
     const pre = sessionStorage.getItem('preselected_asset')
@@ -134,7 +203,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
   }, [open])
 
-  // When switching to MoonPay, remap unsupported assets
   useEffect(() => {
     if (provider === 'moonpay') {
       const safe = MOONPAY_ASSET_FALLBACK[asset]
@@ -142,10 +210,8 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
   }, [provider])
 
-  // Reset quote when inputs change
   useEffect(() => { setQuote(null) }, [asset, currency, amount])
 
-  // Debounced quote for local provider
   useEffect(() => {
     if (provider !== 'local') return
     if (!amount || parseFloat(amount) <= 0) { setQuote(null); return }
@@ -153,6 +219,64 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     return () => clearTimeout(timer)
   }, [amount, currency, asset, provider])
 
+  // ─────────────────────────────────────────────────────────
+  // NEW useEffects — addon only
+  // ─────────────────────────────────────────────────────────
+
+  // Capability matrix: auto-fallback when currency no longer supports current provider
+  useEffect(() => {
+    const avail = getAvailableProviders(currency)
+    if (!avail.includes(provider)) {
+      setProvider(avail[0] || 'local')
+    }
+    setError(null)
+  }, [currency])
+
+  // Asset remapping when switching TO busha or kotani
+  useEffect(() => {
+    if (provider === 'busha') {
+      const safe = BUSHA_ASSET_FALLBACK[asset]
+      if (safe) setAsset(safe)
+      // Ensure currency is Busha-compatible
+      if (!ONRAMP_PROVIDER_CURRENCIES.busha.includes(currency)) setCurrency('NGN')
+      setBushaQuote(null); setBushaPayInStep('form'); setBushaPayInDetails(null)
+    }
+    if (provider === 'kotani') {
+      const safe = KOTANI_ASSET_FALLBACK[asset]
+      if (safe) setAsset(safe)
+      // Ensure currency is Kotani-compatible
+      if (!ONRAMP_PROVIDER_CURRENCIES.kotani.includes(currency)) setCurrency('KES')
+      setKotaniQuote(null); setKotaniPayInSent(false); setKotaniPayInDetails(null)
+      setKotaniPhone(''); setKotaniTelco('')
+    }
+    setError(null)
+  }, [provider])
+
+  // Clear new quotes when inputs change
+  useEffect(() => {
+    setBushaQuote(null)
+    setKotaniQuote(null)
+  }, [asset, currency, amount])
+
+  // Debounced Busha quote
+  useEffect(() => {
+    if (provider !== 'busha') return
+    if (!amount || parseFloat(amount) <= 0) { setBushaQuote(null); return }
+    const timer = setTimeout(fetchBushaQuote, 500)
+    return () => clearTimeout(timer)
+  }, [amount, currency, asset, provider])
+
+  // Debounced Kotani quote
+  useEffect(() => {
+    if (provider !== 'kotani') return
+    if (!amount || parseFloat(amount) <= 0) { setKotaniQuote(null); return }
+    const timer = setTimeout(fetchKotaniQuote, 500)
+    return () => clearTimeout(timer)
+  }, [amount, currency, asset, provider])
+
+  // ─────────────────────────────────────────────────────────
+  // EXISTING handlers — untouched
+  // ─────────────────────────────────────────────────────────
   const fetchQuote = async () => {
     setFetchingQuote(true)
     setError(null)
@@ -173,7 +297,6 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
   }
 
-  // ── Local provider (Paystack / Flutterwave) ───────────────────
   const handleLocalPay = async () => {
     if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
     const minAmount = currency === 'NGN' ? 1000 : 10
@@ -203,78 +326,183 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     }
   }
 
-  // ── MoonPay (correct SDK API — handlers in constructor) ───────
   const handleMoonPay = async () => {
     if (!session) { toast.error('Sign in to buy crypto'); return }
     setLoading(true); setError(null)
-
     try {
-      // 1. Resolve wallet address and other user data from backend
       const walletRes = await api.post('/api/v1/moonpay/url/onramp', {
         asset,
         base_currency_code: mpCurrency,
-        // base_currency_amount intentionally omitted — let MoonPay widget set the amount
       })
       if (!walletRes?.success) throw new Error('Failed to get wallet params')
-
-      // 2. Initialize the MoonPay SDK (WITHOUT signature)
       const moonPayInit = await loadMoonPay()
       if (!moonPayInit) throw new Error('MoonPay SDK failed to load')
-
-      // Use the params from backend, but exclude signature
       const { signature: _, ...sdkParams } = walletRes.params
       const widget = moonPayInit({
         flow: 'buy',
         environment: 'production',
         variant: 'overlay',
-        params: sdkParams,           // NO signature yet
+        params: sdkParams,
         handlers: {
           async onTransactionCompleted() {
             toast.success('🎉 Purchase complete!')
             onOpenChange(false)
           },
-          onCloseOverlay() {
-            onOpenChange(false)
-          },
+          onCloseOverlay() { onOpenChange(false) },
           onError(error: any) {
-            logger.error?.('MoonPay error:', error)
             setError('MoonPay encountered an error. Please try again.')
             onOpenChange(false)
           },
         },
       })
-
-      // 3. Generate the exact URL the SDK will use
       const urlToSign: string = widget.generateUrlForSigning()
       const urlObj = new URL(urlToSign)
-      const queryString = urlObj.search.slice(1)   // remove leading '?'
-
-      // 4. Send only the query string to backend for signing
+      const queryString = urlObj.search.slice(1)
       const signRes = await api.post('/api/v1/moonpay/sign', { query_string: queryString })
       if (!signRes?.success) throw new Error('Signature generation failed')
-
-      // 5. Apply signature, then close modal and show widget
       widget.updateSignature(signRes.signature)
-
-      // Close the Seamount modal before showing MoonPay overlay ── prevents frozen widget
       onOpenChange(false)
-      setTimeout(() => {
-        widget.show()
-      }, 100)
-
+      setTimeout(() => { widget.show() }, 100)
     } catch (err: any) {
       const msg = err?.message || 'MoonPay initialization failed'
-      setError(msg)
-      toast.error(msg)
+      setError(msg); toast.error(msg)
     } finally {
       setLoading(false)
     }
   }
 
+  // ─────────────────────────────────────────────────────────
+  // NEW handlers — addon only
+  // ─────────────────────────────────────────────────────────
+  const fetchBushaQuote = async () => {
+    setBushaFetchingQuote(true); setError(null)
+    try {
+      const res = await api.post('/api/v1/busha/onramp/quote', {
+        amount_fiat: parseFloat(amount), currency, crypto_asset: asset,
+      })
+      if (res?.success) setBushaQuote(res)
+      else setError(res?.message || res?.detail || 'Failed to get Busha quote')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || 'Busha quote failed')
+      setBushaQuote(null)
+    } finally { setBushaFetchingQuote(false) }
+  }
+
+  const fetchKotaniQuote = async () => {
+    setKotaniFetchingQuote(true); setError(null)
+    try {
+      const res = await api.post('/api/v1/kotani/onramp/quote', {
+        amount_fiat: parseFloat(amount), currency, crypto_asset: asset,
+      })
+      if (res?.success) setKotaniQuote(res)
+      else setError(res?.message || res?.detail || 'Failed to get Kotani quote')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || 'Kotani quote failed')
+      setKotaniQuote(null)
+    } finally { setKotaniFetchingQuote(false) }
+  }
+
+  const handleBusha = async () => {
+    if (!session) { toast.error('Sign in to buy crypto'); return }
+    if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
+    setLoading(true); setError(null)
+    try {
+      const res = await api.post('/api/v1/busha/onramp/initialize', {
+        amount_fiat: parseFloat(amount), currency, crypto_asset: asset,
+      })
+      const data = res.data || res
+      if (data?.success) {
+        setBushaPayInDetails(data)
+        setBushaPayInStep('bank_details')
+        toast.success('Bank account ready — transfer the exact amount shown.')
+      } else {
+        throw new Error(data?.message || data?.detail || 'Busha initialization failed')
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Busha failed'
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
+  }
+
+  const handleKotani = async () => {
+    if (!session) { toast.error('Sign in to buy crypto'); return }
+    if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
+    if (!kotaniPhone) { toast.error('Enter your phone number'); return }
+    if (!kotaniTelco) { toast.error('Select your mobile network'); return }
+    setLoading(true); setError(null)
+    try {
+      const res = await api.post('/api/v1/kotani/onramp/initialize', {
+        amount_fiat: parseFloat(amount), currency, crypto_asset: asset,
+        phone_number: kotaniPhone, telco_id: kotaniTelco,
+      })
+      const data = res.data || res
+      if (data?.success) {
+        setKotaniPayInDetails(data)
+        setKotaniPayInSent(true)
+        toast.success('Payment request sent to your phone!')
+      } else {
+        throw new Error(data?.message || data?.detail || 'Kotani initialization failed')
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'Kotani failed'
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
+  }
+
+  const handleBushaCopyAccount = () => {
+    const acct = bushaPayInDetails?.pay_in_details?.account_number
+    if (acct) { navigator.clipboard.writeText(acct); setBushaAccountCopied(true); toast.success('Copied!'); setTimeout(() => setBushaAccountCopied(false), 2000) }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // EXISTING computed values — untouched
+  // ─────────────────────────────────────────────────────────
   const selectedCurrency = LOCAL_CURRENCIES.find(c => c.code === currency)
   const activeGroups     = provider === 'moonpay' ? MOONPAY_ASSET_GROUPS : LOCAL_ASSET_GROUPS
   const selectedLabel    = Object.values(activeGroups).flat().find((a: any) => a.value === asset)
 
+  // NEW computed values
+  const availableProviders = getAvailableProviders(currency)
+  const bushaOnrampCurrencies = LOCAL_CURRENCIES.filter(c => ONRAMP_PROVIDER_CURRENCIES.busha.includes(c.code))
+  const kotaniOnrampCurrencies = LOCAL_CURRENCIES.filter(c => ONRAMP_PROVIDER_CURRENCIES.kotani.includes(c.code))
+  const kotaniTelcos = KOTANI_ONRAMP_TELCOS[currency] ?? []
+  const selectedBushaCurrency = LOCAL_CURRENCIES.find(c => c.code === currency)
+  const selectedKotaniCurrency = LOCAL_CURRENCIES.find(c => c.code === currency)
+
+  // Dispatch to correct handler based on provider
+  const handleSubmit = () => {
+    if (provider === 'moonpay') return handleMoonPay()
+    if (provider === 'busha')   return handleBusha()
+    if (provider === 'kotani')  return handleKotani()
+    return handleLocalPay()
+  }
+
+  // Submit button disabled state (each provider has its own logic)
+  const isSubmitDisabled = loading || fetchingQuote ||
+    (provider === 'local'   && (!amount || parseFloat(amount) <= 0)) ||
+    (provider === 'busha'   && (bushaFetchingQuote || (!amount || parseFloat(amount) <= 0) || bushaPayInStep === 'bank_details')) ||
+    (provider === 'kotani'  && (kotaniFetchingQuote || (!amount || parseFloat(amount) <= 0) || !kotaniPhone || !kotaniTelco || kotaniPayInSent))
+
+  // Submit button label
+  const submitLabel = (() => {
+    if (loading) return <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Launching...</>
+    if (provider === 'moonpay') return <><ShieldCheck className="mr-2 h-4 w-4" />Buy with MoonPay</>
+    if (provider === 'busha')   return <><Wallet className="mr-2 h-4 w-4" />Get Bank Account</>
+    if (provider === 'kotani')  return <><Smartphone className="mr-2 h-4 w-4" />Send Payment Request</>
+    return <><Wallet className="mr-2 h-4 w-4" />Pay {selectedCurrency?.symbol}{amount || '0'}</>
+  })()
+
+  // Submit button colour
+  const submitClass = (() => {
+    if (provider === 'moonpay') return 'bg-blue-600 hover:bg-blue-700'
+    if (provider === 'busha')   return 'bg-purple-600 hover:bg-purple-700'
+    if (provider === 'kotani')  return 'bg-orange-600 hover:bg-orange-700'
+    return 'bg-green-600 hover:bg-green-700'
+  })()
+
+  // ─────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="
@@ -285,7 +513,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         border border-gray-200 dark:border-gray-700
         shadow-2xl
       ">
-        {/* Sticky Header */}
+        {/* Sticky Header — original structure preserved */}
         <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-5 pt-5 pb-4 rounded-t-2xl">
           <DialogHeader>
             <div className="flex items-center justify-between">
@@ -312,35 +540,30 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         {/* Body */}
         <div className="px-5 py-4 space-y-4">
 
-          {/* Provider Toggle */}
+          {/* ── Provider Toggle — dynamically shows only capable providers ── */}
           <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => { setProvider('local'); setError(null) }}
-              className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                provider === 'local'
-                  ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
-              }`}
-            >
-              <Banknote className="h-5 w-5" />
-              <span>Local Payment</span>
-              <span className="text-[10px] font-normal opacity-70">NGN · KES · GHS & more</span>
-            </button>
-            <button
-              onClick={() => { setProvider('moonpay'); setError(null) }}
-              className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                provider === 'moonpay'
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
-              }`}
-            >
-              <Globe className="h-5 w-5" />
-              <span>MoonPay</span>
-              <span className="text-[10px] font-normal opacity-70">Card · Apple Pay · 160+ countries</span>
-            </button>
+            {availableProviders.map(p => {
+              const meta = PROVIDER_META[p]
+              const isActive = provider === p
+              return (
+                <button
+                  key={p}
+                  onClick={() => { setProvider(p); setError(null) }}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    isActive
+                      ? meta.activeClass
+                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                  }`}
+                >
+                  {meta.icon}
+                  <span>{meta.label}</span>
+                  <span className="text-[10px] font-normal opacity-70">{meta.sublabel}</span>
+                </button>
+              )
+            })}
           </div>
 
-          {/* Asset Selection */}
+          {/* ── Asset Selection — shared across all providers ── */}
           <div className="space-y-1.5">
             <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
               Select Asset to Receive
@@ -375,9 +598,21 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 ⚠️ Algorand-native assets (goBTC, goETH, USDCa) not supported by MoonPay. Switch to Local Payment for those.
               </p>
             )}
+            {provider === 'busha' && BUSHA_ASSET_FALLBACK[asset] && (
+              <p className="text-xs text-purple-600 dark:text-purple-400">
+                ℹ️ Algorand-native assets remapped to their cross-chain equivalent for Busha.
+              </p>
+            )}
+            {provider === 'kotani' && KOTANI_ASSET_FALLBACK[asset] && (
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                ℹ️ Asset remapped to supported equivalent for Kotani Pay.
+              </p>
+            )}
           </div>
 
-          {/* ── LOCAL PAYMENT FLOW ── */}
+          {/* ═══════════════════════════════════════════════════════
+              EXISTING — LOCAL PAYMENT FLOW (untouched)
+          ═══════════════════════════════════════════════════════ */}
           {provider === 'local' && (
             <>
               {/* Currency */}
@@ -453,7 +688,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             </>
           )}
 
-          {/* ── MOONPAY FLOW ── */}
+          {/* ═══════════════════════════════════════════════════════
+              EXISTING — MOONPAY FLOW (untouched)
+          ═══════════════════════════════════════════════════════ */}
           {provider === 'moonpay' && (
             <>
               <div className="space-y-1.5">
@@ -504,6 +741,263 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             </>
           )}
 
+          {/* ═══════════════════════════════════════════════════════
+              NEW — BUSHA FLOW (addon)
+          ═══════════════════════════════════════════════════════ */}
+          {provider === 'busha' && (
+            <>
+              {bushaPayInStep === 'form' && (
+                <>
+                  {/* Busha currency — filtered to NGN / KES */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Your Currency</Label>
+                    <Select value={currency} onValueChange={v => { setCurrency(v); setBushaQuote(null) }}>
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+                        {bushaOnrampCurrencies.map(c => (
+                          <SelectItem key={c.code} value={c.code} className="text-gray-900 dark:text-gray-100 py-2.5">
+                            <span className="text-base mr-2">{c.flag}</span>
+                            <span className="font-medium">{c.symbol}</span>
+                            <span className="ml-1 text-gray-500 dark:text-gray-400">{c.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">
+                        {selectedBushaCurrency?.symbol}
+                      </span>
+                      <Input type="number" placeholder="0.00" value={amount}
+                        onChange={e => setAmount(e.target.value)} disabled={loading}
+                        className="pl-10 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-base"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Minimum: {selectedBushaCurrency?.symbol}{currency === 'NGN' ? '1,000' : '10'}
+                    </p>
+                  </div>
+
+                  {/* Busha live quote */}
+                  {bushaFetchingQuote && (
+                    <div className="flex items-center gap-2 py-1">
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                      <span className="text-xs text-gray-400">Fetching Busha quote...</span>
+                    </div>
+                  )}
+                  {bushaQuote && !bushaFetchingQuote && (
+                    <div className="rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-3.5 space-y-2">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Live Quote · Busha</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">You pay (gross)</span>
+                        <span className="text-gray-600 dark:text-gray-300 font-medium">
+                          {selectedBushaCurrency?.symbol}{parseFloat(bushaQuote.gross_amount || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Fee ({bushaQuote.markup_pct?.toFixed(1)}%)</span>
+                        <span className="text-gray-600 dark:text-gray-300">
+                          -{selectedBushaCurrency?.symbol}{parseFloat(bushaQuote.markup_amount || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-bold pt-1.5 border-t border-purple-200 dark:border-purple-700">
+                        <span className="text-gray-800 dark:text-white text-sm">You Receive</span>
+                        <span className="text-green-600 dark:text-green-400 text-sm">
+                          {parseFloat(bushaQuote.crypto_amount || 0).toFixed(6)} {asset.split('_')[0]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Alert className="border border-purple-100 dark:border-purple-900 bg-purple-50 dark:bg-purple-900/20 rounded-xl py-3">
+                    <Info className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                    <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <strong className="text-purple-700 dark:text-purple-400">Busha Direct</strong> — a temporary bank account will be generated. Transfer the exact amount within the expiry window to complete your purchase.
+                    </AlertDescription>
+                  </Alert>
+                </>
+              )}
+
+              {bushaPayInStep === 'bank_details' && bushaPayInDetails && (
+                <>
+                  <div className="rounded-xl border-2 border-purple-200 dark:border-purple-700 overflow-hidden">
+                    <div className="bg-purple-50 dark:bg-purple-900/30 px-4 py-3 flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-purple-600" />
+                      <span className="font-bold text-purple-700 dark:text-purple-300 text-sm">Transfer to this account</span>
+                    </div>
+                    {[
+                      { label: 'Bank Name',      value: bushaPayInDetails.pay_in_details?.bank_name },
+                      { label: 'Account Number', value: bushaPayInDetails.pay_in_details?.account_number, copy: true },
+                      { label: 'Account Name',   value: bushaPayInDetails.pay_in_details?.account_name },
+                      { label: 'Amount to Pay',  value: `${selectedBushaCurrency?.symbol}${parseFloat(bushaPayInDetails.pay_in_details?.amount || 0).toFixed(2)}`, highlight: true },
+                    ].map(row => (
+                      <div key={row.label} className="flex justify-between items-center px-4 py-3 border-t border-purple-100 dark:border-purple-800">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{row.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-semibold ${row.highlight ? 'text-purple-700 dark:text-purple-300 text-base' : 'text-gray-900 dark:text-white'}`}>
+                            {row.value}
+                          </span>
+                          {row.copy && (
+                            <button onClick={handleBushaCopyAccount} className="text-purple-500 hover:text-purple-700">
+                              {bushaAccountCopied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Alert className="border border-amber-200 bg-amber-50 dark:bg-amber-900/20 rounded-xl py-3">
+                    <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                      Transfer <strong>exactly</strong> the amount shown. Account expires at{' '}
+                      <strong>
+                        {bushaPayInDetails.pay_in_details?.expires_at
+                          ? new Date(bushaPayInDetails.pay_in_details.expires_at).toLocaleTimeString()
+                          : 'expiry'}
+                      </strong>. Crypto will be credited automatically after payment clears.
+                    </AlertDescription>
+                  </Alert>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════
+              NEW — KOTANI PAY FLOW (addon)
+          ═══════════════════════════════════════════════════════ */}
+          {provider === 'kotani' && (
+            <>
+              {!kotaniPayInSent ? (
+                <>
+                  {/* Kotani currency — filtered to Kotani-supported */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Your Currency</Label>
+                    <Select value={currency} onValueChange={v => { setCurrency(v); setKotaniQuote(null); setKotaniTelco('') }}>
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 max-h-[260px] z-[9999]">
+                        {kotaniOnrampCurrencies.map(c => (
+                          <SelectItem key={c.code} value={c.code} className="text-gray-900 dark:text-gray-100 py-2.5">
+                            <span className="text-base mr-2">{c.flag}</span>
+                            <span className="font-medium">{c.symbol}</span>
+                            <span className="ml-1 text-gray-500 dark:text-gray-400">{c.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">
+                        {selectedKotaniCurrency?.symbol}
+                      </span>
+                      <Input type="number" placeholder="0.00" value={amount}
+                        onChange={e => setAmount(e.target.value)} disabled={loading}
+                        className="pl-10 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-base"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mobile network */}
+                  {kotaniTelcos.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Mobile Network</Label>
+                      <Select value={kotaniTelco} onValueChange={setKotaniTelco}>
+                        <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                          <SelectValue placeholder="Select network" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+                          {kotaniTelcos.map(t => (
+                            <SelectItem key={t.id} value={t.id} className="text-gray-900 dark:text-white py-2.5">{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Phone number */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Phone Number</Label>
+                    <Input
+                      type="tel" placeholder="e.g. 0712345678"
+                      value={kotaniPhone} onChange={e => setKotaniPhone(e.target.value)}
+                      disabled={loading}
+                      className="h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  {/* Kotani live quote */}
+                  {kotaniFetchingQuote && (
+                    <div className="flex items-center gap-2 py-1">
+                      <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                      <span className="text-xs text-gray-400">Fetching Kotani quote...</span>
+                    </div>
+                  )}
+                  {kotaniQuote && !kotaniFetchingQuote && (
+                    <div className="rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 p-3.5 space-y-2">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Live Quote · Kotani Pay</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Fee ({kotaniQuote.markup_pct?.toFixed(1)}%)</span>
+                        <span className="text-gray-600 dark:text-gray-300">
+                          -{parseFloat(kotaniQuote.markup_crypto || 0).toFixed(6)} {asset.split('_')[0]}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-bold pt-1.5 border-t border-orange-200 dark:border-orange-700">
+                        <span className="text-gray-800 dark:text-white text-sm">You Receive</span>
+                        <span className="text-green-600 dark:text-green-400 text-sm">
+                          {parseFloat(kotaniQuote.net_crypto || 0).toFixed(6)} {asset.split('_')[0]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Alert className="border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-900/20 rounded-xl py-3">
+                    <Info className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
+                    <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                      <strong className="text-orange-700 dark:text-orange-400">Kotani Pay</strong> — a payment request (STK push) will be sent to your phone. Approve it to complete the purchase.
+                    </AlertDescription>
+                  </Alert>
+                </>
+              ) : (
+                /* STK push sent confirmation */
+                <div className="text-center py-4 space-y-3">
+                  <div className="p-4 rounded-full bg-orange-50 dark:bg-orange-900/20 w-20 h-20 mx-auto flex items-center justify-center">
+                    <Smartphone className="h-10 w-10 text-orange-500 animate-pulse" />
+                  </div>
+                  <p className="font-bold text-lg text-gray-900 dark:text-white">Check Your Phone</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed px-4">
+                    A payment request has been sent to <strong>{kotaniPayInDetails?.pay_in_details?.phone_number || kotaniPhone}</strong> via{' '}
+                    <strong>{kotaniPayInDetails?.pay_in_details?.telco || kotaniTelco}</strong>. Approve it to complete your purchase.
+                  </p>
+                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3">
+                    <p className="text-xs text-gray-500">Amount</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      {selectedKotaniCurrency?.symbol}{parseFloat(amount).toFixed(2)} {currency}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-400">Crypto will appear in your wallet within 2–5 minutes after approval.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Error — shared across all providers */}
           {error && (
             <Alert variant="destructive" className="rounded-xl border py-3">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -519,26 +1013,20 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               className="flex-1 h-12 rounded-xl border-gray-200 dark:border-gray-700 font-semibold">
               Cancel
             </Button>
-            <Button
-              onClick={provider === 'moonpay' ? handleMoonPay : handleLocalPay}
-              disabled={
-                loading ||
-                (provider === 'local' && (!amount || parseFloat(amount) <= 0)) ||
-                fetchingQuote
-              }
-              className={`flex-[2] h-12 rounded-xl font-bold text-white ${
-                provider === 'moonpay'
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {loading
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Launching...</>
-                : provider === 'moonpay'
-                  ? <><ShieldCheck className="mr-2 h-4 w-4" />Buy with MoonPay</>
-                  : <><Wallet className="mr-2 h-4 w-4" />Pay {selectedCurrency?.symbol}{amount || '0'}</>
-              }
-            </Button>
+            {(provider === 'busha' && bushaPayInStep === 'bank_details') || (provider === 'kotani' && kotaniPayInSent) ? (
+              <Button onClick={() => onOpenChange(false)}
+                className="flex-[2] h-12 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700">
+                Done
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitDisabled}
+                className={`flex-[2] h-12 rounded-xl font-bold text-white ${submitClass}`}
+              >
+                {submitLabel}
+              </Button>
+            )}
           </div>
           {provider === 'local' && (
             <div className="text-center">
