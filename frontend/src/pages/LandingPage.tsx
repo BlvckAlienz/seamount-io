@@ -233,7 +233,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       title: "🛡️ Real-Time AML Intelligence",
       description: "On-premise AI fraud detection for every transaction",
       features: [
-        "12K+ fraud signatures: EFCC, CBN, Kenya DCI, curated typologies",
+        "45K+ fraud signatures: EFCC, CBN, Kenya DCI, curated typologies",
         "Real-time embedding & cosine similarity matching",
         "5-factor scoring: pattern, structuring, velocity, counterparty, time",
         "Instant Suspicious Transaction Reports — anti-hallucination AI",
@@ -848,7 +848,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
                     whileHover={{ scale: 1.02 }}
                   >
                     <div className="text-xs opacity-70 mb-1">Pattern Library</div>
-                    <motion.div className="text-xl font-bold">12,389</motion.div>
+                    <motion.div className="text-xl font-bold">45,389</motion.div>
                     <div className="flex gap-1 mt-1">
                       {['EFCC','CBN','DCI','Typologies'].map((s,i) => (
                         <span key={i} className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{s}</span>
@@ -1098,13 +1098,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             
             <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
               <span className="block">Seamount</span>
-              <span className="gradient-text">Digital Assets Market</span>
+              <span className="gradient-text">Digital Money Market</span>
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              <p className="mb-2">Global Payments. Asset tokenization. Compliance.</p>
+              <p className="mb-2">Stablecoins. Global Payments. Asset tokenization.</p>
               <p className="font-semibold text-gray-900">
-                One Platform. Real Solutions.
+                Unlocking growth for communities.
               </p>
             </div>
             
