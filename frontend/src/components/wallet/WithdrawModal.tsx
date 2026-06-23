@@ -185,9 +185,9 @@ const OFFRAMP_PROVIDER_CURRENCIES: Record<WithdrawProvider, string[]> = {
 }
 
 const WITHDRAW_PROVIDER_META: Record<WithdrawProvider, { label: string; sublabel: string; activeClass: string }> = {
-  cashramp: { label: 'Cashramp',   sublabel: 'Smart routing · Africa', activeClass: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'      },
-  busha:    { label: 'Busha',      sublabel: 'Bank transfer · NGN/KES', activeClass: 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' },
-  kotani:   { label: 'Kotani Pay', sublabel: 'Mobile money · Africa',   activeClass: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
+  cashramp: { label: 'Cashramp',   sublabel: 'Smart routing · Africa', activeClass: 'border-blue-500 bg-blue-50 text-blue-700'      },
+  busha:    { label: 'Busha',      sublabel: 'Bank transfer · NGN/KES', activeClass: 'border-purple-500 bg-purple-50 text-purple-700' },
+  kotani:   { label: 'Kotani Pay', sublabel: 'Mobile money · Africa',   activeClass: 'border-orange-500 bg-orange-50 text-orange-700' },
 }
 
 // Kotani telcos for offramp
@@ -573,24 +573,24 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600"
+        className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white border-2 border-gray-200"
         style={{ zIndex: 1000 }}
       >
         <DialogHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
               <ArrowDownToLine className="h-6 w-6 text-red-600" />
               Withdraw to {payoutMethod === 'bank_transfer' ? 'Bank' : 'Mobile Money'}
             </DialogTitle>
             <button
               onClick={() => onOpenChange(false)}
-              className="rounded-full p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="rounded-full p-1.5 hover:bg-gray-100 transition-colors"
               aria-label="Close"
             >
-              <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <X className="h-4 w-4 text-gray-500" />
             </button>
           </div>
-          <DialogDescription className="text-base text-gray-600 dark:text-gray-400 mt-2">
+          <DialogDescription className="text-base text-gray-600 mt-2">
             Convert crypto to local currency. Fast, secure withdrawals via Cashramp.
           </DialogDescription>
         </DialogHeader>
@@ -600,7 +600,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
           {/* ── NEW: Provider Toggle — only when >1 provider available ── */}
           {availableWithdrawProviders.length > 1 && (
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-900 dark:text-white">Payment Rail</Label>
+              <Label className="text-sm font-semibold text-gray-900">Payment Rail</Label>
               <div className="grid grid-cols-3 gap-2">
                 {availableWithdrawProviders.map(p => {
                   const meta = WITHDRAW_PROVIDER_META[p]
@@ -611,7 +611,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                       className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
                         withdrawProvider === p
                           ? meta.activeClass
-                          : 'border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-gray-300 bg-white dark:bg-gray-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-white'
                       }`}
                     >
                       <span className="font-bold">{meta.label}</span>
@@ -630,22 +630,22 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             <>
               {/* Asset Selection */}
               <div className="space-y-2">
-                <Label htmlFor="withdraw-asset" className="text-sm font-semibold text-gray-900 dark:text-white">
+                <Label htmlFor="withdraw-asset" className="text-sm font-semibold text-gray-900">
                   Crypto Asset to Withdraw
                 </Label>
                 <Select value={asset} onValueChange={setAsset}>
-                  <SelectTrigger id="withdraw-asset" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger id="withdraw-asset" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue placeholder="Select crypto to withdraw" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
+                  <SelectContent className="bg-white border-gray-300 max-h-[400px] z-50">
                     {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                       <div key={chain} className="py-2">
-                        <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-100 dark:bg-gray-900">
+                        <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-100">
                           {CHAIN_NAMES[chain] || chain}
                         </div>
                         {assets.map((a) => (
                           <SelectItem key={a.value} value={a.value}
-                            className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8">
+                            className="text-gray-900 hover:bg-gray-100 py-3 pl-8">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">{a.icon}</span>
                               <span className="font-medium">{a.label}</span>
@@ -660,13 +660,13 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
               {/* Crypto Amount */}
               <div className="space-y-2">
-                <Label htmlFor="withdraw-amount" className="text-sm font-semibold text-gray-900 dark:text-white">
+                <Label htmlFor="withdraw-amount" className="text-sm font-semibold text-gray-900">
                   Amount to Withdraw
                 </Label>
                 {availableBalance > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
-                    <span className="font-bold text-blue-700 dark:text-blue-300">
+                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-gray-700">Available:</span>
+                    <span className="font-bold text-blue-700">
                       {availableBalance.toFixed(6)} {getAssetSymbol(asset)}
                     </span>
                   </div>
@@ -676,30 +676,30 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     id="withdraw-amount" type="number" step="0.01" min="0.01"
                     max={availableBalance || undefined} placeholder="0.00" value={amount}
                     onChange={(e) => setAmount(e.target.value)} disabled={loading}
-                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium pr-20"
+                    className="bg-gray-50 border-gray-300 text-gray-900 h-12 text-lg font-medium pr-20"
                   />
-                  <span className="absolute right-3 top-3 text-gray-600 dark:text-gray-400 font-semibold text-lg">
+                  <span className="absolute right-3 top-3 text-gray-600 font-semibold text-lg">
                     {getAssetSymbol(asset)}
                   </span>
                 </div>
                 {parseFloat(amount) > availableBalance && availableBalance > 0 && (
-                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">⚠️ Amount exceeds available balance</p>
+                  <p className="text-sm text-red-600 font-medium">⚠️ Amount exceeds available balance</p>
                 )}
               </div>
 
               {/* Currency Selection */}
               <div className="space-y-2">
-                <Label htmlFor="withdraw-currency" className="text-sm font-semibold text-gray-900 dark:text-white">
+                <Label htmlFor="withdraw-currency" className="text-sm font-semibold text-gray-900">
                   Receive Currency
                 </Label>
                 <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger id="withdraw-currency" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger id="withdraw-currency" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[300px] z-50">
+                  <SelectContent className="bg-white border-gray-300 max-h-[300px] z-50">
                     {WITHDRAWAL_CURRENCIES.filter(c => OFFRAMP_PROVIDER_CURRENCIES.cashramp.includes(c.code)).map((curr) => (
                       <SelectItem key={curr.code} value={curr.code}
-                        className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3">
+                        className="text-gray-900 hover:bg-gray-100 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{curr.flag}</span>
                           <span className="font-medium">{curr.symbol}</span>
@@ -715,39 +715,39 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {fetchingQuote && (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Calculating quote...</span>
+                  <span className="ml-2 text-sm text-gray-600">Calculating quote...</span>
                 </div>
               )}
               {quote && !fetchingQuote && (
-                <div className="rounded-xl bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-2 border-red-200 dark:border-red-700 p-4 space-y-3 shadow-lg">
+                <div className="rounded-xl bg-gradient-to-br from-red-50 to-pink-50 border-2 border-red-200 p-4 space-y-3 shadow-lg">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Live Quote</span>
+                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Live Quote</span>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Valid 5 min</span>
+                    <span className="text-xs text-gray-500">Valid 5 min</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Crypto Value:</span>
-                    <span className="font-bold text-base text-gray-900 dark:text-white">${quote.crypto_value_usd?.toFixed(2)} USD</span>
+                    <span className="text-sm font-medium text-gray-700">Crypto Value:</span>
+                    <span className="font-bold text-base text-gray-900">${quote.crypto_value_usd?.toFixed(2)} USD</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Exchange Rate:</span>
-                    <span className="font-bold text-base text-gray-900 dark:text-white">1 USD = {getCurrencySymbol(currency)}{quote.exchange_rate?.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-gray-700">Exchange Rate:</span>
+                    <span className="font-bold text-base text-gray-900">1 USD = {getCurrencySymbol(currency)}{quote.exchange_rate?.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Gross Amount:</span>
-                    <span className="font-bold text-base text-gray-900 dark:text-white">{getCurrencySymbol(currency)}{quote.gross_fiat_amount?.toLocaleString()}</span>
+                    <span className="text-sm font-medium text-gray-700">Gross Amount:</span>
+                    <span className="font-bold text-base text-gray-900">{getCurrencySymbol(currency)}{quote.gross_fiat_amount?.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Withdrawal Fee ({quote.fee_percentage?.toFixed(1)}%):</span>
-                    <span className="font-bold text-base text-gray-900 dark:text-white">{getCurrencySymbol(currency)}{quote.withdrawal_fee?.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-gray-700">Withdrawal Fee ({quote.fee_percentage?.toFixed(1)}%):</span>
+                    <span className="font-bold text-base text-gray-900">{getCurrencySymbol(currency)}{quote.withdrawal_fee?.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t-2 border-red-300 dark:border-red-700">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
-                    <span className="font-bold text-xl text-green-600 dark:text-green-400">{getCurrencySymbol(currency)}{quote.net_fiat_amount?.toLocaleString()}</span>
+                  <div className="flex justify-between items-center pt-2 border-t-2 border-red-300">
+                    <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                    <span className="font-bold text-xl text-green-600">{getCurrencySymbol(currency)}{quote.net_fiat_amount?.toLocaleString()}</span>
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
+                  <div className="text-xs text-gray-600 mt-2 flex items-center gap-1">
                     <span>📊 Price: {quote.price_source}</span>
                     <span>•</span>
                     <span>💱 Forex: {quote.forex_source}</span>
@@ -758,21 +758,21 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {/* Payout Method Selection */}
               {supportsMobileMoney && supportsBankTransfer && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-white">Payout Method</Label>
+                  <Label className="text-sm font-semibold text-gray-900">Payout Method</Label>
                   <div className="grid grid-cols-2 gap-3">
                     <Button type="button" variant="outline" onClick={() => setPayoutMethod('bank_transfer')}
                       className={`h-12 text-base font-bold border-2 transition-all duration-200 ${
                         payoutMethod === 'bank_transfer'
-                          ? 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20 dark:from-blue-400/30 dark:to-indigo-400/30 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-200 backdrop-blur-sm shadow-lg'
-                          : 'bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-100 hover:bg-gray-100/70 dark:hover:bg-gray-600/70 backdrop-blur-sm'
+                          ? 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border-blue-500 text-blue-700 backdrop-blur-sm shadow-lg'
+                          : 'bg-white/50 border-gray-300 text-gray-700 hover:bg-gray-100/70 backdrop-blur-sm'
                       }`}>
                       <Building2 className="mr-2 h-5 w-5" />Bank Transfer
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setPayoutMethod('mobile_money')}
                       className={`h-12 text-base font-bold border-2 transition-all duration-200 ${
                         payoutMethod === 'mobile_money'
-                          ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 dark:from-green-400/30 dark:to-emerald-400/30 border-green-500 dark:border-green-400 text-green-700 dark:text-green-200 backdrop-blur-sm shadow-lg'
-                          : 'bg-white/50 dark:bg-gray-700/50 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-100 hover:bg-gray-100/70 dark:hover:bg-gray-600/70 backdrop-blur-sm'
+                          ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-500 text-green-700 backdrop-blur-sm shadow-lg'
+                          : 'bg-white/50 border-gray-300 text-gray-700 hover:bg-gray-100/70 backdrop-blur-sm'
                       }`}>
                       <Smartphone className="mr-2 h-5 w-5" />Mobile Money
                     </Button>
@@ -785,14 +785,14 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                 <>
                   {(currency === 'NGN' || currency === 'KES') && (
                     <div className="space-y-2">
-                      <Label htmlFor="bank" className="text-sm font-semibold text-gray-900 dark:text-white">Bank</Label>
+                      <Label htmlFor="bank" className="text-sm font-semibold text-gray-900">Bank</Label>
                       <Select value={bankCode} onValueChange={setBankCode}>
-                        <SelectTrigger id="bank" className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                        <SelectTrigger id="bank" className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                           <SelectValue placeholder="Select bank" />
                         </SelectTrigger>
-                        <SelectContent className="max-h-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
+                        <SelectContent className="max-h-[200px] bg-white border-gray-300 z-50">
                           {(currency === 'NGN' ? NIGERIAN_BANKS : KENYAN_BANKS).map(bank => (
-                            <SelectItem key={bank.code} value={bank.code} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <SelectItem key={bank.code} value={bank.code} className="text-gray-900 hover:bg-gray-100">
                               {bank.name}
                             </SelectItem>
                           ))}
@@ -801,25 +801,25 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     </div>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="account" className="text-sm font-semibold text-gray-900 dark:text-white">Account Number</Label>
+                    <Label htmlFor="account" className="text-sm font-semibold text-gray-900">Account Number</Label>
                     <div className="flex gap-2">
                       <Input id="account" type="text" maxLength={10} placeholder="0123456789"
                         value={bankAccount}
                         onChange={(e) => { setBankAccount(e.target.value); setAccountName(null) }}
                         disabled={loading || verifying}
-                        className="flex-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-base"
+                        className="flex-1 bg-gray-50 border-gray-300 text-gray-900 h-12 text-base"
                       />
                       <Button type="button" variant="outline" onClick={verifyBankAccount}
                         disabled={!bankAccount || !bankCode || verifying || loading || bankAccount.length !== 10}
-                        className="shrink-0 h-12 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-semibold px-6">
+                        className="shrink-0 h-12 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold px-6">
                         {verifying ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Verify'}
                       </Button>
                     </div>
                   </div>
                   {accountName && (
-                    <Alert className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800">
+                    <Alert className="bg-green-50 border-2 border-green-300">
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <AlertDescription className="text-green-900 dark:text-green-100 font-bold text-base">{accountName}</AlertDescription>
+                      <AlertDescription className="text-green-900 font-bold text-base">{accountName}</AlertDescription>
                     </Alert>
                   )}
                 </>
@@ -829,14 +829,14 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {payoutMethod === 'mobile_money' && supportsMobileMoney && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-900 dark:text-white">Mobile Money Provider</Label>
+                    <Label className="text-sm font-semibold text-gray-900">Mobile Money Provider</Label>
                     <Select value={mobileProvider} onValueChange={setMobileProvider}>
-                      <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 h-12 text-gray-900 dark:text-gray-100">
+                      <SelectTrigger className="bg-white border-gray-300 h-12 text-gray-900">
                         <SelectValue placeholder="Select provider" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 z-50">
+                      <SelectContent className="bg-white border-gray-300 z-50">
                         {selectedCurrency?.mobile_providers?.map((provider) => (
-                          <SelectItem key={provider} value={provider} className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">
+                          <SelectItem key={provider} value={provider} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
                             {MOBILE_PROVIDER_NAMES[provider] || provider}
                           </SelectItem>
                         ))}
@@ -844,12 +844,12 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-900 dark:text-white">Phone Number</Label>
+                    <Label className="text-sm font-semibold text-gray-900">Phone Number</Label>
                     <Input type="tel" placeholder="e.g., 0712345678" value={mobileNumber}
                       onChange={(e) => setMobileNumber(e.target.value)}
-                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 h-12"
+                      className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 h-12"
                     />
-                    <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
+                    <p className="text-xs text-gray-700 font-medium">
                       Enter number registered with {mobileProvider ? MOBILE_PROVIDER_NAMES[mobileProvider] : 'mobile money'}
                     </p>
                   </div>
@@ -857,10 +857,10 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               )}
 
               {/* Provider Info Alert */}
-              <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
-                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-                  <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> We automatically select the best provider.
+              <Alert className="bg-blue-50 border-2 border-blue-300">
+                <Info className="h-5 w-5 text-blue-600" />
+                <AlertDescription className="text-gray-900 text-sm font-medium">
+                  <strong className="text-blue-700">Smart Routing:</strong> We automatically select the best provider.
                 </AlertDescription>
               </Alert>
 
@@ -881,17 +881,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             <>
               {/* Asset */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Crypto Asset to Sell</Label>
+                <Label className="text-sm font-semibold text-gray-900">Crypto Asset to Sell</Label>
                 <Select value={asset} onValueChange={setAsset}>
-                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
+                  <SelectContent className="bg-white border-gray-300 max-h-[400px] z-50">
                     {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                       <div key={chain} className="py-2">
-                        <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-100 dark:bg-gray-900">{CHAIN_NAMES[chain] || chain}</div>
+                        <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-100">{CHAIN_NAMES[chain] || chain}</div>
                         {assets.map((a) => (
-                          <SelectItem key={a.value} value={a.value} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8">
+                          <SelectItem key={a.value} value={a.value} className="text-gray-900 hover:bg-gray-100 py-3 pl-8">
                             <div className="flex items-center gap-2"><span className="text-xl">{a.icon}</span><span className="font-medium">{a.label}</span></div>
                           </SelectItem>
                         ))}
@@ -903,32 +903,32 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
               {/* Amount */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Amount to Withdraw</Label>
+                <Label className="text-sm font-semibold text-gray-900">Amount to Withdraw</Label>
                 {availableBalance > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
-                    <span className="font-bold text-blue-700 dark:text-blue-300">{availableBalance.toFixed(6)} {getAssetSymbol(asset)}</span>
+                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-gray-700">Available:</span>
+                    <span className="font-bold text-blue-700">{availableBalance.toFixed(6)} {getAssetSymbol(asset)}</span>
                   </div>
                 )}
                 <div className="relative">
                   <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={amount}
                     onChange={(e) => setAmount(e.target.value)} disabled={loading}
-                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium pr-20"
+                    className="bg-gray-50 border-gray-300 text-gray-900 h-12 text-lg font-medium pr-20"
                   />
-                  <span className="absolute right-3 top-3 text-gray-600 dark:text-gray-400 font-semibold text-lg">{getAssetSymbol(asset)}</span>
+                  <span className="absolute right-3 top-3 text-gray-600 font-semibold text-lg">{getAssetSymbol(asset)}</span>
                 </div>
               </div>
 
               {/* Currency — Busha-supported only */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Receive Currency</Label>
+                <Label className="text-sm font-semibold text-gray-900">Receive Currency</Label>
                 <Select value={currency} onValueChange={v => { setCurrency(v); setBushaWQuote(null) }}>
-                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
+                  <SelectContent className="bg-white border-gray-300 z-50">
                     {bushaOfframpCurrencies.map(curr => (
-                      <SelectItem key={curr.code} value={curr.code} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3">
+                      <SelectItem key={curr.code} value={curr.code} className="text-gray-900 hover:bg-gray-100 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{curr.flag}</span>
                           <span className="font-medium">{curr.symbol}</span>
@@ -944,26 +944,26 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {bushaWFetchingQuote && (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
-                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Getting Busha quote...</span>
+                  <span className="ml-2 text-sm text-gray-600">Getting Busha quote...</span>
                 </div>
               )}
               {bushaWQuote && !bushaWFetchingQuote && (
-                <div className="rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-700 p-4 space-y-3">
+                <div className="rounded-xl bg-purple-50 border-2 border-purple-200 p-4 space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Live Quote · Busha</span>
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Live Quote · Busha</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Exchange Rate:</span>
-                    <span className="font-bold text-gray-900 dark:text-white">1 {getAssetSymbol(asset)} = {getCurrencySymbol(currency)}{parseFloat(bushaWQuote.busha_rate || 0).toFixed(2)}</span>
+                    <span className="text-sm text-gray-700">Exchange Rate:</span>
+                    <span className="font-bold text-gray-900">1 {getAssetSymbol(asset)} = {getCurrencySymbol(currency)}{parseFloat(bushaWQuote.busha_rate || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Fee ({bushaWQuote.markup_pct}%):</span>
-                    <span className="font-bold text-gray-900 dark:text-white">-{getCurrencySymbol(currency)}{parseFloat(bushaWQuote.markup_amount || 0).toFixed(2)}</span>
+                    <span className="text-sm text-gray-700">Fee ({bushaWQuote.markup_pct}%):</span>
+                    <span className="font-bold text-gray-900">-{getCurrencySymbol(currency)}{parseFloat(bushaWQuote.markup_amount || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t-2 border-purple-300 dark:border-purple-700">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
-                    <span className="font-bold text-xl text-green-600 dark:text-green-400">{getCurrencySymbol(currency)}{parseFloat(bushaWQuote.net_fiat || 0).toLocaleString()}</span>
+                  <div className="flex justify-between items-center pt-2 border-t-2 border-purple-300">
+                    <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                    <span className="font-bold text-xl text-green-600">{getCurrencySymbol(currency)}{parseFloat(bushaWQuote.net_fiat || 0).toLocaleString()}</span>
                   </div>
                 </div>
               )}
@@ -972,38 +972,38 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {currency === 'NGN' && (
                 <>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-900 dark:text-white">Bank</Label>
+                    <Label className="text-sm font-semibold text-gray-900">Bank</Label>
                     <Select value={bushaWBankCode} onValueChange={v => { setBushaWBankCode(v); setBushaWAccountName(null) }}>
-                      <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                      <SelectTrigger className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                         <SelectValue placeholder="Select bank" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
+                      <SelectContent className="max-h-[200px] bg-white border-gray-300 z-50">
                         {NIGERIAN_BANKS.map(bank => (
-                          <SelectItem key={bank.code} value={bank.code} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700">{bank.name}</SelectItem>
+                          <SelectItem key={bank.code} value={bank.code} className="text-gray-900 hover:bg-gray-100">{bank.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-900 dark:text-white">Account Number</Label>
+                    <Label className="text-sm font-semibold text-gray-900">Account Number</Label>
                     <div className="flex gap-2">
                       <Input type="text" maxLength={10} placeholder="0123456789"
                         value={bushaWBankAccount}
                         onChange={e => { setBushaWBankAccount(e.target.value); setBushaWAccountName(null) }}
                         disabled={loading || bushaWVerifying}
-                        className="flex-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-base"
+                        className="flex-1 bg-gray-50 border-gray-300 text-gray-900 h-12 text-base"
                       />
                       <Button type="button" variant="outline" onClick={verifyBushaWBank}
                         disabled={!bushaWBankAccount || !bushaWBankCode || bushaWVerifying || loading || bushaWBankAccount.length !== 10}
-                        className="shrink-0 h-12 border-2 border-gray-300 dark:border-gray-600 font-semibold px-6">
+                        className="shrink-0 h-12 border-2 border-gray-300 font-semibold px-6">
                         {bushaWVerifying ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Verify'}
                       </Button>
                     </div>
                   </div>
                   {bushaWAccountName && (
-                    <Alert className="bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-800">
+                    <Alert className="bg-green-50 border-2 border-green-300">
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <AlertDescription className="text-green-900 dark:text-green-100 font-bold text-base">{bushaWAccountName}</AlertDescription>
+                      <AlertDescription className="text-green-900 font-bold text-base">{bushaWAccountName}</AlertDescription>
                     </Alert>
                   )}
                 </>
@@ -1012,18 +1012,18 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {/* KES M-Pesa */}
               {currency === 'KES' && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-white">M-Pesa Phone Number</Label>
+                  <Label className="text-sm font-semibold text-gray-900">M-Pesa Phone Number</Label>
                   <Input type="tel" placeholder="e.g. 0712345678" value={bushaWPhone}
                     onChange={e => setBushaWPhone(e.target.value)}
-                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12"
+                    className="bg-gray-50 border-gray-300 text-gray-900 h-12"
                   />
                 </div>
               )}
 
-              <Alert className="bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-800">
-                <Info className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-                  <strong className="text-purple-700 dark:text-purple-300">Busha Direct:</strong> Funds arrive in 5–15 minutes via Busha's exchange.
+              <Alert className="bg-purple-50 border-2 border-purple-300">
+                <Info className="h-5 w-5 text-purple-600" />
+                <AlertDescription className="text-gray-900 text-sm font-medium">
+                  <strong className="text-purple-700">Busha Direct:</strong> Funds arrive in 5–15 minutes via Busha's exchange.
                 </AlertDescription>
               </Alert>
 
@@ -1043,17 +1043,17 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
             <>
               {/* Asset */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Crypto Asset to Sell</Label>
+                <Label className="text-sm font-semibold text-gray-900">Crypto Asset to Sell</Label>
                 <Select value={asset} onValueChange={setAsset}>
-                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
+                  <SelectContent className="bg-white border-gray-300 max-h-[400px] z-50">
                     {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                       <div key={chain} className="py-2">
-                        <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-100 dark:bg-gray-900">{CHAIN_NAMES[chain] || chain}</div>
+                        <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-100">{CHAIN_NAMES[chain] || chain}</div>
                         {assets.map((a) => (
-                          <SelectItem key={a.value} value={a.value} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8">
+                          <SelectItem key={a.value} value={a.value} className="text-gray-900 hover:bg-gray-100 py-3 pl-8">
                             <div className="flex items-center gap-2"><span className="text-xl">{a.icon}</span><span className="font-medium">{a.label}</span></div>
                           </SelectItem>
                         ))}
@@ -1065,32 +1065,32 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
               {/* Amount */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Amount to Withdraw</Label>
+                <Label className="text-sm font-semibold text-gray-900">Amount to Withdraw</Label>
                 {availableBalance > 0 && (
-                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
-                    <span className="font-bold text-blue-700 dark:text-blue-300">{availableBalance.toFixed(6)} {getAssetSymbol(asset)}</span>
+                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-gray-700">Available:</span>
+                    <span className="font-bold text-blue-700">{availableBalance.toFixed(6)} {getAssetSymbol(asset)}</span>
                   </div>
                 )}
                 <div className="relative">
                   <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={amount}
                     onChange={(e) => setAmount(e.target.value)} disabled={loading}
-                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium pr-20"
+                    className="bg-gray-50 border-gray-300 text-gray-900 h-12 text-lg font-medium pr-20"
                   />
-                  <span className="absolute right-3 top-3 text-gray-600 dark:text-gray-400 font-semibold text-lg">{getAssetSymbol(asset)}</span>
+                  <span className="absolute right-3 top-3 text-gray-600 font-semibold text-lg">{getAssetSymbol(asset)}</span>
                 </div>
               </div>
 
               {/* Currency — Kotani-supported only */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Receive Currency</Label>
+                <Label className="text-sm font-semibold text-gray-900">Receive Currency</Label>
                 <Select value={currency} onValueChange={v => { setCurrency(v); setKotaniWQuote(null); setKotaniWTelco('') }}>
-                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                  <SelectTrigger className="w-full bg-gray-50 border-gray-300 text-gray-900 h-12">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[300px] z-50">
+                  <SelectContent className="bg-white border-gray-300 max-h-[300px] z-50">
                     {kotaniOfframpCurrencies.map(curr => (
-                      <SelectItem key={curr.code} value={curr.code} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3">
+                      <SelectItem key={curr.code} value={curr.code} className="text-gray-900 hover:bg-gray-100 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xl">{curr.flag}</span>
                           <span className="font-medium">{curr.symbol}</span>
@@ -1106,22 +1106,22 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {kotaniWFetchingQuote && (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
-                  <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">Getting Kotani quote...</span>
+                  <span className="ml-2 text-sm text-gray-600">Getting Kotani quote...</span>
                 </div>
               )}
               {kotaniWQuote && !kotaniWFetchingQuote && (
-                <div className="rounded-xl bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-700 p-4 space-y-3">
+                <div className="rounded-xl bg-orange-50 border-2 border-orange-200 p-4 space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Live Quote · Kotani Pay</span>
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Live Quote · Kotani Pay</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Fee ({kotaniWQuote.markup_pct}%):</span>
-                    <span className="font-bold text-gray-900 dark:text-white">-{parseFloat(kotaniWQuote.markup_crypto || 0).toFixed(6)} {getAssetSymbol(asset)}</span>
+                    <span className="text-sm text-gray-700">Fee ({kotaniWQuote.markup_pct}%):</span>
+                    <span className="font-bold text-gray-900">-{parseFloat(kotaniWQuote.markup_crypto || 0).toFixed(6)} {getAssetSymbol(asset)}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t-2 border-orange-300 dark:border-orange-700">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">You Receive:</span>
-                    <span className="font-bold text-xl text-green-600 dark:text-green-400">{getCurrencySymbol(currency)}{parseFloat(kotaniWQuote.net_fiat || 0).toLocaleString()}</span>
+                  <div className="flex justify-between items-center pt-2 border-t-2 border-orange-300">
+                    <span className="text-sm font-semibold text-gray-900">You Receive:</span>
+                    <span className="font-bold text-xl text-green-600">{getCurrencySymbol(currency)}{parseFloat(kotaniWQuote.net_fiat || 0).toLocaleString()}</span>
                   </div>
                 </div>
               )}
@@ -1129,14 +1129,14 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
               {/* Mobile network */}
               {kotaniOfframpTelcos.length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900 dark:text-white">Mobile Network</Label>
+                  <Label className="text-sm font-semibold text-gray-900">Mobile Network</Label>
                   <Select value={kotaniWTelco} onValueChange={setKotaniWTelco}>
-                    <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 h-12 text-gray-900 dark:text-gray-100">
+                    <SelectTrigger className="bg-white border-gray-300 h-12 text-gray-900">
                       <SelectValue placeholder="Select network" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 z-50">
+                    <SelectContent className="bg-white border-gray-300 z-50">
                       {kotaniOfframpTelcos.map(t => (
-                        <SelectItem key={t.id} value={t.id} className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">{t.name}</SelectItem>
+                        <SelectItem key={t.id} value={t.id} className="text-gray-900 hover:bg-gray-100 cursor-pointer">{t.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1145,20 +1145,20 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
 
               {/* Phone number */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Phone Number</Label>
+                <Label className="text-sm font-semibold text-gray-900">Phone Number</Label>
                 <Input type="tel" placeholder="e.g., 0712345678" value={kotaniWPhone}
                   onChange={(e) => setKotaniWPhone(e.target.value)}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 h-12"
+                  className="bg-white border-gray-300 text-gray-900 h-12"
                 />
-                <p className="text-xs text-gray-700 dark:text-gray-300 font-medium">
+                <p className="text-xs text-gray-700 font-medium">
                   Enter number registered with {kotaniWTelco || 'mobile money'}
                 </p>
               </div>
 
-              <Alert className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-800">
-                <Info className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-                  <strong className="text-orange-700 dark:text-orange-300">Kotani Pay:</strong> Funds arrive via mobile money in 2–10 minutes.
+              <Alert className="bg-orange-50 border-2 border-orange-300">
+                <Info className="h-5 w-5 text-orange-600" />
+                <AlertDescription className="text-gray-900 text-sm font-medium">
+                  <strong className="text-orange-700">Kotani Pay:</strong> Funds arrive via mobile money in 2–10 minutes.
                 </AlertDescription>
               </Alert>
 

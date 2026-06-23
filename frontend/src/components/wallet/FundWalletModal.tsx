@@ -123,10 +123,10 @@ const ONRAMP_PROVIDER_CURRENCIES: Record<Provider, string[]> = {
 
 // Provider metadata for rendering toggle buttons
 const PROVIDER_META: Record<Provider, { label: string; sublabel: string; icon: React.ReactNode; activeClass: string }> = {
-  local:   { label: 'Paystack / Flutterwave', sublabel: 'NGN · KES · GHS & more', icon: <Banknote className="h-5 w-5" />, activeClass: 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' },
-  moonpay: { label: 'MoonPay',               sublabel: 'Card · Apple Pay · 160+',  icon: <Globe className="h-5 w-5" />,   activeClass: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'  },
-  busha:   { label: 'Busha',                 sublabel: 'Bank transfer · NGN/KES',  icon: <Wallet className="h-5 w-5" />,  activeClass: 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' },
-  kotani:  { label: 'Kotani Pay',            sublabel: 'Mobile money · Africa',    icon: <Smartphone className="h-5 w-5" />, activeClass: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' },
+  local:   { label: 'Paystack / Flutterwave', sublabel: 'NGN · KES · GHS & more', icon: <Banknote className="h-5 w-5" />, activeClass: 'border-green-500 bg-green-50 text-green-700' },
+  moonpay: { label: 'MoonPay',               sublabel: 'Card · Apple Pay · 160+',  icon: <Globe className="h-5 w-5" />,   activeClass: 'border-blue-500 bg-blue-50 text-blue-700'  },
+  busha:   { label: 'Busha',                 sublabel: 'Bank transfer · NGN/KES',  icon: <Wallet className="h-5 w-5" />,  activeClass: 'border-purple-500 bg-purple-50 text-purple-700' },
+  kotani:  { label: 'Kotani Pay',            sublabel: 'Mobile money · Africa',    icon: <Smartphone className="h-5 w-5" />, activeClass: 'border-orange-500 bg-orange-50 text-orange-700' },
 }
 
 // Asset remapping when switching to Busha (unsupported Algorand-native assets)
@@ -509,29 +509,29 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         w-[95vw] max-w-md
         max-h-[92dvh] overflow-y-auto
         rounded-2xl p-0
-        bg-white dark:bg-gray-900
-        border border-gray-200 dark:border-gray-700
+        bg-white
+        border border-gray-200
         shadow-2xl
       ">
         {/* Sticky Header — original structure preserved */}
-        <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-5 pt-5 pb-4 rounded-t-2xl">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 pt-5 pb-4 rounded-t-2xl">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30">
-                  <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
+                <div className="p-2 rounded-xl bg-blue-50">
+                  <Wallet className="h-5 w-5 text-blue-600" />
                 </div>
                 Buy Crypto
               </DialogTitle>
               <button
                 onClick={() => onOpenChange(false)}
-                className="rounded-full p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="rounded-full p-1.5 hover:bg-gray-100 transition-colors"
                 aria-label="Close"
               >
-                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <X className="h-4 w-4 text-gray-500" />
               </button>
             </div>
-            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <DialogDescription className="text-sm text-gray-500 mt-1">
               Card, bank transfer, Apple Pay & Google Pay. 160+ countries.
             </DialogDescription>
           </DialogHeader>
@@ -552,7 +552,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                   className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-sm font-semibold transition-all ${
                     isActive
                       ? meta.activeClass
-                      : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
                   {meta.icon}
@@ -565,22 +565,22 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
           {/* ── Asset Selection — shared across all providers ── */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <Label className="text-sm font-semibold text-gray-700">
               Select Asset to Receive
             </Label>
             <Select value={asset} onValueChange={setAsset}>
-              <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+              <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="max-h-72 rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+              <SelectContent className="max-h-72 rounded-xl bg-white border-gray-200 z-[9999]">
                 {Object.entries(activeGroups).map(([chain, assets]) => (
                   <div key={chain}>
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest bg-gray-50 dark:bg-gray-900">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50">
                       {chain}
                     </div>
                     {(assets as any[]).map((a: any) => (
                       <SelectItem key={a.value} value={a.value}
-                        className="py-2.5 pl-6 text-sm text-gray-900 dark:text-white cursor-pointer">
+                        className="py-2.5 pl-6 text-sm text-gray-900 cursor-pointer">
                         <span className="mr-2">{a.icon}</span>{a.label}
                       </SelectItem>
                     ))}
@@ -589,22 +589,22 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               </SelectContent>
             </Select>
             {asset === 'MATIC' && (
-              <p className="text-xs text-purple-600 dark:text-purple-400">
+              <p className="text-xs text-purple-600">
                 ℹ️ MATIC runs on the POL network — delivered to your Polygon address.
               </p>
             )}
             {provider === 'moonpay' && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-amber-600">
                 ⚠️ Algorand-native assets (goBTC, goETH, USDCa) not supported by MoonPay. Switch to Local Payment for those.
               </p>
             )}
             {provider === 'busha' && BUSHA_ASSET_FALLBACK[asset] && (
-              <p className="text-xs text-purple-600 dark:text-purple-400">
+              <p className="text-xs text-purple-600">
                 ℹ️ Algorand-native assets remapped to their cross-chain equivalent for Busha.
               </p>
             )}
             {provider === 'kotani' && KOTANI_ASSET_FALLBACK[asset] && (
-              <p className="text-xs text-orange-600 dark:text-orange-400">
+              <p className="text-xs text-orange-600">
                 ℹ️ Asset remapped to supported equivalent for Kotani Pay.
               </p>
             )}
@@ -617,18 +617,18 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             <>
               {/* Currency */}
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Your Currency</Label>
+                <Label className="text-sm font-semibold text-gray-700">Your Currency</Label>
                 <Select value={currency} onValueChange={v => { setCurrency(v); setQuote(null) }}>
-                  <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                  <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 max-h-[260px] z-[9999]">
+                  <SelectContent className="bg-white border-gray-200 max-h-[260px] z-[9999]">
                     {LOCAL_CURRENCIES.map(c => (
                       <SelectItem key={c.code} value={c.code}
-                        className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 py-2.5">
+                        className="text-gray-900 hover:bg-gray-100 py-2.5">
                         <span className="text-base mr-2">{c.flag}</span>
                         <span className="font-medium">{c.symbol}</span>
-                        <span className="ml-1 text-gray-500 dark:text-gray-400">{c.name}</span>
+                        <span className="ml-1 text-gray-500">{c.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -637,17 +637,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
               {/* Amount */}
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</Label>
+                <Label className="text-sm font-semibold text-gray-700">Amount</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
                     {selectedCurrency?.symbol}
                   </span>
                   <Input type="number" placeholder="0.00" value={amount}
                     onChange={e => setAmount(e.target.value)} disabled={loading}
-                    className="pl-10 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-base"
+                    className="pl-10 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900 text-base"
                   />
                 </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
+                <p className="text-xs text-gray-400">
                   Minimum: {selectedCurrency?.symbol}{currency === 'NGN' ? '1,000' : '10'}
                 </p>
               </div>
@@ -660,29 +660,29 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 </div>
               )}
               {quote && !fetchingQuote && (
-                <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-3.5 space-y-2">
+                <div className="rounded-xl bg-blue-50 border border-blue-100 p-3.5 space-y-2">
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Live Quote</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">Fee ({quote.total_fee_pct?.toFixed(1)}%)</span>
-                    <span className="text-gray-600 dark:text-gray-300">-{selectedCurrency?.symbol}{quote.total_fee?.toFixed(2)}</span>
+                    <span className="text-gray-500">Fee ({quote.total_fee_pct?.toFixed(1)}%)</span>
+                    <span className="text-gray-600">-{selectedCurrency?.symbol}{quote.total_fee?.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between font-bold pt-1.5 border-t border-blue-200 dark:border-blue-700">
-                    <span className="text-gray-800 dark:text-white text-sm">You Receive</span>
-                    <span className="text-green-600 dark:text-green-400 text-sm">
+                  <div className="flex justify-between font-bold pt-1.5 border-t border-blue-200">
+                    <span className="text-gray-800 text-sm">You Receive</span>
+                    <span className="text-green-600 text-sm">
                       {quote.crypto_to_receive?.toFixed(4)} {asset.split('_')[0]}
                     </span>
                   </div>
                 </div>
               )}
 
-              <Alert className="border border-green-100 dark:border-green-900 bg-green-50 dark:bg-green-900/20 rounded-xl py-3">
+              <Alert className="border border-green-100 bg-green-50 rounded-xl py-3">
                 <Info className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
-                <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                  <strong className="text-green-700 dark:text-green-400">Smart routing</strong> — best provider auto-selected for your currency. Crypto credited instantly after payment.
-                  {currency === 'NGN' && <span className="block mt-1 text-blue-600 dark:text-blue-400">🔵 Powered by Paystack for NGN</span>}
+                <AlertDescription className="text-xs text-gray-700 leading-relaxed">
+                  <strong className="text-green-700">Smart routing</strong> — best provider auto-selected for your currency. Crypto credited instantly after payment.
+                  {currency === 'NGN' && <span className="block mt-1 text-blue-600">🔵 Powered by Paystack for NGN</span>}
                 </AlertDescription>
               </Alert>
             </>
@@ -694,21 +694,21 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
           {provider === 'moonpay' && (
             <>
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <Label className="text-sm font-semibold text-gray-700">
                   Amount <span className="font-normal text-gray-400">(optional pre-fill)</span>
                 </Label>
                 <div className="flex gap-2">
                   <Input type="number" placeholder="0.00" value={amount}
                     onChange={e => setAmount(e.target.value)} disabled={loading}
-                    className="flex-1 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    className="flex-1 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900"
                   />
                   <Select value={mpCurrency} onValueChange={setMpCurrency}>
-                    <SelectTrigger className="w-24 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                    <SelectTrigger className="w-24 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+                    <SelectContent className="rounded-xl bg-white border-gray-200 z-[9999]">
                       {MOONPAY_FIAT.map(c => (
-                        <SelectItem key={c.code} value={c.code} className="text-gray-900 dark:text-white">
+                        <SelectItem key={c.code} value={c.code} className="text-gray-900">
                           {c.flag} {c.code}
                         </SelectItem>
                       ))}
@@ -724,17 +724,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                   { icon: '⚡', text: 'Instant delivery' },
                   { icon: '🌍', text: '160+ countries' },
                 ].map(b => (
-                  <div key={b.text} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-center">
+                  <div key={b.text} className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-gray-50 text-center">
                     <span className="text-lg">{b.icon}</span>
-                    <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">{b.text}</span>
+                    <span className="text-[10px] font-medium text-gray-500">{b.text}</span>
                   </div>
                 ))}
               </div>
 
-              <Alert className="border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/20 rounded-xl py-3">
+              <Alert className="border border-blue-100 bg-blue-50 rounded-xl py-3">
                 <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                  Powered by <strong className="text-blue-600 dark:text-blue-400">MoonPay</strong> —
+                <AlertDescription className="text-xs text-gray-700 leading-relaxed">
+                  Powered by <strong className="text-blue-600">MoonPay</strong> —
                   crypto delivered directly to your Seamount wallet. Apple Pay & Google Pay open in a new tab.
                 </AlertDescription>
               </Alert>
@@ -750,17 +750,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 <>
                   {/* Busha currency — filtered to NGN / KES */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Your Currency</Label>
+                    <Label className="text-sm font-semibold text-gray-700">Your Currency</Label>
                     <Select value={currency} onValueChange={v => { setCurrency(v); setBushaQuote(null) }}>
-                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+                      <SelectContent className="bg-white border-gray-200 z-[9999]">
                         {bushaOnrampCurrencies.map(c => (
-                          <SelectItem key={c.code} value={c.code} className="text-gray-900 dark:text-gray-100 py-2.5">
+                          <SelectItem key={c.code} value={c.code} className="text-gray-900 py-2.5">
                             <span className="text-base mr-2">{c.flag}</span>
                             <span className="font-medium">{c.symbol}</span>
-                            <span className="ml-1 text-gray-500 dark:text-gray-400">{c.name}</span>
+                            <span className="ml-1 text-gray-500">{c.name}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -769,17 +769,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
                   {/* Amount */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</Label>
+                    <Label className="text-sm font-semibold text-gray-700">Amount</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
                         {selectedBushaCurrency?.symbol}
                       </span>
                       <Input type="number" placeholder="0.00" value={amount}
                         onChange={e => setAmount(e.target.value)} disabled={loading}
-                        className="pl-10 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-base"
+                        className="pl-10 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900 text-base"
                       />
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                    <p className="text-xs text-gray-400">
                       Minimum: {selectedBushaCurrency?.symbol}{currency === 'NGN' ? '1,000' : '10'}
                     </p>
                   </div>
@@ -792,36 +792,36 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                     </div>
                   )}
                   {bushaQuote && !bushaFetchingQuote && (
-                    <div className="rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 p-3.5 space-y-2">
+                    <div className="rounded-xl bg-purple-50 border border-purple-100 p-3.5 space-y-2">
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Live Quote · Busha</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">You pay (gross)</span>
-                        <span className="text-gray-600 dark:text-gray-300 font-medium">
+                        <span className="text-gray-500">You pay (gross)</span>
+                        <span className="text-gray-600 font-medium">
                           {selectedBushaCurrency?.symbol}{parseFloat(bushaQuote.gross_amount || 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Fee ({bushaQuote.markup_pct?.toFixed(1)}%)</span>
-                        <span className="text-gray-600 dark:text-gray-300">
+                        <span className="text-gray-500">Fee ({bushaQuote.markup_pct?.toFixed(1)}%)</span>
+                        <span className="text-gray-600">
                           -{selectedBushaCurrency?.symbol}{parseFloat(bushaQuote.markup_amount || 0).toFixed(2)}
                         </span>
                       </div>
-                      <div className="flex justify-between font-bold pt-1.5 border-t border-purple-200 dark:border-purple-700">
-                        <span className="text-gray-800 dark:text-white text-sm">You Receive</span>
-                        <span className="text-green-600 dark:text-green-400 text-sm">
+                      <div className="flex justify-between font-bold pt-1.5 border-t border-purple-200">
+                        <span className="text-gray-800 text-sm">You Receive</span>
+                        <span className="text-green-600 text-sm">
                           {parseFloat(bushaQuote.crypto_amount || 0).toFixed(6)} {asset.split('_')[0]}
                         </span>
                       </div>
                     </div>
                   )}
 
-                  <Alert className="border border-purple-100 dark:border-purple-900 bg-purple-50 dark:bg-purple-900/20 rounded-xl py-3">
+                  <Alert className="border border-purple-100 bg-purple-50 rounded-xl py-3">
                     <Info className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
-                    <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                      <strong className="text-purple-700 dark:text-purple-400">Busha Direct</strong> — a temporary bank account will be generated. Transfer the exact amount within the expiry window to complete your purchase.
+                    <AlertDescription className="text-xs text-gray-700 leading-relaxed">
+                      <strong className="text-purple-700">Busha Direct</strong> — a temporary bank account will be generated. Transfer the exact amount within the expiry window to complete your purchase.
                     </AlertDescription>
                   </Alert>
                 </>
@@ -829,10 +829,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
               {bushaPayInStep === 'bank_details' && bushaPayInDetails && (
                 <>
-                  <div className="rounded-xl border-2 border-purple-200 dark:border-purple-700 overflow-hidden">
-                    <div className="bg-purple-50 dark:bg-purple-900/30 px-4 py-3 flex items-center gap-2">
+                  <div className="rounded-xl border-2 border-purple-200 overflow-hidden">
+                    <div className="bg-purple-50 px-4 py-3 flex items-center gap-2">
                       <CheckCircle2 className="h-5 w-5 text-purple-600" />
-                      <span className="font-bold text-purple-700 dark:text-purple-300 text-sm">Transfer to this account</span>
+                      <span className="font-bold text-purple-700 text-sm">Transfer to this account</span>
                     </div>
                     {[
                       { label: 'Bank Name',      value: bushaPayInDetails.pay_in_details?.bank_name },
@@ -840,10 +840,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                       { label: 'Account Name',   value: bushaPayInDetails.pay_in_details?.account_name },
                       { label: 'Amount to Pay',  value: `${selectedBushaCurrency?.symbol}${parseFloat(bushaPayInDetails.pay_in_details?.amount || 0).toFixed(2)}`, highlight: true },
                     ].map(row => (
-                      <div key={row.label} className="flex justify-between items-center px-4 py-3 border-t border-purple-100 dark:border-purple-800">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{row.label}</span>
+                      <div key={row.label} className="flex justify-between items-center px-4 py-3 border-t border-purple-100">
+                        <span className="text-xs text-gray-500">{row.label}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`text-sm font-semibold ${row.highlight ? 'text-purple-700 dark:text-purple-300 text-base' : 'text-gray-900 dark:text-white'}`}>
+                          <span className={`text-sm font-semibold ${row.highlight ? 'text-purple-700 text-base' : 'text-gray-900'}`}>
                             {row.value}
                           </span>
                           {row.copy && (
@@ -855,9 +855,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                       </div>
                     ))}
                   </div>
-                  <Alert className="border border-amber-200 bg-amber-50 dark:bg-amber-900/20 rounded-xl py-3">
+                  <Alert className="border border-amber-200 bg-amber-50 rounded-xl py-3">
                     <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                    <AlertDescription className="text-xs text-amber-800 leading-relaxed">
                       Transfer <strong>exactly</strong> the amount shown. Account expires at{' '}
                       <strong>
                         {bushaPayInDetails.pay_in_details?.expires_at
@@ -880,17 +880,17 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                 <>
                   {/* Kotani currency — filtered to Kotani-supported */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Your Currency</Label>
+                    <Label className="text-sm font-semibold text-gray-700">Your Currency</Label>
                     <Select value={currency} onValueChange={v => { setCurrency(v); setKotaniQuote(null); setKotaniTelco('') }}>
-                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                      <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 max-h-[260px] z-[9999]">
+                      <SelectContent className="bg-white border-gray-200 max-h-[260px] z-[9999]">
                         {kotaniOnrampCurrencies.map(c => (
-                          <SelectItem key={c.code} value={c.code} className="text-gray-900 dark:text-gray-100 py-2.5">
+                          <SelectItem key={c.code} value={c.code} className="text-gray-900 py-2.5">
                             <span className="text-base mr-2">{c.flag}</span>
                             <span className="font-medium">{c.symbol}</span>
-                            <span className="ml-1 text-gray-500 dark:text-gray-400">{c.name}</span>
+                            <span className="ml-1 text-gray-500">{c.name}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -899,14 +899,14 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
                   {/* Amount */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</Label>
+                    <Label className="text-sm font-semibold text-gray-700">Amount</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-semibold">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">
                         {selectedKotaniCurrency?.symbol}
                       </span>
                       <Input type="number" placeholder="0.00" value={amount}
                         onChange={e => setAmount(e.target.value)} disabled={loading}
-                        className="pl-10 h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-base"
+                        className="pl-10 h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900 text-base"
                       />
                     </div>
                   </div>
@@ -914,14 +914,14 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                   {/* Mobile network */}
                   {kotaniTelcos.length > 0 && (
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Mobile Network</Label>
+                      <Label className="text-sm font-semibold text-gray-700">Mobile Network</Label>
                       <Select value={kotaniTelco} onValueChange={setKotaniTelco}>
-                        <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                        <SelectTrigger className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900">
                           <SelectValue placeholder="Select network" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 z-[9999]">
+                        <SelectContent className="bg-white border-gray-200 z-[9999]">
                           {kotaniTelcos.map(t => (
-                            <SelectItem key={t.id} value={t.id} className="text-gray-900 dark:text-white py-2.5">{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={t.id} className="text-gray-900 py-2.5">{t.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -930,12 +930,12 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
 
                   {/* Phone number */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Phone Number</Label>
+                    <Label className="text-sm font-semibold text-gray-700">Phone Number</Label>
                     <Input
                       type="tel" placeholder="e.g. 0712345678"
                       value={kotaniPhone} onChange={e => setKotaniPhone(e.target.value)}
                       disabled={loading}
-                      className="h-12 rounded-xl border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="h-12 rounded-xl border-gray-200 bg-gray-50 text-gray-900"
                     />
                   </div>
 
@@ -947,47 +947,47 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
                     </div>
                   )}
                   {kotaniQuote && !kotaniFetchingQuote && (
-                    <div className="rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 p-3.5 space-y-2">
+                    <div className="rounded-xl bg-orange-50 border border-orange-100 p-3.5 space-y-2">
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Live Quote · Kotani Pay</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Fee ({kotaniQuote.markup_pct?.toFixed(1)}%)</span>
-                        <span className="text-gray-600 dark:text-gray-300">
+                        <span className="text-gray-500">Fee ({kotaniQuote.markup_pct?.toFixed(1)}%)</span>
+                        <span className="text-gray-600">
                           -{parseFloat(kotaniQuote.markup_crypto || 0).toFixed(6)} {asset.split('_')[0]}
                         </span>
                       </div>
-                      <div className="flex justify-between font-bold pt-1.5 border-t border-orange-200 dark:border-orange-700">
-                        <span className="text-gray-800 dark:text-white text-sm">You Receive</span>
-                        <span className="text-green-600 dark:text-green-400 text-sm">
+                      <div className="flex justify-between font-bold pt-1.5 border-t border-orange-200">
+                        <span className="text-gray-800 text-sm">You Receive</span>
+                        <span className="text-green-600 text-sm">
                           {parseFloat(kotaniQuote.net_crypto || 0).toFixed(6)} {asset.split('_')[0]}
                         </span>
                       </div>
                     </div>
                   )}
 
-                  <Alert className="border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-900/20 rounded-xl py-3">
+                  <Alert className="border border-orange-100 bg-orange-50 rounded-xl py-3">
                     <Info className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
-                    <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                      <strong className="text-orange-700 dark:text-orange-400">Kotani Pay</strong> — a payment request (STK push) will be sent to your phone. Approve it to complete the purchase.
+                    <AlertDescription className="text-xs text-gray-700 leading-relaxed">
+                      <strong className="text-orange-700">Kotani Pay</strong> — a payment request (STK push) will be sent to your phone. Approve it to complete the purchase.
                     </AlertDescription>
                   </Alert>
                 </>
               ) : (
                 /* STK push sent confirmation */
                 <div className="text-center py-4 space-y-3">
-                  <div className="p-4 rounded-full bg-orange-50 dark:bg-orange-900/20 w-20 h-20 mx-auto flex items-center justify-center">
+                  <div className="p-4 rounded-full bg-orange-50 w-20 h-20 mx-auto flex items-center justify-center">
                     <Smartphone className="h-10 w-10 text-orange-500 animate-pulse" />
                   </div>
-                  <p className="font-bold text-lg text-gray-900 dark:text-white">Check Your Phone</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed px-4">
+                  <p className="font-bold text-lg text-gray-900">Check Your Phone</p>
+                  <p className="text-sm text-gray-500 leading-relaxed px-4">
                     A payment request has been sent to <strong>{kotaniPayInDetails?.pay_in_details?.phone_number || kotaniPhone}</strong> via{' '}
                     <strong>{kotaniPayInDetails?.pay_in_details?.telco || kotaniTelco}</strong>. Approve it to complete your purchase.
                   </p>
-                  <div className="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-3">
+                  <div className="rounded-xl bg-gray-50 border border-gray-200 p-3">
                     <p className="text-xs text-gray-500">Amount</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    <p className="text-xl font-bold text-gray-900">
                       {selectedKotaniCurrency?.symbol}{parseFloat(amount).toFixed(2)} {currency}
                     </p>
                   </div>
@@ -1007,10 +1007,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
         </div>
 
         {/* Sticky Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-5 py-4 rounded-b-2xl space-y-3">
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 py-4 rounded-b-2xl space-y-3">
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}
-              className="flex-1 h-12 rounded-xl border-gray-200 dark:border-gray-700 font-semibold">
+              className="flex-1 h-12 rounded-xl border-gray-200 font-semibold">
               Cancel
             </Button>
             {(provider === 'busha' && bushaPayInStep === 'bank_details') || (provider === 'kotani' && kotaniPayInSent) ? (

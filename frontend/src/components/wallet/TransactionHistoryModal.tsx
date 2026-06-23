@@ -110,22 +110,22 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl rounded-2xl">
-        <DialogHeader className="border-b border-gray-100 dark:border-gray-800 pb-4">
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
-            <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+      <DialogContent className="sm:max-w-[800px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white border border-gray-200 shadow-2xl rounded-2xl">
+        <DialogHeader className="border-b border-gray-100 pb-4">
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <Clock className="h-6 w-6 text-blue-600" />
             Transaction History
           </DialogTitle>
         </DialogHeader>
 
         {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-2 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex flex-wrap gap-2 py-4 border-b border-gray-100">
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               filter === 'all'
-                ? 'bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/50'
-                : 'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-700/50'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                : 'bg-gray-50 text-gray-500 hover:text-blue-600 border border-gray-200'
             }`}
           >
             All Chains
@@ -136,8 +136,8 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
               onClick={() => setFilter(chain)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
                 filter === chain
-                  ? 'bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/50'
-                  : 'bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-300 border border-gray-200 dark:border-gray-700/50'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'bg-gray-50 text-gray-500 hover:text-blue-600 border border-gray-200'
               }`}
             >
               <span>{CHAIN_ICONS[chain]}</span>
@@ -151,13 +151,13 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">Loading your transactions...</p>
+              <p className="text-gray-500">Loading your transactions...</p>
             </div>
           ) : filteredTransactions.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📭</div>
-              <p className="text-gray-500 dark:text-gray-400">No transactions found</p>
-              <p className="text-sm text-gray-400 dark:text-gray-600 mt-2">Your transaction history will appear here</p>
+              <p className="text-gray-500">No transactions found</p>
+              <p className="text-sm text-gray-400 mt-2">Your transaction history will appear here</p>
             </div>
           ) : (
             filteredTransactions.map((tx) => {
@@ -169,7 +169,7 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
               return (
                 <div
                   key={tx.id}
-                  className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 hover:border-blue-300 dark:hover:border-blue-500/40 transition-all"
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-all"
                 >
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     {/* Left: Chain & Type */}
@@ -177,7 +177,7 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
                       <div className="text-2xl">{CHAIN_ICONS[tx.chain]}</div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                          <span className="text-lg font-semibold text-gray-900">
                             {typeLabel}
                           </span>
                           {tx.status === 'completed' ? (

@@ -472,15 +472,15 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
     <>
       <Dialog open={open && !showConfirmation && !showScanner} onOpenChange={onOpenChange}>
         <DialogContent 
-          className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600"
+          className="sm:max-w-[550px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white border-2 border-gray-200"
           style={{ zIndex: 1000 }}
         >
           <DialogHeader className="border-b pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
               <Send className="h-6 w-6 text-green-600" />
               Send Crypto
             </DialogTitle>
-            <DialogDescription className="text-base text-gray-600 dark:text-gray-400 mt-2">
+            <DialogDescription className="text-base text-gray-600 mt-2">
               Send cryptocurrency via multi-chain networks. Fast, secure, and low-cost.
             </DialogDescription>
           </DialogHeader>
@@ -488,31 +488,31 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
           <div className="space-y-5 py-4">
             {/* Asset Selection */}
             <div className="space-y-2">
-              <Label htmlFor="send-asset" className="text-sm font-semibold text-gray-900 dark:text-white">
+              <Label htmlFor="send-asset" className="text-sm font-semibold text-gray-900">
                 Asset to Send
               </Label>
               <Select value={asset} onValueChange={setAsset}>
-                <SelectTrigger id="send-asset" className="w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12">
+                <SelectTrigger id="send-asset" className="w-full bg-white border-gray-300 text-gray-900 h-12">
                   <SelectValue placeholder="Select asset to send" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 max-h-[400px] z-50">
+                <SelectContent className="bg-white border-gray-300 max-h-[400px] z-50">
                   {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
                     <div key={chain} className="py-2">
-                      <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-100 dark:bg-gray-900">
+                      <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-100">
                         {CHAIN_NAMES[chain] || chain}
                       </div>
                       {assets.map((a) => (
                         <SelectItem 
                           key={a.value} 
                           value={a.value}
-                          className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8"
+                          className="text-gray-900 hover:bg-gray-100 py-3 pl-8"
                         >
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2">
                               <span className="text-xl">{a.icon}</span>
                               <span className="font-medium">{a.label}</span>
                             </div>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">{a.description}</span>
+                            <span className="text-xs text-gray-600">{a.description}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -523,14 +523,14 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               
               {/* Balance Display */}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Available Balance:</span>
+                <span className="text-gray-600">Available Balance:</span>
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-green-400 animate-pulse" />
-                  <span className="font-bold text-gray-900 dark:text-white">
+                  <span className="font-bold text-gray-900">
                     {availableBalance.toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
                   </span>
                   {balanceUSD > 0 && (
-                    <span className="text-gray-500 dark:text-gray-400">
+                    <span className="text-gray-500">
                       (${balanceUSD.toFixed(2)})
                     </span>
                   )}
@@ -540,7 +540,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
             {/* Recipient Address with QR Button */}
             <div className="space-y-2">
-              <Label htmlFor="recipient" className="text-sm font-semibold text-gray-900 dark:text-white">
+              <Label htmlFor="recipient" className="text-sm font-semibold text-gray-900">
                 Recipient Address (Scan QR Code Available)
               </Label>
               <div className="flex gap-2">
@@ -550,8 +550,8 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
                   disabled={loading}
-                  className={`flex-1 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base ${
-                    validationError ? 'border-red-500 dark:border-red-500' : ''
+                  className={`flex-1 bg-white border-gray-300 text-gray-900 h-12 text-base ${
+                    validationError ? 'border-red-500' : ''
                   }`}
                 />
                 <button
@@ -565,13 +565,13 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               </div>
               
               {validationError && (
-                <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                <div className="flex items-center gap-2 text-xs text-red-600 font-medium">
                   <AlertCircle className="h-4 w-4" />
                   {validationError}
                 </div>
               )}
               {!validationError && recipient.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400 font-medium">
+                <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
                   <CheckCircle2 className="h-4 w-4" />
                   Valid {selectedChain} address ✓
                 </div>
@@ -580,7 +580,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
             {/* Amount */}
             <div className="space-y-2">
-              <Label htmlFor="amount" className="text-sm font-semibold text-gray-900 dark:text-white">
+              <Label htmlFor="amount" className="text-sm font-semibold text-gray-900">
                 Crypto Amount
               </Label>
               <div className="relative">
@@ -593,7 +593,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   disabled={loading}
-                  className="pr-20 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-lg font-medium"
+                  className="pr-20 bg-white border-gray-300 text-gray-900 h-12 text-lg font-medium"
                 />
                 <button
                   type="button"
@@ -608,7 +608,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
             {/* Memo (Optional) */}
             <div className="space-y-2">
-              <Label htmlFor="memo" className="text-sm font-semibold text-gray-900 dark:text-white">
+              <Label htmlFor="memo" className="text-sm font-semibold text-gray-900">
                 Memo (Optional)
               </Label>
               <Input
@@ -618,47 +618,47 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
                 onChange={(e) => setMemo(e.target.value)}
                 disabled={loading}
                 maxLength={100}
-                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white h-12 text-base"
+                className="bg-white border-gray-300 text-gray-900 h-12 text-base"
               />
-              <p className="text-xs text-gray-600 dark:text-gray-400">
+              <p className="text-xs text-gray-600">
                 Optional message attached to this transaction
               </p>
             </div>
 
             {/* Fee Estimate */}
             {(estimatedNetworkFee > 0 || seamountFeeNative > 0) && (
-              <div className="space-y-2 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-2 mb-2">
                   <Info className="h-4 w-4 text-blue-500" />
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Fee Estimate</span>
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Fee Estimate</span>
                 </div>
                 
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Network Fee:</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-600">Network Fee:</span>
+                  <span className="font-mono text-gray-900">
                     {estimatedNetworkFee.toFixed(6)} {nativeAsset}
                   </span>
                 </div>
                 
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Seamount Fee:</span>
-                  <span className="font-mono text-green-600 dark:text-green-400 font-medium">
+                  <span className="text-gray-600">Seamount Fee:</span>
+                  <span className="font-mono text-green-600 font-medium">
                     {seamountFeeNative.toFixed(6)} {nativeAsset}
                   </span>
                 </div>
                 
-                <div className="flex justify-between text-sm font-semibold border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">
-                  <span className="text-gray-800 dark:text-gray-200">Total Cost:</span>
-                  <span className="text-gray-900 dark:text-white">
+                <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2 mt-1">
+                  <span className="text-gray-800">Total Cost:</span>
+                  <span className="text-gray-900">
                     {(parseFloat(amount) + estimatedNetworkFee + seamountFeeNative).toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
                   </span>
                 </div>
                 
                 {/* Insufficient Balance Warning */}
                 {insufficientNative && (
-                  <div className="flex items-start gap-2 mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded">
+                  <div className="flex items-start gap-2 mt-3 p-2 bg-red-50 border border-red-300 rounded">
                     <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs text-red-800 dark:text-red-300">
+                    <div className="text-xs text-red-800">
                       <span className="font-bold">Insufficient {nativeAsset} balance.</span> You need additional{' '}
                       {(estimatedNetworkFee + seamountFeeNative - nativeBalance).toFixed(6)} {nativeAsset} to cover fees.
                     </div>
@@ -675,10 +675,10 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             )}
 
             {/* Info Alert */}
-            <Alert className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-800">
-              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
-                <strong className="text-blue-700 dark:text-blue-300">Smart Routing:</strong> Automatically routed through {CHAIN_NAMES[selectedChain]} network.
+            <Alert className="bg-blue-50 border-2 border-blue-300">
+              <Info className="h-5 w-5 text-blue-600" />
+              <AlertDescription className="text-gray-900 text-sm font-medium">
+                <strong className="text-blue-700">Smart Routing:</strong> Automatically routed through {CHAIN_NAMES[selectedChain]} network.
               </AlertDescription>
             </Alert>
 
@@ -697,7 +697,7 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
-              className="w-full sm:w-auto h-12 px-6 text-base font-semibold border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full sm:w-auto h-12 px-6 text-base font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-100"
             >
               Cancel
             </Button>
@@ -716,15 +716,15 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
       {/* QR SCANNER MODAL */}
       <Dialog open={showScanner} onOpenChange={(open) => { if (!open) setShowScanner(false); }}>
         <DialogContent
-          className="sm:max-w-[500px] max-w-[95vw] bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600"
+          className="sm:max-w-[500px] max-w-[95vw] bg-white border-2 border-gray-300"
           style={{ zIndex: 2000 }}
         >
-          <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+          <DialogHeader className="border-b border-gray-200 pb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
               <QrCode className="h-6 w-6 text-blue-500" />
               Scan Wallet QR Code
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400 text-sm">
+            <DialogDescription className="text-gray-600 text-sm">
               Point your camera at a wallet QR code. Address will auto-fill.
             </DialogDescription>
           </DialogHeader>
@@ -733,19 +733,19 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
             {/* Scanner viewport */}
             <div
               id={scannerContainerId}
-              className="w-full rounded-xl overflow-hidden border-2 border-blue-500 dark:border-blue-400"
+              className="w-full rounded-xl overflow-hidden border-2 border-blue-500"
               style={{ minHeight: '300px', background: '#000' }}
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <p className="text-xs text-gray-500 text-center">
               Supports Bitcoin, Ethereum, Algorand, Tron, Polygon, Solana QR codes
             </p>
           </div>
 
-          <DialogFooter className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <DialogFooter className="border-t border-gray-200 pt-4">
             <Button
               variant="outline"
               onClick={() => setShowScanner(false)}
-              className="w-full h-12 px-6 text-base font-semibold border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full h-12 px-6 text-base font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-100"
             >
               <X className="mr-2 h-4 w-4" />
               Cancel
@@ -756,33 +756,33 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
 
       {/* CONFIRMATION MODAL */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600">
+        <DialogContent className="sm:max-w-[500px] max-w-[95vw] max-h-[90vh] overflow-y-auto bg-white border-2 border-gray-200">
           <DialogHeader className="border-b pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
               Confirm Transaction
             </DialogTitle>
-            <DialogDescription className="text-gray-600 dark:text-gray-400">
+            <DialogDescription className="text-gray-600">
               Please review the transaction details before confirming
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Transaction Summary Card */}
-            <div className="rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-700 p-4 space-y-3">
+            <div className="rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-4 space-y-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Transaction Details</span>
+                <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Transaction Details</span>
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">You're Sending:</span>
+                <span className="text-sm font-medium text-gray-700">You're Sending:</span>
                 <div className="text-right">
-                  <div className="font-bold text-xl text-gray-900 dark:text-white">
+                  <div className="font-bold text-xl text-gray-900">
                     {parseFloat(amount).toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
                   </div>
                   {balanceUSD > 0 && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-gray-600">
                       ≈ ${(parseFloat(amount) * (balanceUSD / availableBalance)).toFixed(2)} USD
                     </div>
                   )}
@@ -790,57 +790,57 @@ export function SendForm({ open, onOpenChange }: SendFormProps) {
               </div>
 
               {/* Fee Breakdown */}
-              <div className="border-t border-green-300 dark:border-green-700 pt-3 mt-3 space-y-2">
+              <div className="border-t border-green-300 pt-3 mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Network Fee:</span>
-                  <span className="font-mono text-gray-900 dark:text-white">
+                  <span className="text-gray-600">Network Fee:</span>
+                  <span className="font-mono text-gray-900">
                     {estimatedNetworkFee.toFixed(6)} {nativeAsset}
                   </span>
                 </div>
                 
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Seamount Fee:</span>
-                  <span className="font-mono text-green-600 dark:text-green-400 font-medium">
+                  <span className="text-gray-600">Seamount Fee:</span>
+                  <span className="font-mono text-green-600 font-medium">
                     {seamountFeeNative.toFixed(6)} {nativeAsset}
                   </span>
                 </div>
                 
-                <div className="flex justify-between text-sm font-semibold border-t border-green-300 dark:border-green-700 pt-2 mt-1">
-                  <span className="text-gray-800 dark:text-gray-200">Total to Deduct:</span>
-                  <span className="text-gray-900 dark:text-white">
+                <div className="flex justify-between text-sm font-semibold border-t border-green-300 pt-2 mt-1">
+                  <span className="text-gray-800">Total to Deduct:</span>
+                  <span className="text-gray-900">
                     {(parseFloat(amount) + estimatedNetworkFee + seamountFeeNative).toFixed(6)} {selectedAssetConfig?.value.split('_')[0]}
                   </span>
                 </div>
               </div>
 
-              <div className="border-t border-green-300 dark:border-green-700 pt-3">
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Recipient Address:</div>
-                <div className="font-mono text-sm text-gray-900 dark:text-white break-all bg-white/50 dark:bg-gray-900/50 p-2 rounded">
+              <div className="border-t border-green-300 pt-3">
+                <div className="text-xs text-gray-600 mb-1">Recipient Address:</div>
+                <div className="font-mono text-sm text-gray-900 break-all bg-white/50 p-2 rounded">
                   {recipient}
                 </div>
               </div>
 
               {memo && (
-                <div className="border-t border-green-300 dark:border-green-700 pt-3">
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Memo:</div>
-                  <div className="text-sm text-gray-900 dark:text-white bg-white/50 dark:bg-gray-900/50 p-2 rounded">
+                <div className="border-t border-green-300 pt-3">
+                  <div className="text-xs text-gray-600 mb-1">Memo:</div>
+                  <div className="text-sm text-gray-900 bg-white/50 p-2 rounded">
                     {memo}
                   </div>
                 </div>
               )}
 
-              <div className="border-t border-green-300 dark:border-green-700 pt-3">
+              <div className="border-t border-green-300 pt-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Network:</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{CHAIN_NAMES[selectedChain]}</span>
+                  <span className="text-gray-600">Network:</span>
+                  <span className="font-semibold text-gray-900">{CHAIN_NAMES[selectedChain]}</span>
                 </div>
               </div>
             </div>
 
             {/* Warning Alert */}
-            <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-300 dark:border-yellow-800">
+            <Alert className="bg-yellow-50 border-2 border-yellow-300">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
+              <AlertDescription className="text-gray-900 text-sm font-medium">
                 <strong>⚠️ Warning:</strong> Double-check the recipient address. Crypto transactions cannot be reversed.
               </AlertDescription>
             </Alert>
