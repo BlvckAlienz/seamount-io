@@ -577,19 +577,10 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
         style={{ zIndex: 1000 }}
       >
         <DialogHeader className="border-b pb-4">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
-              <ArrowDownToLine className="h-6 w-6 text-red-600" />
-              Withdraw to {payoutMethod === 'bank_transfer' ? 'Bank' : 'Mobile Money'}
-            </DialogTitle>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="rounded-full p-1.5 hover:bg-gray-100 transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4 text-gray-500" />
-            </button>
-          </div>
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <ArrowDownToLine className="h-6 w-6 text-red-600" />
+            Withdraw to {payoutMethod === 'bank_transfer' ? 'Bank' : 'Mobile Money'}
+          </DialogTitle>
           <DialogDescription className="text-base text-gray-600 mt-2">
             Convert crypto to local currency. Fast, secure withdrawals via Cashramp.
           </DialogDescription>
