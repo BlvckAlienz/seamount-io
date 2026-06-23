@@ -59,6 +59,16 @@
   z-index: 9998 !important;
 }
 
+/* iOS Safari safe area — prevents sidebar profile cutoff */
+html {
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+}
+
 /* Prevent horizontal scroll on mobile */
 @media (max-width: 640px) {
   body {

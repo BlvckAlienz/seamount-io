@@ -109,7 +109,8 @@ const Sidebar: React.FC = () => {
       {/* 🖥️ SIDEBAR */}
       <aside
         className={`
-          fixed lg:sticky top-0 left-0 h-screen
+          fixed lg:sticky top-0 left-0
+          h-[100dvh] [height:100dvh] lg:h-screen
           bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900
           border-r border-gray-700/50
           transition-all duration-300 ease-in-out
@@ -134,7 +135,7 @@ const Sidebar: React.FC = () => {
           </div>
 
           {/* 🧭 NAVIGATION */}
-          <nav className="flex-1 p-4 overflow-y-auto">
+          <nav className="flex-1 p-4 overflow-y-auto min-h-0">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -167,8 +168,8 @@ const Sidebar: React.FC = () => {
             })}
           </nav>
 
-          {/* 👤 USER PROFILE - ENHANCED VERSION FROM DASHBOARD */}
-          <div className="p-4 border-t border-gray-800 relative">
+          {/* 👤 USER PROFILE */}
+          <div className="flex-shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-gray-800 relative">
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="w-full flex items-center gap-3 hover:bg-gray-800 p-2 rounded-lg transition-colors"

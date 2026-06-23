@@ -1102,7 +1102,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             </h1>
             
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
-              <p className="mb-2">Stablecoins. Global Payments. Asset tokenization.</p>
+              <p className="mb-2">Stablecoins. 24/7 Payments & Yield. Asset tokenization.</p>
               <p className="font-semibold text-gray-900">
                 Unlocking growth for communities.
               </p>
