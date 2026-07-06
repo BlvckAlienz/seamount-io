@@ -513,7 +513,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     try {
       const res = await api.post('/api/v1/kotani/offramp/initialize', {
         crypto_asset: asset, crypto_amount: parseFloat(amount),
-        currency, phone_number: kotaniWPhone, telco_id: kotaniWTelco,
+        currency, phone_number: kotaniWPhone, network: kotaniWTelco,
       })
       const data = res.data || res
       if (data?.success) {

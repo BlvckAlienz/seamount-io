@@ -433,7 +433,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     try {
       const res = await api.post('/api/v1/kotani/onramp/initialize', {
         amount_fiat: parseFloat(amount), currency, crypto_asset: asset,
-        phone_number: kotaniPhone, telco_id: kotaniTelco,
+        phone_number: kotaniPhone, network: kotaniTelco,
       })
       const data = res.data || res
       if (data?.success) {
