@@ -100,7 +100,7 @@ class OnrampInitReq(BaseModel):
     crypto_asset:  str
     phone_number:  str
     network:       str          # e.g. MPESA, MTN — replaces telco_id
-    account_name:  str          # required by Kotani v3
+    account_name:  Optional[str] = None
     country_code:  Optional[str] = None  # ISO-2; auto-derived from currency if omitted
 
 class OfframpQuoteReq(BaseModel):
@@ -114,7 +114,7 @@ class OfframpInitReq(BaseModel):
     currency:      str
     phone_number:  str
     network:       str          # e.g. MPESA, MTN — replaces telco_id
-    account_name:  str          # required by Kotani v3
+    account_name:  Optional[str] = None
     country_code:  Optional[str] = None
 
 
@@ -193,12 +193,14 @@ async def onramp_initialize(
         if not country_code:
             raise HTTPException(400, f"Cannot resolve country_code for currency {req.currency}. Pass it explicitly.")
 
+        account_name = req.account_name or f"Seamount User {req.phone_number[-4:]}"
+
         # FIX [3]: new ensure_customer signature — phone_number, country_code, network, account_name
         await svc.ensure_customer(
             phone_number=req.phone_number,
             country_code=country_code,
             network=req.network,
-            account_name=req.account_name,
+            account_name=account_name,
             first_name=current_user.get("first_name", ""),
             last_name=current_user.get("last_name", ""),
             email=current_user.get("email", ""),
@@ -213,7 +215,7 @@ async def onramp_initialize(
             receiver_address=wallet_addr,
             phone_number=req.phone_number,
             network_provider=req.network,
-            account_name=req.account_name,
+            account_name=account_name,
             callback_url=CALLBACK_BASE,
         )
 
@@ -335,12 +337,14 @@ async def offramp_initialize(
         if not country_code:
             raise HTTPException(400, f"Cannot resolve country_code for currency {req.currency}. Pass it explicitly.")
 
+        account_name = req.account_name or f"Seamount User {req.phone_number[-4:]}"
+
         # FIX [4]: new ensure_customer signature
         await svc.ensure_customer(
             phone_number=req.phone_number,
             country_code=country_code,
             network=req.network,
-            account_name=req.account_name,
+            account_name=account_name,
             first_name=current_user.get("first_name", ""),
             last_name=current_user.get("last_name", ""),
             email=current_user.get("email", ""),
@@ -354,7 +358,7 @@ async def offramp_initialize(
             crypto_asset=req.crypto_asset,
             phone_number=req.phone_number,
             network_provider=req.network,
-            account_name=req.account_name,
+            account_name=account_name,
             callback_url=CALLBACK_BASE,
             markup_pct=MARKUP_PCT,
         )
