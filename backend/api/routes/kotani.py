@@ -338,6 +338,7 @@ async def offramp_initialize(
             raise HTTPException(400, f"Cannot resolve country_code for currency {req.currency}. Pass it explicitly.")
 
         account_name = req.account_name or f"Seamount User {req.phone_number[-4:]}"
+        sender_addr  = await _wallet_for_asset(db, current_user["id"], req.crypto_asset)
 
         # FIX [4]: new ensure_customer signature
         await svc.ensure_customer(
@@ -361,6 +362,7 @@ async def offramp_initialize(
             account_name=account_name,
             callback_url=CALLBACK_BASE,
             markup_pct=MARKUP_PCT,
+            sender_address=sender_addr,
         )
 
         # FIX [7]: fee breakdown is now under result["_seamount"]
