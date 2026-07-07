@@ -118,7 +118,7 @@ const ONRAMP_PROVIDER_CURRENCIES: Record<Provider, string[]> = {
   local:   ['NGN','KES','GHS','ZAR','UGX','TZS','RWF','XOF','XAF','ZMW','USD','GBP','EUR'],
   moonpay: ['USD','EUR','GBP','NGN','KES','GHS','ZAR'],
   busha:   ['NGN','KES'],
-  kotani:  ['KES','GHS','UGX','TZS','RWF','XOF','XAF','ZMW'],
+  kotani:  ['KES','GHS','UGX','TZS','RWF','XOF','XAF','ZMW','ZAR'],
 }
 
 // Provider metadata for rendering toggle buttons
@@ -149,6 +149,7 @@ const KOTANI_ONRAMP_TELCOS: Record<string, { id: string; name: string }[]> = {
   ZMW: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }, { id: 'ZAMTEL', name: 'Zamtel' }],
   XOF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
   XAF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
+  ZAR: [{ id: 'MTN', name: 'MTN MoMo' }],
 }
 
 // Derive available providers for a given currency

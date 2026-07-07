@@ -181,7 +181,7 @@ type WithdrawProvider = 'cashramp' | 'busha' | 'kotani'
 const OFFRAMP_PROVIDER_CURRENCIES: Record<WithdrawProvider, string[]> = {
   cashramp: ['NGN','KES','GHS','ZAR','UGX','TZS','RWF','ZMW'],
   busha:    ['NGN','KES'],
-  kotani:   ['KES','GHS','UGX','TZS','RWF','ZMW','XOF','XAF'],
+  kotani:   ['KES','GHS','UGX','TZS','RWF','ZMW','XOF','XAF','ZAR'],
 }
 
 const WITHDRAW_PROVIDER_META: Record<WithdrawProvider, { label: string; sublabel: string; activeClass: string }> = {
@@ -200,6 +200,7 @@ const KOTANI_OFFRAMP_TELCOS: Record<string, { id: string; name: string }[]> = {
   ZMW: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }, { id: 'ZAMTEL', name: 'Zamtel' }],
   XOF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
   XAF: [{ id: 'ORANGE', name: 'Orange Money' }, { id: 'MTN', name: 'MTN MoMo' }],
+  ZAR: [{ id: 'MTN', name: 'MTN MoMo' }],
 }
 
 // Derive which providers are available for a given currency
