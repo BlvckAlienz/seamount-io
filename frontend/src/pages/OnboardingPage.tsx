@@ -594,8 +594,9 @@ const OnboardingPage = () => {
           id_number:      formData.idNumber,
           date_of_birth:  formData.dateOfBirth,
           phone_number:   formData.phoneNumber,
+          address:        formData.address,
           country_code:   formData.country,
-          source_of_funds: 'Employment',
+          source_of_funds: formData.sourceOfFunds,
         });
       } catch (profileErr) {
         console.warn('Compliance profile save failed (non-fatal):', profileErr);

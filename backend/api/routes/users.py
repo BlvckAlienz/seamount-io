@@ -215,6 +215,7 @@ async def save_compliance_profile(
             "id_number":       data.get('id_number'),
             "date_of_birth":   data.get('date_of_birth'),
             "phone_number":    data.get('phone_number'),
+            "address":         data.get('address'),
             "country_code":    (data.get('country_code') or 'NG').upper(),
             "source_of_funds": data.get('source_of_funds', 'Employment'),
             "updated_at":      datetime.now(timezone.utc).isoformat(),

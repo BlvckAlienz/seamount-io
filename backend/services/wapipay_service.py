@@ -360,6 +360,7 @@ class WapiPayService:
         remitter_name:    str,
         remitter_id:      str,
         remitter_phone:   str,
+        remitter_source_of_funds: str,
         reference:        str,
     ) -> Dict:
         route_id, _ = await self._get_route_id(country, 1)  # 1 = bank
@@ -368,9 +369,10 @@ class WapiPayService:
             "originatorConversationId": originator_id,
             "paymentNotes":             f"Seamount withdrawal {reference}",
             "remitter": {
-                "name":        remitter_name,
-                "phoneNumber": remitter_phone,
-                "idNumber":    remitter_id,
+                "name":           remitter_name,
+                "phoneNumber":    remitter_phone,
+                "idNumber":       remitter_id,
+                "sourceOfFunds":  remitter_source_of_funds,
             },
             "recipient": {
                 "name":                 account_name,
@@ -411,6 +413,9 @@ class WapiPayService:
         remitter_name: str,
         remitter_id:   str,
         remitter_phone: str,
+        remitter_address: str,
+        remitter_country: str,
+        remitter_source_of_funds: str,
         reference:     str,
     ) -> Dict:
         route_id, _ = await self._get_route_id(country, 175)  # 175 = mobile
@@ -422,10 +427,10 @@ class WapiPayService:
                 "name":        remitter_name,
                 "phoneNumber": remitter_phone,
                 "idNumber":    remitter_id,
-                "country":     "NG",
+                "country":     remitter_country,
                 "ccy":         840,  # USD numeric ISO
-                "sourceOfFunds": "Employment",
-                "address":     "Lagos, Nigeria",
+                "sourceOfFunds": remitter_source_of_funds,
+                "address":     remitter_address,
             },
             "recipient": {
                 "name":                 recipient_name,

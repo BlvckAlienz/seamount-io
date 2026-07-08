@@ -952,6 +952,24 @@ class Settings(BaseSettings):
         description="'sandbox' or 'production'"
     )
 
+    # ── WapiPay ───────────────────────────────────────────────────────────────
+    WAPIPAY_CLIENT_ID: Optional[str] = Field(
+        default=None,
+        description="WapiPay App client_id from developer dashboard"
+    )
+    WAPIPAY_CLIENT_SECRET: Optional[SecretStr] = Field(
+        default=None,
+        description="WapiPay App client_secret from developer dashboard"
+    )
+    WAPIPAY_ENVIRONMENT: str = Field(
+        default="sandbox",
+        description="'sandbox' or 'production'"
+    )
+    WAPIPAY_WEBHOOK_SECRET: Optional[SecretStr] = Field(
+        default=None,
+        description="WapiPay webhook signing secret — leave unset until WapiPay confirms signing method"
+    )
+
     # Harbor (OwlPay) - Multi-chain crypto gateway
     HARBOR_API_KEY: Optional[SecretStr] = Field(None, env="HARBOR_API_KEY")
     HARBOR_WEBHOOK_URL: Optional[str] = Field(

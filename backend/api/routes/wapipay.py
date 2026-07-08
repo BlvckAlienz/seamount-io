@@ -178,20 +178,26 @@ async def bank_offramp(
     profile = db.supabase.from_("user_compliance_profiles") \
         .select("*").eq("user_id", user_id).limit(1).execute()
     if not profile.data:
-        raise HTTPException(400, "Compliance profile required. Please complete KYC first.")
+        raise HTTPException(400, "KYC required before withdrawing.")
     p = profile.data[0]
 
-    svc = _wapipay()
-    result = await svc.bank_payment(
-        amount=req.crypto_amount,  # converted to fiat upstream by offramp route — pass fiat here
+    if not p.get("address"):
+        raise HTTPException(400, "Address missing from compliance profile. Please update your KYC details.")
+
+    svc    = _wapipay()
+    result = await svc.mobile_payment(
+        amount=req.crypto_amount,
         currency=req.currency,
         country=req.country,
-        account_number=req.account_number,
-        account_name=req.account_name,
-        bank_swift_or_code=req.bank_code,
+        phone_number=req.phone_number,
+        network=req.network,
+        recipient_name=current_user.get("first_name", "User"),
         remitter_name=f"{current_user.get('first_name','')} {current_user.get('last_name','')}".strip(),
         remitter_id=p.get("id_number", ""),
         remitter_phone=p.get("phone_number", ""),
+        remitter_address=p.get("address", ""),
+        remitter_country=p.get("country_code", "NG"),
+        remitter_source_of_funds=p.get("source_of_funds", "Employment"),
         reference=reference,
     )
 
@@ -237,17 +243,18 @@ async def mobile_offramp(
         raise HTTPException(400, "KYC required before withdrawing.")
     p = profile.data[0]
 
-    svc    = _wapipay()
-    result = await svc.mobile_payment(
-        amount=req.crypto_amount,
+    svc = _wapipay()
+    result = await svc.bank_payment(
+        amount=req.crypto_amount,  # converted to fiat upstream by offramp route — pass fiat here
         currency=req.currency,
         country=req.country,
-        phone_number=req.phone_number,
-        network=req.network,
-        recipient_name=current_user.get("first_name", "User"),
+        account_number=req.account_number,
+        account_name=req.account_name,
+        bank_swift_or_code=req.bank_code,
         remitter_name=f"{current_user.get('first_name','')} {current_user.get('last_name','')}".strip(),
         remitter_id=p.get("id_number", ""),
         remitter_phone=p.get("phone_number", ""),
+        remitter_source_of_funds=p.get("source_of_funds", "Employment"),
         reference=reference,
     )
 

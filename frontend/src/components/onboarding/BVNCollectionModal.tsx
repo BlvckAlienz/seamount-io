@@ -141,8 +141,20 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     dateOfBirth: '',
     gender: '',
     phoneNumber: '',
+    address: '',
+    sourceOfFunds: '',
     country: countryCode
   });
+
+  const SOURCE_OF_FUNDS_OPTIONS = [
+    { value: 'Employment',        label: 'Employment / Salary' },
+    { value: 'Business Income',   label: 'Business Income' },
+    { value: 'Savings',           label: 'Personal Savings' },
+    { value: 'Investment Returns', label: 'Investment Returns' },
+    { value: 'Crypto Trading',    label: 'Crypto Trading Gains' },
+    { value: 'Inheritance',       label: 'Inheritance / Gift' },
+    { value: 'Other',             label: 'Other' },
+  ];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -182,6 +194,14 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
     }
     if (!formData.phoneNumber) {
       setError('Phone number is required');
+      return false;
+    }
+    if (!formData.address || formData.address.trim().length < 5) {
+      setError('Address is required');
+      return false;
+    }
+    if (!formData.sourceOfFunds) {
+      setError('Source of funds is required');
       return false;
     }
     return true;
@@ -321,6 +341,31 @@ const BVNCollectionModal: React.FC<BVNCollectionModalProps> = ({
                 className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Residential Address *</label>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              placeholder="Street, City"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Source of Funds *</label>
+            <select
+              value={formData.sourceOfFunds}
+              onChange={(e) => setFormData({...formData, sourceOfFunds: e.target.value})}
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:outline-none appearance-none"
+            >
+              <option value="">Select source of funds</option>
+              {SOURCE_OF_FUNDS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
           {error && (
