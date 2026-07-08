@@ -24,7 +24,7 @@ interface FundWalletModalProps {
 // ─────────────────────────────────────────────────────────────
 // EXISTING — untouched
 // ─────────────────────────────────────────────────────────────
-type Provider = 'local' | 'moonpay' | 'busha' | 'kotani'
+type Provider = 'local' | 'moonpay' | 'busha' | 'kotani' | 'wapipay'
 
 const MOONPAY_ASSET_GROUPS = {
   '🟢 Algorand': [
@@ -119,6 +119,7 @@ const ONRAMP_PROVIDER_CURRENCIES: Record<Provider, string[]> = {
   moonpay: ['USD','EUR','GBP','NGN','KES','GHS','ZAR'],
   busha:   ['NGN','KES'],
   kotani:  ['KES','GHS','UGX','TZS','RWF','XOF','XAF','ZMW','ZAR'],
+  wapipay: ['NGN'],
 }
 
 // Provider metadata for rendering toggle buttons
@@ -127,6 +128,12 @@ const PROVIDER_META: Record<Provider, { label: string; sublabel: string; icon: R
   moonpay: { label: 'MoonPay',               sublabel: 'Card · Apple Pay · 160+',  icon: <Globe className="h-5 w-5" />,   activeClass: 'border-blue-500 bg-blue-50 text-blue-700'  },
   busha:   { label: 'Busha',                 sublabel: 'Bank transfer · NGN/KES',  icon: <Wallet className="h-5 w-5" />,  activeClass: 'border-purple-500 bg-purple-50 text-purple-700' },
   kotani:  { label: 'Kotani Pay',            sublabel: 'Mobile money · Africa',    icon: <Smartphone className="h-5 w-5" />, activeClass: 'border-orange-500 bg-orange-50 text-orange-700' },
+  wapipay: {
+    label: 'WapiPay',
+    sublabel: 'NGN Virtual Account',
+    icon: <Globe className="h-5 w-5" />,
+    activeClass: 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300',
+  },
 }
 
 // Asset remapping when switching to Busha (unsupported Algorand-native assets)
@@ -191,6 +198,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const [kotaniTelco, setKotaniTelco]                 = useState('')
   const [kotaniPayInSent, setKotaniPayInSent]         = useState(false)
   const [kotaniPayInDetails, setKotaniPayInDetails]   = useState<any>(null)
+  // WapiPay onramp state
+  const [wapiVA, setWapiVA]               = useState<any>(null)
+  const [wapiVALoading, setWapiVALoading] = useState(false)
 
   // ─────────────────────────────────────────────────────────
   // EXISTING useEffects — untouched
@@ -249,6 +259,10 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
       if (!ONRAMP_PROVIDER_CURRENCIES.kotani.includes(currency)) setCurrency('KES')
       setKotaniQuote(null); setKotaniPayInSent(false); setKotaniPayInDetails(null)
       setKotaniPhone(''); setKotaniTelco('')
+    }
+    if (provider === 'wapipay') {
+      if (!ONRAMP_PROVIDER_CURRENCIES.wapipay.includes(currency)) setCurrency('NGN')
+      setWapiVA(null)
     }
     setError(null)
   }, [provider])
@@ -469,12 +483,25 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const kotaniTelcos = KOTANI_ONRAMP_TELCOS[currency] ?? []
   const selectedBushaCurrency = LOCAL_CURRENCIES.find(c => c.code === currency)
   const selectedKotaniCurrency = LOCAL_CURRENCIES.find(c => c.code === currency)
+  
+  const handleWapiPay = async () => {
+    if (!session) { toast.error('Sign in to continue'); return }
+    setWapiVALoading(true); setError(null)
+    try {
+      const res = await api.get('/api/v1/wapipay/virtual-account')
+      if (res?.success) setWapiVA(res)
+      else throw new Error(res?.error || 'Could not load account')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message || 'WapiPay unavailable')
+    } finally { setWapiVALoading(false) }
+  }
 
   // Dispatch to correct handler based on provider
   const handleSubmit = () => {
     if (provider === 'moonpay') return handleMoonPay()
     if (provider === 'busha')   return handleBusha()
     if (provider === 'kotani')  return handleKotani()
+    if (provider === 'wapipay') return handleWapiPay()
     return handleLocalPay()
   }
 
@@ -482,7 +509,9 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
   const isSubmitDisabled = loading || fetchingQuote ||
     (provider === 'local'   && (!amount || parseFloat(amount) <= 0)) ||
     (provider === 'busha'   && (bushaFetchingQuote || (!amount || parseFloat(amount) <= 0) || bushaPayInStep === 'bank_details')) ||
-    (provider === 'kotani'  && (kotaniFetchingQuote || (!amount || parseFloat(amount) <= 0) || !kotaniPhone || !kotaniTelco || kotaniPayInSent))
+    (provider === 'kotani'  && (kotaniFetchingQuote || (!amount || parseFloat(amount) <= 0) || !kotaniPhone || !kotaniTelco || kotaniPayInSent)) ||
+    (provider === 'wapipay'  && (wapiVALoading || !!wapiVA))
+    
 
   // Submit button label
   const submitLabel = (() => {
@@ -490,6 +519,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     if (provider === 'moonpay') return <><ShieldCheck className="mr-2 h-4 w-4" />Buy with MoonPay</>
     if (provider === 'busha')   return <><Wallet className="mr-2 h-4 w-4" />Get Bank Account</>
     if (provider === 'kotani')  return <><Smartphone className="mr-2 h-4 w-4" />Send Payment Request</>
+    if (provider === 'wapipay') return <><Globe className="mr-2 h-4 w-4" />Get NGN Account</>
     return <><Wallet className="mr-2 h-4 w-4" />Pay {selectedCurrency?.symbol}{amount || '0'}</>
   })()
 
@@ -498,6 +528,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
     if (provider === 'moonpay') return 'bg-blue-600 hover:bg-blue-700'
     if (provider === 'busha')   return 'bg-purple-600 hover:bg-purple-700'
     if (provider === 'kotani')  return 'bg-orange-600 hover:bg-orange-700'
+    if (provider === 'wapipay') return 'bg-cyan-600 hover:bg-cyan-700'
     return 'bg-green-600 hover:bg-green-700'
   })()
 
@@ -998,6 +1029,46 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
             </>
           )}
 
+          {/* ═══════════ WAPIPAY — NGN VIRTUAL ACCOUNT FLOW ═══════════ */}
+          {provider === 'wapipay' && (
+            <>
+              {!wapiVA ? (
+                <Alert className="border border-cyan-100 dark:border-cyan-900 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl py-3">
+                  <Info className="h-4 w-4 text-cyan-600 shrink-0 mt-0.5" />
+                  <AlertDescription className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+                    <strong className="text-cyan-700 dark:text-cyan-400">WapiPay Virtual Account</strong> — we'll assign you a dedicated NGN bank account. Transfer any amount anytime — crypto is credited automatically.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="rounded-xl border-2 border-cyan-200 dark:border-cyan-700 overflow-hidden">
+                  <div className="bg-cyan-50 dark:bg-cyan-900/30 px-4 py-3 flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-cyan-600" />
+                    <span className="font-bold text-cyan-700 dark:text-cyan-300 text-sm">Your NGN Deposit Account</span>
+                  </div>
+                  {[
+                    { label: 'Bank Name',      value: wapiVA.bank_name },
+                    { label: 'Account Number', value: wapiVA.account_number },
+                    { label: 'Account Name',   value: wapiVA.account_name },
+                  ].map(row => (
+                    <div key={row.label} className="flex justify-between items-center px-4 py-3 border-t border-cyan-100 dark:border-cyan-800">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{row.label}</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{row.value}</span>
+                    </div>
+                  ))}
+                  <div className="px-4 py-3 border-t border-cyan-100 dark:border-cyan-800 bg-cyan-50/50 dark:bg-cyan-900/20">
+                    <p className="text-xs text-cyan-700 dark:text-cyan-300">{wapiVA.instruction}</p>
+                  </div>
+                </div>
+              )}
+              {wapiVALoading && (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-cyan-500" />
+                  <span className="text-xs text-gray-400">Loading your account...</span>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Error — shared across all providers */}
           {error && (
             <Alert variant="destructive" className="rounded-xl border py-3">
@@ -1014,7 +1085,7 @@ export function FundWalletModal({ open, onOpenChange }: FundWalletModalProps) {
               className="flex-1 h-12 rounded-xl border-gray-200 font-semibold">
               Cancel
             </Button>
-            {(provider === 'busha' && bushaPayInStep === 'bank_details') || (provider === 'kotani' && kotaniPayInSent) ? (
+            {(provider === 'busha' && bushaPayInStep === 'bank_details') || (provider === 'kotani' && kotaniPayInSent) || (provider === 'wapipay' && !!wapiVA) ? (
               <Button onClick={() => onOpenChange(false)}
                 className="flex-[2] h-12 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700">
                 Done

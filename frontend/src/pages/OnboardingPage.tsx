@@ -586,6 +586,20 @@ const OnboardingPage = () => {
       });
 
       const verifyResponse = await apiClient.post('/api/v1/kyc/start-verification');
+
+      // Save compliance profile silently (powers WapiPay payment rails)
+      try {
+        await apiClient.post('/api/v1/user/compliance-profile', {
+          id_type:        formData.idType,
+          id_number:      formData.idNumber,
+          date_of_birth:  formData.dateOfBirth,
+          phone_number:   formData.phoneNumber,
+          country_code:   formData.country,
+          source_of_funds: 'Employment',
+        });
+      } catch (profileErr) {
+        console.warn('Compliance profile save failed (non-fatal):', profileErr);
+      }
       
       toast.success('✅ Verification submitted!', { id: toastId });
       setShowBVNModal(false);

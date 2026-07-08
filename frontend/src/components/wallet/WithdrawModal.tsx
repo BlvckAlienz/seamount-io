@@ -175,19 +175,21 @@ const MOBILE_PROVIDER_NAMES: { [key: string]: string } = {
 // ─────────────────────────────────────────────────────────────
 // NEW — addon constants only
 // ─────────────────────────────────────────────────────────────
-type WithdrawProvider = 'cashramp' | 'busha' | 'kotani'
+type WithdrawProvider = 'cashramp' | 'busha' | 'kotani' | 'wapipay'
 
 // Capability matrix — drives tab visibility per currency
 const OFFRAMP_PROVIDER_CURRENCIES: Record<WithdrawProvider, string[]> = {
   cashramp: ['NGN','KES','GHS','ZAR','UGX','TZS','RWF','ZMW'],
   busha:    ['NGN','KES'],
   kotani:   ['KES','GHS','UGX','TZS','RWF','ZMW','XOF','XAF','ZAR'],
+  wapipay:  ['KES', 'UGX', 'TZS', 'RWF', 'ZMW'],
 }
 
 const WITHDRAW_PROVIDER_META: Record<WithdrawProvider, { label: string; sublabel: string; activeClass: string }> = {
   cashramp: { label: 'Cashramp',   sublabel: 'Smart routing · Africa', activeClass: 'border-blue-500 bg-blue-50 text-blue-700'      },
   busha:    { label: 'Busha',      sublabel: 'Bank transfer · NGN/KES', activeClass: 'border-purple-500 bg-purple-50 text-purple-700' },
   kotani:   { label: 'Kotani Pay', sublabel: 'Mobile money · Africa',   activeClass: 'border-orange-500 bg-orange-50 text-orange-700' },
+  wapipay:  { label: 'WapiPay', sublabel: 'Bank wire · EA corridors', activeClass: 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' },
 }
 
 // Kotani telcos for offramp
@@ -208,6 +210,18 @@ const getAvailableWithdrawProviders = (curr: string): WithdrawProvider[] =>
   (Object.entries(OFFRAMP_PROVIDER_CURRENCIES) as [WithdrawProvider, string[]][])
     .filter(([, currencies]) => currencies.includes(curr))
     .map(([p]) => p)
+
+// ── NEW — WapiPay addon constants ──────────────────────────────
+const WAPIPAY_COUNTRY_MAP: Record<string, string> = {
+  KES: 'KE', UGX: 'UG', TZS: 'TZ', RWF: 'RW', ZMW: 'ZM',
+}
+const WAPIPAY_MOBILE_NETWORKS: Record<string, { id: string; name: string }[]> = {
+  KES: [{ id: 'MPESA', name: 'M-Pesa' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  UGX: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  TZS: [{ id: 'MPESA', name: 'M-Pesa' }, { id: 'AIRTEL', name: 'Airtel' }, { id: 'TIGO', name: 'Tigo Cash' }],
+  RWF: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+  ZMW: [{ id: 'MTN', name: 'MTN MoMo' }, { id: 'AIRTEL', name: 'Airtel Money' }],
+}
 
 interface WithdrawModalProps {
   open: boolean
@@ -262,6 +276,11 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const [kotaniWTelco, setKotaniWTelco]               = useState('')
   const [kotaniWQuote, setKotaniWQuote]               = useState<any>(null)
   const [kotaniWFetchingQuote, setKotaniWFetchingQuote] = useState(false)
+  // WapiPay offramp state
+  const [wapiWPhone, setWapiWPhone]   = useState('')
+  const [wapiWNetwork, setWapiWNetwork] = useState('')
+  const [wapiWQuote, setWapiWQuote]   = useState<any>(null)
+  const [wapiWFetching, setWapiWFetching] = useState(false)
 
   // ─────────────────────────────────────────────────────────
   // EXISTING useEffects — untouched
@@ -514,7 +533,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     try {
       const res = await api.post('/api/v1/kotani/offramp/initialize', {
         crypto_asset: asset, crypto_amount: parseFloat(amount),
-        currency, phone_number: kotaniWPhone, network: kotaniWTelco,
+        currency, phone_number: kotaniWPhone, telco_id: kotaniWTelco,
       })
       const data = res.data || res
       if (data?.success) {
@@ -530,6 +549,35 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
     } finally { setLoading(false) }
   }
 
+  const handleWapiWithdraw = async () => {
+    if (!amount || parseFloat(amount) <= 0) { toast.error('Enter a valid amount'); return }
+    if (parseFloat(amount) > availableBalance) { toast.error('Insufficient balance'); return }
+    if (!wapiWPhone) { toast.error('Enter phone number'); return }
+    if (!wapiWNetwork) { toast.error('Select mobile network'); return }
+    setLoading(true); setError(null)
+    try {
+      const res = await api.post('/api/v1/wapipay/offramp/mobile', {
+        crypto_asset:  asset,
+        crypto_amount: parseFloat(amount),
+        currency,
+        country:       WAPIPAY_COUNTRY_MAP[currency] || 'KE',
+        phone_number:  wapiWPhone,
+        network:       wapiWNetwork,
+      })
+      const data = res.data || res
+      if (data?.success) {
+        toast.success('Withdrawal initiated via WapiPay! Funds arriving in 2–10 minutes.')
+        setAmount(''); setWapiWPhone(''); setWapiWNetwork(''); setWapiWQuote(null)
+        onOpenChange(false)
+      } else {
+        throw new Error(data?.detail || data?.error || 'WapiPay withdrawal failed')
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || 'WapiPay failed'
+      setError(msg); toast.error(msg)
+    } finally { setLoading(false) }
+  }
+
   // NEW computed values
   const availableWithdrawProviders  = getAvailableWithdrawProviders(currency)
   const bushaOfframpCurrencies      = WITHDRAWAL_CURRENCIES.filter(c => OFFRAMP_PROVIDER_CURRENCIES.busha.includes(c.code))
@@ -540,6 +588,7 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
   const handleWithdrawDispatch = () => {
     if (withdrawProvider === 'busha')   return handleBushaWithdraw()
     if (withdrawProvider === 'kotani')  return handleKotaniWithdraw()
+    if (withdrawProvider === 'wapipay') return handleWapiWithdraw()
     return handleWithdraw()
   }
 
@@ -554,6 +603,11 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
         parseFloat(amount) <= 0 || parseFloat(amount) > availableBalance ||
         (currency === 'NGN' && !bushaWAccountName) ||
         (currency === 'KES' && !bushaWPhone)
+    }
+    if (withdrawProvider === 'wapipay') {
+      return loading || !amount || parseFloat(amount) <= 0 ||
+        parseFloat(amount) > availableBalance ||
+        !wapiWPhone || !wapiWNetwork
     }
     // kotani
     return loading || kotaniWFetchingQuote || !kotaniWQuote || !amount ||
@@ -1151,6 +1205,112 @@ export function WithdrawModal({ open, onOpenChange }: WithdrawModalProps) {
                 <Info className="h-5 w-5 text-orange-600" />
                 <AlertDescription className="text-gray-900 text-sm font-medium">
                   <strong className="text-orange-700">Kotani Pay:</strong> Funds arrive via mobile money in 2–10 minutes.
+                </AlertDescription>
+              </Alert>
+
+              {error && (
+                <Alert variant="destructive" className="border-2">
+                  <AlertCircle className="h-5 w-5" />
+                  <AlertDescription className="font-medium">{error}</AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
+
+          {/* ═══════════ WAPIPAY MOBILE OFFRAMP ═══════════ */}
+          {withdrawProvider === 'wapipay' && (
+            <>
+              {/* Asset */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Crypto Asset</Label>
+                <Select value={asset} onValueChange={setAsset}>
+                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 max-h-[400px] z-50">
+                    {Object.entries(ASSET_GROUPS).map(([chain, assets]) => (
+                      <div key={chain} className="py-2">
+                        <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-100 dark:bg-gray-900">{CHAIN_NAMES[chain] || chain}</div>
+                        {assets.map((a) => (
+                          <SelectItem key={a.value} value={a.value} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3 pl-8">
+                            <div className="flex items-center gap-2"><span className="text-xl">{a.icon}</span><span className="font-medium">{a.label}</span></div>
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Amount */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Amount</Label>
+                {availableBalance > 0 && (
+                  <div className="flex justify-between items-center px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Available:</span>
+                    <span className="font-bold text-blue-700 dark:text-blue-300">{availableBalance.toFixed(6)} {getAssetSymbol(asset)}</span>
+                  </div>
+                )}
+                <div className="relative">
+                  <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={amount}
+                    onChange={(e) => setAmount(e.target.value)} disabled={loading}
+                    className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12 text-lg font-medium pr-20"
+                  />
+                  <span className="absolute right-3 top-3 text-gray-600 dark:text-gray-400 font-semibold text-lg">{getAssetSymbol(asset)}</span>
+                </div>
+              </div>
+
+              {/* Currency */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Receive Currency</Label>
+                <Select value={currency} onValueChange={v => { setCurrency(v); setWapiWNetwork('') }}>
+                  <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 z-50">
+                    {WITHDRAWAL_CURRENCIES.filter(c => OFFRAMP_PROVIDER_CURRENCIES.wapipay.includes(c.code)).map(curr => (
+                      <SelectItem key={curr.code} value={curr.code} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{curr.flag}</span>
+                          <span className="font-medium">{curr.symbol}</span>
+                          <span>{curr.name} ({curr.code})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Mobile network */}
+              {(WAPIPAY_MOBILE_NETWORKS[currency] || []).length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-900 dark:text-white">Mobile Network</Label>
+                  <Select value={wapiWNetwork} onValueChange={setWapiWNetwork}>
+                    <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 h-12 text-gray-900 dark:text-gray-100">
+                      <SelectValue placeholder="Select network" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 z-50">
+                      {(WAPIPAY_MOBILE_NETWORKS[currency] || []).map(n => (
+                        <SelectItem key={n.id} value={n.id} className="text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer">{n.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-900 dark:text-white">Phone Number</Label>
+                <Input type="tel" placeholder="e.g. 0712345678" value={wapiWPhone}
+                  onChange={(e) => setWapiWPhone(e.target.value)}
+                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-900 dark:text-gray-100 h-12"
+                />
+              </div>
+
+              <Alert className="bg-cyan-50 dark:bg-cyan-900/20 border-2 border-cyan-300 dark:border-cyan-800">
+                <Info className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                <AlertDescription className="text-gray-900 dark:text-gray-100 text-sm font-medium">
+                  <strong className="text-cyan-700 dark:text-cyan-300">WapiPay:</strong> Cross-border mobile money in 2–10 minutes.
                 </AlertDescription>
               </Alert>
 

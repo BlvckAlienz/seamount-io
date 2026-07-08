@@ -377,6 +377,22 @@ except ImportError as e:
     routers_available['kotani'] = None
 
 try:
+    from backend.api.routes.wapipay import router as wapipay_router
+    routers_available['wapipay'] = wapipay_router
+    logger.info("✅ WapiPay router imported")
+except ImportError as e:
+    logger.error(f"❌ WapiPay router import error: {e}")
+    routers_available['wapipay'] = None
+
+try:
+    from backend.api.routes.wapipay_webhooks import router as wapipay_webhooks_router
+    routers_available['wapipay_webhooks'] = wapipay_webhooks_router
+    logger.info("✅ WapiPay webhooks router imported")
+except ImportError as e:
+    logger.error(f"❌ WapiPay webhooks router import error: {e}")
+    routers_available['wapipay_webhooks'] = None
+
+try:
     from backend.api.routes.learn import router as learn_router
     routers_available['learn'] = learn_router
     logger.info("✅ Financial Literacy router imported (quests, wellbeing, guild)")
@@ -529,6 +545,19 @@ async def lifespan(app: FastAPI):
                     )
                     logger.info("✅ Multi-Chain Wallet Service initialized")
                     
+                    # Start WapiPay credit worker (polls pending virtual-account collections)
+                    try:
+                        from backend.services.wapipay_credit_worker import WapiPayCreditWorker
+                        wapipay_credit_worker = WapiPayCreditWorker(
+                            db_service=db_service,
+                            oracle_service=oracle_service,
+                        )
+                        await wapipay_credit_worker.start()
+                        app.state.wapipay_credit_worker = wapipay_credit_worker
+                        logger.info("✅ WapiPay credit worker started")
+                    except Exception as e:
+                        logger.error(f"❌ WapiPay credit worker failed to start: {e}")
+
                     # Initialize XRP Service
                     xrp_service = None
                     if xrp_services_available:
@@ -786,6 +815,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"❌ Failed to stop P2P worker: {e}")
 
+    # Stop WapiPay credit worker
+    if hasattr(app.state, 'wapipay_credit_worker'):
+        try:
+            await app.state.wapipay_credit_worker.stop()
+            logger.info("✅ WapiPay credit worker stopped")
+        except Exception as e:
+            logger.error(f"❌ Failed to stop WapiPay credit worker: {e}")
+            
     # Stop XRP monitor
     if hasattr(app.state, 'xrp_monitor'):
         try:
@@ -1018,6 +1055,15 @@ if routers_available.get('kotani'):
     if hasattr(routers_available['market'], 'quota_router'):
         app.include_router(routers_available['market'].quota_router, prefix="/api/v1")
         logger.info("Quota health router registered at /api/v1/quota")
+
+if routers_available.get('wapipay'):
+    app.include_router(routers_available['wapipay'], prefix="/api/v1", tags=["WapiPay"])
+    logger.info("✅ WapiPay router registered at /api/v1/wapipay")
+
+if routers_available.get('wapipay_webhooks'):
+    # 🚨 NO /api/v1 prefix — must match exact URLs registered on WapiPay dashboard
+    app.include_router(routers_available['wapipay_webhooks'], tags=["WapiPay Webhooks"])
+    logger.info("✅ WapiPay webhooks registered at /webhooks/wapipay/{collections,payouts}")
 
 # 🏦 Tokenization Routes (Seamount Protocol)
 try:

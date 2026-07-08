@@ -194,6 +194,48 @@ async def update_user_profile(
         logger.error(f"[Profile Update] Error [Error ID: {error_id}]: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update profile. Error ID: {error_id}")
 
+@router.post("/compliance-profile")
+async def save_compliance_profile(
+    request: Request,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    supabase=Depends(get_supabase_client)
+):
+    """
+    Save/update user compliance profile — collected once during KYC onboarding,
+    reused by WapiPay (and any future rail) for remitter fields on payment orders.
+    Zero extra UX friction: called silently from OnboardingPage's BVN/ID step.
+    """
+    try:
+        data = await request.json()
+        user_id = current_user.get('id')
+
+        payload = {
+            "user_id":         user_id,
+            "id_type":         data.get('id_type'),
+            "id_number":       data.get('id_number'),
+            "date_of_birth":   data.get('date_of_birth'),
+            "phone_number":    data.get('phone_number'),
+            "country_code":    (data.get('country_code') or 'NG').upper(),
+            "source_of_funds": data.get('source_of_funds', 'Employment'),
+            "updated_at":      datetime.now(timezone.utc).isoformat(),
+        }
+
+        result = supabase.from_("user_compliance_profiles").upsert(
+            payload,
+            on_conflict="user_id"
+        ).execute()
+
+        if not result.data:
+            raise Exception("Compliance profile upsert returned no data")
+
+        logger.info(f"[Compliance Profile] Saved for user {user_id}")
+        return {"success": True, "profile": result.data[0]}
+
+    except Exception as e:
+        error_id = str(uuid.uuid4())[:8]
+        logger.error(f"[Compliance Profile] Error [Error ID: {error_id}]: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save compliance profile. Error ID: {error_id}")
+
 @router.post("/change-password")
 async def change_password(
     request: Request,
