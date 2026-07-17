@@ -1042,7 +1042,7 @@ class Settings(BaseSettings):
     # Operational
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
-    API_BASE_URL: str = Field(default="https://seamount-api.onrender.com")
+    API_BASE_URL: str = Field(default="https://seamount-main.onrender.com")
     FRONTEND_URL: str = Field(default="http://localhost:3000")
     
     # Business Model

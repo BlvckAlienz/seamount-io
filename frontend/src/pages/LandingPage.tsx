@@ -54,7 +54,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
 
     const fetchOracleData = async () => {
       try {
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://seamount-api.onrender.com';
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://seamount-main.onrender.com';
         const btcResponse = await fetch(`${API_BASE}/api/oracle/price/bitcoin`);
         
         if (!btcResponse.ok) {

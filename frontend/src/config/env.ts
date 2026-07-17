@@ -16,7 +16,7 @@ export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // API Configuration - CRITICAL FIX
 // Use VITE_API_BASE_URL if available, otherwise fall back to production URL
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-api.onrender.com';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://seamount-main.onrender.com';
 
 // API Keys (Optional - we have fallbacks)
 export const ALPHA_VANTAGE_API_KEY = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY || '';

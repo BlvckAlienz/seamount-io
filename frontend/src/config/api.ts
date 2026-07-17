@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 // ─── Active Server Pool — ordered by health ────────────────────────────────
 // ONLY servers that are confirmed deployed and active
 const API_POOL: string[] = [
-  'https://seamount-api.onrender.com',   // PRIMARY — confirmed warm
+  'https://seamount-main.onrender.com',   // PRIMARY — confirmed warm
   'https://seamount-io-pr8a.onrender.com',   // BACKUP  — confirmed warm
 ];
 
