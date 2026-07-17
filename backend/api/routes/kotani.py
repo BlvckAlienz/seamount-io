@@ -36,7 +36,7 @@ from backend.services.kotani_service import SEAMOUNT_TO_KOTANI, KotaniError
 router = APIRouter(prefix="/kotani", tags=["Kotani Pay"])
 logger = logging.getLogger(__name__)
 
-CALLBACK_BASE = "https://seamount-api.onrender.com/api/v1/kotani/webhook"
+CALLBACK_BASE = "https://seamount-main.onrender.com/api/v1/kotani/webhook"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────

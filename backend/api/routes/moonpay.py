@@ -334,7 +334,7 @@ async def moonpay_webhook(
     """
     Handle MoonPay transaction webhooks.
     Register URL in MoonPay Dashboard → Developers → Webhooks:
-    https://seamount-api.onrender.com/api/v1/moonpay/webhook
+    https://seamount-main.onrender.com/api/v1/moonpay/webhook
     """
     raw_body   = await request.body()
     sig_header = request.headers.get('moonpay-signature-v2', '')
