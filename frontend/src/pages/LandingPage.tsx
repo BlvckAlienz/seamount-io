@@ -191,7 +191,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       title: "🌐 Digital Payments & Yield",
       description: "Global settlement with multi-chain smart wallets",
       features: [
-        "Multi-chain wallets (Algorand, Bitcoin, Ethereum, Polygon, Tron, Solana)",
+        "Multi-chain wallets (Algorand, Bitcoin, Ethereum, Polygon, Solana, Tron, XRP Ledger)",
         "24/7 settlements plus earn yields (up to 8.2% APY)",
         "Local payment rails integration (Flutterwave, Paystack)",
         "Enterprise treasury management"
@@ -205,10 +205,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       title: "🗝️ Asset Tokenization",
       description: "Transform assets into digital securities and raise capital from private markets",
       features: [
-        "Raise capital through fractional ownership",
-        "Bypass traditional gatekeepers with direct access to investors",
-        "Women-led businesses gain equal visibility and opportunity",
-        "Transparent, merit-based capital allocation"
+        "Access sandbox and launchpad for RWA tokenization",
+        "Build in coordinated environment with legal, regulatory, liquidity, and banking partners",
+        "Clear pathway from idea to tokenized asset with governance, economics, and investor protection built-in",
+        "Leverage Seamount's investor network for private placements"
       ],
       icon: <PieChart className="h-12 w-12" />,
       color: "from-purple-500 to-pink-500",
@@ -233,10 +233,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
       title: "🛡️ Real-Time AML Intelligence",
       description: "On-premise AI fraud detection for every transaction",
       features: [
-        "45K+ fraud signatures: EFCC, CBN, Kenya DCI, curated typologies",
-        "Real-time embedding & cosine similarity matching",
-        "5-factor scoring: pattern, structuring, velocity, counterparty, time",
-        "Instant Suspicious Transaction Reports — anti-hallucination AI",
+        "Real-time transaction risk scoring with AI",
+        "Fraud detection and anti-money laundering (AML) compliance",
+        "Instant Suspicious Transaction Reports (STR) generation for regulators",
         "100% on-premise: zero transaction data leaves your servers"
       ],
       icon: <Shield className="h-12 w-12" />,
