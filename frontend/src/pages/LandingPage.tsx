@@ -1104,7 +1104,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onOpenAuth }) => {
             <div className="text-base sm:text-xl md:text-2xl text-gray-600 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-2">
               <p className="mb-2">Self-Custody Wallets. Crypto Investments & Yield.</p>
               <p className="font-semibold text-gray-900">
-                Unlocking growth for communities.
+                Unlocking Growth for Emerging Markets.
               </p>
             </div>
             
