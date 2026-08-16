@@ -133,7 +133,7 @@ class WDKClient:
         # 🚨 CRITICAL FIX: Correct wrong Render URL and force correct endpoint
         # ── WDK server pool — tried in order on failure ──
         self._wdk_pool = [
-            "https://seamount-wdk1.onrender.com",        # PRIMARY – active & warmed
+            "https://seamount-wdk.onrender.com",        # PRIMARY – active & warmed
             "https://seamount-wdk-ne5i.onrender.com",        # BACKUP  – active & warmed
         ]
         self._wdk_health: dict = {}  # url -> {fail_count, dead_until}
