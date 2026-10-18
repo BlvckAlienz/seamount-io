@@ -46,7 +46,7 @@ export function getActiveBase(): string {
 
 // ─── Warm-Up — ping both servers + both WDK servers ───────────────────────
 const WDK_POOL: string[] = [
-  'https://seamount-wdk.onrender.com',
+  'https://seamount-wdk1.onrender.com',
   'https://seamount-wdk-ne5i.onrender.com',  // paired with seamount-api2
 ];
 

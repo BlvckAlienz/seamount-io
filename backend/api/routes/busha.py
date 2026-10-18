@@ -25,7 +25,7 @@ from backend.services.ramp_router import get_busha_service, MARKUP_PCT
 router = APIRouter(prefix="/busha", tags=["Busha"])
 logger = logging.getLogger(__name__)
 
-CALLBACK_BASE = "https://seamount-api.onrender.com/api/v1/busha/webhook"
+CALLBACK_BASE = "https://seamount-main.onrender.com/api/v1/busha/webhook"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -378,7 +378,7 @@ async def busha_webhook(request: Request, db = Depends(get_db_service)):
     Handle Busha transfer webhooks.
     Events: transfer.funds_received, transfer.completed, transfer.failed
     Register URL in Busha dashboard → Settings → Webhooks:
-    https://seamount-api.onrender.com/api/v1/busha/webhook
+    https://seamount-main.onrender.com/api/v1/busha/webhook
     """
     try:
         raw  = await request.body()
