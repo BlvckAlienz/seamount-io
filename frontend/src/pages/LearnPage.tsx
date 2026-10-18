@@ -35,9 +35,9 @@ const OmniTerminal = () => {
     setMessages(prev => [...prev, { role: 'ai', text: '', time, isStreaming: true }]);
 
     try {
-      let baseUrl = import.meta.env.VITE_API_URL || 'https://seamount-api.onrender.com';
+      let baseUrl = import.meta.env.VITE_API_URL || 'https://seamount-main.onrender.com';
       if (baseUrl.includes('main3')) {
-          baseUrl = 'https://seamount-api.onrender.com';
+          baseUrl = 'https://seamount-main.onrender.com';
       }
 
       const response = await fetch(`${baseUrl}/api/v1/learn/quests/tutor/ask`, {
