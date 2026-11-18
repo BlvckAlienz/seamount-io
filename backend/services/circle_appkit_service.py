@@ -69,7 +69,7 @@ class CircleAppKitService:
     def _wdk_url(self) -> str:
         base = getattr(self.settings, "WDK_SERVICE_URL", None) \
             or getattr(self.settings, "WDK_API_URL",      None) \
-            or "https://seamount-wdk-ne5i.onrender.com"
+            or "https://seamount-wdk4.onrender.com"
         return base.rstrip("/")
 
     @property

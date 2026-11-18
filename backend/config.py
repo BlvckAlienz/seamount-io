@@ -648,7 +648,7 @@ class Settings(BaseSettings):
     # TETHER WDK CONFIGURATION
     # ========================================================================
     WDK_SERVICE_URL: str = Field(
-        default="https://seamount-wdk-ne5i.onrender.com",
+        default="https://seamount-wdk4.onrender.com",
         description="Your deployed WDK microservice (Node.js)"
     )
 
@@ -973,7 +973,7 @@ class Settings(BaseSettings):
     # Harbor (OwlPay) - Multi-chain crypto gateway
     HARBOR_API_KEY: Optional[SecretStr] = Field(None, env="HARBOR_API_KEY")
     HARBOR_WEBHOOK_URL: Optional[str] = Field(
-        "https://seamount-main.onrender.com/api/v1/webhooks/owlpay",
+        "https://seamount-main2.onrender.com/api/v1/webhooks/owlpay",
         env="HARBOR_WEBHOOK_URL"
     )
     # ✅ Webhook secret is OPTIONAL (Harbor doesn't provide one)
@@ -1006,7 +1006,7 @@ class Settings(BaseSettings):
         description="Pretium Tron settlement wallet address"
     )
     PRETIUM_WEBHOOK_URL: str = Field(
-        default="https://seamount-main.onrender.com/webhooks/pretium",
+        default="https://seamount-main2.onrender.com/webhooks/pretium",
         description="Pretium webhook callback URL"
     )
     PRETIUM_CALLBACK_URL: str = Field(
